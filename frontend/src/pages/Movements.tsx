@@ -7,7 +7,7 @@ import MovementForm from '../components/MovementForm'
 import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePayload } from '../components/MovementDetailModal'
 import { runAutoRecurring } from '../utils/recurringTemplates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
-import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical } from 'lucide-react'
+import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
 
@@ -37,6 +37,19 @@ const COLS = [
 type ColKey = typeof COLS[number]['key']
 
 const DEFAULT_VISIBLE = new Set<ColKey>(['date', 'name', 'type', 'amount', 'paid'])
+
+const EXPORT_FIELDS = [
+  { key: 'date',      label: 'Fecha' },
+  { key: 'bank_date', label: 'Fecha banco' },
+  { key: 'name',      label: 'Nombre' },
+  { key: 'type',      label: 'Tipo' },
+  { key: 'group',     label: 'Grupo' },
+  { key: 'money',     label: 'Importe' },
+  { key: 'paid',      label: 'Pagado' },
+  { key: 'no_count',  label: 'No contar' },
+  { key: 'notes',     label: 'Notas' },
+  { key: 'account',   label: 'Cuenta' },
+] as const
 
 function loadSet<T extends string>(key: string, fallback: Set<T>): Set<T> {
   try { const s = localStorage.getItem(key); if (s) return new Set(JSON.parse(s) as T[]) } catch { /**/ }
@@ -613,6 +626,9 @@ export default function Movements() {
   const colPickerRef = useRef<HTMLDivElement>(null)
   const yearPickerRef = useRef<HTMLDivElement>(null)
   const selectAllRef = useRef<HTMLInputElement>(null)
+  const exportPickerRef = useRef<HTMLDivElement>(null)
+  const [showExportPicker, setShowExportPicker] = useState(false)
+  const [exportFields, setExportFields] = useState<Set<string>>(() => new Set(EXPORT_FIELDS.map(f => f.key)))
   const qc = useQueryClient()
   const [dayOrder, setDayOrder] = useState<Record<string, number[]>>(() => {
     try { return JSON.parse(localStorage.getItem('movements-day-order') ?? '{}') } catch { return {} }
@@ -648,6 +664,33 @@ export default function Movements() {
   }
 
   const clearBulk = () => { setSelected(new Set()); setBulkField(''); setBulkValue('') }
+
+  function exportCSV() {
+    const selectedMvs = filteredMovements.filter(mv => selected.has(mv.id))
+    const flds = EXPORT_FIELDS.filter(f => exportFields.has(f.key))
+    const headers = flds.map(f => f.label)
+    const rows = selectedMvs.map(mv => flds.map(f => {
+      switch (f.key) {
+        case 'date':      return mv.date
+        case 'bank_date': return mv.bank_date ?? ''
+        case 'name':      return mv.name
+        case 'type':      return typeMap[mv.movement_type_id ?? 0]?.name ?? ''
+        case 'group':     return mv.label ?? ''
+        case 'money':     return String(mv.dinero)
+        case 'paid':      return mv.paid ? 'Sí' : 'No'
+        case 'no_count':  return mv.no_count ? 'Sí' : 'No'
+        case 'notes':     return mv.notes ?? ''
+        case 'account':   return mv.account_id ? (accountMap[mv.account_id] ?? '') : ''
+        default:          return ''
+      }
+    }))
+    const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = 'movimientos.csv'; a.click()
+    URL.revokeObjectURL(url)
+    setShowExportPicker(false)
+  }
 
   const bulkDelete = async () => {
     if (!confirm(`¿Eliminar ${selected.size} movimiento${selected.size > 1 ? 's' : ''}? Esta acción no se puede deshacer.`)) return
@@ -751,6 +794,8 @@ export default function Movements() {
         setShowColPicker(false)
       if (yearPickerRef.current && !yearPickerRef.current.contains(e.target as Node))
         setShowYearPicker(false)
+      if (exportPickerRef.current && !exportPickerRef.current.contains(e.target as Node))
+        setShowExportPicker(false)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -809,6 +854,7 @@ export default function Movements() {
   const typeToGroupMap = useMemo(() => Object.fromEntries(types.map(t => [t.id, t.income_expense_group_id])), [types])
   const { data: accountsSummary } = useQuery({ queryKey: ['accounts-summary'], queryFn: () => import('../api/accounts').then(m => m.getAccountsSummary()) })
   const accounts = accountsSummary?.accounts ?? []
+  const accountMap = useMemo(() => Object.fromEntries(accounts.map(a => [a.id, a.name])), [accounts])
 
   // Daily balance: balance of the main account at the END of each calendar day.
   // All movements on the same date show the same value — avoids same-day ordering issues.
@@ -1123,6 +1169,39 @@ export default function Movements() {
             <Copy className="w-3.5 h-3.5" />
             Duplicar
           </button>
+
+          <div className="relative" ref={exportPickerRef}>
+            <button onClick={() => setShowExportPicker(v => !v)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-colors ${showExportPicker ? 'bg-gray-100 dark:bg-gray-700 border-blue-300 dark:border-blue-700 text-gray-700 dark:text-gray-200' : 'bg-white dark:bg-gray-800 border-blue-200 dark:border-blue-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
+              <Download className="w-3.5 h-3.5" />
+              Exportar
+            </button>
+            {showExportPicker && (
+              <div className="absolute left-0 top-full mt-1 z-30 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-3 min-w-[190px]">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Campos</span>
+                  <div className="flex gap-2 text-xs">
+                    <button onClick={() => setExportFields(new Set(EXPORT_FIELDS.map(f => f.key)))} className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-300">Todos</button>
+                    <button onClick={() => setExportFields(new Set())} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">Ninguno</button>
+                  </div>
+                </div>
+                {EXPORT_FIELDS.map(f => (
+                  <label key={f.key} className="flex items-center gap-2 px-1 py-1 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                    <input type="checkbox" checked={exportFields.has(f.key)}
+                      onChange={() => setExportFields(prev => { const n = new Set(prev); n.has(f.key) ? n.delete(f.key) : n.add(f.key); return n })}
+                      className="rounded border-gray-300 dark:border-gray-600" />
+                    <span className="text-sm text-gray-700 dark:text-gray-300">{f.label}</span>
+                  </label>
+                ))}
+                <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                  <button onClick={exportCSV} disabled={exportFields.size === 0}
+                    className="w-full px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors disabled:opacity-40">
+                    Descargar CSV
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
 
           <div className="w-px h-4 bg-blue-200 dark:bg-blue-700 shrink-0" />
 
