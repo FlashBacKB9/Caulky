@@ -103,7 +103,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
       await updateAccountFull(account.id, {
         name: name.trim() || account.name,
         color, icon,
-        initial_balance: parseFloat(balance.replace(',', '.')) || account.initial_balance,
+        initial_balance: isNaN(parseFloat(balance.replace(',', '.'))) ? account.initial_balance : parseFloat(balance.replace(',', '.')),
       })
       if (!account.is_main) {
         const prevLinked = new Set(allTypes.filter(t => t.linked_account_id === account.id).map(t => t.id))
@@ -736,7 +736,7 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
       name: newName.trim(),
       color: newColor,
       icon: newIcon,
-      initial_balance: parseFloat(newBal.replace(',', '.')) || 0,
+      initial_balance: isNaN(parseFloat(newBal.replace(',', '.'))) ? 0 : parseFloat(newBal.replace(',', '.')),
     }),
     onSuccess: () => {
       invalidate()
