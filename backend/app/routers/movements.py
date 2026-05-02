@@ -28,7 +28,7 @@ def _enrich(mv: Movement) -> MovementRead:
     return data
 
 
-@router.get("/", response_model=list[MovementRead])
+@router.get("", response_model=list[MovementRead])
 async def list_movements(
     year: int | None = Query(None),
     month: int | None = Query(None),
@@ -49,7 +49,7 @@ async def list_movements(
     return [_enrich(mv) for mv in result.scalars().all()]
 
 
-@router.post("/", response_model=MovementRead, status_code=201)
+@router.post("", response_model=MovementRead, status_code=201)
 async def create_movement(body: MovementCreate, db: AsyncSession = Depends(get_db)):
     mv = Movement(**body.model_dump())
     db.add(mv)

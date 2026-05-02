@@ -69,7 +69,7 @@ async def _build_account_items(db: AsyncSession) -> list[AccountRead]:
     return items
 
 
-@router.get("/", response_model=list[AccountRead])
+@router.get("", response_model=list[AccountRead])
 async def list_accounts(db: AsyncSession = Depends(get_db)):
     return await _build_account_items(db)
 
@@ -81,7 +81,7 @@ async def accounts_summary(db: AsyncSession = Depends(get_db)):
     return {"accounts": items, "total": total}
 
 
-@router.post("/", response_model=AccountRead, status_code=201)
+@router.post("", response_model=AccountRead, status_code=201)
 async def create_account(body: AccountCreate, db: AsyncSession = Depends(get_db)):
     res = await db.execute(select(func.max(Account.sort_order)))
     max_order = res.scalar() or 0

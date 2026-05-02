@@ -15,7 +15,7 @@ def _with_color(mt: MovementType) -> MovementTypeRead:
     return data
 
 
-@router.get("/", response_model=list[MovementTypeRead])
+@router.get("", response_model=list[MovementTypeRead])
 async def list_types(db: AsyncSession = Depends(get_db)):
     result = await db.execute(
         select(MovementType)
@@ -25,7 +25,7 @@ async def list_types(db: AsyncSession = Depends(get_db)):
     return [_with_color(mt) for mt in result.scalars().all()]
 
 
-@router.post("/", response_model=MovementTypeRead, status_code=201)
+@router.post("", response_model=MovementTypeRead, status_code=201)
 async def create_type(body: MovementTypeCreate, db: AsyncSession = Depends(get_db)):
     mt = MovementType(**body.model_dump())
     db.add(mt)

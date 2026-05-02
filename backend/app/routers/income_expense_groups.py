@@ -10,13 +10,13 @@ from app.schemas.income_expense_group import (
 router = APIRouter(prefix="/groups", tags=["income_expense_groups"])
 
 
-@router.get("/", response_model=list[IncomeExpenseGroupRead])
+@router.get("", response_model=list[IncomeExpenseGroupRead])
 async def list_groups(db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(IncomeExpenseGroup).order_by(IncomeExpenseGroup.id))
     return result.scalars().all()
 
 
-@router.post("/", response_model=IncomeExpenseGroupRead, status_code=201)
+@router.post("", response_model=IncomeExpenseGroupRead, status_code=201)
 async def create_group(body: IncomeExpenseGroupCreate, db: AsyncSession = Depends(get_db)):
     group = IncomeExpenseGroup(**body.model_dump())
     db.add(group)
