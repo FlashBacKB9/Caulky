@@ -165,7 +165,7 @@ async def _seed_defaults(db: AsyncSession) -> None:
     # ── Groups ────────────────────────────────────────────────────────────────
     groups_data = [
         {"name": "Ingreso",       "color": "#22c55e"},
-        {"name": "Ahorro",        "color": "#3b82f6"},
+        {"name": "Ahorro",        "color": "#d97706"},
         {"name": "Vivienda",      "color": "#f97316"},
         {"name": "Alimentación",  "color": "#eab308"},
         {"name": "Transporte",    "color": "#8b5cf6"},

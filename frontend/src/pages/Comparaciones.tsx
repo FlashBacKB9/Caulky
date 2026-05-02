@@ -383,22 +383,35 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
 
   const gTotal = (d: AnnualData, name: string) => d.groups.find(g => g.name === name)?.total ?? null
 
-  const fmtV = (v: number | null, abs = false) => {
-    if (v === null || v === 0) return <span className="text-gray-300 dark:text-gray-600">—</span>
-    return <>{fmt(abs ? Math.abs(v) : v)}</>
-  }
-
   const TH  = 'px-3 py-2 text-right text-[11px] font-semibold text-gray-500 dark:text-gray-400 whitespace-nowrap'
-  const TD  = 'px-3 py-1.5 text-right text-xs font-mono whitespace-nowrap text-gray-600 dark:text-gray-300'
+  const TD  = 'px-3 py-1.5 text-right text-xs font-mono whitespace-nowrap'
   const LBL = 'px-3 py-1.5 text-xs font-medium whitespace-nowrap sticky left-0 z-10'
 
-  function GroupRow({ name, abs, className, bgClass }: { name: string; abs?: boolean; className?: string; bgClass: string }) {
+  function GroupRow({ name, mode, bgClass, labelClass }: {
+    name: string
+    mode: 'income' | 'savings' | 'signed'
+    bgClass: string
+    labelClass?: string
+  }) {
     return (
       <tr className={`hover:brightness-95 ${bgClass}`}>
-        <td className={`${LBL} ${bgClass} ${className ?? 'text-gray-600 dark:text-gray-300'}`}>{name}</td>
+        <td className={`${LBL} ${bgClass} ${labelClass ?? 'text-gray-600 dark:text-gray-300'}`}>{name}</td>
         {yearData.map(d => {
           const v = gTotal(d, name)
-          return <td key={d.year} className={`${TD} ${className ?? ''}`}>{fmtV(v, abs)}</td>
+          if (v === null || v === 0) {
+            return <td key={d.year} className={TD}><span className="text-gray-300 dark:text-gray-600">—</span></td>
+          }
+          if (mode === 'income') {
+            return <td key={d.year} className={`${TD} text-green-700 dark:text-green-400`}>{fmt(Math.abs(v))}</td>
+          }
+          if (mode === 'savings') {
+            return <td key={d.year} className={`${TD} text-gray-600 dark:text-gray-300`}>{fmt(Math.abs(v))}</td>
+          }
+          // signed: expense groups — negative=red, positive=green (devolutions)
+          if (v < 0) {
+            return <td key={d.year} className={`${TD} text-red-500 dark:text-red-400`}>{fmt(v)}</td>
+          }
+          return <td key={d.year} className={`${TD} text-green-600 dark:text-green-400`}>+{fmt(v)}</td>
         })}
       </tr>
     )
@@ -417,15 +430,19 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
           <tbody className="divide-y divide-gray-50 dark:divide-gray-800/60">
 
             {incomeNames.map(name => (
-              <GroupRow key={name} name={name} bgClass="bg-green-50/40 dark:bg-green-900/10" className="text-green-700 dark:text-green-400"/>
+              <GroupRow key={name} name={name} mode="income"
+                bgClass="bg-green-50/40 dark:bg-green-900/10"
+                labelClass="text-green-700 dark:text-green-400"/>
             ))}
 
             {savingsNames.map(name => (
-              <GroupRow key={name} name={name} abs bgClass="bg-white dark:bg-gray-900"/>
+              <GroupRow key={name} name={name} mode="savings"
+                bgClass={name === 'Ahorro' ? 'bg-amber-50/40 dark:bg-amber-900/10' : 'bg-white dark:bg-gray-900'}
+                labelClass={name === 'Ahorro' ? 'text-amber-700 dark:text-amber-500 font-medium' : undefined}/>
             ))}
 
             {expenseNames.map(name => (
-              <GroupRow key={name} name={name} abs bgClass="bg-white dark:bg-gray-900"/>
+              <GroupRow key={name} name={name} mode="signed" bgClass="bg-white dark:bg-gray-900"/>
             ))}
 
             {/* Gasto Total */}
