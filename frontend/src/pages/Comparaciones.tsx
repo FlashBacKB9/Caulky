@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueries } from '@tanstack/react-query'
 import {
   ResponsiveContainer, ComposedChart, AreaChart, Area,
@@ -115,7 +115,7 @@ function YearCard({ year, colorDot, subtitle, children }: { year: number; colorD
 
 // ── Side charts ───────────────────────────────────────────────────────────────
 
-function SideExpGroupChart({ data, displayType }: { data: AnnualData; displayType: DisplayType }) {
+function SideExpGroupChart({ data, displayType, domainMax }: { data: AnnualData; displayType: DisplayType; domainMax?: number }) {
   const { fmtK } = useCurrency()
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const groups   = expGroups(data).filter(g => Math.abs(g.total) > 0)
@@ -131,7 +131,7 @@ function SideExpGroupChart({ data, displayType }: { data: AnnualData; displayTyp
       <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" {...xProps}/>
-        <YAxis {...yProps(fmtK)}/>
+        <YAxis {...yProps(fmtK)} domain={domainMax !== undefined ? [0, domainMax] : undefined}/>
         <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={v => String(Math.round(v))}/>}/>
         <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8}
           onClick={legendClick(setHidden)}
@@ -147,7 +147,7 @@ function SideExpGroupChart({ data, displayType }: { data: AnnualData; displayTyp
   )
 }
 
-function SideExpTotalChart({ data, displayType }: { data: AnnualData; displayType: DisplayType }) {
+function SideExpTotalChart({ data, displayType, domainMax }: { data: AnnualData; displayType: DisplayType; domainMax?: number }) {
   const { fmtK, fmt } = useCurrency()
   const groups  = expGroups(data)
   const cut     = cutoff(data.year)
@@ -161,7 +161,7 @@ function SideExpTotalChart({ data, displayType }: { data: AnnualData; displayTyp
       <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" {...xProps}/>
-        <YAxis {...yProps(fmtK)}/>
+        <YAxis {...yProps(fmtK)} domain={domainMax !== undefined ? [0, domainMax] : undefined}/>
         <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
         {displayType === 'bar'  && <Bar  {...common} fill={color} radius={[3,3,0,0]}/>}
         {displayType === 'area' && <Area {...common} type="linear" stroke={color} fill={color} fillOpacity={0.12} strokeWidth={2} dot={false}/>}
@@ -171,7 +171,7 @@ function SideExpTotalChart({ data, displayType }: { data: AnnualData; displayTyp
   )
 }
 
-function SideIncomeChart({ data, displayType }: { data: AnnualData; displayType: DisplayType }) {
+function SideIncomeChart({ data, displayType, domainMax }: { data: AnnualData; displayType: DisplayType; domainMax?: number }) {
   const { fmtK, fmt } = useCurrency()
   const inc  = data.groups.find(g => g.name === 'Ingreso') ?? EMPTY_G
   const cut  = cutoff(data.year)
@@ -185,7 +185,7 @@ function SideIncomeChart({ data, displayType }: { data: AnnualData; displayType:
       <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" {...xProps}/>
-        <YAxis {...yProps(fmtK)}/>
+        <YAxis {...yProps(fmtK)} domain={domainMax !== undefined ? [0, domainMax] : undefined}/>
         <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
         {displayType === 'bar'  && <Bar  {...common} fill={color} radius={[3,3,0,0]}/>}
         {displayType === 'area' && <Area {...common} type="linear" stroke={color} fill={color} fillOpacity={0.12} strokeWidth={2} dot={false}/>}
@@ -271,12 +271,17 @@ function OvExpGroupChart({ dA, dB, yA, yB, displayType }: {
   dA: AnnualData; dB: AnnualData; yA: number; yB: number; displayType: DisplayType
 }) {
   const { fmtK } = useCurrency()
-  const [hidden, setHidden] = useState<Set<string>>(new Set())
   const gA = expGroups(dA).filter(g => Math.abs(g.total) > 0)
   const gB = expGroups(dB).filter(g => Math.abs(g.total) > 0)
   const colorMap: Record<string, string> = {}
   for (const g of [...gA, ...gB]) colorMap[g.name] = g.color
   const names  = [...new Set([...gA.map(g => g.name), ...gB.map(g => g.name)])]
+  const namesKey = names.join(',')
+
+  // Show only first category initially; reset when categories change
+  const [hidden, setHidden] = useState<Set<string>>(() => new Set(names.slice(1)))
+  useEffect(() => { setHidden(new Set(names.slice(1))) }, [namesKey])
+
   const maxCut = Math.max(cutoff(yA), cutoff(yB))
   const chartData = MONTHS.slice(0, maxCut + 1).map((m, i) => {
     const row: Record<string, number | string | null> = { month: m }
@@ -287,32 +292,46 @@ function OvExpGroupChart({ dA, dB, yA, yB, displayType }: {
     return row
   })
   if (!names.length) return <Empty/>
+
+  const customLegend = () => (
+    <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center pt-2 px-2">
+      {names.map(name => (
+        <div key={name} className="flex items-center gap-1.5 cursor-pointer select-none"
+          style={{ opacity: hidden.has(name) ? 0.35 : 1 }}
+          onClick={() => setHidden(p => toggleHidden(p, name))}>
+          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorMap[name] }}/>
+          <span className="text-[11px] text-gray-600 dark:text-gray-400"
+            style={{ textDecoration: hidden.has(name) ? 'line-through' : 'none' }}>{name}</span>
+        </div>
+      ))}
+    </div>
+  )
+
   return (
-    <ResponsiveContainer width="100%" height={320}>
+    <ResponsiveContainer width="100%" height={340}>
       <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" {...xProps}/>
         <YAxis {...yProps(fmtK)}/>
         <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={v => String(Math.round(v))}/>}/>
-        <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8}
-          onClick={legendClick(setHidden)}
-          formatter={legendFmt(hidden)}/>
+        <Legend content={customLegend}/>
         {names.flatMap(name => {
           const color = colorMap[name]
           const kA = `${name}__A`, kB = `${name}__B`
-          const cA = { key: kA, dataKey: kA, name: `${name} (${yA})`, hide: hidden.has(kA), isAnimationActive: false, connectNulls: true }
-          const cB = { key: kB, dataKey: kB, name: `${name} (${yB})`, hide: hidden.has(kB), isAnimationActive: false, connectNulls: true }
+          const isHidden = hidden.has(name)
+          const cA = { key: kA, dataKey: kA, name, hide: isHidden, isAnimationActive: false, connectNulls: true, legendType: 'none' as const }
+          const cB = { key: kB, dataKey: kB, name: `${name}__b`, hide: isHidden, isAnimationActive: false, connectNulls: true, legendType: 'none' as const }
           if (displayType === 'bar') return [
             <Bar {...cA} fill={color} maxBarSize={12} radius={[2,2,0,0]}/>,
             <Bar {...cB} fill={color} fillOpacity={0.45} maxBarSize={12} radius={[2,2,0,0]}/>,
           ]
           if (displayType === 'area') return [
-            <Area {...cA} type="linear" stroke={color} fill={color} fillOpacity={0.12} strokeWidth={2} dot={false}/>,
+            <Area {...cA} type="linear" stroke={color} fill={color} fillOpacity={0.15} strokeWidth={2} dot={false}/>,
             <Area {...cB} type="linear" stroke={color} fill={color} fillOpacity={0.05} strokeWidth={2} strokeDasharray="5 4" dot={false}/>,
           ]
           return [
             <Line {...cA} type="linear" stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 3, strokeWidth: 0 }}/>,
-            <Line {...cB} type="linear" stroke={color} strokeWidth={2} strokeDasharray="5 4" strokeOpacity={0.55} dot={false} activeDot={{ r: 3, strokeWidth: 0 }}/>,
+            <Line {...cB} type="linear" stroke={color} strokeWidth={2} strokeDasharray="5 4" strokeOpacity={0.65} dot={false} activeDot={{ r: 3, strokeWidth: 0 }}/>,
           ]
         })}
       </ComposedChart>
@@ -320,14 +339,16 @@ function OvExpGroupChart({ dA, dB, yA, yB, displayType }: {
   )
 }
 
-function OvBarChart({ dA, dB, yA, yB, kind }: {
-  dA: AnnualData; dB: AnnualData; yA: number; yB: number; kind: 'expenses-total' | 'income' | 'net'
+function OvBarChart({ dA, dB, yA, yB, kind, displayType }: {
+  dA: AnnualData; dB: AnnualData; yA: number; yB: number
+  kind: 'expenses-total' | 'income' | 'net'
+  displayType: DisplayType
 }) {
   const { fmtK, fmt } = useCurrency()
   const [hidden, setHidden] = useState<Set<string>>(new Set())
   const maxCut = Math.max(cutoff(yA), cutoff(yB))
   const colorA = kind === 'income' ? '#22c55e' : kind === 'net' ? '#3b82f6' : '#ef4444'
-  const colorB = kind === 'income' ? '#86efac' : kind === 'net' ? '#a5b4fc' : '#fca5a5'
+  const colorB = kind === 'income' ? '#16a34a' : kind === 'net' ? '#1d4ed8' : '#b91c1c'
 
   function monthVal(d: AnnualData, i: number) {
     if (kind === 'expenses-total') return Math.round(expGroups(d).reduce((s, g) => s + Math.abs(mval(g, i)), 0))
@@ -346,6 +367,9 @@ function OvBarChart({ dA, dB, yA, yB, kind }: {
   })
 
   const kA = String(yA), kB = String(yB)
+  const cA = { dataKey: kA, isAnimationActive: false as const, hide: hidden.has(kA), connectNulls: true }
+  const cB = { dataKey: kB, isAnimationActive: false as const, hide: hidden.has(kB), connectNulls: true }
+
   return (
     <ResponsiveContainer width="100%" height={320}>
       <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barGap={2}>
@@ -356,8 +380,18 @@ function OvBarChart({ dA, dB, yA, yB, kind }: {
         <Legend wrapperStyle={{ fontSize: 11 }}
           onClick={legendClick(setHidden)}
           formatter={legendFmt(hidden)}/>
-        <Bar dataKey={kA} fill={colorA} radius={[3,3,0,0]} isAnimationActive={false} hide={hidden.has(kA)} maxBarSize={32}/>
-        <Bar dataKey={kB} fill={colorB} radius={[3,3,0,0]} isAnimationActive={false} hide={hidden.has(kB)} maxBarSize={32}/>
+        {displayType === 'bar' && <>
+          <Bar {...cA} fill={colorA} radius={[3,3,0,0]} maxBarSize={32}/>
+          <Bar {...cB} fill={colorB} fillOpacity={0.6} radius={[3,3,0,0]} maxBarSize={32}/>
+        </>}
+        {displayType === 'line' && <>
+          <Line {...cA} type="linear" stroke={colorA} strokeWidth={2} dot={false} activeDot={{ r: 3, strokeWidth: 0 }}/>
+          <Line {...cB} type="linear" stroke={colorB} strokeWidth={2} strokeDasharray="5 4" dot={false} activeDot={{ r: 3, strokeWidth: 0 }}/>
+        </>}
+        {displayType === 'area' && <>
+          <Area {...cA} type="linear" stroke={colorA} fill={colorA} fillOpacity={0.12} strokeWidth={2} dot={false}/>
+          <Area {...cB} type="linear" stroke={colorB} fill={colorB} fillOpacity={0.07} strokeWidth={2} strokeDasharray="5 4" dot={false}/>
+        </>}
       </ComposedChart>
     </ResponsiveContainer>
   )
@@ -599,6 +633,33 @@ export default function Comparaciones() {
   const effectiveMode = canOverlay ? mode : 'side'
   const distMonthIdx  = kind === 'distribution' && period === 'month' ? month : undefined
 
+  // Shared Y-axis max so side-by-side charts are visually comparable
+  const sharedYMax = useMemo(() => {
+    if (!dA || !dB || effectiveMode !== 'side') return undefined
+    const monthMax = (d: AnnualData, getValue: (d: AnnualData, i: number) => number) => {
+      const cut = cutoff(d.year)
+      let max = 0
+      for (let i = 0; i <= cut; i++) max = Math.max(max, getValue(d, i))
+      return max
+    }
+    if (kind === 'expenses-group') {
+      const val = (d: AnnualData, i: number) => {
+        const gs = expGroups(d).filter(g => Math.abs(g.total) > 0)
+        return gs.reduce((mx, g) => Math.max(mx, Math.abs(mval(g, i))), 0)
+      }
+      return Math.max(monthMax(dA, val), monthMax(dB, val)) * 1.1
+    }
+    if (kind === 'expenses-total') {
+      const val = (d: AnnualData, i: number) => expGroups(d).reduce((s, g) => s + Math.abs(mval(g, i)), 0)
+      return Math.max(monthMax(dA, val), monthMax(dB, val)) * 1.1
+    }
+    if (kind === 'income') {
+      const val = (d: AnnualData, i: number) => Math.abs(mval(d.groups.find(g => g.name === 'Ingreso') ?? EMPTY_G, i))
+      return Math.max(monthMax(dA, val), monthMax(dB, val)) * 1.1
+    }
+    return undefined
+  }, [dA, dB, kind, effectiveMode])
+
   const selCls = (active: boolean) =>
     `px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${active
       ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900'
@@ -611,9 +672,9 @@ export default function Comparaciones() {
 
   function renderSide(d: AnnualData) {
     switch (kind) {
-      case 'expenses-group': return <SideExpGroupChart data={d} displayType={displayType}/>
-      case 'expenses-total': return <SideExpTotalChart data={d} displayType={displayType}/>
-      case 'income':         return <SideIncomeChart   data={d} displayType={displayType}/>
+      case 'expenses-group': return <SideExpGroupChart data={d} displayType={displayType} domainMax={sharedYMax}/>
+      case 'expenses-total': return <SideExpTotalChart data={d} displayType={displayType} domainMax={sharedYMax}/>
+      case 'income':         return <SideIncomeChart   data={d} displayType={displayType} domainMax={sharedYMax}/>
       case 'net':            return <SideNetChart data={d}/>
       case 'distribution':   return <SideDistChart data={d} monthIdx={distMonthIdx}/>
     }
@@ -625,7 +686,7 @@ export default function Comparaciones() {
       case 'expenses-group': return <OvExpGroupChart dA={dA} dB={dB} yA={yearA} yB={yearB} displayType={displayType}/>
       case 'expenses-total':
       case 'income':
-      case 'net': return <OvBarChart dA={dA} dB={dB} yA={yearA} yB={yearB} kind={kind}/>
+      case 'net': return <OvBarChart dA={dA} dB={dB} yA={yearA} yB={yearB} kind={kind} displayType={displayType}/>
       default:    return null
     }
   }
@@ -652,8 +713,8 @@ export default function Comparaciones() {
 
         {sep}
 
-        {/* Display type toggle (not for distribution/net) */}
-        {kind !== 'distribution' && kind !== 'net' && (
+        {/* Display type toggle (not for distribution) */}
+        {kind !== 'distribution' && (
           <>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
               <button onClick={() => setDisplayType('line')} className={tabCls(displayType === 'line')}>
@@ -728,10 +789,17 @@ export default function Comparaciones() {
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
-          <div className="flex items-center gap-4 mb-3">
-            {[{ year: yearA, color: dotA }, { year: yearB, color: dotB }].map(({ year, color }) => (
+          <div className="flex items-center gap-5 mb-3">
+            {([{ year: yearA, color: dotA, dashed: false }, { year: yearB, color: dotB, dashed: true }] as const).map(({ year, color, dashed }) => (
               <div key={year} className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}/>
+                {kind === 'expenses-group' ? (
+                  <svg width="22" height="10" className="shrink-0">
+                    <line x1="0" y1="5" x2="22" y2="5" stroke={color} strokeWidth="2.5"
+                      strokeDasharray={dashed ? '5 4' : undefined}/>
+                  </svg>
+                ) : (
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }}/>
+                )}
                 <span className="text-sm font-semibold text-gray-700 dark:text-gray-200">{year}</span>
               </div>
             ))}
