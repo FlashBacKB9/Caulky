@@ -10,7 +10,7 @@ import {
 } from 'lucide-react'
 import {
   loadTemplates, saveTemplates, applyFormula, computeDates,
-  MONTHS_NAME, WEEKDAY_NAMES, WEEK_ORD_NAMES, WEEK_ORD_VALUES, describeRule,
+  WEEKDAY_NAMES, WEEK_ORD_NAMES, WEEK_ORD_VALUES, describeRule,
   type MovementTemplate, type RecurrenceRule, type TemplateRecurrence,
 } from '../utils/recurringTemplates'
 

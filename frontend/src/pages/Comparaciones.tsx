@@ -3,7 +3,7 @@ import { useQuery, useQueries } from '@tanstack/react-query'
 import {
   ResponsiveContainer, ComposedChart, AreaChart, Area,
   PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  Line, Bar,
+  Line, Bar, type LegendPayload,
 } from 'recharts'
 import { getAnnualStats } from '../api/stats'
 import { useCurrency } from '../hooks/useCurrency'
@@ -82,8 +82,8 @@ const yProps = (fmtK: (v: number) => string) => ({
 // ── Legend helpers ────────────────────────────────────────────────────────────
 
 function legendFmt(hidden: Set<string>) {
-  return (v: string, entry: { dataKey?: string }) => {
-    const key = entry.dataKey ?? v
+  return (v: string, entry: LegendPayload) => {
+    const key = String(entry.dataKey ?? v)
     return (
       <span style={{ opacity: hidden.has(key) ? 0.4 : 1, cursor: 'pointer', textDecoration: hidden.has(key) ? 'line-through' : 'none' }}>
         {v}
@@ -93,6 +93,9 @@ function legendFmt(hidden: Set<string>) {
 }
 function toggleHidden(prev: Set<string>, key: string): Set<string> {
   const next = new Set(prev); next.has(key) ? next.delete(key) : next.add(key); return next
+}
+function legendClick(set: React.Dispatch<React.SetStateAction<Set<string>>>) {
+  return (data: LegendPayload) => set(p => toggleHidden(p, String(data.dataKey ?? '')))
 }
 
 // ── Year card ─────────────────────────────────────────────────────────────────
@@ -129,9 +132,9 @@ function SideExpGroupChart({ data, displayType }: { data: AnnualData; displayTyp
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" {...xProps}/>
         <YAxis {...yProps(fmtK)}/>
-        <Tooltip content={p => <CT {...(p as Parameters<typeof CT>[0])} fmt={v => String(Math.round(v))}/>}/>
+        <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={v => String(Math.round(v))}/>}/>
         <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8}
-          onClick={(e: { dataKey?: string }) => setHidden(p => toggleHidden(p, e.dataKey ?? ''))}
+          onClick={legendClick(setHidden)}
           formatter={legendFmt(hidden)}/>
         {groups.map(g => {
           const common = { key: g.name, dataKey: g.name, hide: hidden.has(g.name), isAnimationActive: false }
@@ -159,7 +162,7 @@ function SideExpTotalChart({ data, displayType }: { data: AnnualData; displayTyp
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" {...xProps}/>
         <YAxis {...yProps(fmtK)}/>
-        <Tooltip content={p => <CT {...(p as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
+        <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
         {displayType === 'bar'  && <Bar  {...common} fill={color} radius={[3,3,0,0]}/>}
         {displayType === 'area' && <Area {...common} type="linear" stroke={color} fill={color} fillOpacity={0.12} strokeWidth={2} dot={false}/>}
         {displayType === 'line' && <Line {...common} type="linear" stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 3, strokeWidth: 0 }}/>}
@@ -183,7 +186,7 @@ function SideIncomeChart({ data, displayType }: { data: AnnualData; displayType:
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" {...xProps}/>
         <YAxis {...yProps(fmtK)}/>
-        <Tooltip content={p => <CT {...(p as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
+        <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
         {displayType === 'bar'  && <Bar  {...common} fill={color} radius={[3,3,0,0]}/>}
         {displayType === 'area' && <Area {...common} type="linear" stroke={color} fill={color} fillOpacity={0.12} strokeWidth={2} dot={false}/>}
         {displayType === 'line' && <Line {...common} type="linear" stroke={color} strokeWidth={2} dot={false} activeDot={{ r: 3, strokeWidth: 0 }}/>}
@@ -215,7 +218,7 @@ function SideNetChart({ data }: { data: AnnualData }) {
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" {...xProps}/>
         <YAxis {...yProps(fmtK)} domain={[min - pad, max + pad]}/>
-        <Tooltip content={p => <CT {...(p as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
+        <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
         <Area type="monotone" dataKey="Balance" stroke="#3b82f6" strokeWidth={2}
           fill={`url(#netGrad${data.year})`} dot={false} activeDot={{ r: 3, strokeWidth: 0 }} isAnimationActive={false}/>
       </AreaChart>
@@ -245,7 +248,7 @@ function SideDistChart({ data, monthIdx }: { data: AnnualData; monthIdx?: number
               <Cell key={s.name} fill={s.color} opacity={hov === null || hov === i ? 1 : 0.3} stroke="none"/>
             ))}
           </Pie>
-          <Tooltip formatter={(v: number) => [fmt(v), '']} contentStyle={{ borderRadius: 12, border: '1px solid #f3f4f6', fontSize: 12 }}/>
+          <Tooltip formatter={(v: unknown) => [fmt(v as number), '']} contentStyle={{ borderRadius: 12, border: '1px solid #f3f4f6', fontSize: 12 }}/>
         </PieChart>
       </ResponsiveContainer>
       <div className="flex flex-wrap justify-center gap-x-3 gap-y-1 px-2">
@@ -290,9 +293,9 @@ function OvExpGroupChart({ dA, dB, yA, yB, displayType }: {
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" {...xProps}/>
         <YAxis {...yProps(fmtK)}/>
-        <Tooltip content={p => <CT {...(p as Parameters<typeof CT>[0])} fmt={v => String(Math.round(v))}/>}/>
+        <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={v => String(Math.round(v))}/>}/>
         <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8}
-          onClick={(e: { dataKey?: string }) => setHidden(p => toggleHidden(p, e.dataKey ?? ''))}
+          onClick={legendClick(setHidden)}
           formatter={legendFmt(hidden)}/>
         {names.flatMap(name => {
           const color = colorMap[name]
@@ -349,9 +352,9 @@ function OvBarChart({ dA, dB, yA, yB, kind }: {
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" {...xProps}/>
         <YAxis {...yProps(fmtK)}/>
-        <Tooltip content={p => <CT {...(p as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
+        <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
         <Legend wrapperStyle={{ fontSize: 11 }}
-          onClick={(e: { dataKey?: string }) => setHidden(p => toggleHidden(p, e.dataKey ?? ''))}
+          onClick={legendClick(setHidden)}
           formatter={legendFmt(hidden)}/>
         <Bar dataKey={kA} fill={colorA} radius={[3,3,0,0]} isAnimationActive={false} hide={hidden.has(kA)} maxBarSize={32}/>
         <Bar dataKey={kB} fill={colorB} radius={[3,3,0,0]} isAnimationActive={false} hide={hidden.has(kB)} maxBarSize={32}/>
@@ -486,9 +489,9 @@ function EvolutionLineChart({ yearData }: { yearData: AnnualData[] }) {
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="year" {...xProps}/>
         <YAxis {...yProps(fmtK)}/>
-        <Tooltip content={p => <CT {...(p as Parameters<typeof CT>[0])} fmt={v => String(Math.round(v))}/>}/>
+        <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={v => String(Math.round(v))}/>}/>
         <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8}
-          onClick={(e: { dataKey?: string }) => setHidden(p => toggleHidden(p, e.dataKey ?? ''))}
+          onClick={legendClick(setHidden)}
           formatter={legendFmt(hidden)}/>
         {names.map(name => (
           <Line key={name} type="linear" dataKey={name} stroke={colorMap[name]} strokeWidth={2}
@@ -525,9 +528,9 @@ function EvolutionStackedChart({ yearData }: { yearData: AnnualData[] }) {
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="year" {...xProps}/>
         <YAxis {...yProps(fmtK)}/>
-        <Tooltip content={p => <CT {...(p as Parameters<typeof CT>[0])} fmt={v => String(Math.round(v))}/>}/>
+        <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={v => String(Math.round(v))}/>}/>
         <Legend wrapperStyle={{ fontSize: 11 }} iconType="circle" iconSize={8}
-          onClick={(e: { dataKey?: string }) => setHidden(p => toggleHidden(p, e.dataKey ?? ''))}
+          onClick={legendClick(setHidden)}
           formatter={legendFmt(hidden)}/>
         {expNames.map(name => (
           <Bar key={name} dataKey={name} fill={colorMap[name]} stackId="exp"

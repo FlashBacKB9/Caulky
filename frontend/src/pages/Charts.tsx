@@ -234,7 +234,7 @@ function DashExpLineChart({ filtered, typeToGroup, groupById, year }: ChartProps
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" tick={{ fontSize:11, fill:'#9ca3af' }} axisLine={false} tickLine={false}/>
         <YAxis tickFormatter={fmtK} tick={{ fontSize:11, fill:'#9ca3af' }} axisLine={false} tickLine={false} width={42}/>
-        <Tooltip content={p=><CT {...(p as Parameters<typeof CT>[0])} fmt={v=>String(Math.round(v))}/>}/>
+        <Tooltip content={p=><CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={v=>String(Math.round(v))}/>}/>
         <Legend wrapperStyle={{ fontSize:11, paddingTop:12 }} iconType="circle" iconSize={8}
           onClick={e=>{ const k=e.dataKey as string; setHidden(p=>{ const n=new Set(p); n.has(k)?n.delete(k):n.add(k); return n }) }}
           formatter={(v:string)=><span style={{ color:hidden.has(v)?'#d1d5db':undefined, cursor:'pointer' }}>{v}</span>}
@@ -325,7 +325,7 @@ function DashBalanceChart({ filtered, typeToGroup, groupById, year, accounts }: 
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" tick={{ fontSize:11, fill:'#9ca3af' }} axisLine={false} tickLine={false}/>
         <YAxis tickFormatter={fmtK} tick={{ fontSize:11, fill:'#9ca3af' }} axisLine={false} tickLine={false} width={48} domain={[min-pad,max+pad]}/>
-        <Tooltip formatter={(v:number)=>[fmt(v),'Balance']} labelStyle={{ color:'#6b7280', fontSize:11 }} contentStyle={{ borderRadius:12, border:'1px solid #f3f4f6', fontSize:12 }}/>
+        <Tooltip formatter={(v:unknown)=>[fmt(v as number),'Balance']} labelStyle={{ color:'#6b7280', fontSize:11 }} contentStyle={{ borderRadius:12, border:'1px solid #f3f4f6', fontSize:12 }}/>
         <Area type="linear" dataKey="balance" stroke="#3b82f6" strokeWidth={2} fill="url(#dashBalGrad)" dot={false} activeDot={{ r:4, strokeWidth:0, fill:'#3b82f6' }} isAnimationActive={false}/>
       </AreaChart>
     </ResponsiveContainer>
@@ -417,7 +417,7 @@ function DonutLayout({ data, mode, fmt, outerR, side, onLayoutChange }: {
         <div key={d.name} className="flex items-center gap-2 text-xs">
           <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }}/>
           <span className="flex-1 truncate text-gray-600 dark:text-gray-400">{d.name}</span>
-          <span className="font-mono text-gray-700 dark:text-gray-200 shrink-0">{fmt(d.value, 0)}</span>
+          <span className="font-mono text-gray-700 dark:text-gray-200 shrink-0">{fmt(d.value)}</span>
         </div>
       ))}
     </div>
@@ -589,7 +589,7 @@ function SubtypesByGroupChart({ filtered, typeToGroup, groupById, typeById, mode
     for (const mv of filtered) { if (mv.dinero>=0||!mv.movement_type_id) continue; const tid=mv.movement_type_id; if (!typeInfo[tid]) { const t=typeById[tid]; typeInfo[tid]={ name:t?.name??'?', color:t?.color??'#6b7280' } } }
     const byGroup: Record<number,Record<string,number>>={}
     for (const mv of filtered) { if (mv.dinero>=0||!mv.movement_type_id) continue; const gid=typeToGroup[mv.movement_type_id]; if (!gid) continue; const key=`t${mv.movement_type_id}`; if (!byGroup[gid]) byGroup[gid]={}; byGroup[gid][key]=(byGroup[gid][key]??0)+Math.abs(mv.dinero) }
-    const data=Object.entries(byGroup).map(([gid,vals])=>({ group:groupById[+gid]?.name??'?', ...vals })).sort((a,b)=>{ const sum=(x: typeof a)=>Object.entries(x).filter(([k])=>k.startsWith('t')).reduce((s,[,v])=>s+(v as number),0); return sum(b)-sum(a) })
+    const data=Object.entries(byGroup).map(([gid,vals])=>({ group:groupById[+gid]?.name??'?', ...vals })).sort((a,b)=>{ const sum=(x: typeof a)=>Object.entries(x).filter(([k])=>k.startsWith('t')).reduce((s,[,v])=>s+(v as unknown as number),0); return sum(b)-sum(a) })
     const subtypes=Object.entries(typeInfo).map(([id,info])=>({ key:`t${id}`, ...info }))
     return { data, subtypes }
   }, [filtered, typeToGroup, groupById, typeById])
@@ -709,7 +709,7 @@ function ResizableWrapper({ colSpan, height, onUpdateColSpan, onUpdateHeight, is
     const move = (ev: MouseEvent) => setLiveH(Math.max(150, Math.min(900, startH + ev.clientY - startY)))
     const up   = (ev: MouseEvent) => {
       window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up)
-      setLiveH(null); onUpdateHeight(Math.max(150, Math.min(900, startH + ev.clientY - startY)))
+      setLiveH(null); onUpdateHeight?.(Math.max(150, Math.min(900, startH + ev.clientY - startY)))
     }
     window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
   }
@@ -835,13 +835,6 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
   const mFmt  = def.metric==='count' ? (v: number) => String(Math.round(v)) : fmt
   const mFmtK = def.metric==='count' ? (v: number) => String(Math.round(v)) : fmtK
   const tt = (p: unknown) => <CT {...(p as Parameters<typeof CT>[0])} fmt={mFmt}/>
-
-  function setSeriesOverride(key: string, patch: Partial<Omit<SeriesOverride,'key'>>) {
-    const existing = def.overrides.find(o=>o.key===key)
-    const s = series.find(s=>s.key===key)!
-    const updated: SeriesOverride = { key, display:s.display, color:s.color, label:s.label, ...(existing??{}), ...patch }
-    upd({ overrides: existing ? def.overrides.map(o=>o.key===key?updated:o) : [...def.overrides, updated] })
-  }
 
   // permVisible = not permanently hidden via overrides (X button in builder)
   // visible     = also exclude locally toggled series (legend click)
@@ -1481,7 +1474,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                               title={s.stacked?'Dejar de apilar':'Apilar'}
                               className={`p-1.5 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${s.stacked&&s.display!=='line'&&s.display!=='hidden'?'bg-blue-500 text-white':'text-gray-400 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400'}`}
                             ><Layers className="w-3.5 h-3.5"/></button>
-                            <button onClick={()=>setSeriesOverride(s.key,{ display:s.display==='hidden'?def.defaultDisplay==='donut'?'bar':def.defaultDisplay:'hidden' })}
+                            <button onClick={()=>setSeriesOverride(s.key,{ display:s.display==='hidden'?(def.defaultDisplay==='donut'||def.defaultDisplay==='pie')?'bar':def.defaultDisplay:'hidden' })}
                               title={s.display==='hidden'?'Mostrar':'Ocultar'}
                               className={`p-1.5 rounded transition-colors ${s.display==='hidden'?'text-gray-300 hover:text-gray-500':'text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400'}`}
                             ><X className="w-3.5 h-3.5"/></button>

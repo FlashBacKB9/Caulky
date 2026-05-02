@@ -180,7 +180,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
             {ICON_KEYS.map(k => (
               <button key={k} onClick={() => setIcon(k)}
                 className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${icon === k ? 'ring-2' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                style={icon === k ? { backgroundColor: color + '20', ringColor: color } : {}}>
+                style={icon === k ? { backgroundColor: color + '20' } : {}}>
                 <AppIcon name={k} className="w-4 h-4" style={{ color: icon === k ? color : undefined }} strokeWidth={1.5} />
               </button>
             ))}
@@ -777,7 +777,7 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
               {ICON_KEYS.map(k => (
                 <button key={k} onClick={() => setNewIcon(k)}
                   className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${newIcon === k ? 'ring-2' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                  style={newIcon === k ? { backgroundColor: newColor + '20', ringColor: newColor } : {}}>
+                  style={newIcon === k ? { backgroundColor: newColor + '20' } : {}}>
                   <AppIcon name={k} className="w-4 h-4" style={{ color: newIcon === k ? newColor : undefined }} strokeWidth={1.5} />
                 </button>
               ))}
