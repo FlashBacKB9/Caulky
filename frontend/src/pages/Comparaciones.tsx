@@ -377,9 +377,10 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
     }
   }
 
-  const incomeNames  = allNames.filter(n => n === 'Ingreso')
-  const savingsNames = allNames.filter(n => ['Ahorro','Gastos Anuales','Inversión'].includes(n))
-  const expenseNames = allNames.filter(n => !EXP_SKIP.has(n))
+  const incomeNames   = allNames.filter(n => n === 'Ingreso')
+  const ahorroNames   = allNames.filter(n => n === 'Ahorro')
+  const outflowNames  = allNames.filter(n => ['Gastos Anuales','Inversión'].includes(n))
+  const expenseNames  = allNames.filter(n => !EXP_SKIP.has(n))
 
   const gTotal = (d: AnnualData, name: string) => d.groups.find(g => g.name === name)?.total ?? null
 
@@ -435,10 +436,14 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
                 labelClass="text-green-700 dark:text-green-400"/>
             ))}
 
-            {savingsNames.map(name => (
+            {ahorroNames.map(name => (
               <GroupRow key={name} name={name} mode="savings"
-                bgClass={name === 'Ahorro' ? 'bg-amber-50/40 dark:bg-amber-900/10' : 'bg-white dark:bg-gray-900'}
-                labelClass={name === 'Ahorro' ? 'text-amber-700 dark:text-amber-500 font-medium' : undefined}/>
+                bgClass="bg-amber-50/40 dark:bg-amber-900/10"
+                labelClass="text-amber-700 dark:text-amber-500 font-medium"/>
+            ))}
+
+            {outflowNames.map(name => (
+              <GroupRow key={name} name={name} mode="signed" bgClass="bg-white dark:bg-gray-900"/>
             ))}
 
             {expenseNames.map(name => (
@@ -464,8 +469,7 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
               {yearData.map(d => {
                 const income   = d.groups.find(g => g.name === 'Ingreso')?.total ?? 0
                 const expenses = expGroups(d).reduce((s, g) => s + g.total, 0)
-                const savings  = savingsNames.reduce((s, n) => s + (gTotal(d, n) ?? 0), 0)
-                const net      = income + expenses + savings
+                const net      = income + expenses
                 return (
                   <td key={d.year} className={`px-3 py-1.5 text-right text-xs font-mono font-semibold whitespace-nowrap ${net > 0 ? 'text-green-600 dark:text-green-400' : net < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-400'}`}>
                     {net !== 0 ? fmt(net) : <span className="text-gray-300 dark:text-gray-600">—</span>}
