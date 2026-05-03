@@ -1,5 +1,5 @@
 from datetime import date
-from sqlalchemy import Boolean, Date, ForeignKey, Numeric, String, Text
+from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -21,6 +21,9 @@ class Movement(Base):
     account_id: Mapped[int | None] = mapped_column(
         ForeignKey("accounts.id"), nullable=True
     )
+    is_shared: Mapped[bool] = mapped_column(Boolean, default=False)
+    shared_between: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    my_share: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
 
     movement_type: Mapped["MovementType | None"] = relationship(back_populates="movements")
     account: Mapped["Account | None"] = relationship(back_populates="movements")

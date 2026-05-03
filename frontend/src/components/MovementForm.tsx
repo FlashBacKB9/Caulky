@@ -159,6 +159,7 @@ export default function MovementForm({ onClose }: Props) {
   const [form, setForm] = useState({
     name: '', money: '', date: today, bank_date: '',
     movement_type_id: '', paid: true, no_count: false, notes: '',
+    is_shared: false, shared_between: '2', my_share: '',
   })
   const set = (field: string, value: unknown) => setForm(f => ({ ...f, [field]: value }))
 
@@ -199,11 +200,14 @@ export default function MovementForm({ onClose }: Props) {
   // ── Mutations ────────────────────────────────────────────────────────────────
   const mutation = useMutation({
     mutationFn: async () => {
+      const shared_between = form.is_shared && !form.my_share ? (parseInt(form.shared_between) || 2) : undefined
+      const my_share = form.is_shared && form.my_share ? (parseFloat(form.my_share) || undefined) : undefined
       const mv = await createMovement({
         name: form.name, money: parseFloat(form.money), date: form.date,
         bank_date: form.bank_date || undefined,
         movement_type_id: form.movement_type_id ? parseInt(form.movement_type_id) : undefined,
         paid: form.paid, no_count: form.no_count, notes: form.notes || undefined,
+        is_shared: form.is_shared, shared_between, my_share,
       })
       if (pendingFiles.length) {
         const fd = new FormData()
@@ -464,6 +468,45 @@ export default function MovementForm({ onClose }: Props) {
                   <label className={LBL}>Notas</label>
                   <textarea value={form.notes} onChange={e => set('notes', e.target.value)}
                     rows={2} placeholder="Opcional..." className={INP + ' resize-none'} />
+                </div>
+                <div>
+                  <div className="flex items-center gap-3">
+                    <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
+                      <input type="checkbox" checked={form.is_shared} onChange={e => set('is_shared', e.target.checked)} className="rounded" />
+                      Compartido
+                    </label>
+                  </div>
+                  {form.is_shared && (
+                    <div className="mt-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 space-y-2">
+                      <p className="text-xs text-blue-600 dark:text-blue-400">El importe total resta del balance. Solo tu parte cuenta en las estadísticas.</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Nº personas</label>
+                          <input type="number" min={2} max={99} className={INP}
+                            value={form.shared_between}
+                            onChange={e => setForm(f => ({ ...f, shared_between: e.target.value, my_share: '' }))}
+                            placeholder="2" />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">O mi importe</label>
+                          <input type="number" step="0.01" min={0} className={INP}
+                            value={form.my_share}
+                            onChange={e => setForm(f => ({ ...f, my_share: e.target.value, shared_between: e.target.value ? '' : f.shared_between }))}
+                            placeholder="ej. 10.00" />
+                        </div>
+                      </div>
+                      {(() => {
+                        const total = Math.abs(parseFloat(form.money) || 0)
+                        if (form.my_share) {
+                          const share = parseFloat(form.my_share) || 0
+                          return <p className="text-xs text-blue-500">Tu parte: <strong>{share.toFixed(2)}€</strong> de {total.toFixed(2)}€</p>
+                        }
+                        const n = parseInt(form.shared_between) || 2
+                        const share = total / n
+                        return <p className="text-xs text-blue-500">Tu parte: <strong>{share.toFixed(2)}€</strong> ({n} personas)</p>
+                      })()}
+                    </div>
+                  )}
                 </div>
                 <div>
                   <label className={LBL}>Adjuntos</label>

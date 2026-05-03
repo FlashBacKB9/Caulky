@@ -17,6 +17,18 @@ router = APIRouter(prefix="/stats", tags=["stats"])
 SAVINGS_GROUPS = {"Ahorro", "Gastos Anuales", "Inversión"}
 
 
+def _effective_money(mv) -> float:
+    """Money used for stats: full amount for account balance, shared part for category stats."""
+    money = float(mv.money)
+    if not mv.is_shared:
+        return money
+    if mv.shared_between and mv.shared_between > 1:
+        return money / mv.shared_between
+    if mv.my_share is not None:
+        return float(mv.my_share) * (1 if money >= 0 else -1)
+    return money
+
+
 def _groups_with_year(year: int):
     """Build a query that loads groups+types+movements filtered to the given year at the DB level."""
     return (
@@ -52,7 +64,7 @@ async def annual_stats(year: int = Query(default=date.today().year), db: AsyncSe
         for mt in group.movement_types:
             mt_monthly = {m: 0.0 for m in MONTH_NAMES}
             for mv in mt.movements:
-                dinero = compute_dinero(float(mv.money), group.name)
+                dinero = compute_dinero(_effective_money(mv), group.name)
                 for i, month_name in enumerate(MONTH_NAMES, start=1):
                     val = monthly_value(dinero, mv.date, i, mv.no_count)
                     mt_monthly[month_name] += val
@@ -121,7 +133,7 @@ async def dashboard(
             for mv in mt.movements:
                 if mv.no_count:
                     continue
-                dinero = compute_dinero(float(mv.money), group.name)
+                dinero = compute_dinero(_effective_money(mv), group.name)
                 group_annual += dinero
                 if mv.date.month == current_month:
                     group_monthly += dinero

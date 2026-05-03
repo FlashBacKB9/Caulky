@@ -18,6 +18,9 @@ export interface Movement {
   paid: boolean
   no_count: boolean
   notes?: string
+  is_shared: boolean
+  shared_between?: number
+  my_share?: number
   dinero: number
   label: string
   color: string

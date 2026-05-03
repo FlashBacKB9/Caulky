@@ -15,6 +15,9 @@ export interface DraftRow {
   paid: boolean
   no_count: boolean
   notes: string
+  is_shared: boolean
+  shared_between: string
+  my_share: string
 }
 
 export function toDraft(mv: Movement): DraftRow {
@@ -28,10 +31,15 @@ export function toDraft(mv: Movement): DraftRow {
     paid: mv.paid,
     no_count: mv.no_count,
     notes: mv.notes ?? '',
+    is_shared: mv.is_shared,
+    shared_between: String(mv.shared_between ?? 2),
+    my_share: mv.my_share != null ? String(mv.my_share) : '',
   }
 }
 
 export function draftPayload(d: DraftRow, original: Movement) {
+  const shared_between = d.is_shared && !d.my_share ? (parseInt(d.shared_between) || 2) : null
+  const my_share = d.is_shared && d.my_share ? (parseFloat(d.my_share) || null) : null
   return {
     name: d.name,
     money: parseFloat(d.money) || original.money,
@@ -41,6 +49,9 @@ export function draftPayload(d: DraftRow, original: Movement) {
     paid: d.paid,
     no_count: d.no_count,
     notes: d.notes || null,
+    is_shared: d.is_shared,
+    shared_between,
+    my_share,
   }
 }
 
@@ -165,6 +176,48 @@ export default function MovementDetailModal({ movement, types, onClose }: {
                 <button className={TOGGLE(!draft.no_count)} onClick={() => setField('no_count', false)}>No</button>
               </div>
             </div>
+          </div>
+
+          {/* Compartido */}
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Compartido</label>
+              <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
+                <button className={TOGGLE(draft.is_shared)} onClick={() => setDraft(d => ({ ...d, is_shared: true, my_share: '', shared_between: d.shared_between || '2' }))}>Sí</button>
+                <button className={TOGGLE(!draft.is_shared)} onClick={() => setDraft(d => ({ ...d, is_shared: false, shared_between: '2', my_share: '' }))}>No</button>
+              </div>
+            </div>
+            {draft.is_shared && (
+              <div className="mt-1.5 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 space-y-2">
+                <p className="text-xs text-blue-600 dark:text-blue-400">El importe total resta del balance. Solo tu parte cuenta en las estadísticas.</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Nº personas</label>
+                    <input type="number" min={2} max={99} className={IN + ' text-sm'}
+                      value={draft.shared_between}
+                      onChange={e => setDraft(d => ({ ...d, shared_between: e.target.value, my_share: '' }))}
+                      placeholder="2" />
+                  </div>
+                  <div>
+                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">O mi importe</label>
+                    <input type="number" step="0.01" min={0} className={IN + ' text-sm'}
+                      value={draft.my_share}
+                      onChange={e => setDraft(d => ({ ...d, my_share: e.target.value, shared_between: e.target.value ? '' : d.shared_between }))}
+                      placeholder="ej. 10.00" />
+                  </div>
+                </div>
+                {draft.is_shared && (() => {
+                  const total = Math.abs(parseFloat(draft.money) || 0)
+                  if (draft.my_share) {
+                    const share = parseFloat(draft.my_share) || 0
+                    return <p className="text-xs text-blue-500 dark:text-blue-400">Tu parte: <strong>{share.toFixed(2)}€</strong> de {total.toFixed(2)}€</p>
+                  }
+                  const n = parseInt(draft.shared_between) || 2
+                  const share = total / n
+                  return <p className="text-xs text-blue-500 dark:text-blue-400">Tu parte: <strong>{share.toFixed(2)}€</strong> ({n} personas)</p>
+                })()}
+              </div>
+            )}
           </div>
 
           {/* Notas */}

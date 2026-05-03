@@ -27,6 +27,9 @@ class MovementBase(BaseModel):
     paid: bool = True
     no_count: bool = False
     notes: Optional[str] = None
+    is_shared: bool = False
+    shared_between: Optional[int] = None
+    my_share: Optional[float] = None
 
 
 class MovementCreate(MovementBase):
@@ -44,6 +47,9 @@ class MovementUpdate(BaseModel):
     paid: Optional[bool] = None
     no_count: Optional[bool] = None
     notes: Optional[str] = None
+    is_shared: Optional[bool] = None
+    shared_between: Optional[int] = None
+    my_share: Optional[float] = None
 
 
 class MovementRead(MovementBase):

@@ -7,7 +7,7 @@ import MovementForm from '../components/MovementForm'
 import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePayload } from '../components/MovementDetailModal'
 import { runAutoRecurring } from '../utils/recurringTemplates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
-import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download } from 'lucide-react'
+import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
 
@@ -1410,6 +1410,12 @@ export default function Movements() {
                               onClick={e => { e.stopPropagation(); setSelectedMv(mv) }}>
                               <span className="flex items-center gap-1.5 min-w-0">
                                 <span className="truncate">{mv.name}</span>
+                                {mv.is_shared && (() => {
+                                  const label = mv.my_share != null
+                                    ? `${mv.my_share.toFixed(2)}€ tuyo`
+                                    : mv.shared_between ? `1/${mv.shared_between}` : 'compartido'
+                                  return <span title={`Compartido: ${label}`} className="flex items-center gap-0.5 text-blue-400 shrink-0"><Users className="w-3 h-3" /><span className="text-xs">{label}</span></span>
+                                })()}
                                 {mv.notes && <span title={mv.notes}><MessageSquare className="w-3 h-3 text-gray-400 shrink-0" /></span>}
                                 {mv.files.length > 0 && <span className="flex items-center gap-0.5 text-gray-400 shrink-0"><Paperclip className="w-3 h-3" /><span className="text-xs">{mv.files.length}</span></span>}
                               </span>
