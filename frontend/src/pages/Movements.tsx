@@ -167,9 +167,12 @@ function CalendarView({ movements, types }: {
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
 
   const cells: { dateStr: string; day: number; current: boolean }[] = []
+  const localDateStr = (d: Date) =>
+    `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+
   for (let i = 0; i < firstDow; i++) {
     const d = new Date(calYear, calMonth, 1 - (firstDow - i))
-    cells.push({ dateStr: d.toISOString().split('T')[0], day: d.getDate(), current: false })
+    cells.push({ dateStr: localDateStr(d), day: d.getDate(), current: false })
   }
   for (let d = 1; d <= daysInMonth; d++) {
     cells.push({ dateStr: `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`, day: d, current: true })
@@ -177,7 +180,7 @@ function CalendarView({ movements, types }: {
   const remaining = cells.length % 7 === 0 ? 0 : 7 - (cells.length % 7)
   for (let d = 1; d <= remaining; d++) {
     const nd = new Date(calYear, calMonth + 1, d)
-    cells.push({ dateStr: nd.toISOString().split('T')[0], day: d, current: false })
+    cells.push({ dateStr: localDateStr(nd), day: d, current: false })
   }
 
   const typeMap = useMemo(() => Object.fromEntries(types.map(t => [t.id, t])), [types])
