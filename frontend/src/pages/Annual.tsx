@@ -8,7 +8,7 @@ import { useCurrency } from '../hooks/useCurrency'
 const MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
 
 interface MType { id: number; name: string; monthly: Record<string,number>; total: number; media: number }
-interface Group { id: number; name: string; color: string; monthly: Record<string,number>; total: number; movement_types: MType[] }
+interface Group { id: number; name: string; color: string; monthly: Record<string,number>; total: number; media: number; movement_types: MType[] }
 
 function loadLS<T>(key: string, fallback: T): T {
   try { const s = localStorage.getItem(key); if (s) return JSON.parse(s) } catch { /**/ }
@@ -141,12 +141,12 @@ export default function Annual() {
   // ── Export ─────────────────────────────────────────────────────────────────────
 
   function exportCSV() {
-    const rows: string[][] = [['Categoría / Tipo', ...MONTHS.map(m => m.slice(0, 3)), 'Total', 'Media']]
+    const rows: string[][] = [['Categoría / Tipo', ...MONTHS.map(m => m.slice(0, 3)), 'Media', 'Total']]
     for (const g of sortedGroups) {
       if (showGroups)
-        rows.push([g.name, ...MONTHS.map(m => String(g.monthly[m] ?? 0)), String(g.total), ''])
+        rows.push([g.name, ...MONTHS.map(m => String(g.monthly[m] ?? 0)), String(Math.round(g.media)), String(g.total)])
       for (const mt of g.movement_types)
-        rows.push([showGroups ? `  ${mt.name}` : mt.name, ...MONTHS.map(m => String(mt.monthly[m] ?? 0)), String(mt.total), String(mt.media)])
+        rows.push([showGroups ? `  ${mt.name}` : mt.name, ...MONTHS.map(m => String(mt.monthly[m] ?? 0)), String(mt.media), String(mt.total)])
     }
     const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
     const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
@@ -214,8 +214,8 @@ export default function Annual() {
               <th className="w-1 px-0"></th>
               <th className="px-4 py-3 text-left min-w-[180px]">Categoría / Tipo</th>
               {MONTHS.map(m => <th key={m} className="px-3 py-3 text-right capitalize">{m.slice(0,3)}</th>)}
-              <th className="px-3 py-3 text-right">Total</th>
               <th className="px-3 py-3 text-right">Media</th>
+              <th className="px-3 py-3 text-right">Total</th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-950">
@@ -256,8 +256,8 @@ export default function Annual() {
                         {fmt(group.monthly[m])}
                       </td>
                     ))}
+                    <td className="px-3 py-2.5 text-right text-gray-400">{fmt(group.media)}</td>
                     <td className="px-3 py-2.5 text-right font-mono" style={{ color: group.color }}>{fmt(group.total)}</td>
-                    <td className="px-3 py-2.5 text-right text-gray-400">—</td>
                   </tr>
                 )}
 
@@ -287,8 +287,8 @@ export default function Annual() {
                         {fmt(mt.monthly[m])}
                       </td>
                     ))}
-                    <td className="px-3 py-1.5 text-right font-mono font-medium text-gray-700 dark:text-gray-300">{fmt(mt.total)}</td>
                     <td className="px-3 py-1.5 text-right text-gray-400">{fmt(mt.media)}</td>
+                    <td className="px-3 py-1.5 text-right font-mono font-medium text-gray-700 dark:text-gray-300">{fmt(mt.total)}</td>
                   </tr>
                 ))}
               </React.Fragment>

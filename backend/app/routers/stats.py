@@ -73,6 +73,8 @@ async def annual_stats(year: int = Query(default=date.today().year), db: AsyncSe
             })
 
         group_total = sum(group_monthly.values())
+        non_zero_group = [v for v in group_monthly.values() if v != 0]
+        group_media = group_total / len(non_zero_group) if non_zero_group else 0.0
         current_month_name = MONTH_NAMES[date.today().month - 1]
         output.append({
             "id": group.id,
@@ -82,6 +84,7 @@ async def annual_stats(year: int = Query(default=date.today().year), db: AsyncSe
             "initial_balance": float(group.initial_balance) if group.initial_balance else None,
             "monthly": group_monthly,
             "total": group_total,
+            "media": group_media,
             "absolute_total": group_total + (float(group.initial_balance) if group.initial_balance else 0),
             "current_month": group_monthly[current_month_name],
             "movement_types": types_out,
