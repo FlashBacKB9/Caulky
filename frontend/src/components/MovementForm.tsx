@@ -263,6 +263,7 @@ export default function MovementForm({ onClose }: Props) {
       bank_date: (tpl.bankDateMode ?? 'manual') === 'today' ? today : '',
       movement_type_id: tpl.movement_type_id,
       paid: tpl.paid, no_count: tpl.no_count, notes: tpl.notes,
+      is_shared: false, shared_between: '2', my_share: '',
     })
     setPanel('form')
   }

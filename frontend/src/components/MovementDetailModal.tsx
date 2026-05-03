@@ -31,7 +31,7 @@ export function toDraft(mv: Movement): DraftRow {
     paid: mv.paid,
     no_count: mv.no_count,
     notes: mv.notes ?? '',
-    is_shared: mv.is_shared,
+    is_shared: mv.is_shared ?? false,
     shared_between: String(mv.shared_between ?? 2),
     my_share: mv.my_share != null ? String(mv.my_share) : '',
   }
