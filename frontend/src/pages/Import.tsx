@@ -9,7 +9,7 @@ import { getAccountsSummary, type Account } from '../api/accounts'
 
 // ── API helpers ──────────────────────────────────────────────────────────────
 
-type ColMap = { date: number | null; name: number | null; money: number | null; bankDate: number | null; type: number | null; notes: number | null }
+type ColMap = { date: number | null; name: number | null; money: number | null; bankDate: number | null; type: number | null; notes: number | null; shared: number | null; sharedBetween: number | null; myShare: number | null }
 
 const PREVIEW_ROWS = 5
 
@@ -113,12 +113,15 @@ function StepUpload({ onParsed }: { onParsed: (r: ParseResult) => void }) {
 // ── Step 2: Map columns ──────────────────────────────────────────────────────
 
 const FIELDS = [
-  { key: 'date',     label: 'Fecha',              required: true },
-  { key: 'name',     label: 'Nombre',              required: true },
-  { key: 'money',    label: 'Importe',             required: true },
-  { key: 'bankDate', label: 'Fecha banco',         required: false },
-  { key: 'type',     label: 'Tipo de movimiento',  required: false },
-  { key: 'notes',    label: 'Notas',               required: false },
+  { key: 'date',          label: 'Fecha',              required: true },
+  { key: 'name',          label: 'Nombre',              required: true },
+  { key: 'money',         label: 'Importe',             required: true },
+  { key: 'bankDate',      label: 'Fecha banco',         required: false },
+  { key: 'type',          label: 'Tipo de movimiento',  required: false },
+  { key: 'notes',         label: 'Notas',               required: false },
+  { key: 'shared',        label: 'Compartido',          required: false },
+  { key: 'sharedBetween', label: 'Nº personas',         required: false },
+  { key: 'myShare',       label: 'Mi importe',          required: false },
 ] as const
 
 function StepColumns({
@@ -138,7 +141,7 @@ function StepColumns({
   const set = (key: keyof ColMap, val: number | null) => setColMap({ ...colMap, [key]: val })
 
   const preview = parsed.rows.slice(0, PREVIEW_ROWS)
-  const activeCols = [colMap.date, colMap.name, colMap.money, colMap.type, colMap.notes].filter(c => c !== null) as number[]
+  const activeCols = [colMap.date, colMap.name, colMap.money, colMap.type, colMap.notes, colMap.shared, colMap.sharedBetween, colMap.myShare].filter(c => c !== null) as number[]
 
   return (
     <div className="space-y-6">
@@ -388,6 +391,9 @@ function StepImport({
     col_bank_date: colMap.bankDate ?? undefined,
     col_type: colMap.type ?? undefined,
     col_notes: colMap.notes ?? undefined,
+    col_shared: colMap.shared ?? undefined,
+    col_shared_between: colMap.sharedBetween ?? undefined,
+    col_my_share: colMap.myShare ?? undefined,
     account_id: accountId ?? undefined,
     type_map: typeMap,
   }
@@ -517,7 +523,7 @@ export default function Import() {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
   const [parsed, setParsed] = useState<ParseResult | null>(null)
-  const [colMap, setColMap] = useState<ColMap>({ date: null, name: null, money: null, bankDate: null, type: null, notes: null })
+  const [colMap, setColMap] = useState<ColMap>({ date: null, name: null, money: null, bankDate: null, type: null, notes: null, shared: null, sharedBetween: null, myShare: null })
   const [typeMap, setTypeMap] = useState<Record<string, TypeMapping>>({})
   const [accountId, setAccountId] = useState<number | null>(null)
 

@@ -103,6 +103,9 @@ class RunImportRequest(BaseModel):
     col_bank_date: Optional[int] = None
     col_type: Optional[int] = None
     col_notes: Optional[int] = None
+    col_shared: Optional[int] = None
+    col_shared_between: Optional[int] = None
+    col_my_share: Optional[int] = None
     account_id: Optional[int] = None
     type_map: dict[str, TypeMapping] = {}
     dry_run: bool = False
@@ -240,6 +243,26 @@ async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db)):
             bank_date = _parse_date(raw_bank_date) if raw_bank_date else None
             notes = get(req.col_notes) or None
 
+            raw_shared = get(req.col_shared)
+            is_shared = bool(raw_shared) and raw_shared.lower() not in ('0', 'no', 'false')
+            shared_between: Optional[int] = None
+            my_share: Optional[float] = None
+            if is_shared:
+                raw_sb = get(req.col_shared_between)
+                raw_ms = get(req.col_my_share)
+                if raw_ms:
+                    try:
+                        my_share = _parse_money(raw_ms)
+                    except ValueError:
+                        pass
+                elif raw_sb:
+                    try:
+                        shared_between = int(float(raw_sb))
+                    except ValueError:
+                        pass
+                if not my_share and not shared_between:
+                    shared_between = 2
+
             type_id: Optional[int] = None
             if req.col_type is not None:
                 type_name = get(req.col_type)
@@ -270,6 +293,9 @@ async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db)):
                     paid=True,
                     no_count=False,
                     notes=notes,
+                    is_shared=is_shared,
+                    shared_between=shared_between,
+                    my_share=my_share,
                 ))
                 imported += 1
         except Exception as e:

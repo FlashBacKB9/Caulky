@@ -23,6 +23,9 @@ export interface RunImportParams {
   col_bank_date?: number
   col_type?: number
   col_notes?: number
+  col_shared?: number
+  col_shared_between?: number
+  col_my_share?: number
   account_id?: number
   type_map: Record<string, TypeMapping>
   dry_run?: boolean
