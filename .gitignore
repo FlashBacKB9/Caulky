@@ -19,6 +19,11 @@ backend/update_account_icons.py
 frontend/node_modules/
 frontend/dist/
 
+# PyInstaller output
+dist/
+build/
+*.spec.bak
+
 # OS
 .DS_Store
 Thumbs.db
