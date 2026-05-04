@@ -69,6 +69,8 @@ interface DataPoint {
   label: string
   balance: number
   net: number
+  income: number
+  expense: number
   phase: 1 | 2
   mortgageDebt?: number
   interestPaid?: number
@@ -184,7 +186,7 @@ function computeOneProjection(
     const growthI  = Math.pow(1 + phase.incomeGrowthPct  / 100, yearN)
 
     if (t === 0) {
-      points.push({ t, label, balance: Math.round(balance * 100) / 100, net: 0, phase: 1,
+      points.push({ t, label, balance: Math.round(balance * 100) / 100, net: 0, income: 0, expense: 0, phase: 1,
         mortgageDebt: hasMortgage ? Math.round(mortgageRemaining) : undefined, interestPaid: 0 })
       continue
     }
@@ -238,6 +240,8 @@ function computeOneProjection(
       t, label,
       balance:      Math.round(balance * 100) / 100,
       net:          Math.round(net * 100) / 100,
+      income:       Math.round(monthIncome * 100) / 100,
+      expense:      Math.round(monthExpense * 100) / 100,
       phase:        (phaseIdx + 1) as 1 | 2,
       mortgageDebt:  hasMortgage ? Math.round(Math.max(0, mortgageRemaining)) : undefined,
       interestPaid:  hasMortgage ? Math.round(cumulativeInterest) : undefined,
@@ -574,394 +578,211 @@ function ChartTooltip({ active, payload, label, fmt, twoPhases }: {
   )
 }
 
-function DiffTooltip({ active, payload, label, fmt }: {
-  active?: boolean; payload?: { value: number }[]; label?: string; fmt: (v: number) => string
-}) {
-  if (!active || !payload?.length) return null
-  const v = payload[0].value
+
+// ── Mortgage scenario comparison (side-by-side / overlay like Comparaciones) ──
+
+type MortgageViewMode = 'side' | 'overlay'
+type MortgageChartKind = 'balance' | 'cashflow' | 'debt'
+
+const CHART_KINDS: { id: MortgageChartKind; label: string }[] = [
+  { id: 'balance',  label: 'Balance'          },
+  { id: 'cashflow', label: 'Ingresos / Gastos' },
+  { id: 'debt',     label: 'Deuda restante'    },
+]
+
+function ScenarioCard({ title, color, children }: { title: string; color: string; children: React.ReactNode }) {
   return (
-    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg px-3 py-2 text-xs space-y-1">
-      <p className="font-semibold text-gray-700 dark:text-gray-200">{label}</p>
-      <p className={v >= 0 ? 'text-green-600 dark:text-green-400' : 'text-orange-500'}>
-        {v >= 0 ? 'Beneficio: +' : 'Coste: '}{fmt(Math.abs(v))}
-      </p>
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 flex-1 min-w-0">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: color }} />
+        <span className="text-sm font-bold text-gray-800 dark:text-white">{title}</span>
+      </div>
+      {children}
     </div>
   )
 }
 
-// ── Mortgage comparison charts ────────────────────────────────────────────────
-
-function MortgageCompareCharts({ main, noAmo, xTicks, fmt }: {
+function MortgageScenarioCompare({ main, noAmo, xTicks, fmt }: {
   main: DataPoint[]; noAmo: DataPoint[]; xTicks: string[]; fmt: (v: number, d?: number) => string
 }) {
-  const [mode, setMode] = useState<'overlay' | 'diff' | 'debt'>('overlay')
+  const [viewMode, setViewMode]   = useState<MortgageViewMode>('side')
+  const [chartKind, setChartKind] = useState<MortgageChartKind>('balance')
 
-  const overlayData = main.map((pt, i) => ({ ...pt, noAmoBalance: noAmo[i]?.balance ?? null }))
-  const diffData    = main.map((pt, i) => ({ ...pt, diff: pt.balance - (noAmo[i]?.balance ?? pt.balance) }))
-  const debtData    = main.map((pt, i) => ({
-    ...pt,
-    noAmoDebt:     noAmo[i]?.mortgageDebt ?? null,
-    noAmoInterest: noAmo[i]?.interestPaid ?? null,
+  const COLOR_MAIN  = '#3b82f6'
+  const COLOR_NOAMO = '#f97316'
+
+  const fmtK = (v: number) => Math.abs(v) >= 1000000 ? `${(v/1000000).toFixed(1)}M€` : Math.abs(v) >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v}€`
+
+  // Shared axis props
+  const xP = { dataKey: 'label' as const, ticks: xTicks, tick: { fontSize: 11 }, tickLine: false as const, axisLine: false as const }
+  const yP = (domain?: [number, number]) => ({ tickFormatter: fmtK, tick: { fontSize: 11 }, tickLine: false as const, axisLine: false as const, width: 52, ...(domain ? { domain } : {}) })
+  const gridP = { strokeDasharray: '3 3', stroke: 'currentColor', className: 'text-gray-100 dark:text-gray-800' }
+  const margP = { top: 4, right: 8, left: 0, bottom: 0 }
+
+  // Domains
+  const allBals  = [...main.map(p => p.balance),  ...noAmo.map(p => p.balance)]
+  const allIncs  = [...main.map(p => p.income),   ...noAmo.map(p => p.income)]
+  const allExps  = [...main.map(p => p.expense),  ...noAmo.map(p => p.expense)]
+  const allDebts = [...main.map(p => p.mortgageDebt ?? 0), ...noAmo.map(p => p.mortgageDebt ?? 0)]
+  const balDomain: [number, number]  = [Math.floor(Math.min(...allBals) / 5000) * 5000,  Math.ceil(Math.max(...allBals) / 5000) * 5000]
+  const cfMax = Math.ceil(Math.max(...allIncs, ...allExps) / 1000) * 1000
+  const debtMax = Math.ceil(Math.max(...allDebts) / 10000) * 10000
+
+  // Debt paid-off
+  const debtPaidMain  = main.find((p, i)  => i > 0 && (p.mortgageDebt  ?? 1) === 0 && (main[i-1]?.mortgageDebt  ?? 1) > 0)
+  const debtPaidNoAmo = noAmo.find((p, i) => i > 0 && (p.mortgageDebt  ?? 1) === 0 && (noAmo[i-1]?.mortgageDebt ?? 1) > 0)
+  const monthsSaved   = debtPaidMain && debtPaidNoAmo ? debtPaidNoAmo.t - debtPaidMain.t : null
+
+  // Interest saved
+  const intMain  = main[main.length - 1]?.interestPaid ?? 0
+  const intNoAmo = noAmo[noAmo.length - 1]?.interestPaid ?? 0
+  const intSaved = intNoAmo - intMain
+
+  // Overlay merged data
+  const overlayData = main.map((pt, i) => ({
+    label: pt.label,
+    balance: pt.balance,        noAmoBalance: noAmo[i]?.balance,
+    income:  pt.income,         noAmoIncome:  noAmo[i]?.income,
+    expense: pt.expense,        noAmoExpense: noAmo[i]?.expense,
+    debt:    pt.mortgageDebt,   noAmoDebt:    noAmo[i]?.mortgageDebt,
   }))
 
-  // Debt paid-off points
-  const debtPaidMain  = main.find((pt, i) => i > 0 && (pt.mortgageDebt ?? 1) === 0 && (main[i - 1]?.mortgageDebt ?? 1) > 0)
-  const debtPaidNoAmo = noAmo.find((pt, i) => i > 0 && (pt.mortgageDebt ?? 1) === 0 && (noAmo[i - 1]?.mortgageDebt ?? 1) > 0)
-  const monthsSaved   = debtPaidNoAmo && debtPaidMain ? debtPaidNoAmo.t - debtPaidMain.t : null
+  const tooltip = <Tooltip formatter={(v) => typeof v === 'number' ? fmt(v, 0) : String(v ?? '')} labelFormatter={l => String(l)} />
 
-  // Interest totals
-  const totalInterestMain  = main[main.length - 1]?.interestPaid ?? 0
-  const totalInterestNoAmo = noAmo[noAmo.length - 1]?.interestPaid ?? 0
-  const interestSaved      = totalInterestNoAmo - totalInterestMain
+  function SideChart({ pts, color }: { pts: DataPoint[]; color: string }) {
+    if (chartKind === 'balance') return (
+      <ResponsiveContainer width="100%" height={220}>
+        <ComposedChart data={pts} margin={margP}>
+          <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP(balDomain)} />
+          {tooltip}
+          <Area dataKey="balance" stroke={color} strokeWidth={2} fill={color + '20'} dot={false} name="Balance" />
+        </ComposedChart>
+      </ResponsiveContainer>
+    )
+    if (chartKind === 'cashflow') return (
+      <ResponsiveContainer width="100%" height={220}>
+        <ComposedChart data={pts} margin={margP}>
+          <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP([0, cfMax])} />
+          {tooltip}
+          <Line dataKey="income"  stroke="#22c55e" strokeWidth={2} dot={false} name="Ingresos" />
+          <Line dataKey="expense" stroke="#ef4444" strokeWidth={2} dot={false} name="Gastos"   />
+        </ComposedChart>
+      </ResponsiveContainer>
+    )
+    // debt
+    return (
+      <ResponsiveContainer width="100%" height={220}>
+        <ComposedChart data={pts} margin={margP}>
+          <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP([0, debtMax])} />
+          {tooltip}
+          <Area dataKey="mortgageDebt" stroke={color} strokeWidth={2} fill={color + '20'} dot={false} name="Deuda" />
+        </ComposedChart>
+      </ResponsiveContainer>
+    )
+  }
 
-  // Balance diff summary
-  const breakEven = diffData.find(pt => pt.diff > 0 && pt.t > 0)
-  const finalDiff = diffData[diffData.length - 1]?.diff ?? 0
-
-  const allBalances = [...main.map(p => p.balance), ...noAmo.map(p => p.balance)]
-  const yMin = Math.floor(Math.min(...allBalances) / 5000) * 5000
-  const yMax = Math.ceil(Math.max(...allBalances) / 5000) * 5000
-
-  const maxDebt = Math.max(...main.map(p => p.mortgageDebt ?? 0), ...noAmo.map(p => p.mortgageDebt ?? 0))
-  const debtYMax = Math.ceil(maxDebt / 10000) * 10000
-
-  const fmtK = (v: number) => Math.abs(v) >= 1000000 ? `${(v/1000000).toFixed(1)}M€` : Math.abs(v) >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v}€`
-
-  const TABS = [
-    { id: 'overlay', label: 'Balance' },
-    { id: 'diff',    label: 'Diferencia' },
-    { id: 'debt',    label: 'Deuda' },
-  ] as const
+  function OverlayChart() {
+    if (chartKind === 'balance') return (
+      <ResponsiveContainer width="100%" height={260}>
+        <ComposedChart data={overlayData} margin={margP}>
+          <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP(balDomain)} />
+          {tooltip}
+          <Line dataKey="noAmoBalance" stroke={COLOR_NOAMO} strokeWidth={2} dot={false} strokeDasharray="5 3" name="Sin amortizar" />
+          <Area dataKey="balance"      stroke={COLOR_MAIN}  strokeWidth={2} fill={COLOR_MAIN + '20'} dot={false} name="Con amortización" />
+        </ComposedChart>
+      </ResponsiveContainer>
+    )
+    if (chartKind === 'cashflow') return (
+      <ResponsiveContainer width="100%" height={260}>
+        <ComposedChart data={overlayData} margin={margP}>
+          <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP([0, cfMax])} />
+          {tooltip}
+          <Line dataKey="income"     stroke="#22c55e" strokeWidth={2} dot={false} name="Ingresos"              />
+          <Line dataKey="expense"    stroke="#ef4444" strokeWidth={2} dot={false} name="Gastos (con amort.)"   />
+          <Line dataKey="noAmoExpense" stroke="#f97316" strokeWidth={2} dot={false} strokeDasharray="5 3" name="Gastos (sin amort.)" />
+        </ComposedChart>
+      </ResponsiveContainer>
+    )
+    return (
+      <ResponsiveContainer width="100%" height={260}>
+        <ComposedChart data={overlayData} margin={margP}>
+          <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP([0, debtMax])} />
+          {tooltip}
+          {debtPaidMain  && <ReferenceLine x={debtPaidMain.label}  stroke={COLOR_MAIN}  strokeDasharray="3 2" label={{ value: 'Pagada',       fill: COLOR_MAIN,  fontSize: 9, position: 'insideTopRight'  }} />}
+          {debtPaidNoAmo && <ReferenceLine x={debtPaidNoAmo.label} stroke={COLOR_NOAMO} strokeDasharray="3 2" label={{ value: 'Pagada sin amo.', fill: COLOR_NOAMO, fontSize: 9, position: 'insideBottomRight' }} />}
+          <Line dataKey="noAmoDebt" stroke={COLOR_NOAMO} strokeWidth={2} dot={false} strokeDasharray="5 3" name="Sin amortizar"     />
+          <Area dataKey="debt"      stroke={COLOR_MAIN}  strokeWidth={2} fill={COLOR_MAIN + '20'} dot={false} name="Con amortización" />
+        </ComposedChart>
+      </ResponsiveContainer>
+    )
+  }
 
   return (
     <div className="space-y-4">
-      {/* Summary cards */}
+      {/* Summary chips */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">Interés ahorrado</p>
-          <p className="text-sm font-semibold text-green-600 dark:text-green-400">
-            {interestSaved > 0 ? `−${fmt(interestSaved, 0)}` : fmt(interestSaved, 0)}
-          </p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {fmt(totalInterestMain, 0)} vs {fmt(totalInterestNoAmo, 0)} sin amortizar
-          </p>
+          <p className="text-xs text-gray-400 mb-1">Interés ahorrado</p>
+          <p className="text-sm font-semibold text-green-600 dark:text-green-400">{intSaved > 0 ? `−${fmt(intSaved, 0)}` : fmt(intSaved, 0)}</p>
+          <p className="text-xs text-gray-400 mt-0.5">{fmt(intMain, 0)} vs {fmt(intNoAmo, 0)} sin amortizar</p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
-          <p className="text-xs text-gray-400 dark:text-gray-500 mb-1">
-            {monthsSaved != null ? 'Años ahorrados' : 'Punto de equilibrio'}
-          </p>
+          <p className="text-xs text-gray-400 mb-1">{monthsSaved != null ? 'Tiempo ahorrado' : 'Hipoteca pagada'}</p>
           <p className="text-sm font-semibold text-gray-800 dark:text-white">
-            {monthsSaved != null
-              ? `${Math.floor(monthsSaved / 12)}a ${monthsSaved % 12}m antes`
-              : breakEven ? breakEven.label : 'Fuera del horizonte'}
+            {monthsSaved != null ? `${Math.floor(monthsSaved/12)}a ${monthsSaved%12}m antes` : debtPaidMain?.label ?? 'Fuera del horizonte'}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">
-            {monthsSaved != null
-              ? `Hipoteca pagada en ${debtPaidMain?.label ?? '?'} vs ${debtPaidNoAmo?.label ?? '?'}`
-              : breakEven ? `Mes ${breakEven.t} — balance empieza a superar sin amortizar` : ''}
+            {monthsSaved != null ? `${debtPaidMain?.label ?? '?'} vs ${debtPaidNoAmo?.label ?? '?'}` : ''}
           </p>
         </div>
       </div>
 
-      {/* Chart panel */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Comparación de amortización</p>
-          <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
-            {TABS.map(tab => (
-              <button key={tab.id} onClick={() => setMode(tab.id)}
-                className={`px-2.5 py-1 text-xs font-medium transition-colors ${mode === tab.id ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                {tab.label}
-              </button>
-            ))}
+      {/* Controls */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          {CHART_KINDS.map(k => (
+            <button key={k.id} onClick={() => setChartKind(k.id)}
+              className={`px-3 py-1.5 text-xs font-medium transition-colors ${chartKind === k.id ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+              {k.label}
+            </button>
+          ))}
+        </div>
+        <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+          <button onClick={() => setViewMode('side')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === 'side' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+            <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="6" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="2" width="6" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/></svg>
+            Lado a lado
+          </button>
+          <button onClick={() => setViewMode('overlay')}
+            className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === 'overlay' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+            <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/><path d="M1 7h14" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2"/></svg>
+            Superponer
+          </button>
+        </div>
+      </div>
+
+      {/* Charts */}
+      {viewMode === 'side' ? (
+        <div className="flex gap-4">
+          <ScenarioCard title="Con amortización" color={COLOR_MAIN}>
+            <SideChart pts={main} color={COLOR_MAIN} />
+          </ScenarioCard>
+          <ScenarioCard title="Sin amortizar" color={COLOR_NOAMO}>
+            <SideChart pts={noAmo} color={COLOR_NOAMO} />
+          </ScenarioCard>
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
+          <div className="flex items-center gap-4 text-xs text-gray-400">
+            <span className="flex items-center gap-1.5"><span className="inline-block w-5 h-0.5" style={{ backgroundColor: COLOR_MAIN }} /> Con amortización</span>
+            <span className="flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed" style={{ borderColor: COLOR_NOAMO }} /> Sin amortizar</span>
           </div>
+          <OverlayChart />
         </div>
-
-        {mode === 'overlay' && (
-          <>
-            <div className="h-60">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={overlayData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-gray-100 dark:text-gray-800" />
-                  <XAxis dataKey="label" ticks={xTicks} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis domain={[yMin, yMax]} tickFormatter={fmtK} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={56} />
-                  <Tooltip content={<ChartTooltip fmt={v => fmt(v, 0)} twoPhases={false} />} />
-                  <Line dataKey="noAmoBalance" stroke="#f97316" strokeWidth={2} dot={false} strokeDasharray="4 2" />
-                  <Area dataKey="balance" stroke="#3b82f6" strokeWidth={2} fill="#3b82f620" dot={false} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-gray-400">
-              <span className="flex items-center gap-1.5"><span className="inline-block w-5 h-0.5 bg-blue-500" /> Con amortización</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed border-orange-400" /> Sin amortizar</span>
-            </div>
-          </>
-        )}
-
-        {mode === 'diff' && (
-          <>
-            <div className="h-60">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={diffData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="diffPos" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#22c55e" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#22c55e" stopOpacity={0.02} />
-                    </linearGradient>
-                    <linearGradient id="diffNeg" x1="0" y1="1" x2="0" y2="0">
-                      <stop offset="5%"  stopColor="#f97316" stopOpacity={0.3} />
-                      <stop offset="95%" stopColor="#f97316" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-gray-100 dark:text-gray-800" />
-                  <XAxis dataKey="label" ticks={xTicks} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis tickFormatter={fmtK} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={56} />
-                  <Tooltip content={<DiffTooltip fmt={v => fmt(v, 0)} />} />
-                  <ReferenceLine y={0} stroke="#9ca3af" strokeDasharray="3 2" />
-                  {breakEven && <ReferenceLine x={breakEven.label} stroke="#22c55e" strokeDasharray="3 2" label={{ value: 'Equilibrio', fill: '#22c55e', fontSize: 10 }} />}
-                  <Area dataKey="diff" stroke="#3b82f6" strokeWidth={2} dot={false}
-                    fill={finalDiff >= 0 ? 'url(#diffPos)' : 'url(#diffNeg)'} />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="text-xs text-gray-400">Positivo = amortizar adelanta tu balance. Negativo = el coste del capital extra aún no compensa.</p>
-          </>
-        )}
-
-        {mode === 'debt' && (
-          <>
-            <div className="h-60">
-              <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={debtData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="debtGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%"  stopColor="#3b82f6" stopOpacity={0.15} />
-                      <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.02} />
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-gray-100 dark:text-gray-800" />
-                  <XAxis dataKey="label" ticks={xTicks} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-                  <YAxis domain={[0, debtYMax]} tickFormatter={fmtK} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={56} />
-                  <Tooltip formatter={(v) => typeof v === 'number' ? fmt(v, 0) : String(v ?? '')} labelFormatter={(l) => l} />
-                  {debtPaidMain  && <ReferenceLine x={debtPaidMain.label}  stroke="#3b82f6" strokeDasharray="3 2" label={{ value: 'Pagada', fill: '#3b82f6', fontSize: 9, position: 'insideTopRight' }} />}
-                  {debtPaidNoAmo && <ReferenceLine x={debtPaidNoAmo.label} stroke="#f97316" strokeDasharray="3 2" label={{ value: 'Pagada (sin amo.)', fill: '#f97316', fontSize: 9, position: 'insideBottomRight' }} />}
-                  <Line dataKey="noAmoDebt" stroke="#f97316" strokeWidth={2} dot={false} strokeDasharray="4 2" name="Sin amortizar" />
-                  <Area dataKey="mortgageDebt" stroke="#3b82f6" strokeWidth={2} fill="url(#debtGrad)" dot={false} name="Con amortización" />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="flex items-center gap-4 text-xs text-gray-400">
-              <span className="flex items-center gap-1.5"><span className="inline-block w-5 h-0.5 bg-blue-500" /> Deuda con amortización</span>
-              <span className="flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed border-orange-400" /> Deuda sin amortizar</span>
-            </div>
-            <div className="grid grid-cols-2 gap-3 pt-1">
-              <div className="rounded-lg bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 px-3 py-2">
-                <p className="text-xs text-gray-400 mb-0.5">Interés total pagado</p>
-                <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">{fmt(totalInterestMain, 0)}</p>
-                <p className="text-xs text-gray-400">Con amortización</p>
-              </div>
-              <div className="rounded-lg bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800 px-3 py-2">
-                <p className="text-xs text-gray-400 mb-0.5">Interés total pagado</p>
-                <p className="text-sm font-semibold text-orange-500">{fmt(totalInterestNoAmo, 0)}</p>
-                <p className="text-xs text-gray-400">Sin amortizar</p>
-              </div>
-            </div>
-          </>
-        )}
-      </div>
+      )}
     </div>
   )
 }
-
-// ── Mortgage strategy comparison ──────────────────────────────────────────────
-
-const STRATEGY_COLORS = ['#ef4444', '#3b82f6', '#a855f7', '#eab308']
-
-interface StrategyResult {
-  label: string
-  points: DataPoint[]
-  perYear: number
-  color: string
-}
-
-function buildStrategies(cfg: Config, autoIncome: number, autoExpense: number): StrategyResult[] {
-  const m2 = cfg.phases[1].mortgage
-  const presets = [
-    { label: 'Sin amortización', perYear: 0 },
-    { label: 'Moderada (3K/año)', perYear: 3000 },
-    { label: 'Agresiva (6K/año)', perYear: 6000 },
-  ]
-  const customPerYear = m2.amortize ? m2.amortizePerYear : 0
-  const hasCustom = !presets.some(p => p.perYear === customPerYear) && customPerYear > 0
-  if (hasCustom) presets.push({ label: `Personalizado (${(customPerYear / 1000).toFixed(0)}K/año)`, perYear: customPerYear })
-
-  return presets.map((p, i) => {
-    const withAmo = p.perYear > 0
-    const points = computeOneProjection(cfg, autoIncome, autoExpense, withAmo, p.perYear)
-    return { label: p.label, points, perYear: p.perYear, color: STRATEGY_COLORS[i] ?? '#6b7280' }
-  })
-}
-
-function MortgageStrategyComparison({ cfg, autoIncome, autoExpense, fmt }: {
-  cfg: Config; autoIncome: number; autoExpense: number; fmt: (v: number, d?: number) => string
-}) {
-  const m2 = cfg.phases[1].mortgage
-  const strategies = useMemo(
-    () => buildStrategies(cfg, autoIncome, autoExpense),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [JSON.stringify(cfg), autoIncome, autoExpense]
-  )
-
-  const basePoints = strategies[0].points
-  const fmtK = (v: number) => Math.abs(v) >= 1000000 ? `${(v/1000000).toFixed(1)}M€` : Math.abs(v) >= 1000 ? `${(v/1000).toFixed(0)}k€` : `${v}€`
-
-  // Merged chart data
-  const chartData = basePoints.map((pt, i) => {
-    const row: Record<string, number | string> = { label: pt.label, t: pt.t }
-    strategies.forEach(s => {
-      row[`debt_${s.label}`]    = Math.max(0, s.points[i]?.mortgageDebt ?? 0)
-      row[`balance_${s.label}`] = s.points[i]?.balance ?? 0
-    })
-    return row
-  })
-
-  // Table stats per strategy
-  const rows = strategies.map(s => {
-    const paidIdx = s.points.findIndex((p, i) => i > 0 && (p.mortgageDebt ?? 1) === 0 && (s.points[i-1]?.mortgageDebt ?? 1) > 0)
-    const paidPt  = paidIdx >= 0 ? s.points[paidIdx] : null
-    const last    = s.points[s.points.length - 1]
-    const baseRow = strategies[0]
-    const basePaidIdx = baseRow.points.findIndex((p, i) => i > 0 && (p.mortgageDebt ?? 1) === 0 && (baseRow.points[i-1]?.mortgageDebt ?? 1) > 0)
-    const monthsSaved = paidIdx >= 0 && basePaidIdx >= 0 ? basePaidIdx - paidIdx : null
-    return {
-      label:           s.label,
-      color:           s.color,
-      perYear:         s.perYear,
-      finLabel:        paidPt?.label ?? '—',
-      meses:           paidIdx >= 0 ? paidIdx : (basePaidIdx >= 0 ? basePaidIdx : m2.termYears * 12),
-      monthsSaved,
-      interest:        last?.interestPaid ?? 0,
-      interestSaved:   (strategies[0].points[strategies[0].points.length - 1]?.interestPaid ?? 0) - (last?.interestPaid ?? 0),
-      amortExtra:      last?.amortExtraCum ?? 0,
-      costeTotal:      m2.amount + (last?.interestPaid ?? 0),
-    }
-  })
-
-  const maxDebt   = Math.max(...strategies.flatMap(s => s.points.map(p => p.mortgageDebt ?? 0)))
-  const debtYMax  = Math.ceil(maxDebt / 10000) * 10000
-  const allBals   = strategies.flatMap(s => s.points.map(p => p.balance))
-  const balYMin   = Math.floor(Math.min(...allBals) / 10000) * 10000
-  const balYMax   = Math.ceil(Math.max(...allBals) / 10000) * 10000
-
-  const xTicks = useMemo(() => {
-    const step = cfg.projectionYears <= 5 ? 6 : cfg.projectionYears <= 10 ? 12 : 24
-    return basePoints.filter(p => p.t % step === 0).map(p => p.label)
-  }, [basePoints, cfg.projectionYears])
-
-  return (
-    <div className="space-y-4">
-      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Comparativa amortización</p>
-
-      {/* Table */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-x-auto">
-        <table className="w-full text-xs min-w-[640px]">
-          <thead>
-            <tr className="border-b border-gray-100 dark:border-gray-800">
-              <th className="text-left px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400">Estrategia</th>
-              <th className="text-right px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400">Fin hipoteca</th>
-              <th className="text-right px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400">Meses</th>
-              <th className="text-right px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400">Ahorro tiempo</th>
-              <th className="text-right px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400">Intereses</th>
-              <th className="text-right px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400">Ahorro intereses</th>
-              <th className="text-right px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400">Amort. extra</th>
-              <th className="text-right px-3 py-2.5 font-medium text-gray-500 dark:text-gray-400">Coste total</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
-            {rows.map(r => (
-              <tr key={r.label} className="hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
-                <td className="px-3 py-2.5 font-medium whitespace-nowrap" style={{ color: r.color }}>
-                  {r.label}{r.perYear === 0 && ' ✓'}
-                </td>
-                <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-300">{r.finLabel}</td>
-                <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-300">{r.meses}</td>
-                <td className="px-3 py-2.5 text-right">
-                  {r.monthsSaved != null && r.monthsSaved > 0
-                    ? <span className="text-green-600 dark:text-green-400">{Math.floor(r.monthsSaved/12)}a {r.monthsSaved%12}m antes</span>
-                    : <span className="text-gray-400">—</span>}
-                </td>
-                <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-300">{fmt(r.interest, 0)}</td>
-                <td className="px-3 py-2.5 text-right">
-                  {r.interestSaved > 0
-                    ? <span className="text-green-600 dark:text-green-400">+{fmt(r.interestSaved, 0)}</span>
-                    : <span className="text-gray-400">—</span>}
-                </td>
-                <td className="px-3 py-2.5 text-right text-gray-500 dark:text-gray-400">{r.amortExtra > 0 ? fmt(r.amortExtra, 0) : '—'}</td>
-                <td className="px-3 py-2.5 text-right text-gray-600 dark:text-gray-300">{fmt(r.costeTotal, 0)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Debt chart */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Deuda restante: todas las estrategias</p>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-gray-100 dark:text-gray-800" />
-              <XAxis dataKey="label" ticks={xTicks} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis domain={[0, debtYMax]} tickFormatter={fmtK} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={56} />
-              <Tooltip formatter={(v) => typeof v === 'number' ? fmt(v, 0) : String(v ?? '')} labelFormatter={l => String(l)} />
-              {strategies.map(s => (
-                <Line key={s.label} dataKey={`debt_${s.label}`} stroke={s.color} strokeWidth={2}
-                  dot={false} name={s.label}
-                  strokeDasharray={s.perYear === 0 ? undefined : undefined} />
-              ))}
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {strategies.map(s => (
-            <span key={s.label} className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-              <span className="inline-block w-5 h-0.5" style={{ backgroundColor: s.color }} />
-              {s.label}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {/* Balance chart */}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
-        <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Balance total: sin vs con amortización</p>
-        <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <ComposedChart data={chartData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="currentColor" className="text-gray-100 dark:text-gray-800" />
-              <XAxis dataKey="label" ticks={xTicks} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} />
-              <YAxis domain={[balYMin, balYMax]} tickFormatter={fmtK} tick={{ fontSize: 11 }} tickLine={false} axisLine={false} width={56} />
-              <Tooltip formatter={(v) => typeof v === 'number' ? fmt(v, 0) : String(v ?? '')} labelFormatter={l => String(l)} />
-              {strategies.map(s => (
-                <Line key={s.label} dataKey={`balance_${s.label}`} stroke={s.color} strokeWidth={2}
-                  dot={false} name={s.label} />
-              ))}
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          {strategies.map(s => (
-            <span key={s.label} className="flex items-center gap-1.5 text-xs text-gray-500 dark:text-gray-400">
-              <span className="inline-block w-5 h-0.5" style={{ backgroundColor: s.color }} />
-              {s.label}
-            </span>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function Projection() {
@@ -1348,18 +1169,11 @@ export default function Projection() {
             })}
           </div>
 
-          {/* Mortgage comparison charts */}
+          {/* Mortgage scenario comparison */}
           {showMortgageCharts && projResult.noAmo && (
-            <MortgageCompareCharts
+            <MortgageScenarioCompare
               main={points} noAmo={projResult.noAmo}
-              xTicks={xTicks} fmt={v => fmt(v, 0)}
-            />
-          )}
-
-          {/* Strategy comparison table + charts */}
-          {cfg.twoPhases && cfg.phases[1].mortgage.enabled && cfg.phases[1].mortgage.amount > 0 && (
-            <MortgageStrategyComparison
-              cfg={cfg} autoIncome={autoIncome} autoExpense={autoExpense} fmt={fmt}
+              xTicks={xTicks} fmt={fmt}
             />
           )}
         </div>
