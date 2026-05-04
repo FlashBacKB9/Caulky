@@ -136,4 +136,12 @@ Caulky/
 
 ## License
 
-MIT — do whatever you want with it.
+**CC BY-NC 4.0 — Attribution-NonCommercial**
+
+You are free to use, copy, modify and distribute this project for any **non-commercial** purpose, as long as you credit the original:
+
+> Caulky by [FlashBacKB9](https://github.com/FlashBacKB9) — https://github.com/FlashBacKB9/Caulky
+
+**You may not** sell this software, offer it as a paid service, or use it in any way that generates revenue.
+
+Full license: [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/)
