@@ -1,7 +1,9 @@
 import { useState } from 'react'
-import { NavLink } from 'react-router-dom'
-import { Wallet, Settings, Info, X, ExternalLink } from 'lucide-react'
+import { NavLink, useNavigate } from 'react-router-dom'
+import { Wallet, Settings, Info, X, ExternalLink, LogOut } from 'lucide-react'
 import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
+import { logout } from '../api/auth'
+import { useAuth } from '../context/AuthContext'
 
 function InfoModal({ onClose }: { onClose: () => void }) {
   return (
@@ -88,6 +90,14 @@ function InfoModal({ onClose }: { onClose: () => void }) {
 export default function Sidebar() {
   const navEntries = useNavConfig()
   const [showInfo, setShowInfo] = useState(false)
+  const { setUser } = useAuth()
+  const navigate = useNavigate()
+
+  async function handleLogout() {
+    await logout().catch(() => {})
+    setUser(null)
+    navigate('/login', { replace: true })
+  }
 
   const visibleLinks = navEntries
     .filter(e => e.visible && PAGE_META[e.id])
@@ -137,6 +147,13 @@ export default function Sidebar() {
           >
             <Info className="w-4 h-4" strokeWidth={1.5} />
             Acerca de
+          </button>
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-400 dark:text-gray-500 hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+          >
+            <LogOut className="w-4 h-4" strokeWidth={1.5} />
+            Cerrar sesión
           </button>
         </div>
       </aside>
