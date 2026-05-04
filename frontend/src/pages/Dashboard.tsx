@@ -409,29 +409,22 @@ function CyclingBalanceHistoryChart({ accounts, movements, movementTypes, height
 
   return (
     <div className="h-full flex flex-col">
-      <div className="flex items-center justify-between mb-3">
-        <button onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={safeIdx === 0}
-          className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 transition-colors">
-          <ChevronLeft className="w-4 h-4" />
-        </button>
-        <div className="text-center">
+      <div className="flex items-center justify-between mb-2">
+        <button onClick={() => setIdx(i => (i + 1) % accounts.length)}
+          className="text-center flex-1 hover:opacity-70 transition-opacity cursor-pointer">
           <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: acc.color }}>{acc.name}</p>
           <p className="text-lg font-bold text-gray-800 dark:text-white tabular-nums">{fmt(acc.balance)}</p>
-        </div>
-        <button onClick={() => setIdx(i => Math.min(accounts.length - 1, i + 1))} disabled={safeIdx === accounts.length - 1}
-          className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 transition-colors">
-          <ChevronRight className="w-4 h-4" />
         </button>
-      </div>
-      <div className="flex justify-center gap-1 mb-2">
-        {accounts.map((_, i) => (
-          <button key={i} onClick={() => setIdx(i)}
-            className={`w-1.5 h-1.5 rounded-full transition-colors ${i === safeIdx ? 'opacity-100' : 'opacity-30'}`}
-            style={{ backgroundColor: accounts[i].color }} />
-        ))}
+        <div className="flex gap-1 shrink-0 ml-3">
+          {accounts.map((_, i) => (
+            <button key={i} onClick={() => setIdx(i)}
+              className={`w-1.5 h-1.5 rounded-full transition-colors ${i === safeIdx ? 'opacity-100' : 'opacity-30'}`}
+              style={{ backgroundColor: accounts[i].color }} />
+          ))}
+        </div>
       </div>
       <div className="flex-1">
-        <BalanceLineChart data={chartData} lines={[{ key: acc.name, color: acc.color }]} height={height - 80} />
+        <BalanceLineChart data={chartData} lines={[{ key: acc.name, color: acc.color }]} height={height - 60} />
       </div>
     </div>
   )
