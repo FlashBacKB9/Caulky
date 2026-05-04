@@ -6,9 +6,10 @@ import {
 } from 'recharts'
 import {
   TrendingUp, Plus, Trash2, Copy, Sparkles, Bookmark,
-  BookmarkCheck, ChevronDown, ChevronUp, Info, Target, X, ChevronRight,
+  BookmarkCheck, ChevronDown, ChevronUp, Info, Target, X, ChevronRight, Landmark,
 } from 'lucide-react'
 import { getMovements } from '../api/movements'
+import { getAccountsSummary } from '../api/accounts'
 import { useCurrency } from '../hooks/useCurrency'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -429,6 +430,9 @@ export default function Projection() {
 
   // ── Auto-mode: fetch and aggregate movements ────────────────────────────────
 
+  const accountsQuery = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
+  const accountsTotal = accountsQuery.data?.total ?? null
+
   const yearsToFetch = Array.from({ length: cfg.autoYears }, (_, i) => new Date().getFullYear() - i)
   const movementsQueries = useQuery({
     queryKey: ['projection-movements', cfg.autoYears],
@@ -593,7 +597,17 @@ export default function Projection() {
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
               <div className="flex items-center gap-3 px-4 py-3">
                 <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">Balance inicial</span>
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1.5">
+                  {accountsTotal !== null && (
+                    <button
+                      onClick={() => setPatch({ initialBalance: Math.round(accountsTotal) })}
+                      title={`Usar saldo actual de cuentas (${Math.round(accountsTotal).toLocaleString('es-ES')} €)`}
+                      className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors whitespace-nowrap"
+                    >
+                      <Landmark className="w-3 h-3" />
+                      Usar cuentas
+                    </button>
+                  )}
                   <input type="number" step={100} className={`${INP_SM} w-28 text-right`}
                     value={cfg.initialBalance || ''} placeholder="0"
                     onChange={e => setPatch({ initialBalance: parseFloat(e.target.value) || 0 })} />
@@ -630,17 +644,34 @@ export default function Projection() {
                   }`} />
                 </button>
               </div>
-              {cfg.twoPhases && (
-                <div className="flex items-center gap-3 px-4 py-3">
-                  <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">Duración Fase 1</span>
-                  <div className="flex items-center gap-1">
-                    <input type="number" min={1} max={600} className={`${INP_SM} w-16 text-right`}
-                      value={cfg.phases[0].durationMonths}
-                      onChange={e => setPhase(0, { durationMonths: parseInt(e.target.value) || 0 })} />
-                    <span className="text-xs text-gray-400">meses</span>
+              {cfg.twoPhases && (() => {
+                const now = new Date()
+                // Convert durationMonths → YYYY-MM date string
+                const toDateStr = (months: number) => {
+                  const d = new Date(now.getFullYear(), now.getMonth() + months, 1)
+                  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+                }
+                // Convert YYYY-MM date string → months from now (rounded)
+                const toMonths = (dateStr: string) => {
+                  const [y, m] = dateStr.split('-').map(Number)
+                  return Math.max(1, (y - now.getFullYear()) * 12 + (m - now.getMonth() - 1))
+                }
+                const dateVal = toDateStr(cfg.phases[0].durationMonths)
+                return (
+                  <div className="flex items-center gap-3 px-4 py-3">
+                    <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">Fin Fase 1</span>
+                    <div className="flex items-center gap-1.5">
+                      <input type="month" className={`${INP_SM}`}
+                        value={dateVal}
+                        min={toDateStr(1)}
+                        onChange={e => e.target.value && setPhase(0, { durationMonths: toMonths(e.target.value) })} />
+                      <span className="text-xs text-gray-400 whitespace-nowrap">
+                        ({cfg.phases[0].durationMonths} meses)
+                      </span>
+                    </div>
                   </div>
-                </div>
-              )}
+                )
+              })()}
             </div>
           </section>
 
