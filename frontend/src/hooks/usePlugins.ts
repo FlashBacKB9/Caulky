@@ -52,6 +52,13 @@ function savePlugins(plugins: Plugin[]) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(plugins))
 }
 
+function uid() {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
+    const r = Math.random() * 16 | 0
+    return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16)
+  })
+}
+
 export function applyAllEnabled() {
   loadPlugins().filter(p => p.enabled).forEach(runPlugin)
 }
@@ -71,7 +78,7 @@ export function usePlugins() {
   const addPlugin = useCallback(async (file: File) => {
     const code = await file.text()
     const plugin: Plugin = {
-      id: crypto.randomUUID(),
+      id: uid(),
       ...parseMetadata(code),
       enabled: true,
       code,
