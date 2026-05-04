@@ -1242,7 +1242,7 @@ export default function Settings() {
   if (!data) return null
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Configuración</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">

@@ -429,7 +429,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
         </button>
       </div>
 
-      <div className="p-6 max-w-2xl mx-auto space-y-4">
+      <div className="p-3 md:p-6 max-w-2xl mx-auto space-y-4">
 
         {/* Current period summary */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">

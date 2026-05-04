@@ -163,7 +163,7 @@ export default function Annual() {
   const GRIP   = 'cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 transition-colors'
 
   return (
-    <div className="p-6">
+    <div className="p-3 md:p-6">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
           Finanzas

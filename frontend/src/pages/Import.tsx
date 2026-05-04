@@ -542,7 +542,7 @@ export default function Import() {
   const goToStep4 = () => setStep(4)
 
   return (
-    <div className="p-6 max-w-3xl">
+    <div className="p-3 md:p-6 max-w-3xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Importar Excel</h1>
         <p className="text-sm text-gray-400 mt-1">Importa movimientos desde un archivo .xlsx</p>

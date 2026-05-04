@@ -1677,7 +1677,7 @@ export default function Charts() {
   )
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-3 md:p-6 space-y-4">
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Gráficos</h1>

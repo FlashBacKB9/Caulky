@@ -695,7 +695,7 @@ export default function Comparaciones() {
   const sep  = <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0"/>
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-5">
       <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Comparaciones</h1>
 
       {/* Controls */}

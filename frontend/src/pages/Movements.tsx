@@ -1028,7 +1028,7 @@ export default function Movements() {
   const showBalance = !sort || sort.key === 'date'
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-3 md:p-6 space-y-4">
       {showForm && <MovementForm onClose={() => setShowForm(false)} />}
       {selectedMv && (
         <MovementDetailModal
