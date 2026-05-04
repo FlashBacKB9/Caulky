@@ -268,7 +268,7 @@ function BalanceEvolutionChart({ groups, year, initialTotal, height = 260 }: { g
         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
         <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
         <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={48} domain={[min - pad, max + pad]} />
-        <Tooltip formatter={(v: unknown) => [fmt(v as number), 'Balance']} labelStyle={{ color: '#6b7280', fontSize: 11 }} contentStyle={{ borderRadius: 12, border: '1px solid #f3f4f6', fontSize: 12 }} />
+        <Tooltip content={<ChartTooltip />}/>
         <Area type="linear" dataKey="balance" stroke="#3b82f6" strokeWidth={2} fill="url(#balanceGrad)" dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: '#3b82f6' }} isAnimationActive={false} />
       </AreaChart>
     </ResponsiveContainer>
@@ -326,7 +326,7 @@ function BalanceLineChart({ data, lines, height }: {
         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
         <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
         <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={48} domain={[minV - pad, maxV + pad]} />
-        <Tooltip formatter={(v: unknown, name) => [fmt(v as number), String(name ?? '')]} labelStyle={{ color: '#6b7280', fontSize: 11 }} contentStyle={{ borderRadius: 12, border: '1px solid #f3f4f6', fontSize: 12 }} />
+        <Tooltip content={<ChartTooltip />}/>
         {lines.length > 1 && <Legend />}
         {lines.map(l => (
           <Line key={l.key} type="linear" dataKey={l.key} stroke={l.color} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: l.color }} isAnimationActive={false} />
@@ -728,7 +728,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
           <CartesianGrid strokeDasharray="3 3" stroke={GRID_CLR} vertical={false}/>
           <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd"/>
           <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={52}/>
-          <Tooltip formatter={(v: unknown) => [fmt(v as number), 'Balance']} contentStyle={{ borderRadius: 12, border: '1px solid #f3f4f6', fontSize: 12 }}/>
+          <Tooltip content={<ChartTooltip />}/>
           <Area type="monotone" dataKey="balance" stroke="#3b82f6" strokeWidth={2} fill="url(#cumGradD)" dot={false}/>
         </AreaChart>
       </ResponsiveContainer>
@@ -746,7 +746,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
           <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" paddingAngle={2}>
             {data.map((d, i) => <Cell key={i} fill={d.color}/>)}
           </Pie>
-          <Tooltip formatter={(v: unknown) => [fmt(v as number)]}/>
+          <Tooltip content={<ChartTooltip />}/>
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }}/>
         </PieChart>
       </ResponsiveContainer>
@@ -764,7 +764,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
           <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" paddingAngle={2}>
             {data.map((d, i) => <Cell key={i} fill={d.color}/>)}
           </Pie>
-          <Tooltip formatter={(v: unknown) => [fmt(v as number)]}/>
+          <Tooltip content={<ChartTooltip />}/>
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }}/>
         </PieChart>
       </ResponsiveContainer>
@@ -896,7 +896,7 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
           <Pie data={data} cx="50%" cy="50%" innerRadius={innerR} outerRadius={85} dataKey="value" paddingAngle={2}>
             {data.map((d, i) => <Cell key={i} fill={d.color}/>)}
           </Pie>
-          <Tooltip formatter={(v: unknown) => [fmt(v as number)]}/>
+          <Tooltip content={<ChartTooltip />}/>
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }}/>
         </PieChart>
       </ResponsiveContainer>
@@ -935,7 +935,7 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
             <Pie data={d} cx="50%" cy="50%" innerRadius={def.defaultDisplay === 'donut' ? 55 : 0} outerRadius={85} dataKey="value" paddingAngle={2}>
               {d.map((item, i) => <Cell key={i} fill={item.color}/>)}
             </Pie>
-            <Tooltip formatter={(v: unknown) => [mFmt(v as number)]}/>
+            <Tooltip content={<ChartTooltip />}/>
             <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }}/>
           </PieChart>
         </ResponsiveContainer>

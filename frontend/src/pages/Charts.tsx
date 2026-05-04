@@ -341,7 +341,7 @@ function DashBalanceChart({ filtered, typeToGroup, groupById, year, accounts }: 
         <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/>
         <XAxis dataKey="month" tick={{ fontSize:11, fill:'#9ca3af' }} axisLine={false} tickLine={false}/>
         <YAxis tickFormatter={fmtK} tick={{ fontSize:11, fill:'#9ca3af' }} axisLine={false} tickLine={false} width={48} domain={[min-pad,max+pad]}/>
-        <Tooltip formatter={(v:unknown)=>[fmt(v as number),'Balance']} labelStyle={{ color:'#6b7280', fontSize:11 }} contentStyle={{ borderRadius:12, border:'1px solid #f3f4f6', fontSize:12 }}/>
+        <Tooltip content={(p:unknown)=><CT {...(p as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
         <Area type="linear" dataKey="balance" stroke="#3b82f6" strokeWidth={2} fill="url(#dashBalGrad)" dot={false} activeDot={{ r:4, strokeWidth:0, fill:'#3b82f6' }} isAnimationActive={false}/>
       </AreaChart>
     </ResponsiveContainer>
@@ -425,7 +425,7 @@ function DonutLayout({ data, mode, fmt, outerR, side, onLayoutChange }: {
           <Pie data={data} cx="50%" cy="50%" innerRadius={innerR} outerRadius={outerR} paddingAngle={mode==='donut'?2:1} dataKey="value">
             {data.map((d,i) => <Cell key={i} fill={d.color}/>)}
           </Pie>
-          <Tooltip formatter={(v: unknown) => fmt(v as number)}/>
+          <Tooltip content={(p: unknown) => { const { active, payload } = p as { active?: boolean; payload?: { name:string; value:number; payload:{ color:string } }[] }; if (!active||!payload?.length) return null; const item=payload[0]; return (<div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-lg px-3 py-2.5 text-xs"><div className="flex items-center gap-2"><span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor:item.payload.color }}/><span className="text-gray-500 dark:text-gray-400">{item.name}:</span><span className="font-mono font-medium text-gray-800 dark:text-gray-100">{fmt(item.value)}</span></div></div>) }}/>
         </PieChart>
       </ResponsiveContainer>
       {editable && (
