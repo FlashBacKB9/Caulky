@@ -411,15 +411,20 @@ function DonutLayout({ data, mode, fmt, outerR, side, onLayoutChange }: {
   )
 
   const listBlock = (
-    <div key="list" className={`flex-1 space-y-1.5 min-w-0 ${isRow ? 'overflow-y-auto' : ''}`}
-      style={isRow ? { maxHeight: boxSize } : {}}>
-      {data.map(d => (
-        <div key={d.name} className="flex items-center gap-2 text-xs">
-          <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }}/>
-          <span className="flex-1 truncate text-gray-600 dark:text-gray-400">{d.name}</span>
-          <span className="font-mono text-gray-700 dark:text-gray-200 shrink-0">{fmt(d.value)}</span>
-        </div>
-      ))}
+    <div key="list" className="flex-1 min-w-0 relative" style={isRow ? { maxHeight: boxSize } : {}}>
+      <div className={`space-y-1.5 ${isRow ? 'overflow-y-auto h-full [&::-webkit-scrollbar]:hidden' : ''}`}
+        style={isRow ? { maxHeight: boxSize, scrollbarWidth: 'none' } : {}}>
+        {data.map(d => (
+          <div key={d.name} className="flex items-center gap-2 text-xs">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }}/>
+            <span className="flex-1 truncate text-gray-600 dark:text-gray-400">{d.name}</span>
+            <span className="font-mono text-gray-700 dark:text-gray-200 shrink-0">{fmt(d.value)}</span>
+          </div>
+        ))}
+      </div>
+      {isRow && (
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white dark:from-gray-900 to-transparent rounded-b" />
+      )}
     </div>
   )
 
