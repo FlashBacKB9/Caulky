@@ -867,7 +867,7 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
   accounts: Account[]; height: number; period: 'month' | 'year'
   selDate: { year: number; month: number }
 }) {
-  const { fmt, fmtK } = useCurrency()
+  const { fmtK } = useCurrency()
   const curYear  = selDate.year
   const curMonth = selDate.month
 
