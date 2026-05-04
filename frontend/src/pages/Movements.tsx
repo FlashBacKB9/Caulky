@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMovements, updateMovement, deleteMovement, createMovement, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
@@ -21,7 +21,7 @@ function saveFavorites(favs: FilterFavorite[]) {
   localStorage.setItem('movements-filter-favorites', JSON.stringify(favs))
 }
 
-// ── Column definitions ───────────────────────────────────────────────────────
+// â”€â”€ Column definitions â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const COLS = [
   { key: 'date',      label: 'Fecha',       defaultWidth: 106, align: 'left'   },
@@ -77,18 +77,18 @@ function loadColOrder(): ColKey[] {
   return all
 }
 
-// ── Shared input className ───────────────────────────────────────────────────
+// â”€â”€ Shared input className â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const INPUT = 'w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-400'
 
-// ── Shared constants ──────────────────────────────────────────────────────────
+// â”€â”€ Shared constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-const DAYS_SHORT = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom']
+const DAYS_SHORT = ['lun', 'mar', 'miÃ©', 'jue', 'vie', 'sÃ¡b', 'dom']
 const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 const MONTHS_SHORT_CAL = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
-// ── Context menu ──────────────────────────────────────────────────────────────
+// â”€â”€ Context menu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface CtxMenu { x: number; y: number; mv: Movement }
 
@@ -139,7 +139,7 @@ function MovementContextMenu({ menu, onDuplicate, onDelete, onClose }: {
   )
 }
 
-// ── Calendar view ────────────────────────────────────────────────────────────
+// â”€â”€ Calendar view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function CalendarView({ movements, types, selectedYear }: {
   movements: Movement[]
@@ -229,7 +229,7 @@ function CalendarView({ movements, types, selectedYear }: {
         <MovementContextMenu
           menu={ctxMenu}
           onDuplicate={mv => calDupMut.mutate(mv)}
-          onDelete={mv => { if (confirm(`¿Eliminar "${mv.name}"?`)) calDelMut.mutate(mv) }}
+          onDelete={mv => { if (confirm(`Â¿Eliminar "${mv.name}"?`)) calDelMut.mutate(mv) }}
           onClose={() => setCtxMenu(null)}
         />
       )}
@@ -306,13 +306,13 @@ function CalendarView({ movements, types, selectedYear }: {
                   <button
                     onClick={e => { e.stopPropagation(); setExpandedDays(prev => { const n = new Set(prev); n.add(cell.dateStr); return n }) }}
                     className="text-[10px] text-blue-500 dark:text-blue-400 pl-0.5 hover:underline leading-tight block"
-                  >+{extra} más</button>
+                  >+{extra} mÃ¡s</button>
                 )}
                 {expandedDays.has(cell.dateStr) && (
                   <button
                     onClick={e => { e.stopPropagation(); setExpandedDays(prev => { const n = new Set(prev); n.delete(cell.dateStr); return n }) }}
                     className="text-[10px] text-blue-500 dark:text-blue-400 pl-0.5 hover:underline leading-tight block"
-                  >− colapsar</button>
+                  >âˆ’ colapsar</button>
                 )}
               </div>
             )
@@ -323,7 +323,7 @@ function CalendarView({ movements, types, selectedYear }: {
   )
 }
 
-// ── Kanban view ───────────────────────────────────────────────────────────────
+// â”€â”€ Kanban view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
   const { fmt } = useCurrency()
@@ -457,7 +457,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
         <MovementContextMenu
           menu={ctxMenu}
           onDuplicate={mv => kanbanDupMut.mutate(mv)}
-          onDelete={mv => { if (confirm(`¿Eliminar "${mv.name}"?`)) kanbanDelMut.mutate(mv) }}
+          onDelete={mv => { if (confirm(`Â¿Eliminar "${mv.name}"?`)) kanbanDelMut.mutate(mv) }}
           onClose={() => setCtxMenu(null)}
         />
       )}
@@ -471,14 +471,14 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
           {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         <div className="flex items-center gap-1 flex-wrap">
-          <button className={pillCls(kanbanMonth === null)} onClick={() => setKanbanMonth(null)}>Todo el año</button>
+          <button className={pillCls(kanbanMonth === null)} onClick={() => setKanbanMonth(null)}>Todo el aÃ±o</button>
           {MONTHS_SHORT_CAL.map((m, i) => availableMonths.has(i) && (
             <button key={i} className={pillCls(kanbanMonth === i)} onClick={() => setKanbanMonth(i)}>{m}</button>
           ))}
         </div>
       </div>
 
-      {/* ── Año completo: acordeón 3 niveles ── */}
+      {/* â”€â”€ AÃ±o completo: acordeÃ³n 3 niveles â”€â”€ */}
       {kanbanMonth === null && (
         tree.length === 0
           ? <div className="text-center text-gray-400 py-16">Sin movimientos</div>
@@ -560,7 +560,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
           )
       )}
 
-      {/* ── Mes concreto: grid plano por tipo ── */}
+      {/* â”€â”€ Mes concreto: grid plano por tipo â”€â”€ */}
       {kanbanMonth !== null && (
         columns.length === 0
           ? <div className="text-center text-gray-400 py-16">Sin movimientos</div>
@@ -598,7 +598,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
   )
 }
 
-// ── Main component ───────────────────────────────────────────────────────────
+// â”€â”€ Main component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function Movements() {
   const { fmt } = useCurrency()
@@ -698,15 +698,15 @@ export default function Movements() {
         case 'type':      return typeMap[mv.movement_type_id ?? 0]?.name ?? ''
         case 'group':     return mv.label ?? ''
         case 'money':     return String(mv.dinero)
-        case 'paid':      return mv.paid ? 'Sí' : 'No'
-        case 'no_count':  return mv.no_count ? 'Sí' : 'No'
+        case 'paid':      return mv.paid ? 'SÃ­' : 'No'
+        case 'no_count':  return mv.no_count ? 'SÃ­' : 'No'
         case 'notes':     return mv.notes ?? ''
         case 'account':   return mv.account_id ? (accountMap[mv.account_id] ?? '') : ''
         default:          return ''
       }
     }))
     const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
-    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob(['ï»¿' + csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a'); a.href = url; a.download = 'movimientos.csv'; a.click()
     URL.revokeObjectURL(url)
@@ -714,7 +714,7 @@ export default function Movements() {
   }
 
   const bulkDelete = async () => {
-    if (!confirm(`¿Eliminar ${selected.size} movimiento${selected.size > 1 ? 's' : ''}? Esta acción no se puede deshacer.`)) return
+    if (!confirm(`Â¿Eliminar ${selected.size} movimiento${selected.size > 1 ? 's' : ''}? Esta acciÃ³n no se puede deshacer.`)) return
     setIsBulkPending(true)
     try {
       await Promise.all([...selected].map(id => deleteMovement(id)))
@@ -774,7 +774,7 @@ export default function Movements() {
       case 'account_id':
         return (
           <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className={BSEL}>
-            <option value="">— elegir —</option>
+            <option value="">â€” elegir â€”</option>
             <option value="0">Sin cuenta</option>
             {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
@@ -782,16 +782,16 @@ export default function Movements() {
       case 'movement_type_id':
         return (
           <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className={BSEL}>
-            <option value="">— elegir —</option>
-            <option value="0">Sin categoría</option>
+            <option value="">â€” elegir â€”</option>
+            <option value="0">Sin categorÃ­a</option>
             {types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         )
       case 'paid': case 'no_count':
         return (
           <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className={BSEL}>
-            <option value="">— elegir —</option>
-            <option value="true">Sí</option>
+            <option value="">â€” elegir â€”</option>
+            <option value="true">SÃ­</option>
             <option value="false">No</option>
           </select>
         )
@@ -878,7 +878,7 @@ export default function Movements() {
   const accountMap = useMemo(() => Object.fromEntries(accounts.map(a => [a.id, a.name])), [accounts])
 
   // Daily balance: balance of the main account at the END of each calendar day.
-  // All movements on the same date show the same value — avoids same-day ordering issues.
+  // All movements on the same date show the same value â€” avoids same-day ordering issues.
   const dailyBalance = useMemo(() => {
     const main = accounts.find(a => a.is_main)
     if (!main) return new Map<string, number>()
@@ -953,7 +953,7 @@ export default function Movements() {
     return new Set([...counts.entries()].filter(([, n]) => n > 1).map(([d]) => d))
   }, [filteredMovements])
 
-  // For date-grouped view: maps the first movement's id in each day → rowspan count.
+  // For date-grouped view: maps the first movement's id in each day â†’ rowspan count.
   // Movements that are NOT first in their day are absent from this map (their balance cell is skipped).
   const daySpans = useMemo(() => {
     const grouped = !sort || sort.key === 'date'
@@ -1028,7 +1028,7 @@ export default function Movements() {
   const showBalance = !sort || sort.key === 'date'
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-3 md:p-6 space-y-4">
       {showForm && <MovementForm onClose={() => setShowForm(false)} />}
       {selectedMv && (
         <MovementDetailModal
@@ -1041,7 +1041,7 @@ export default function Movements() {
         <MovementContextMenu
           menu={ctxMenu}
           onDuplicate={mv => { createMovement(duplicatePayload(mv)).then(() => { qc.invalidateQueries({ queryKey: ['movements'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }) }) }}
-          onDelete={mv => { if (confirm(`¿Eliminar "${mv.name}"?`)) deleteMut.mutate(mv.id) }}
+          onDelete={mv => { if (confirm(`Â¿Eliminar "${mv.name}"?`)) deleteMut.mutate(mv.id) }}
           onClose={() => setCtxMenu(null)}
         />
       )}
@@ -1102,7 +1102,7 @@ export default function Movements() {
             </button>
           ))}
 
-          {/* Búsqueda rápida */}
+          {/* BÃºsqueda rÃ¡pida */}
           {showSearch && (
             <input
               ref={searchInputRef}
@@ -1278,7 +1278,7 @@ export default function Movements() {
           <div className="flex-1" />
 
           <button onClick={clearBulk} className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-200 transition-colors">
-            Quitar selección
+            Quitar selecciÃ³n
           </button>
         </div>
       )}
@@ -1460,7 +1460,7 @@ export default function Movements() {
                                 <span className="truncate">{mv.name}</span>
                                 {mv.is_shared && (() => {
                                   const label = mv.my_share != null
-                                    ? `${mv.my_share.toFixed(2)}€ tuyo`
+                                    ? `${mv.my_share.toFixed(2)}â‚¬ tuyo`
                                     : mv.shared_between ? `1/${mv.shared_between}` : 'compartido'
                                   return <span title={`Compartido: ${label}`} className="flex items-center gap-0.5 text-blue-400 shrink-0"><Users className="w-3 h-3" /><span className="text-xs">{label}</span></span>
                                 })()}
@@ -1473,12 +1473,12 @@ export default function Movements() {
                             <td key="type" className={cellCls} style={st} onClick={e => enterEdit(e, mv)}>
                               {isEditing
                                 ? <select value={d!.movement_type_id} className={INPUT + ' text-xs'} onChange={e => setField('movement_type_id', e.target.value)} onClick={e => e.stopPropagation()}>
-                                    <option value="">Sin categoría</option>
+                                    <option value="">Sin categorÃ­a</option>
                                     {types.map(t => <option key={t.id} value={t.id}>{t.category} / {t.name}</option>)}
                                   </select>
                                 : typeInfo
                                   ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: color + '22', color }}>{typeInfo.name}</span>
-                                  : <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>}
+                                  : <span className="text-gray-300 dark:text-gray-600 text-xs">â€”</span>}
                             </td>
                           )
                           case 'amount': return (
@@ -1488,22 +1488,22 @@ export default function Movements() {
                           )
                           case 'paid': return (
                             <td key="paid" className={cellCls + ' text-center'} style={st} onClick={e => { if (isEditing) { e.stopPropagation(); setField('paid', !d!.paid) } else enterEdit(e, mv) }}>
-                              {(isEditing ? d!.paid : mv.paid) ? <Check className="w-3.5 h-3.5 mx-auto text-gray-400" strokeWidth={2.5} /> : <span className="text-gray-200 dark:text-gray-700">—</span>}
+                              {(isEditing ? d!.paid : mv.paid) ? <Check className="w-3.5 h-3.5 mx-auto text-gray-400" strokeWidth={2.5} /> : <span className="text-gray-200 dark:text-gray-700">â€”</span>}
                             </td>
                           )
                           case 'bank_date': return (
                             <td key="bank_date" className={cellCls + ' text-gray-500 dark:text-gray-400 tabular-nums'} style={st} onClick={e => enterEdit(e, mv)}>
-                              {isEditing ? <input type="date" value={d!.bank_date} className={INPUT} onChange={e => setField('bank_date', e.target.value)} onClick={e => e.stopPropagation()} /> : mv.bank_date ? fmtDate(mv.bank_date) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                              {isEditing ? <input type="date" value={d!.bank_date} className={INPUT} onChange={e => setField('bank_date', e.target.value)} onClick={e => e.stopPropagation()} /> : mv.bank_date ? fmtDate(mv.bank_date) : <span className="text-gray-300 dark:text-gray-600">â€”</span>}
                             </td>
                           )
                           case 'notes': return (
                             <td key="notes" className={cellCls + ' text-gray-500 dark:text-gray-400'} style={st} onClick={e => enterEdit(e, mv)}>
-                              {isEditing ? <input type="text" value={d!.notes} className={INPUT} onChange={e => setField('notes', e.target.value)} onClick={e => e.stopPropagation()} /> : mv.notes ? <span className="truncate block">{mv.notes}</span> : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                              {isEditing ? <input type="text" value={d!.notes} className={INPUT} onChange={e => setField('notes', e.target.value)} onClick={e => e.stopPropagation()} /> : mv.notes ? <span className="truncate block">{mv.notes}</span> : <span className="text-gray-300 dark:text-gray-600">â€”</span>}
                             </td>
                           )
                           case 'no_count': return (
                             <td key="no_count" className={cellCls + ' text-center'} style={st} onClick={e => { if (isEditing) { e.stopPropagation(); setField('no_count', !d!.no_count) } else enterEdit(e, mv) }}>
-                              {(isEditing ? d!.no_count : mv.no_count) ? <Check className="w-3.5 h-3.5 mx-auto text-gray-400" strokeWidth={2.5} /> : <span className="text-gray-200 dark:text-gray-700">—</span>}
+                              {(isEditing ? d!.no_count : mv.no_count) ? <Check className="w-3.5 h-3.5 mx-auto text-gray-400" strokeWidth={2.5} /> : <span className="text-gray-200 dark:text-gray-700">â€”</span>}
                             </td>
                           )
                         }
@@ -1523,7 +1523,7 @@ export default function Movements() {
                             </button>
                           </span>
                         ) : (
-                          <button onClick={() => { if (confirm(`¿Eliminar "${mv.name}"?`)) deleteMut.mutate(mv.id) }}
+                          <button onClick={() => { if (confirm(`Â¿Eliminar "${mv.name}"?`)) deleteMut.mutate(mv.id) }}
                             className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all p-1">
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -1538,7 +1538,7 @@ export default function Movements() {
                             style={balRowSpan > 1 ? { verticalAlign: 'middle' } : undefined}>
                             {bal !== undefined
                               ? <span className={bal >= 0 ? 'text-gray-600 dark:text-gray-300' : 'text-red-500 dark:text-red-400'}>{fmt(bal)}</span>
-                              : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                              : <span className="text-gray-300 dark:text-gray-600">â€”</span>}
                           </td>
                         )
                       })()}
@@ -1554,7 +1554,7 @@ export default function Movements() {
               <Inbox className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" strokeWidth={1} />
               <p>No hay movimientos</p>
               <button onClick={() => setShowForm(true)} className="mt-3 text-sm text-gray-500 underline hover:text-gray-700">
-                Añadir el primero
+                AÃ±adir el primero
               </button>
             </div>
           )}
@@ -1564,3 +1564,4 @@ export default function Movements() {
     </div>
   )
 }
+

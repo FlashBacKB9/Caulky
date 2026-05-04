@@ -88,7 +88,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
   const navEntries = useNavConfig()
   const [showInfo, setShowInfo] = useState(false)
   const { setUser } = useAuth()
@@ -115,7 +115,12 @@ export default function Sidebar() {
   return (
     <>
       {showInfo && <InfoModal onClose={() => setShowInfo(false)} />}
-      <aside className="w-56 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 overflow-y-auto">
+      <aside className={`
+        fixed inset-y-0 left-0 z-50 w-56 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 overflow-y-auto
+        transition-transform duration-200
+        md:relative md:translate-x-0 md:z-auto
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
         <div className="px-5 py-5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2.5">
           <Wallet className="w-5 h-5 text-gray-800 dark:text-white" strokeWidth={1.5} />
           <span className="font-bold text-lg text-gray-800 dark:text-white">Caulky</span>
@@ -128,6 +133,7 @@ export default function Sidebar() {
               to={to}
               end={to === '/'}
               className={({ isActive }) => linkCls(isActive)}
+              onClick={onClose}
             >
               <Icon className="w-4 h-4" strokeWidth={1.5} />
               {label}
@@ -139,6 +145,7 @@ export default function Sidebar() {
           <NavLink
             to="/settings"
             className={({ isActive }) => linkCls(isActive)}
+            onClick={onClose}
           >
             <Settings className="w-4 h-4" strokeWidth={1.5} />
             Configuración

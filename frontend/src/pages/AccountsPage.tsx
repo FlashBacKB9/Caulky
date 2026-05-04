@@ -179,7 +179,7 @@ export default function AccountsPage() {
   const TICK  = { fontSize: 11, fill: '#9ca3af' }
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-5">
 
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
@@ -226,10 +226,7 @@ export default function AccountsPage() {
       </div>
 
       {/* ── Account cards ──────────────────────────────────────────── */}
-      <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: `repeat(${Math.min(accounts.length, 5)}, minmax(0, 1fr))` }}
-      >
+      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {accounts.map(acc => {
           const change = acc.balance - acc.initial_balance
           return (
@@ -327,10 +324,10 @@ export default function AccountsPage() {
       </div>
 
       {/* ── Monthly change + Distribution ──────────────────────────── */}
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
         {/* Monthly change */}
-        <div className={`${PANEL} p-5 col-span-2`}>
+        <div className={`${PANEL} p-5 lg:col-span-2`}>
           <h2 className={`${TITLE} mb-4`}>Cambio mensual</h2>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={monthlyChangeData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>

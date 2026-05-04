@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react'
+﻿import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueries } from '@tanstack/react-query'
 import {
   ResponsiveContainer, ComposedChart, AreaChart, Area,
@@ -9,17 +9,17 @@ import { getAnnualStats } from '../api/stats'
 import { useCurrency } from '../hooks/useCurrency'
 import { Columns2, Layers, BarChart2, Activity, TrendingUp } from 'lucide-react'
 
-// ── Constants ─────────────────────────────────────────────────────────────────
+// â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const MONTHS    = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const MONTHS_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
-const EXP_SKIP  = new Set(['Ingreso','Total','Ahorro','Gastos Anuales','Inversión'])
-const BAL_SKIP  = new Set(['Total','Ahorro','Gastos Anuales','Inversión'])
+const EXP_SKIP  = new Set(['Ingreso','Total','Ahorro','Gastos Anuales','InversiÃ³n'])
+const BAL_SKIP  = new Set(['Total','Ahorro','Gastos Anuales','InversiÃ³n'])
 const CUR_YEAR  = new Date().getFullYear()
 const YEARS     = Array.from({ length: 8 }, (_, i) => CUR_YEAR - i).filter(y => y >= 2019)
 const GRID      = '#e5e7eb'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface AnnualGroup { name: string; color: string; monthly: Record<string, number>; total: number }
 interface AnnualData  { year: number; groups: AnnualGroup[] }
@@ -29,14 +29,14 @@ type ViewMode    = 'side' | 'overlay'
 type DisplayType = 'line' | 'bar' | 'area'
 
 const CHART_OPTIONS: { id: ChartKind; label: string }[] = [
-  { id: 'expenses-group', label: 'Gastos por categoría' },
+  { id: 'expenses-group', label: 'Gastos por categorÃ­a' },
   { id: 'expenses-total', label: 'Total de gastos'      },
   { id: 'income',         label: 'Ingresos'             },
   { id: 'net',            label: 'Balance neto'         },
-  { id: 'distribution',   label: 'Distribución'         },
+  { id: 'distribution',   label: 'DistribuciÃ³n'         },
 ]
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const cutoff    = (year: number)   => year < CUR_YEAR ? 11 : new Date().getMonth()
 const expGroups = (d: AnnualData)  => d.groups.filter(g => !EXP_SKIP.has(g.name))
@@ -44,7 +44,7 @@ const balGroups = (d: AnnualData)  => d.groups.filter(g => !BAL_SKIP.has(g.name)
 const mval      = (g: AnnualGroup, i: number) => g.monthly[MONTHS_ES[i]] ?? 0
 const EMPTY_G   = { monthly: {}, total: 0, name: '', color: '' } as AnnualGroup
 
-// ── Tooltip ───────────────────────────────────────────────────────────────────
+// â”€â”€ Tooltip â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function CT({ active, payload, label, fmt }: {
   active?: boolean; payload?: { name: string; value: number; color: string }[]
@@ -71,7 +71,7 @@ function Empty() {
   return <div className="flex items-center justify-center h-48 text-sm text-gray-300 dark:text-gray-600">Sin datos</div>
 }
 
-// ── Shared axis props ─────────────────────────────────────────────────────────
+// â”€â”€ Shared axis props â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const xProps = { tick: { fontSize: 11, fill: '#9ca3af' }, axisLine: false as const, tickLine: false as const }
 const yProps = (fmtK: (v: number) => string) => ({
@@ -79,7 +79,7 @@ const yProps = (fmtK: (v: number) => string) => ({
   axisLine: false as const, tickLine: false as const, width: 48,
 })
 
-// ── Legend helpers ────────────────────────────────────────────────────────────
+// â”€â”€ Legend helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function legendFmt(hidden: Set<string>) {
   return (v: string, entry: LegendPayload) => {
@@ -98,7 +98,7 @@ function legendClick(set: React.Dispatch<React.SetStateAction<Set<string>>>) {
   return (data: LegendPayload) => set(p => toggleHidden(p, String(data.dataKey ?? '')))
 }
 
-// ── Year card ─────────────────────────────────────────────────────────────────
+// â”€â”€ Year card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function YearCard({ year, colorDot, subtitle, children }: { year: number; colorDot: string; subtitle?: string; children: React.ReactNode }) {
   return (
@@ -106,14 +106,14 @@ function YearCard({ year, colorDot, subtitle, children }: { year: number; colorD
       <div className="flex items-center gap-2 mb-3">
         <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: colorDot }}/>
         <span className="text-base font-bold text-gray-800 dark:text-white">{year}</span>
-        {subtitle && <span className="text-sm text-gray-400 dark:text-gray-500">· {subtitle}</span>}
+        {subtitle && <span className="text-sm text-gray-400 dark:text-gray-500">Â· {subtitle}</span>}
       </div>
       {children}
     </div>
   )
 }
 
-// ── Side charts ───────────────────────────────────────────────────────────────
+// â”€â”€ Side charts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SideExpGroupChart({ data, displayType, domainMax }: { data: AnnualData; displayType: DisplayType; domainMax?: number }) {
   const { fmtK } = useCurrency()
@@ -265,7 +265,7 @@ function SideDistChart({ data, monthIdx }: { data: AnnualData; monthIdx?: number
   )
 }
 
-// ── Overlay charts ────────────────────────────────────────────────────────────
+// â”€â”€ Overlay charts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function OvExpGroupChart({ dA, dB, yA, yB, displayType }: {
   dA: AnnualData; dB: AnnualData; yA: number; yB: number; displayType: DisplayType
@@ -397,7 +397,7 @@ function OvBarChart({ dA, dB, yA, yB, kind, displayType }: {
   )
 }
 
-// ── Multi-year summary table ───────────────────────────────────────────────────
+// â”€â”€ Multi-year summary table â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
   const { fmt } = useCurrency()
@@ -413,7 +413,7 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
 
   const incomeNames   = allNames.filter(n => n === 'Ingreso')
   const ahorroNames   = allNames.filter(n => n === 'Ahorro')
-  const outflowNames  = allNames.filter(n => ['Gastos Anuales','Inversión'].includes(n))
+  const outflowNames  = allNames.filter(n => ['Gastos Anuales','InversiÃ³n'].includes(n))
   const expenseNames  = allNames.filter(n => !EXP_SKIP.has(n))
 
   const gTotal = (d: AnnualData, name: string) => d.groups.find(g => g.name === name)?.total ?? null
@@ -434,7 +434,7 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
         {yearData.map(d => {
           const v = gTotal(d, name)
           if (v === null || v === 0) {
-            return <td key={d.year} className={TD}><span className="text-gray-300 dark:text-gray-600">—</span></td>
+            return <td key={d.year} className={TD}><span className="text-gray-300 dark:text-gray-600">â€”</span></td>
           }
           if (mode === 'income') {
             return <td key={d.year} className={`${TD} text-green-700 dark:text-green-400`}>{fmt(Math.abs(v))}</td>
@@ -442,7 +442,7 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
           if (mode === 'savings') {
             return <td key={d.year} className={`${TD} text-gray-600 dark:text-gray-300`}>{fmt(Math.abs(v))}</td>
           }
-          // signed: expense groups — negative=red, positive=green (devolutions)
+          // signed: expense groups â€” negative=red, positive=green (devolutions)
           if (v < 0) {
             return <td key={d.year} className={`${TD} text-red-500 dark:text-red-400`}>{fmt(v)}</td>
           }
@@ -458,7 +458,7 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-100 dark:border-gray-800">
-              <th className={`${TH} text-left min-w-[140px] sticky left-0 z-10 bg-gray-50 dark:bg-gray-800/60`}>Categoría</th>
+              <th className={`${TH} text-left min-w-[140px] sticky left-0 z-10 bg-gray-50 dark:bg-gray-800/60`}>CategorÃ­a</th>
               {years.map(y => <th key={y} className={TH}>{y}</th>)}
             </tr>
           </thead>
@@ -491,7 +491,7 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
                 const total = expGroups(d).reduce((s, g) => s + Math.abs(g.total), 0)
                 return (
                   <td key={d.year} className="px-3 py-1.5 text-right text-xs font-mono font-semibold whitespace-nowrap text-blue-700 dark:text-blue-400">
-                    {total > 0 ? fmt(total) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                    {total > 0 ? fmt(total) : <span className="text-gray-300 dark:text-gray-600">â€”</span>}
                   </td>
                 )
               })}
@@ -506,7 +506,7 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
                 const net      = income + expenses
                 return (
                   <td key={d.year} className={`px-3 py-1.5 text-right text-xs font-mono font-semibold whitespace-nowrap ${net > 0 ? 'text-green-600 dark:text-green-400' : net < 0 ? 'text-red-500 dark:text-red-400' : 'text-gray-400'}`}>
-                    {net !== 0 ? fmt(net) : <span className="text-gray-300 dark:text-gray-600">—</span>}
+                    {net !== 0 ? fmt(net) : <span className="text-gray-300 dark:text-gray-600">â€”</span>}
                   </td>
                 )
               })}
@@ -519,7 +519,7 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
   )
 }
 
-// ── Multi-year evolution charts ───────────────────────────────────────────────
+// â”€â”€ Multi-year evolution charts â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function EvolutionLineChart({ yearData }: { yearData: AnnualData[] }) {
   const { fmtK } = useCurrency()
@@ -599,7 +599,7 @@ function EvolutionStackedChart({ yearData }: { yearData: AnnualData[] }) {
   )
 }
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+// â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function Comparaciones() {
   const [yearA,       setYearA]       = useState(CUR_YEAR - 1)
@@ -695,7 +695,7 @@ export default function Comparaciones() {
   const sep  = <div className="w-px h-5 bg-gray-200 dark:bg-gray-700 shrink-0"/>
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-5">
       <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Comparaciones</h1>
 
       {/* Controls */}
@@ -718,13 +718,13 @@ export default function Comparaciones() {
           <>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
               <button onClick={() => setDisplayType('line')} className={tabCls(displayType === 'line')}>
-                <Activity className="w-3.5 h-3.5"/> Líneas
+                <Activity className="w-3.5 h-3.5"/> LÃ­neas
               </button>
               <button onClick={() => setDisplayType('bar')} className={tabCls(displayType === 'bar')}>
                 <BarChart2 className="w-3.5 h-3.5"/> Columnas
               </button>
               <button onClick={() => setDisplayType('area')} className={tabCls(displayType === 'area')}>
-                <TrendingUp className="w-3.5 h-3.5"/> Área
+                <TrendingUp className="w-3.5 h-3.5"/> Ãrea
               </button>
             </div>
             {sep}
@@ -749,11 +749,11 @@ export default function Comparaciones() {
 
         {sep}
 
-        {/* Period selector — distribution only */}
+        {/* Period selector â€” distribution only */}
         {kind === 'distribution' && (
           <>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-              <button onClick={() => setPeriod('year')}  className={tabCls(period === 'year')}>Año completo</button>
+              <button onClick={() => setPeriod('year')}  className={tabCls(period === 'year')}>AÃ±o completo</button>
               <button onClick={() => setPeriod('month')} className={tabCls(period === 'month')}>Mes</button>
             </div>
             {period === 'month' && (
@@ -781,10 +781,10 @@ export default function Comparaciones() {
       {effectiveMode === 'side' ? (
         <div className="flex gap-4">
           <YearCard year={yearA} colorDot={dotA} subtitle={distMonthIdx !== undefined ? MONTHS_ES[distMonthIdx].replace(/^\w/, c => c.toUpperCase()) : undefined}>
-            {dA ? renderSide(dA) : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">Cargando…</div>}
+            {dA ? renderSide(dA) : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">Cargandoâ€¦</div>}
           </YearCard>
           <YearCard year={yearB} colorDot={dotB} subtitle={distMonthIdx !== undefined ? MONTHS_ES[distMonthIdx].replace(/^\w/, c => c.toUpperCase()) : undefined}>
-            {dB ? renderSide(dB) : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">Cargando…</div>}
+            {dB ? renderSide(dB) : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">Cargandoâ€¦</div>}
           </YearCard>
         </div>
       ) : (
@@ -804,24 +804,24 @@ export default function Comparaciones() {
               </div>
             ))}
           </div>
-          {dA && dB ? renderOverlay() : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">Cargando…</div>}
+          {dA && dB ? renderOverlay() : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">Cargandoâ€¦</div>}
         </div>
       )}
 
       {/* Multi-year section */}
       {sortedYearData.length >= 1 && (<>
-        <h2 className="text-lg font-bold text-gray-800 dark:text-white pt-2">Evolución anual</h2>
+        <h2 className="text-lg font-bold text-gray-800 dark:text-white pt-2">EvoluciÃ³n anual</h2>
 
         <SummaryTable yearData={sortedYearData}/>
 
         {sortedYearData.length >= 2 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
-              <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-3">Evolución Anual Gastos</h3>
+              <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-3">EvoluciÃ³n Anual Gastos</h3>
               <EvolutionLineChart yearData={sortedYearData}/>
             </div>
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
-              <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-3">Evolución Anual</h3>
+              <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-3">EvoluciÃ³n Anual</h3>
               <EvolutionStackedChart yearData={sortedYearData}/>
             </div>
           </div>
@@ -830,3 +830,4 @@ export default function Comparaciones() {
     </div>
   )
 }
+

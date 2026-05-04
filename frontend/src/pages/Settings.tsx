@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+﻿import { useRef, useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { getAccountsSummary, createAccount, updateAccountFull, deleteAccount, type Account } from '../api/accounts'
@@ -20,7 +20,7 @@ import {
 import { usePlugins } from '../hooks/usePlugins'
 import AppIcon, { ICON_KEYS } from '../components/AppIcon'
 
-// ── Account Card ──────────────────────────────────────────────────────────────
+// â”€â”€ Account Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const PALETTE_COLORS = [
   '#6b7280','#ef4444','#f97316','#eab308','#22c55e',
@@ -46,7 +46,7 @@ function DeleteMovementsModal({ accountName, movCount, isPending, onDeleteMoveme
             La cuenta <span className="font-semibold text-gray-800 dark:text-white">{accountName}</span> tiene{' '}
             <span className="font-semibold">{movCount}</span> movimiento{movCount !== 1 ? 's' : ''} de ahorro asociados.
           </p>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">¿Qué quieres hacer con ellos?</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Â¿QuÃ© quieres hacer con ellos?</p>
         </div>
         <div className="px-5 pb-5 space-y-2">
           <button
@@ -308,7 +308,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
   )
 }
 
-// ── Inline text input ─────────────────────────────────────────────────────────
+// â”€â”€ Inline text input â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function InlineInput({
   value, onChange, onConfirm, onCancel, placeholder, autoFocus = true,
@@ -327,7 +327,7 @@ function InlineInput({
   )
 }
 
-// ── Color swatch picker ───────────────────────────────────────────────────────
+// â”€â”€ Color swatch picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ColorPicker({ color, onChange }: { color: string; onChange: (c: string) => void }) {
   const ref = useRef<HTMLInputElement>(null)
@@ -351,7 +351,7 @@ function ColorPicker({ color, onChange }: { color: string; onChange: (c: string)
   )
 }
 
-// ── Type form (edit + add) ────────────────────────────────────────────────────
+// â”€â”€ Type form (edit + add) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface TypeFormState {
   name: string
@@ -467,7 +467,7 @@ function TypeForm({
   )
 }
 
-// ── Types section ─────────────────────────────────────────────────────────────
+// â”€â”€ Types section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface EditingGroup { id: number; name: string; color: string }
 type AddingTypeState = TypeFormState & { parentGroupId: number }
@@ -568,7 +568,7 @@ function TypesSection() {
                 }}
               />
 
-              {/* Name: stays in same position — text or input */}
+              {/* Name: stays in same position â€” text or input */}
               {isEditingG ? (
                 <div className="flex-1 min-w-0">
                   <InlineInput
@@ -673,7 +673,7 @@ function TypesSection() {
                     className="flex items-center gap-2 w-full px-4 py-2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                   >
                     <Plus className="w-3 h-3" />
-                    Añadir tipo
+                    AÃ±adir tipo
                   </button>
                 )}
               </div>
@@ -700,7 +700,7 @@ function TypesSection() {
           className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
         >
           <Plus className="w-4 h-4" />
-          Añadir grupo
+          AÃ±adir grupo
         </button>
       )}
     </div>
@@ -708,7 +708,7 @@ function TypesSection() {
 }
 
 
-// ── Shared layout helpers ─────────────────────────────────────────────────────
+// â”€â”€ Shared layout helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -719,7 +719,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-// ── Nav config section ────────────────────────────────────────────────────────
+// â”€â”€ Nav config section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function NavSection({ entries, onChange }: { entries: NavEntry[]; onChange: (e: NavEntry[]) => void }) {
   const toggle = (id: string) =>
@@ -776,7 +776,7 @@ function NavSection({ entries, onChange }: { entries: NavEntry[]; onChange: (e: 
   )
 }
 
-// ── Accounts section ──────────────────────────────────────────────────────────
+// â”€â”€ Accounts section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: number) => string }) {
   const qc = useQueryClient()
@@ -871,7 +871,7 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
   )
 }
 
-// ── Backup section ────────────────────────────────────────────────────────────
+// â”€â”€ Backup section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 import type { RestoreOptions } from '../api/backup'
 
@@ -887,7 +887,7 @@ const ALL_OFF: RestoreOptions = {
 }
 
 const DB_OPTS = [
-  { key: 'groups'      as const, label: 'Grupos y categorías',    warn: true },
+  { key: 'groups'      as const, label: 'Grupos y categorÃ­as',    warn: true },
   { key: 'accounts'    as const, label: 'Cuentas',                warn: true },
   { key: 'types'       as const, label: 'Tipos de movimiento',    warn: true },
   { key: 'movements'   as const, label: 'Movimientos',            warn: true },
@@ -895,7 +895,7 @@ const DB_OPTS = [
 ]
 const LS_OPTS = [
   { key: 'dashboard'  as const, label: 'Dashboard'                  },
-  { key: 'charts'     as const, label: 'Gráficos personalizados'     },
+  { key: 'charts'     as const, label: 'GrÃ¡ficos personalizados'     },
   { key: 'budgets'    as const, label: 'Presupuestos'                },
   { key: 'templates'  as const, label: 'Plantillas de movimientos'   },
   { key: 'appearance' as const, label: 'Apariencia (tema y moneda)'  },
@@ -969,7 +969,7 @@ function BackupSection() {
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm text-gray-700 dark:text-gray-200">Importar copia</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Elige qué secciones restaurar</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Elige quÃ© secciones restaurar</p>
           </div>
           <button onClick={() => fileRef.current?.click()}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
@@ -1006,7 +1006,7 @@ function BackupSection() {
 
             {/* localStorage section */}
             <div className="px-3 py-2 space-y-1 border-t border-gray-50 dark:border-gray-800">
-              <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5">Configuración</p>
+              <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1.5">ConfiguraciÃ³n</p>
               {LS_OPTS.map(o => (
                 <label key={o.key} className="flex items-center gap-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 px-1 py-0.5 rounded">
                   <input type="checkbox" checked={opts[o.key]} onChange={() => toggle(o.key)}
@@ -1022,7 +1022,7 @@ function BackupSection() {
                 <div className="flex items-start gap-1.5">
                   <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
                   <p className="text-xs text-amber-600 dark:text-amber-400">
-                    Los datos de BD seleccionados se borrarán y sustituirán por los del backup
+                    Los datos de BD seleccionados se borrarÃ¡n y sustituirÃ¡n por los del backup
                   </p>
                 </div>
               )}
@@ -1033,7 +1033,7 @@ function BackupSection() {
                 </button>
                 <button onClick={handleRestore} disabled={importing || noneSelected}
                   className="px-3 py-1.5 text-xs font-medium rounded-lg bg-blue-500 hover:bg-blue-600 text-white disabled:opacity-40 transition-colors">
-                  {importing ? 'Restaurando...' : 'Restaurar selección'}
+                  {importing ? 'Restaurando...' : 'Restaurar selecciÃ³n'}
                 </button>
               </div>
             </div>
@@ -1041,13 +1041,13 @@ function BackupSection() {
         )}
 
         {error   && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
-        {success && <p className="text-xs text-green-600 dark:text-green-400">Restauración completada</p>}
+        {success && <p className="text-xs text-green-600 dark:text-green-400">RestauraciÃ³n completada</p>}
       </div>
     </div>
   )
 }
 
-// ── Plugins section ───────────────────────────────────────────────────────────
+// â”€â”€ Plugins section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function PluginsSection() {
   const { plugins, addPlugin, removePlugin, togglePlugin } = usePlugins()
@@ -1121,7 +1121,7 @@ function PluginsSection() {
           className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors whitespace-nowrap"
         >
           <Download className="w-4 h-4" />
-          Guía IA
+          GuÃ­a IA
         </a>
       </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
@@ -1129,7 +1129,7 @@ function PluginsSection() {
   )
 }
 
-// ── Reset section ─────────────────────────────────────────────────────────────
+// â”€â”€ Reset section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function ResetSection() {
   const [showModal, setShowModal] = useState(false)
@@ -1174,8 +1174,8 @@ function ResetSection() {
             </div>
             <div className="px-5 py-4 space-y-4">
               <div className="bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2.5 text-xs text-red-700 dark:text-red-400 space-y-1">
-                <p className="font-semibold">Esta acción es irreversible.</p>
-                <p>Se borrarán todos los movimientos, categorías, cuentas, inversiones y toda la configuración. La aplicación quedará como recién instalada.</p>
+                <p className="font-semibold">Esta acciÃ³n es irreversible.</p>
+                <p>Se borrarÃ¡n todos los movimientos, categorÃ­as, cuentas, inversiones y toda la configuraciÃ³n. La aplicaciÃ³n quedarÃ¡ como reciÃ©n instalada.</p>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs text-gray-500 dark:text-gray-400">
@@ -1242,12 +1242,12 @@ export default function Settings() {
   if (!data) return null
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Configuración</h1>
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
+      <h1 className="text-2xl font-bold text-gray-800 dark:text-white">ConfiguraciÃ³n</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-        {/* ── Col izquierda: preferencias ──────────────────────────── */}
+        {/* â”€â”€ Col izquierda: preferencias â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="space-y-6">
 
           <Section title="Apariencia">
@@ -1297,10 +1297,10 @@ export default function Settings() {
                 </div>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-gray-700 dark:text-gray-200">Tamaño de la interfaz</span>
+                <span className="text-sm text-gray-700 dark:text-gray-200">TamaÃ±o de la interfaz</span>
                 <div className="flex items-center gap-2">
                   <button onClick={zoomOut} disabled={zoom <= zoomMin}
-                    className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 text-base font-medium flex items-center justify-center transition-colors">−</button>
+                    className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 text-base font-medium flex items-center justify-center transition-colors">âˆ’</button>
                   <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 overflow-hidden">
                     <input
                       type="number" min={zoomMin} max={zoomMax} value={zoom}
@@ -1317,9 +1317,9 @@ export default function Settings() {
             </div>
           </Section>
 
-          <Section title="Navegación">
+          <Section title="NavegaciÃ³n">
             <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
-              Elige qué páginas aparecen en el menú lateral y en qué orden.
+              Elige quÃ© pÃ¡ginas aparecen en el menÃº lateral y en quÃ© orden.
             </p>
             <NavSection entries={navEntries} onChange={updateNav} />
           </Section>
@@ -1334,7 +1334,7 @@ export default function Settings() {
               </div>
               <div>
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Editar Dashboard</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Añadir, mover y redimensionar widgets</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">AÃ±adir, mover y redimensionar widgets</p>
               </div>
             </button>
           </Section>
@@ -1356,7 +1356,7 @@ export default function Settings() {
 
         </div>
 
-        {/* ── Col derecha: configuración inicial ────────────────────── */}
+        {/* â”€â”€ Col derecha: configuraciÃ³n inicial â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <div className="space-y-6">
 
           <Section title="Cuentas">
@@ -1373,3 +1373,4 @@ export default function Settings() {
     </div>
   )
 }
+

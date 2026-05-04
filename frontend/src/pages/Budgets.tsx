@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+﻿import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Edit2, Trash2, X, ChevronLeft, History, ChartCandlestick, Table2, TrendingUp } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -7,7 +7,7 @@ import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getGroups, type Group } from '../api/groups'
 import { useCurrency } from '../hooks/useCurrency'
 
-// ── Types ──────────────────────────────────────────────────────────────────────
+// â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface BudgetVersion {
   id: string
@@ -28,7 +28,7 @@ interface Budget {
   versions: BudgetVersion[] // sorted asc by effectiveFrom
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function genId() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 function todayStr() { return new Date().toISOString().slice(0, 10) }
@@ -74,7 +74,7 @@ function generatePeriods(
   if (period === 'custom') {
     const start = customFrom ?? today
     const end   = customTo   ?? today
-    return [{ key: start, label: `${start} → ${end}`, start, end }]
+    return [{ key: start, label: `${start} â†’ ${end}`, start, end }]
   }
 
   const periods: Array<{ key: string; label: string; start: string; end: string }> = []
@@ -102,7 +102,7 @@ function generatePeriods(
       const mon = d.toISOString().slice(0, 10)
       const sun = new Date(d); sun.setDate(d.getDate() + 6)
       const sunStr = sun.toISOString().slice(0, 10)
-      periods.push({ key: mon, label: `${mon.slice(5)} → ${sunStr.slice(5)}`, start: mon, end: sunStr })
+      periods.push({ key: mon, label: `${mon.slice(5)} â†’ ${sunStr.slice(5)}`, start: mon, end: sunStr })
       d.setDate(d.getDate() + 7)
     }
   }
@@ -134,7 +134,7 @@ function pctColors(pct: number) {
   return               { bar: 'bg-emerald-500',  text: 'text-emerald-600 dark:text-emerald-400' }
 }
 
-// ── BudgetCard ─────────────────────────────────────────────────────────────────
+// â”€â”€ BudgetCard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function BudgetCard({ budget, movements, onClick, onEdit, onDelete }: {
   budget: Budget; movements: Movement[]
@@ -184,7 +184,7 @@ function BudgetCard({ budget, movements, onClick, onEdit, onDelete }: {
   )
 }
 
-// ── BudgetForm ─────────────────────────────────────────────────────────────────
+// â”€â”€ BudgetForm â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function BudgetForm({ initial, types, groups, onSave, onCancel }: {
   initial: Budget | null; types: MovementType[]; groups: Group[]
@@ -270,9 +270,9 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
           {/* Amount */}
           <div>
             <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">
-              Límite (€)
+              LÃ­mite (â‚¬)
               {amountChanged && (
-                <span className="ml-2 normal-case font-normal text-blue-400"> — se creará nueva versión desde hoy</span>
+                <span className="ml-2 normal-case font-normal text-blue-400"> â€” se crearÃ¡ nueva versiÃ³n desde hoy</span>
               )}
             </label>
             <input type="number" min="0" step="any" value={amount} onChange={e => setAmount(e.target.value)} placeholder="150" className={inputCls}/>
@@ -292,7 +292,7 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
             {period === 'custom' && (
               <div className="flex items-center gap-2 mt-2">
                 <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className={dateInputCls}/>
-                <span className="text-gray-400 text-xs shrink-0">→</span>
+                <span className="text-gray-400 text-xs shrink-0">â†’</span>
                 <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)} className={dateInputCls}/>
               </div>
             )}
@@ -301,7 +301,7 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
           {/* Tracking start */}
           <div>
             <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">
-              Inicio del seguimiento <span className="normal-case font-normal">(vacío = desde siempre)</span>
+              Inicio del seguimiento <span className="normal-case font-normal">(vacÃ­o = desde siempre)</span>
             </label>
             <input type="date" value={trackingStart} onChange={e => setTrackingStart(e.target.value)}
               className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none w-auto"/>
@@ -313,7 +313,7 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
           {/* Type selector */}
           <div>
             <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">
-              Subcategorías <span className="normal-case font-normal">({selectedIds.size} seleccionadas)</span>
+              SubcategorÃ­as <span className="normal-case font-normal">({selectedIds.size} seleccionadas)</span>
             </label>
             <div className="border border-gray-100 dark:border-gray-800 rounded-xl p-3 space-y-3 max-h-52 overflow-y-auto">
               {Object.entries(typesByGroup).map(([gid, gTypes]) => {
@@ -352,7 +352,7 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
   )
 }
 
-// ── BudgetDetail ───────────────────────────────────────────────────────────────
+// â”€â”€ BudgetDetail â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
   budget: Budget; movements: Movement[]; types: MovementType[]
@@ -429,7 +429,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
         </button>
       </div>
 
-      <div className="p-6 max-w-2xl mx-auto space-y-4">
+      <div className="p-3 md:p-6 max-w-2xl mx-auto space-y-4">
 
         {/* Current period summary */}
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
@@ -445,7 +445,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
             <span>Gastado: <span className="font-semibold text-gray-700 dark:text-gray-200">{fmt(currentSpent)}</span></span>
-            <span>Límite: <span className="font-semibold text-gray-700 dark:text-gray-200">{fmt(currentAmount)}</span></span>
+            <span>LÃ­mite: <span className="font-semibold text-gray-700 dark:text-gray-200">{fmt(currentAmount)}</span></span>
           </div>
           <p className="text-[11px] text-gray-400 mt-2 truncate">{typeNames}</p>
         </div>
@@ -455,7 +455,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
             <div className="flex items-center gap-2 mb-3">
               <History className="w-3.5 h-3.5 text-gray-400" strokeWidth={1.5}/>
-              <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Historial de límites</p>
+              <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Historial de lÃ­mites</p>
             </div>
             <div className="space-y-1.5">
               {[...budget.versions].reverse().map((v, i) => (
@@ -476,7 +476,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
               className={`p-1.5 rounded-md transition-colors ${view === 'table' ? 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 shadow-sm' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
               <Table2 className="w-3.5 h-3.5"/>
             </button>
-            <button onClick={() => setView('chart')} title="Gráfico"
+            <button onClick={() => setView('chart')} title="GrÃ¡fico"
               className={`p-1.5 rounded-md transition-colors ${view === 'chart' ? 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 shadow-sm' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
               <TrendingUp className="w-3.5 h-3.5"/>
             </button>
@@ -503,7 +503,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
                   <YAxis tickFormatter={fmtK} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={60}/>
                   <Tooltip content={tooltipFmt as never}/>
                   <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }}/>
-                  <Line dataKey="limite" name="Límite" stroke="#ef4444" strokeWidth={2} strokeDasharray="6 4" dot={false} activeDot={{ r: 4 }}/>
+                  <Line dataKey="limite" name="LÃ­mite" stroke="#ef4444" strokeWidth={2} strokeDasharray="6 4" dot={false} activeDot={{ r: 4 }}/>
                   <Line dataKey="gasto"  name="Gasto"  stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }}/>
                 </LineChart>
               </ResponsiveContainer>
@@ -518,7 +518,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
                   <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Periodo</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">Límite</th>
+                  <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">LÃ­mite</th>
                   <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">Gastado</th>
                   <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">%</th>
                   <th className="px-4 py-3 w-24"></th>
@@ -553,7 +553,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
   )
 }
 
-// ── Main Page ──────────────────────────────────────────────────────────────────
+// â”€â”€ Main Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export default function Budgets() {
   const [budgets, setBudgets] = useState<Budget[]>(() => {
@@ -579,7 +579,7 @@ export default function Budgets() {
   }
 
   function handleDelete(id: string) {
-    if (!confirm('¿Eliminar este presupuesto?')) return
+    if (!confirm('Â¿Eliminar este presupuesto?')) return
     saveBudgets(budgets.filter(b => b.id !== id))
     if (detailId === id) setDetailId(null)
   }
@@ -618,7 +618,7 @@ export default function Budgets() {
           {budgets.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-400">
               <ChartCandlestick className="w-10 h-10" strokeWidth={1}/>
-              <p className="text-sm">Aún no hay presupuestos</p>
+              <p className="text-sm">AÃºn no hay presupuestos</p>
               <button
                 onClick={() => { setEditingBudget(null); setShowForm(true) }}
                 className="text-sm text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
@@ -654,3 +654,4 @@ export default function Budgets() {
     </div>
   )
 }
+

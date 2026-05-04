@@ -1674,7 +1674,7 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       {/* Header */}
       <div className="flex items-center gap-3 flex-wrap">
         <div className="flex items-center gap-3 flex-1 min-w-0">
@@ -1743,7 +1743,7 @@ export default function Dashboard() {
 
       {/* Widget grid */}
       {config.widgets.length > 0 ? (
-        <div className="grid grid-cols-4 gap-4 items-start">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-start [&>*]:max-sm:!col-span-1 [&>*]:sm:max-md:!col-span-1">
           {config.widgets.map(w => {
             const colCls = COL_CLS[w.colSpan] ?? 'col-span-2'
             const hasResize = isChartWidget(w.id)
