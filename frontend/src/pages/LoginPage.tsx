@@ -37,6 +37,7 @@ export default function LoginPage() {
       const detail = err?.response?.data?.detail
       if (detail === 'LOGIN_BAD_CREDENTIALS') setError('Email o contraseña incorrectos')
       else if (detail === 'REGISTER_USER_ALREADY_EXISTS') setError('Ya existe una cuenta con ese email')
+      else if (mode === 'register') setError('Error al crear la cuenta')
       else setError('Error al iniciar sesión')
     } finally {
       setLoading(false)
@@ -118,6 +119,10 @@ export default function LoginPage() {
             </button>
           </form>
         </div>
+
+        <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-4">
+          Cuenta local · los datos se guardan en tu servidor
+        </p>
       </div>
     </div>
   )
