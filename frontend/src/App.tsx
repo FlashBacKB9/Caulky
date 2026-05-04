@@ -12,6 +12,7 @@ import Investments from './pages/Investments'
 import Documentation from './pages/Documentation'
 import Comparaciones from './pages/Comparaciones'
 import { useDarkMode } from './hooks/useDarkMode'
+import { useUiZoom } from './hooks/useUiZoom'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -24,6 +25,7 @@ const queryClient = new QueryClient({
 
 function Layout() {
   useDarkMode()
+  useUiZoom()
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-gray-950">
       <Sidebar />

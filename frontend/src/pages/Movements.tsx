@@ -7,7 +7,7 @@ import MovementForm from '../components/MovementForm'
 import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePayload } from '../components/MovementDetailModal'
 import { runAutoRecurring } from '../utils/recurringTemplates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
-import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users } from 'lucide-react'
+import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
 
@@ -151,6 +151,24 @@ function CalendarView({ movements, types }: {
   const [calYear, setCalYear] = useState(today.getFullYear())
   const [calMonth, setCalMonth] = useState(today.getMonth())
   const [dateField, setDateField] = useState<'date' | 'bank_date'>('date')
+  const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
+  const [showCalYearPicker, setShowCalYearPicker] = useState(false)
+  const calYearPickerRef = useRef<HTMLDivElement>(null)
+
+  const calYears = useMemo(() => {
+    const years = new Set(movements.map(mv => parseInt(mv.date.slice(0, 4))))
+    years.add(today.getFullYear())
+    return [...years].sort((a, b) => a - b)
+  }, [movements])
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (calYearPickerRef.current && !calYearPickerRef.current.contains(e.target as Node))
+        setShowCalYearPicker(false)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
 
   const byDate = useMemo(() => {
     const map: Record<string, Movement[]> = {}
@@ -233,7 +251,31 @@ function CalendarView({ movements, types }: {
             <ChevronLeft className="w-4 h-4 text-gray-500" />
           </button>
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-gray-800 dark:text-white">{MONTHS_ES[calMonth]} {calYear}</span>
+            <span className="text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-1">
+              {MONTHS_ES[calMonth]}
+              <div ref={calYearPickerRef} className="relative">
+                <button
+                  onClick={() => setShowCalYearPicker(v => !v)}
+                  className="flex items-center gap-0.5 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+                >
+                  {calYear}
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+                {showCalYearPicker && (
+                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-lg py-1 min-w-[90px]">
+                    {calYears.map(y => (
+                      <button
+                        key={y}
+                        onClick={() => { setCalYear(y); setCalMonth(0); setShowCalYearPicker(false) }}
+                        className={`w-full text-left px-4 py-1.5 text-sm transition-colors ${y === calYear ? 'font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
+                      >
+                        {y}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </span>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
               <button className={btnCls(dateField === 'date')} onClick={() => setDateField('date')}>Fecha</button>
               <button className={btnCls(dateField === 'bank_date')} onClick={() => setDateField('bank_date')}>Fecha banco</button>
@@ -274,7 +316,7 @@ function CalendarView({ movements, types }: {
                   isToday ? 'text-blue-600 dark:text-blue-400 font-bold'
                     : cell.current ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'
                 }`}>{cell.day}</div>
-                {mvs.slice(0, MAX).map(mv => {
+                {(expandedDays.has(cell.dateStr) ? mvs : mvs.slice(0, MAX)).map(mv => {
                   const t = typeMap[mv.movement_type_id ?? 0]
                   return (
                     <div key={mv.id}
@@ -296,8 +338,17 @@ function CalendarView({ movements, types }: {
                     </div>
                   )
                 })}
-                {extra > 0 && (
-                  <div className="text-[10px] text-gray-400 dark:text-gray-500 pl-0.5">+{extra} más</div>
+                {extra > 0 && !expandedDays.has(cell.dateStr) && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setExpandedDays(prev => { const n = new Set(prev); n.add(cell.dateStr); return n }) }}
+                    className="text-[10px] text-blue-500 dark:text-blue-400 pl-0.5 hover:underline leading-tight block"
+                  >+{extra} más</button>
+                )}
+                {expandedDays.has(cell.dateStr) && (
+                  <button
+                    onClick={e => { e.stopPropagation(); setExpandedDays(prev => { const n = new Set(prev); n.delete(cell.dateStr); return n }) }}
+                    className="text-[10px] text-blue-500 dark:text-blue-400 pl-0.5 hover:underline leading-tight block"
+                  >− colapsar</button>
                 )}
               </div>
             )
@@ -626,8 +677,11 @@ export default function Movements() {
   const [isBulkPending, setIsBulkPending] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'kanban'>('table')
   const [showYearPicker, setShowYearPicker] = useState(false)
+  const [showSearch, setShowSearch] = useState(false)
+  const [quickSearch, setQuickSearch] = useState('')
   const colPickerRef = useRef<HTMLDivElement>(null)
   const yearPickerRef = useRef<HTMLDivElement>(null)
+  const searchInputRef = useRef<HTMLInputElement>(null)
   const selectAllRef = useRef<HTMLInputElement>(null)
   const exportPickerRef = useRef<HTMLDivElement>(null)
   const [showExportPicker, setShowExportPicker] = useState(false)
@@ -921,10 +975,12 @@ export default function Movements() {
     })
   }, [movements, sort, typeMap, dayOrder])
 
-  const filteredMovements = useMemo(
-    () => applyAdvancedFilter(sortedMovements, advFilter, typeToGroupMap),
-    [sortedMovements, advFilter, typeToGroupMap]
-  )
+  const filteredMovements = useMemo(() => {
+    const base = applyAdvancedFilter(sortedMovements, advFilter, typeToGroupMap)
+    if (!quickSearch.trim()) return base
+    const q = quickSearch.toLowerCase()
+    return base.filter(mv => mv.name.toLowerCase().includes(q))
+  }, [sortedMovements, advFilter, typeToGroupMap, quickSearch])
 
   // Dates that have more than one movement in the current view (eligible for drag reorder)
   const sameDayDates = useMemo(() => {
@@ -1081,6 +1137,31 @@ export default function Movements() {
               {fav.name}
             </button>
           ))}
+
+          {/* Búsqueda rápida */}
+          {showSearch && (
+            <input
+              ref={searchInputRef}
+              autoFocus
+              type="text"
+              value={quickSearch}
+              onChange={e => setQuickSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') { setShowSearch(false); setQuickSearch('') } }}
+              placeholder="Buscar por nombre..."
+              className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 rounded-lg px-3 py-1.5 text-sm w-44 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
+            />
+          )}
+          <button
+            onClick={() => { const next = !showSearch; setShowSearch(next); if (!next) setQuickSearch('') }}
+            title="Buscar por nombre"
+            className={`p-1.5 rounded-lg border transition-colors ${
+              showSearch || quickSearch
+                ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 border-transparent'
+                : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+            }`}
+          >
+            <Search className="w-3.5 h-3.5" />
+          </button>
 
           {/* Filtros */}
           <button onClick={() => setShowFilters(v => !v)}

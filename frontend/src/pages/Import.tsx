@@ -112,27 +112,26 @@ function StepUpload({ onParsed }: { onParsed: (r: ParseResult) => void }) {
 
 // ── Step 2: Map columns ──────────────────────────────────────────────────────
 
-const FIELDS = [
-  { key: 'date',          label: 'Fecha',              required: true },
-  { key: 'name',          label: 'Nombre',              required: true },
-  { key: 'money',         label: 'Importe',             required: true },
-  { key: 'bankDate',      label: 'Fecha banco',         required: false },
+const FIELDS: { key: keyof ColMap; label: string; required: boolean; tooltip?: string }[] = [
+  { key: 'name',          label: 'Nombre',              required: true  },
+  { key: 'money',         label: 'Importe',             required: true  },
   { key: 'type',          label: 'Tipo de movimiento',  required: false },
+  { key: 'date',          label: 'Fecha',               required: true  },
+  { key: 'bankDate',      label: 'Fecha banco',         required: false },
   { key: 'notes',         label: 'Notas',               required: false },
   { key: 'shared',        label: 'Compartido',          required: false },
-  { key: 'sharedBetween', label: 'Nº personas',         required: false },
-  { key: 'myShare',       label: 'Mi importe',          required: false },
-] as const
+  { key: 'sharedBetween', label: 'Nº personas',         required: false,
+    tooltip: 'Número de personas entre las que se divide el gasto. Si está vacío y Compartido es verdadero, se divide entre 2.' },
+  { key: 'myShare',       label: 'Mi importe',          required: false,
+    tooltip: 'Importe del gasto que te corresponde a ti para las estadísticas.' },
+]
 
 function StepColumns({
-  parsed, colMap, setColMap, accounts, accountId, setAccountId, onNext, onBack,
+  parsed, colMap, setColMap, onNext, onBack,
 }: {
   parsed: ParseResult
   colMap: ColMap
   setColMap: (c: ColMap) => void
-  accounts: Account[]
-  accountId: number | null
-  setAccountId: (id: number | null) => void
   onNext: () => void
   onBack: () => void
 }) {
@@ -153,9 +152,15 @@ function StepColumns({
         <div className="divide-y divide-gray-50 dark:divide-gray-800">
           {FIELDS.map(field => (
             <div key={field.key} className="flex items-center px-5 py-3 gap-4">
-              <div className="w-44 shrink-0">
+              <div className="w-44 shrink-0 flex items-center gap-1">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{field.label}</span>
-                {field.required && <span className="text-red-400 ml-1 text-xs">*</span>}
+                {field.required && <span className="text-red-400 text-xs">*</span>}
+                {field.tooltip && (
+                  <span
+                    title={field.tooltip}
+                    className="text-[10px] text-gray-400 dark:text-gray-500 border border-gray-300 dark:border-gray-600 rounded-full w-4 h-4 inline-flex items-center justify-center cursor-help leading-none shrink-0"
+                  >?</span>
+                )}
               </div>
               <select
                 value={colMap[field.key] ?? ''}
@@ -169,34 +174,6 @@ function StepColumns({
               </select>
             </div>
           ))}
-        </div>
-      </div>
-
-      {/* Account selector */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
-        <div className="px-5 py-3 border-b border-gray-50 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">Cuenta destino</p>
-        </div>
-        <div className="px-5 py-4 flex items-center gap-4">
-          <span className="w-44 shrink-0 text-sm font-medium text-gray-700 dark:text-gray-300">Asignar a cuenta</span>
-          {(() => {
-            const selected = accounts.find(a => a.id === accountId)
-            return (
-              <div className="relative flex-1">
-                {selected && (
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: selected.color }} />
-                )}
-                <select
-                  value={accountId ?? ''}
-                  onChange={e => setAccountId(e.target.value ? Number(e.target.value) : null)}
-                  className={`w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg py-1.5 pr-3 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600 ${selected ? 'pl-8' : 'pl-3'}`}
-                >
-                  <option value="">— Sin cuenta —</option>
-                  {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                </select>
-              </div>
-            )
-          })()}
         </div>
       </div>
 
@@ -582,9 +559,6 @@ export default function Import() {
           parsed={parsed}
           colMap={colMap}
           setColMap={setColMap}
-          accounts={accounts}
-          accountId={accountId}
-          setAccountId={setAccountId}
           onNext={goToStep3or4}
           onBack={() => { setParsed(null); setStep(1) }}
         />

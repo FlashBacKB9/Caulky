@@ -11,6 +11,7 @@ import { exportBackup, importBackup, resetSystem } from '../api/backup'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat, DATE_FORMATS } from '../hooks/useDateFormat'
+import { useUiZoom } from '../hooks/useUiZoom'
 import {
   Pencil, Sun, Moon, Lock, Trash2, Plus, Check, X, ChevronRight, ChevronDown, LayoutDashboard,
   Download, Upload, AlertTriangle,
@@ -189,7 +190,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
             <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Saldo inicial</span>
             <input
               type="number" step="0.01" value={balance} onChange={e => setBalance(e.target.value)}
-              className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
+              className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           </div>
           {!account.is_main && (
@@ -786,7 +787,7 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
               <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Saldo inicial</span>
               <input
                 type="number" step="0.01" value={newBal} onChange={e => setNewBal(e.target.value)}
-                className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400"
+                className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -1086,6 +1087,7 @@ export default function Settings() {
   const { dark, toggle } = useDarkMode()
   const { currency, setCurrency, fmt, currencies } = useCurrency()
   const { format: dateFormat, setFormat: setDateFormat } = useDateFormat()
+  const { zoom, inc: zoomIn, dec: zoomOut, reset: zoomReset, min: zoomMin, max: zoomMax } = useUiZoom()
   const { data, isLoading } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
   const navigate = useNavigate()
   const [showInvestments, setShowInvestments] = useState(
@@ -1155,6 +1157,19 @@ export default function Settings() {
                       {f.label}
                     </button>
                   ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-between px-4 py-3">
+                <span className="text-sm text-gray-700 dark:text-gray-200">Tamaño de la interfaz</span>
+                <div className="flex items-center gap-2">
+                  <button onClick={zoomOut} disabled={zoom <= zoomMin}
+                    className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 text-base font-medium flex items-center justify-center transition-colors">−</button>
+                  <button onClick={zoomReset}
+                    className="w-12 text-center text-xs font-mono font-medium text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-lg py-1 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                    {zoom}%
+                  </button>
+                  <button onClick={zoomIn} disabled={zoom >= zoomMax}
+                    className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 text-base font-medium flex items-center justify-center transition-colors">+</button>
                 </div>
               </div>
             </div>
