@@ -275,76 +275,165 @@ function BalanceEvolutionChart({ groups, year, initialTotal, height = 260 }: { g
   )
 }
 
-// ── Account balance history chart ────────────────────────────────────────────
+// ── Account balance history helpers ──────────────────────────────────────────
 
-function AccountBalanceHistoryChart({ accounts, movements, combined = false, height = 260 }: {
-  accounts: Account[]
-  movements: Movement[]
-  combined?: boolean
-  height?: number
+function buildAccountHistory(
+  acc: Account,
+  sorted: Movement[],
+  typeById: Record<number, MovementType>,
+): { label: string; balance: number }[] {
+  if (sorted.length === 0) return []
+  const firstDate = new Date(sorted[0].date + 'T00:00:00')
+  const now = new Date()
+  let bal = acc.initial_balance
+  let mi = 0
+  const result: { label: string; balance: number }[] = []
+  for (let y = firstDate.getFullYear(); y <= now.getFullYear(); y++) {
+    const mStart = y === firstDate.getFullYear() ? firstDate.getMonth() : 0
+    const mEnd   = y === now.getFullYear() ? now.getMonth() : 11
+    for (let m = mStart; m <= mEnd; m++) {
+      while (mi < sorted.length) {
+        const mv = sorted[mi]
+        const d = new Date(mv.date + 'T00:00:00')
+        if (d.getFullYear() > y || (d.getFullYear() === y && d.getMonth() > m)) break
+        if (acc.is_main) {
+          bal += mv.dinero
+        } else {
+          const t = mv.movement_type_id != null ? typeById[mv.movement_type_id] : null
+          if (t?.linked_account_id === acc.id) bal += mv.money
+        }
+        mi++
+      }
+      result.push({ label: `${MONTHS_SHORT[m]} ${String(y).slice(2)}`, balance: Math.round(bal * 100) / 100 })
+    }
+  }
+  return result
+}
+
+function BalanceLineChart({ data, lines, height }: {
+  data: Record<string, number | string>[]
+  lines: { key: string; color: string }[]
+  height: number
 }) {
   const { fmt, fmtK } = useCurrency()
-
-  const { chartData } = useMemo(() => {
-    if (accounts.length === 0) return { chartData: [] }
-    const sorted = [...movements].sort((a, b) => a.date.localeCompare(b.date))
-    if (sorted.length === 0) return { chartData: [] }
-
-    const firstDate = new Date(sorted[0].date + 'T00:00:00')
-    const now = new Date()
-    const balances: Record<number, number> = {}
-    for (const acc of accounts) balances[acc.id] = acc.initial_balance
-
-    let mvIdx = 0
-    const result: Record<string, number | string>[] = []
-
-    for (let y = firstDate.getFullYear(); y <= now.getFullYear(); y++) {
-      const mStart = y === firstDate.getFullYear() ? firstDate.getMonth() : 0
-      const mEnd   = y === now.getFullYear() ? now.getMonth() : 11
-      for (let m = mStart; m <= mEnd; m++) {
-        while (mvIdx < sorted.length) {
-          const mv = sorted[mvIdx]
-          const d = new Date(mv.date + 'T00:00:00')
-          if (d.getFullYear() > y || (d.getFullYear() === y && d.getMonth() > m)) break
-          if (mv.account_id != null) balances[mv.account_id] = (balances[mv.account_id] ?? 0) + mv.dinero
-          mvIdx++
-        }
-        const label = `${MONTHS_SHORT[m]} ${String(y).slice(2)}`
-        const entry: Record<string, number | string> = { label }
-        let total = 0
-        for (const acc of accounts) {
-          const v = Math.round((balances[acc.id] ?? 0) * 100) / 100
-          if (!combined) entry[acc.name] = v
-          total += v
-        }
-        if (combined) entry['Total'] = Math.round(total * 100) / 100
-        result.push(entry)
-      }
-    }
-    return { chartData: result }
-  }, [accounts, movements, combined])
-
-  const lines = combined
-    ? [{ key: 'Total', color: '#3b82f6' }]
-    : accounts.map(a => ({ key: a.name, color: a.color }))
-
-  const allVals = chartData.flatMap(d => lines.map(l => d[l.key] as number)).filter(v => typeof v === 'number')
-  const minV = Math.min(...allVals), maxV = Math.max(...allVals)
+  const allVals = data.flatMap(d => lines.map(l => d[l.key] as number)).filter(v => typeof v === 'number')
+  const minV = allVals.length ? Math.min(...allVals) : 0
+  const maxV = allVals.length ? Math.max(...allVals) : 0
   const pad  = (maxV - minV) * 0.1 || 100
-
   return (
     <ResponsiveContainer width="100%" height={height}>
-      <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+      <LineChart data={data} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
         <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
         <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
         <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={48} domain={[minV - pad, maxV + pad]} />
         <Tooltip formatter={(v: unknown, name) => [fmt(v as number), String(name ?? '')]} labelStyle={{ color: '#6b7280', fontSize: 11 }} contentStyle={{ borderRadius: 12, border: '1px solid #f3f4f6', fontSize: 12 }} />
-        {!combined && <Legend />}
+        {lines.length > 1 && <Legend />}
         {lines.map(l => (
           <Line key={l.key} type="linear" dataKey={l.key} stroke={l.color} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: l.color }} isAnimationActive={false} />
         ))}
       </LineChart>
     </ResponsiveContainer>
+  )
+}
+
+// All accounts multi-line
+function AccountBalanceHistoryChart({ accounts, movements, movementTypes, height = 260 }: {
+  accounts: Account[]
+  movements: Movement[]
+  movementTypes: MovementType[]
+  height?: number
+}) {
+  const typeById = useMemo(() => Object.fromEntries(movementTypes.map(t => [t.id, t])), [movementTypes])
+  const sorted   = useMemo(() => [...movements].sort((a, b) => a.date.localeCompare(b.date)), [movements])
+
+  const { data, lines } = useMemo(() => {
+    if (accounts.length === 0 || sorted.length === 0) return { data: [], lines: [] }
+    const histories = accounts.map(acc => ({ acc, rows: buildAccountHistory(acc, sorted, typeById) }))
+    const labels = histories[0].rows.map(r => r.label)
+    const chartData = labels.map((label, i) => {
+      const entry: Record<string, number | string> = { label }
+      for (const { acc, rows } of histories) entry[acc.name] = rows[i]?.balance ?? 0
+      return entry
+    })
+    return { data: chartData, lines: accounts.map(a => ({ key: a.name, color: a.color })) }
+  }, [accounts, sorted, typeById])
+
+  return <BalanceLineChart data={data} lines={lines} height={height} />
+}
+
+// Combined total single line
+function CombinedBalanceHistoryChart({ accounts, movements, movementTypes, height = 260 }: {
+  accounts: Account[]
+  movements: Movement[]
+  movementTypes: MovementType[]
+  height?: number
+}) {
+  const typeById = useMemo(() => Object.fromEntries(movementTypes.map(t => [t.id, t])), [movementTypes])
+  const sorted   = useMemo(() => [...movements].sort((a, b) => a.date.localeCompare(b.date)), [movements])
+
+  const { data } = useMemo(() => {
+    if (accounts.length === 0 || sorted.length === 0) return { data: [] }
+    const histories = accounts.map(acc => buildAccountHistory(acc, sorted, typeById))
+    const labels = histories[0].map(r => r.label)
+    const chartData = labels.map((label, i) => ({
+      label,
+      Total: Math.round(histories.reduce((s, h) => s + (h[i]?.balance ?? 0), 0) * 100) / 100,
+    }))
+    return { data: chartData }
+  }, [accounts, sorted, typeById])
+
+  return <BalanceLineChart data={data} lines={[{ key: 'Total', color: '#3b82f6' }]} height={height} />
+}
+
+// Cycling: one account at a time, arrows to switch
+function CyclingBalanceHistoryChart({ accounts, movements, movementTypes, height = 260 }: {
+  accounts: Account[]
+  movements: Movement[]
+  movementTypes: MovementType[]
+  height?: number
+}) {
+  const { fmt } = useCurrency()
+  const [idx, setIdx] = useState(0)
+  const typeById = useMemo(() => Object.fromEntries(movementTypes.map(t => [t.id, t])), [movementTypes])
+  const sorted   = useMemo(() => [...movements].sort((a, b) => a.date.localeCompare(b.date)), [movements])
+
+  const safeIdx = Math.min(idx, Math.max(0, accounts.length - 1))
+  const acc     = accounts[safeIdx]
+
+  const chartData = useMemo(() => {
+    if (!acc || sorted.length === 0) return []
+    return buildAccountHistory(acc, sorted, typeById).map(r => ({ label: r.label, [acc.name]: r.balance }))
+  }, [acc, sorted, typeById])
+
+  if (!acc) return null
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between mb-3">
+        <button onClick={() => setIdx(i => Math.max(0, i - 1))} disabled={safeIdx === 0}
+          className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 transition-colors">
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+        <div className="text-center">
+          <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: acc.color }}>{acc.name}</p>
+          <p className="text-lg font-bold text-gray-800 dark:text-white tabular-nums">{fmt(acc.balance)}</p>
+        </div>
+        <button onClick={() => setIdx(i => Math.min(accounts.length - 1, i + 1))} disabled={safeIdx === accounts.length - 1}
+          className="p-1 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 disabled:opacity-30 transition-colors">
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+      <div className="flex justify-center gap-1 mb-2">
+        {accounts.map((_, i) => (
+          <button key={i} onClick={() => setIdx(i)}
+            className={`w-1.5 h-1.5 rounded-full transition-colors ${i === safeIdx ? 'opacity-100' : 'opacity-30'}`}
+            style={{ backgroundColor: accounts[i].color }} />
+        ))}
+      </div>
+      <div className="flex-1">
+        <BalanceLineChart data={chartData} lines={[{ key: acc.name, color: acc.color }]} height={height - 80} />
+      </div>
+    </div>
   )
 }
 
@@ -918,8 +1007,6 @@ const BUILTIN_CHART_DEFS: { id: string; label: string; desc: string; Icon: Lucid
   { id: 'chart-expenses-line',      label: 'Gastos por categoría',          desc: 'Líneas por grupo a lo largo del año',           Icon: BarChart2,  defaultColSpan: 4 },
   { id: 'chart-expenses-pie',       label: 'Distribución de gastos',        desc: 'Donut con el total anual por grupo',             Icon: PieIcon,    defaultColSpan: 2 },
   { id: 'chart-balance',            label: 'Evolución del balance',         desc: 'Área con la evolución mensual del saldo',        Icon: TrendingUp, defaultColSpan: 2 },
-  { id: 'chart-balance-accounts',   label: 'Histórico de balance',          desc: 'Balance histórico por cuenta (todas las cuentas)', Icon: TrendingUp, defaultColSpan: 4 },
-  { id: 'chart-balance-combined',   label: 'Balance total histórico',       desc: 'Evolución del balance total de todas las cuentas', Icon: TrendingUp, defaultColSpan: 2 },
   { id: 'charts-monthly',      label: 'Ingresos y gastos por mes',      desc: 'Barras de ingresos y gastos mensuales',         Icon: BarChart2,  defaultColSpan: 4 },
   { id: 'charts-net',          label: 'Balance neto por mes',           desc: 'Balance neto por cada mes',                    Icon: TrendingUp, defaultColSpan: 2 },
   { id: 'charts-cumulative',   label: 'Balance acumulado',              desc: 'Balance acumulado de todos los movimientos',    Icon: TrendingUp, defaultColSpan: 2 },
@@ -943,6 +1030,12 @@ const METRIC_STAT_OPTIONS = [
 const SPECIAL_STAT_OPTIONS = [
   { id: 'stat-uso',      label: 'Cuenta de uso',   desc: 'Saldo de la cuenta principal',            Icon: CreditCard,      color: '#3b82f6' },
   { id: 'stat-accounts', label: 'Panel de ahorro', desc: 'Cuentas de ahorro con selector cíclico',  Icon: ChartCandlestick, color: '#f59e0b' },
+]
+
+const BALANCE_HISTORY_OPTIONS = [
+  { id: 'stat-balance-history',  label: 'Histórico de balance',        desc: 'Balance histórico de todas las cuentas en un gráfico', Icon: TrendingUp, color: '#6366f1', defaultColSpan: 4 },
+  { id: 'stat-balance-combined', label: 'Balance total histórico',     desc: 'Suma de todas las cuentas en una sola línea',          Icon: TrendingUp, color: '#3b82f6', defaultColSpan: 2 },
+  { id: 'stat-balance-cycle',    label: 'Balance cuenta a cuenta',     desc: 'Una cuenta a la vez, con flechas para cambiar',        Icon: TrendingUp, color: '#f59e0b', defaultColSpan: 2 },
 ]
 
 // ── NewBudgetForm ─────────────────────────────────────────────────────────────
@@ -1112,11 +1205,12 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
     ]
   }, [])
 
-  const availChartOptions = allChartOptions.filter(o => !existingIds.has(o.id))
-  const availMetrics      = METRIC_STAT_OPTIONS.filter(o => !existingIds.has(o.id))
-  const availSpecial      = SPECIAL_STAT_OPTIONS.filter(o => !existingIds.has(o.id))
-  const availAccounts     = accounts.filter(a => !existingIds.has(`stat-account-${a.id}`))
-  const availBudgets      = budgets.filter(b => !existingIds.has(b.id))
+  const availChartOptions  = allChartOptions.filter(o => !existingIds.has(o.id))
+  const availMetrics       = METRIC_STAT_OPTIONS.filter(o => !existingIds.has(o.id))
+  const availSpecial       = SPECIAL_STAT_OPTIONS.filter(o => !existingIds.has(o.id))
+  const availBalanceHist   = BALANCE_HISTORY_OPTIONS.filter(o => !existingIds.has(o.id))
+  const availAccounts      = accounts.filter(a => !existingIds.has(`stat-account-${a.id}`))
+  const availBudgets       = budgets.filter(b => !existingIds.has(b.id))
   const title = mode === 'chart' ? 'Añadir gráfico' : mode === 'stat' ? 'Añadir estadística' : 'Añadir presupuesto'
 
   return (
@@ -1167,7 +1261,7 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
 
           {/* Stat options */}
           {mode === 'stat' && (
-            availMetrics.length === 0 && availAccounts.length === 0 && availSpecial.length === 0 ? (
+            availMetrics.length === 0 && availAccounts.length === 0 && availSpecial.length === 0 && availBalanceHist.length === 0 ? (
               <p className="text-sm text-gray-400 dark:text-gray-500 px-4 py-3">Todos los paneles de estadística ya están en el dashboard</p>
             ) : (
               <>
@@ -1217,6 +1311,26 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
                     {availSpecial.map(o => (
                       <button key={o.id}
                         onClick={() => { onAdd({ id: o.id, colSpan: 1 }); onClose() }}
+                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
+                      >
+                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: o.color + '20' }}>
+                          <o.Icon className="w-4 h-4" style={{ color: o.color }} strokeWidth={1.5} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-gray-800 dark:text-white">{o.label}</p>
+                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{o.desc}</p>
+                        </div>
+                        <Plus className="w-4 h-4 text-gray-300 shrink-0" />
+                      </button>
+                    ))}
+                  </>
+                )}
+                {availBalanceHist.length > 0 && (
+                  <>
+                    <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-4 pt-3 pb-1 border-t border-gray-100 dark:border-gray-800 mt-1">Histórico</p>
+                    {availBalanceHist.map(o => (
+                      <button key={o.id}
+                        onClick={() => { onAdd({ id: o.id, colSpan: o.defaultColSpan }); onClose() }}
                         className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
                       >
                         <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: o.color + '20' }}>
@@ -1323,7 +1437,7 @@ export default function Dashboard() {
 
   const hasBudgetWidgets      = config.widgets.some(w => !w.id.startsWith('stat-') && !w.id.startsWith('chart-') && !w.id.startsWith('charts-') && !customChartDefs.some(c => c.id === w.id))
   const hasChartsBuiltins     = config.widgets.some(w => w.id.startsWith('charts-'))
-  const hasBalanceHistory     = config.widgets.some(w => w.id === 'chart-balance-accounts' || w.id === 'chart-balance-combined')
+  const hasBalanceHistory     = config.widgets.some(w => w.id.startsWith('stat-balance-'))
   const hasCustomChartWidgets = config.widgets.some(w => customChartDefs.some(c => c.id === w.id))
   const needsChartsData       = hasChartsBuiltins || hasCustomChartWidgets
 
@@ -1336,7 +1450,7 @@ export default function Dashboard() {
   })
   const { data: movementTypes = [] } = useQuery({
     queryKey: ['movement-types'], queryFn: getMovementTypes,
-    enabled: needsChartsData || (editMode && addMode === 'budget'),
+    enabled: needsChartsData || hasBalanceHistory || (editMode && addMode === 'budget'),
   })
 
   // Drag state
@@ -1375,7 +1489,7 @@ export default function Dashboard() {
   const PANEL = 'h-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5'
   const TITLE = 'text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
 
-  const isChartWidget = (id: string) => id.startsWith('chart-') || id.startsWith('charts-') || customChartDefs.some(c => c.id === id)
+  const isChartWidget = (id: string) => id.startsWith('chart-') || id.startsWith('charts-') || id.startsWith('stat-balance-') || customChartDefs.some(c => c.id === id)
 
   // Render widget content
   function renderContent(w: DashboardWidget, chartH: number) {
@@ -1419,16 +1533,21 @@ export default function Dashboard() {
         <BalanceEvolutionChart groups={annualData?.groups ?? []} year={year} initialTotal={initialTotal} height={chartH} />
       </div>
     )
-    if (w.id === 'chart-balance-accounts') return (
+    if (w.id === 'stat-balance-history') return (
       <div className={PANEL}>
         <h2 className={`${TITLE} mb-4`}>Histórico de balance por cuenta</h2>
-        <AccountBalanceHistoryChart accounts={allAccounts} movements={movements} combined={false} height={chartH} />
+        <AccountBalanceHistoryChart accounts={allAccounts} movements={movements} movementTypes={movementTypes} height={chartH} />
       </div>
     )
-    if (w.id === 'chart-balance-combined') return (
+    if (w.id === 'stat-balance-combined') return (
       <div className={PANEL}>
         <h2 className={`${TITLE} mb-4`}>Balance total histórico</h2>
-        <AccountBalanceHistoryChart accounts={allAccounts} movements={movements} combined={true} height={chartH} />
+        <CombinedBalanceHistoryChart accounts={allAccounts} movements={movements} movementTypes={movementTypes} height={chartH} />
+      </div>
+    )
+    if (w.id === 'stat-balance-cycle') return (
+      <div className={PANEL}>
+        <CyclingBalanceHistoryChart accounts={allAccounts} movements={movements} movementTypes={movementTypes} height={chartH} />
       </div>
     )
 
