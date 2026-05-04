@@ -1,4 +1,4 @@
-﻿import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { getAccountsSummary, createAccount, updateAccountFull, deleteAccount, type Account } from '../api/accounts'

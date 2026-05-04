@@ -1,4 +1,4 @@
-﻿import React, { useRef, useState, useEffect, useMemo } from 'react'
+import React, { useRef, useState, useEffect, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getAnnualStats } from '../api/stats'
 import { getMovements } from '../api/movements'

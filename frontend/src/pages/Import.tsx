@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { Upload, ChevronRight, ChevronLeft, Check, AlertCircle, FileSpreadsheet, X } from 'lucide-react'

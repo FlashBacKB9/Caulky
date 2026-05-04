@@ -1,4 +1,4 @@
-﻿import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { useQuery, useQueries } from '@tanstack/react-query'
 import {
   ResponsiveContainer, ComposedChart, AreaChart, Area,

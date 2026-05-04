@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMovements, updateMovement, deleteMovement, createMovement, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
