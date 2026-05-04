@@ -1,21 +1,7 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Home, List, BarChart2, LineChart, Settings, Wallet, Upload, ChartCandlestick, TrendingUp, Info, X, ExternalLink, BookOpen, GitCompare, Landmark } from 'lucide-react'
-
-const BASE_LINKS = [
-  { to: '/',          label: 'Dashboard',       Icon: Home },
-  { to: '/movements', label: 'Movimientos',      Icon: List },
-  { to: '/cuentas',   label: 'Cuentas',          Icon: Landmark },
-  { to: '/annual',    label: 'Finanzas del Año', Icon: BarChart2 },
-  { to: '/charts',        label: 'Gráficos',         Icon: LineChart },
-  { to: '/comparaciones', label: 'Comparaciones',    Icon: GitCompare },
-  { to: '/budgets',       label: 'Presupuestos',     Icon: ChartCandlestick },
-  { to: '/import',    label: 'Importar Excel',   Icon: Upload },
-  { to: '/docs',      label: 'Documentación',    Icon: BookOpen },
-  { to: '/settings',  label: 'Configuración',    Icon: Settings },
-]
-
-const INVESTMENTS_LINK = { to: '/inversiones', label: 'Inversiones', Icon: TrendingUp }
+import { Wallet, Settings, Info, X, ExternalLink } from 'lucide-react'
+import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 
 function InfoModal({ onClose }: { onClose: () => void }) {
   return (
@@ -32,7 +18,6 @@ function InfoModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <div className="px-5 py-4 space-y-5 text-sm">
-          {/* Autor */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">Desarrollado por</p>
             <a
@@ -45,7 +30,6 @@ function InfoModal({ onClose }: { onClose: () => void }) {
             </a>
           </div>
 
-          {/* APIs externas */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">APIs y servicios externos</p>
             <div className="space-y-1.5">
@@ -57,7 +41,6 @@ function InfoModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {/* Frontend */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">Frontend</p>
             <div className="space-y-1.5">
@@ -78,7 +61,6 @@ function InfoModal({ onClose }: { onClose: () => void }) {
             </div>
           </div>
 
-          {/* Backend */}
           <div>
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">Backend</p>
             <div className="space-y-1.5">
@@ -104,19 +86,19 @@ function InfoModal({ onClose }: { onClose: () => void }) {
 }
 
 export default function Sidebar() {
-  const [showInvestments, setShowInvestments] = useState(() => localStorage.getItem('caulky-show-investments') === 'true')
+  const navEntries = useNavConfig()
   const [showInfo, setShowInfo] = useState(false)
 
-  useEffect(() => {
-    const handler = (e: StorageEvent) => {
-      if (e.key === 'caulky-show-investments') setShowInvestments(e.newValue === 'true')
-    }
-    window.addEventListener('storage', handler)
-    return () => window.removeEventListener('storage', handler)
-  }, [])
-  const links = showInvestments
-    ? [...BASE_LINKS.slice(0, 3), INVESTMENTS_LINK, ...BASE_LINKS.slice(3)]
-    : BASE_LINKS
+  const visibleLinks = navEntries
+    .filter(e => e.visible && PAGE_META[e.id])
+    .map(e => ({ to: e.id, ...PAGE_META[e.id] }))
+
+  const linkCls = (isActive: boolean) =>
+    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+      isActive
+        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
+        : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200'
+    }`
 
   return (
     <>
@@ -126,26 +108,29 @@ export default function Sidebar() {
           <Wallet className="w-5 h-5 text-gray-800 dark:text-white" strokeWidth={1.5} />
           <span className="font-bold text-lg text-gray-800 dark:text-white">Caulky</span>
         </div>
+
         <nav className="flex-1 px-3 py-4 space-y-1">
-          {links.map(({ to, label, Icon }) => (
+          {visibleLinks.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
-              className={({ isActive }) =>
-                `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                  isActive
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
-                    : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200'
-                }`
-              }
+              className={({ isActive }) => linkCls(isActive)}
             >
               <Icon className="w-4 h-4" strokeWidth={1.5} />
               {label}
             </NavLink>
           ))}
         </nav>
-        <div className="px-3 pb-4 border-t border-gray-100 dark:border-gray-800 pt-3">
+
+        <div className="px-3 pb-4 border-t border-gray-100 dark:border-gray-800 pt-3 space-y-1">
+          <NavLink
+            to="/settings"
+            className={({ isActive }) => linkCls(isActive)}
+          >
+            <Settings className="w-4 h-4" strokeWidth={1.5} />
+            Configuración
+          </NavLink>
           <button
             onClick={() => setShowInfo(true)}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"

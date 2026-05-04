@@ -12,9 +12,10 @@ import { useDarkMode } from '../hooks/useDarkMode'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat, DATE_FORMATS } from '../hooks/useDateFormat'
 import { useUiZoom } from '../hooks/useUiZoom'
+import { loadNavConfig, saveNavConfig, PAGE_META, type NavEntry } from '../hooks/useNavConfig'
 import {
-  Pencil, Sun, Moon, Lock, Trash2, Plus, Check, X, ChevronRight, ChevronDown, LayoutDashboard,
-  Download, Upload, AlertTriangle,
+  Pencil, Sun, Moon, Lock, Trash2, Plus, Check, X, ChevronRight, ChevronDown, ChevronUp,
+  LayoutDashboard, Download, Upload, AlertTriangle,
 } from 'lucide-react'
 import AppIcon, { ICON_KEYS } from '../components/AppIcon'
 
@@ -706,13 +707,70 @@ function TypesSection() {
 }
 
 
-// ── Settings page ─────────────────────────────────────────────────────────────
+// ── Shared layout helpers ─────────────────────────────────────────────────────
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="space-y-3">
       <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">{title}</h2>
       {children}
+    </div>
+  )
+}
+
+// ── Nav config section ────────────────────────────────────────────────────────
+
+function NavSection({ entries, onChange }: { entries: NavEntry[]; onChange: (e: NavEntry[]) => void }) {
+  const toggle = (id: string) =>
+    onChange(entries.map(e => e.id === id ? { ...e, visible: !e.visible } : e))
+
+  const move = (id: string, dir: -1 | 1) => {
+    const idx = entries.findIndex(e => e.id === id)
+    if (idx < 0) return
+    const target = idx + dir
+    if (target < 0 || target >= entries.length) return
+    const next = [...entries]
+    ;[next[idx], next[target]] = [next[target], next[idx]]
+    onChange(next)
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
+      {entries.map((entry, i) => {
+        const meta = PAGE_META[entry.id]
+        if (!meta) return null
+        const Icon = meta.Icon
+        return (
+          <div key={entry.id} className="flex items-center gap-2 px-3 py-2.5">
+            <div className="flex flex-col -space-y-0.5 shrink-0">
+              <button onClick={() => move(entry.id, -1)} disabled={i === 0}
+                className="p-0.5 text-gray-300 dark:text-gray-700 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-20 transition-colors">
+                <ChevronUp className="w-3 h-3" />
+              </button>
+              <button onClick={() => move(entry.id, 1)} disabled={i === entries.length - 1}
+                className="p-0.5 text-gray-300 dark:text-gray-700 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-20 transition-colors">
+                <ChevronDown className="w-3 h-3" />
+              </button>
+            </div>
+            <Icon className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" strokeWidth={1.5} />
+            <span className={`flex-1 text-sm transition-colors ${
+              entry.visible ? 'text-gray-700 dark:text-gray-200' : 'text-gray-300 dark:text-gray-600'
+            }`}>
+              {meta.label}
+            </span>
+            <button
+              onClick={() => toggle(entry.id)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none shrink-0 ${
+                entry.visible ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                entry.visible ? 'translate-x-4' : 'translate-x-0.5'
+              }`} />
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -1090,15 +1148,11 @@ export default function Settings() {
   const { zoom, setZoom, inc: zoomIn, dec: zoomOut, min: zoomMin, max: zoomMax } = useUiZoom()
   const { data, isLoading } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
   const navigate = useNavigate()
-  const [showInvestments, setShowInvestments] = useState(
-    () => localStorage.getItem('caulky-show-investments') === 'true'
-  )
+  const [navEntries, setNavEntries] = useState<NavEntry[]>(loadNavConfig)
 
-  function toggleInvestments() {
-    const next = !showInvestments
-    setShowInvestments(next)
-    localStorage.setItem('caulky-show-investments', String(next))
-    window.dispatchEvent(new StorageEvent('storage', { key: 'caulky-show-investments', newValue: String(next) }))
+  function updateNav(next: NavEntry[]) {
+    setNavEntries(next)
+    saveNavConfig(next)
   }
 
   if (isLoading) return <div className="p-8 text-gray-500">Cargando...</div>
@@ -1108,9 +1162,9 @@ export default function Settings() {
     <div className="p-6 space-y-6">
       <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Configuración</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
 
-        {/* ── Col 1: apariencia, módulos, cuentas ───────────────────── */}
+        {/* ── Col izquierda: preferencias ──────────────────────────── */}
         <div className="space-y-6">
 
           <Section title="Apariencia">
@@ -1180,35 +1234,12 @@ export default function Settings() {
             </div>
           </Section>
 
-          <Section title="Módulos">
-            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
-              <div className="flex items-center justify-between px-4 py-3">
-                <div>
-                  <p className="text-sm text-gray-700 dark:text-gray-200">Inversiones</p>
-                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Versión simple</p>
-                </div>
-                <button
-                  onClick={toggleInvestments}
-                  className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none ${
-                    showInvestments ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'
-                  }`}
-                >
-                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                    showInvestments ? 'translate-x-4' : 'translate-x-0.5'
-                  }`} />
-                </button>
-              </div>
-            </div>
+          <Section title="Navegación">
+            <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
+              Elige qué páginas aparecen en el menú lateral y en qué orden.
+            </p>
+            <NavSection entries={navEntries} onChange={updateNav} />
           </Section>
-
-          <Section title="Cuentas">
-            <AccountsSection accounts={data.accounts} fmt={fmt} />
-          </Section>
-
-        </div>
-
-        {/* ── Col 2: dashboard, backup, reset ───────────────────────── */}
-        <div className="space-y-6">
 
           <Section title="Dashboard">
             <button
@@ -1235,11 +1266,17 @@ export default function Settings() {
 
         </div>
 
-        {/* ── Col 3: tipos de movimiento ─────────────────────────────── */}
-        <div>
+        {/* ── Col derecha: configuración inicial ────────────────────── */}
+        <div className="space-y-6">
+
+          <Section title="Cuentas">
+            <AccountsSection accounts={data.accounts} fmt={fmt} />
+          </Section>
+
           <Section title="Tipos de movimiento">
             <TypesSection />
           </Section>
+
         </div>
 
       </div>
