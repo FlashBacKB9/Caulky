@@ -17,7 +17,7 @@ import { AuthProvider, useAuth } from './context/AuthContext'
 import { useDarkMode } from './hooks/useDarkMode'
 import { useUiZoom } from './hooks/useUiZoom'
 
-const queryClient = new QueryClient({
+export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60_000,

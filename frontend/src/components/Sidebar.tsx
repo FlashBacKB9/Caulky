@@ -4,6 +4,7 @@ import { Wallet, Settings, Info, X, ExternalLink, LogOut } from 'lucide-react'
 import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 import { logout } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
+import { queryClient } from '../App'
 
 function InfoModal({ onClose }: { onClose: () => void }) {
   return (
@@ -95,6 +96,7 @@ export default function Sidebar() {
 
   async function handleLogout() {
     await logout().catch(() => {})
+    queryClient.clear()
     setUser(null)
     navigate('/login', { replace: true })
   }

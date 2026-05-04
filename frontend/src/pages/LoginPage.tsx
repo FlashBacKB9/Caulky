@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Wallet, Eye, EyeOff } from 'lucide-react'
 import { login, register, getMe, claimData } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
+import { queryClient } from '../App'
 
 export default function LoginPage() {
   const { setUser } = useAuth()
@@ -27,6 +28,7 @@ export default function LoginPage() {
         await register(email, password, name || undefined)
         await login(email, password)
       }
+      queryClient.clear()
       const u = await getMe()
       await claimData().catch(() => {})
       setUser(u)
