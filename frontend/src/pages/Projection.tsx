@@ -618,7 +618,7 @@ export default function Projection() {
                 <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">Años de proyección</span>
                 <select className={INP_SM} value={cfg.projectionYears}
                   onChange={e => setPatch({ projectionYears: parseInt(e.target.value) })}>
-                  {[5, 10, 15, 20, 30].map(n => <option key={n} value={n}>{n} años</option>)}
+                  {[5, 10, 15, 20, 25, 30, 35, 40].map(n => <option key={n} value={n}>{n} años</option>)}
                 </select>
               </div>
               <div className="flex items-center gap-3 px-4 py-3">
