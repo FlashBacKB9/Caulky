@@ -1099,13 +1099,23 @@ function PluginsSection() {
       </div>
 
       <input ref={fileRef} type="file" accept=".js" onChange={handleFile} className="sr-only" />
-      <button
-        onClick={() => fileRef.current?.click()}
-        className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
-      >
-        <Upload className="w-4 h-4" />
-        Instalar plugin (.js)
-      </button>
+      <div className="flex gap-2">
+        <button
+          onClick={() => fileRef.current?.click()}
+          className="flex items-center gap-2 flex-1 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+        >
+          <Upload className="w-4 h-4" />
+          Instalar plugin (.js)
+        </button>
+        <a
+          href="/plugins/fuente-personalizada.js"
+          download="fuente-personalizada.js"
+          className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors whitespace-nowrap"
+        >
+          <Download className="w-4 h-4" />
+          Plugin ejemplo
+        </a>
+      </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
     </div>
   )
