@@ -1,4 +1,6 @@
-from sqlalchemy import Boolean, Numeric, String, Text, Integer
+import uuid
+from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text, Integer
+from sqlalchemy.dialects.postgresql import UUID as PUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -14,5 +16,8 @@ class Account(Base):
     initial_balance: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_main: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+    )
 
     movements: Mapped[list["Movement"]] = relationship(back_populates="account")

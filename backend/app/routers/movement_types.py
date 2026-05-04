@@ -5,6 +5,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.movement_type import MovementType
 from app.schemas.movement_type import MovementTypeCreate, MovementTypeRead, MovementTypeUpdate
+from app.auth.setup import current_active_user
+from app.models.user import User
 
 router = APIRouter(prefix="/movement-types", tags=["movement_types"])
 
@@ -16,9 +18,10 @@ def _with_color(mt: MovementType) -> MovementTypeRead:
 
 
 @router.get("", response_model=list[MovementTypeRead])
-async def list_types(db: AsyncSession = Depends(get_db)):
+async def list_types(db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     result = await db.execute(
         select(MovementType)
+        .where(MovementType.user_id == user.id)
         .options(selectinload(MovementType.income_expense_group))
         .order_by(MovementType.income_expense_group_id, MovementType.name)
     )
@@ -26,8 +29,8 @@ async def list_types(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("", response_model=MovementTypeRead, status_code=201)
-async def create_type(body: MovementTypeCreate, db: AsyncSession = Depends(get_db)):
-    mt = MovementType(**body.model_dump())
+async def create_type(body: MovementTypeCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    mt = MovementType(**body.model_dump(), user_id=user.id)
     db.add(mt)
     await db.commit()
     result = await db.execute(
@@ -38,9 +41,9 @@ async def create_type(body: MovementTypeCreate, db: AsyncSession = Depends(get_d
 
 
 @router.get("/{type_id}", response_model=MovementTypeRead)
-async def get_type(type_id: int, db: AsyncSession = Depends(get_db)):
+async def get_type(type_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     result = await db.execute(
-        select(MovementType).where(MovementType.id == type_id)
+        select(MovementType).where(MovementType.id == type_id, MovementType.user_id == user.id)
         .options(selectinload(MovementType.income_expense_group))
     )
     mt = result.scalar_one_or_none()
@@ -50,9 +53,9 @@ async def get_type(type_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/{type_id}", response_model=MovementTypeRead)
-async def update_type(type_id: int, body: MovementTypeUpdate, db: AsyncSession = Depends(get_db)):
+async def update_type(type_id: int, body: MovementTypeUpdate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     result = await db.execute(
-        select(MovementType).where(MovementType.id == type_id)
+        select(MovementType).where(MovementType.id == type_id, MovementType.user_id == user.id)
         .options(selectinload(MovementType.income_expense_group))
     )
     mt = result.scalar_one_or_none()
@@ -69,9 +72,9 @@ async def update_type(type_id: int, body: MovementTypeUpdate, db: AsyncSession =
 
 
 @router.delete("/{type_id}", status_code=204)
-async def delete_type(type_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_type(type_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     mt = await db.get(MovementType, type_id)
-    if not mt:
+    if not mt or mt.user_id != user.id:
         raise HTTPException(status_code=404, detail="Movement type not found")
     await db.delete(mt)
     await db.commit()

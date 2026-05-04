@@ -1,5 +1,7 @@
+import uuid
 from sqlalchemy import ForeignKey, Numeric, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.dialects.postgresql import UUID as PUUID
+from sqlalchemy.orm import Mapped, mapped_column
 from app.database import Base
 
 
@@ -15,6 +17,9 @@ class InvestmentFund(Base):
     current_value_override: Mapped[float | None] = mapped_column(Numeric(14, 2), nullable=True)
     movement_type_id: Mapped[int | None] = mapped_column(
         ForeignKey("movement_types.id", ondelete="SET NULL"), nullable=True
+    )
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        PUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
 
 

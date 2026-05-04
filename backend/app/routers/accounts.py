@@ -1,3 +1,4 @@
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select, func, case, delete as sa_delete, update as sa_update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,18 +7,17 @@ from app.models.account import Account
 from app.models.movement import Movement
 from app.models.movement_type import MovementType
 from app.models.income_expense_group import IncomeExpenseGroup
-from app.schemas.account import AccountRead, AccountCreate, AccountPatch, AccountUpdate
+from app.schemas.account import AccountRead, AccountCreate, AccountPatch
+from app.auth.setup import current_active_user
+from app.models.user import User
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 
-async def _compute_balances(db: AsyncSession) -> dict[int, float]:
-    """
-    Two SQL aggregations replace the Python loop over all movements:
-    1. One query sums compute_dinero (via CASE) for the main account.
-    2. One query sums raw money grouped by linked_account_id for savings accounts.
-    """
-    accounts_res = await db.execute(select(Account).order_by(Account.sort_order))
+async def _compute_balances(db: AsyncSession, user_id: uuid.UUID) -> dict[int, float]:
+    accounts_res = await db.execute(
+        select(Account).where(Account.user_id == user_id).order_by(Account.sort_order)
+    )
     accounts = accounts_res.scalars().all()
     balances: dict[int, float] = {a.id: 0.0 for a in accounts}
     main_ids = [a.id for a in accounts if a.is_main]
@@ -25,10 +25,6 @@ async def _compute_balances(db: AsyncSession) -> dict[int, float]:
     if not main_ids:
         return balances
 
-    # compute_dinero logic as SQL CASE:
-    # money < 0  → refund  → +abs(money)
-    # group = 'Ingreso' → income → +abs(money)
-    # else → expense → -abs(money)
     dinero_expr = case(
         (Movement.money < 0, func.abs(Movement.money)),
         (IncomeExpenseGroup.name == "Ingreso", func.abs(Movement.money)),
@@ -37,6 +33,7 @@ async def _compute_balances(db: AsyncSession) -> dict[int, float]:
 
     main_res = await db.execute(
         select(func.coalesce(func.sum(dinero_expr), 0))
+        .where(Movement.user_id == user_id)
         .outerjoin(MovementType, Movement.movement_type_id == MovementType.id)
         .outerjoin(IncomeExpenseGroup, MovementType.income_expense_group_id == IncomeExpenseGroup.id)
     )
@@ -47,7 +44,7 @@ async def _compute_balances(db: AsyncSession) -> dict[int, float]:
     savings_res = await db.execute(
         select(MovementType.linked_account_id, func.sum(Movement.money))
         .join(Movement, Movement.movement_type_id == MovementType.id)
-        .where(MovementType.linked_account_id.is_not(None))
+        .where(MovementType.linked_account_id.is_not(None), Movement.user_id == user_id)
         .group_by(MovementType.linked_account_id)
     )
     for account_id, total in savings_res.all():
@@ -57,10 +54,12 @@ async def _compute_balances(db: AsyncSession) -> dict[int, float]:
     return balances
 
 
-async def _build_account_items(db: AsyncSession) -> list[AccountRead]:
-    result = await db.execute(select(Account).order_by(Account.sort_order))
+async def _build_account_items(db: AsyncSession, user_id: uuid.UUID) -> list[AccountRead]:
+    result = await db.execute(
+        select(Account).where(Account.user_id == user_id).order_by(Account.sort_order)
+    )
     accounts = result.scalars().all()
-    balances = await _compute_balances(db)
+    balances = await _compute_balances(db, user_id)
     items = []
     for a in accounts:
         data = AccountRead.model_validate(a)
@@ -70,24 +69,27 @@ async def _build_account_items(db: AsyncSession) -> list[AccountRead]:
 
 
 @router.get("", response_model=list[AccountRead])
-async def list_accounts(db: AsyncSession = Depends(get_db)):
-    return await _build_account_items(db)
+async def list_accounts(db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    return await _build_account_items(db, user.id)
 
 
 @router.get("/summary")
-async def accounts_summary(db: AsyncSession = Depends(get_db)):
-    items = await _build_account_items(db)
+async def accounts_summary(db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    items = await _build_account_items(db, user.id)
     total = sum(item.balance for item in items)
     return {"accounts": items, "total": total}
 
 
 @router.post("", response_model=AccountRead, status_code=201)
-async def create_account(body: AccountCreate, db: AsyncSession = Depends(get_db)):
-    res = await db.execute(select(func.max(Account.sort_order)))
+async def create_account(body: AccountCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    res = await db.execute(
+        select(func.max(Account.sort_order)).where(Account.user_id == user.id)
+    )
     max_order = res.scalar() or 0
     account = Account(
         name=body.name, color=body.color, icon=body.icon,
-        initial_balance=body.initial_balance, sort_order=max_order + 1, is_main=False,
+        initial_balance=body.initial_balance, sort_order=max_order + 1,
+        is_main=False, user_id=user.id,
     )
     db.add(account)
     await db.commit()
@@ -98,14 +100,14 @@ async def create_account(body: AccountCreate, db: AsyncSession = Depends(get_db)
 
 
 @router.put("/{account_id}", response_model=AccountRead)
-async def update_account(account_id: int, body: AccountPatch, db: AsyncSession = Depends(get_db)):
+async def update_account(account_id: int, body: AccountPatch, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     account = await db.get(Account, account_id)
-    if not account:
+    if not account or account.user_id != user.id:
         raise HTTPException(status_code=404, detail="Account not found")
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(account, k, v)
     await db.commit()
-    balances = await _compute_balances(db)
+    balances = await _compute_balances(db, user.id)
     data = AccountRead.model_validate(account)
     data.balance = float(account.initial_balance) + balances.get(account.id, 0.0)
     return data
@@ -117,20 +119,19 @@ async def delete_account(
     delete_movements: bool = Query(False),
     convert_to_expense: bool = Query(False),
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
 ):
     account = await db.get(Account, account_id)
-    if not account:
+    if not account or account.user_id != user.id:
         raise HTTPException(status_code=404, detail="Account not found")
     if account.is_main:
         raise HTTPException(status_code=400, detail="Cannot delete the main account")
 
-    # Movement types that feed this savings account (linked_account_id → this account)
     types_res = await db.execute(
         select(MovementType.id).where(MovementType.linked_account_id == account_id)
     )
     linked_type_ids = [r[0] for r in types_res.all()]
 
-    # Count all associated movements
     count = 0
     if linked_type_ids:
         r = await db.execute(
@@ -140,18 +141,14 @@ async def delete_account(
     r2 = await db.execute(select(func.count(Movement.id)).where(Movement.account_id == account_id))
     count += r2.scalar() or 0
 
-    # Neither option chosen → tell the client how many movements exist
     if count > 0 and not delete_movements and not convert_to_expense:
         raise HTTPException(status_code=409, detail=str(count))
 
     if delete_movements:
-        # Remove the movements entirely
         if linked_type_ids:
             await db.execute(sa_delete(Movement).where(Movement.movement_type_id.in_(linked_type_ids)))
         await db.execute(sa_delete(Movement).where(Movement.account_id == account_id))
 
-    # Always unlink movement types so the FK doesn't block deletion
-    # (for convert_to_expense this is the whole point; for delete it's cleanup)
     if linked_type_ids:
         await db.execute(
             sa_update(MovementType)

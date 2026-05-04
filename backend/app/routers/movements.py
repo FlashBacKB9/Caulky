@@ -6,9 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.movement import Movement
 from app.models.movement_type import MovementType
-from app.models.income_expense_group import IncomeExpenseGroup
 from app.schemas.movement import MovementCreate, MovementRead, MovementUpdate
 from app.services.calculations import compute_dinero, compute_label
+from app.auth.setup import current_active_user
+from app.models.user import User
 
 router = APIRouter(prefix="/movements", tags=["movements"])
 
@@ -34,8 +35,9 @@ async def list_movements(
     month: int | None = Query(None),
     unassigned: bool = Query(False),
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
 ):
-    q = select(Movement).options(
+    q = select(Movement).where(Movement.user_id == user.id).options(
         selectinload(Movement.movement_type).selectinload(MovementType.income_expense_group)
     )
     if year:
@@ -50,16 +52,10 @@ async def list_movements(
 
 
 @router.post("", response_model=MovementRead, status_code=201)
-async def create_movement(body: MovementCreate, db: AsyncSession = Depends(get_db)):
-    mv = Movement(**body.model_dump())
+async def create_movement(body: MovementCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    mv = Movement(**body.model_dump(), user_id=user.id)
     db.add(mv)
     await db.commit()
-    await db.refresh(mv)
-    await db.execute(
-        select(Movement).where(Movement.id == mv.id).options(
-            selectinload(Movement.movement_type).selectinload(MovementType.income_expense_group)
-        )
-    )
     result = await db.execute(
         select(Movement).where(Movement.id == mv.id).options(
             selectinload(Movement.movement_type).selectinload(MovementType.income_expense_group)
@@ -69,9 +65,9 @@ async def create_movement(body: MovementCreate, db: AsyncSession = Depends(get_d
 
 
 @router.get("/{movement_id}", response_model=MovementRead)
-async def get_movement(movement_id: int, db: AsyncSession = Depends(get_db)):
+async def get_movement(movement_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     result = await db.execute(
-        select(Movement).where(Movement.id == movement_id).options(
+        select(Movement).where(Movement.id == movement_id, Movement.user_id == user.id).options(
             selectinload(Movement.movement_type).selectinload(MovementType.income_expense_group)
         )
     )
@@ -82,9 +78,9 @@ async def get_movement(movement_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/{movement_id}", response_model=MovementRead)
-async def update_movement(movement_id: int, body: MovementUpdate, db: AsyncSession = Depends(get_db)):
+async def update_movement(movement_id: int, body: MovementUpdate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     result = await db.execute(
-        select(Movement).where(Movement.id == movement_id).options(
+        select(Movement).where(Movement.id == movement_id, Movement.user_id == user.id).options(
             selectinload(Movement.movement_type).selectinload(MovementType.income_expense_group)
         )
     )
@@ -103,9 +99,9 @@ async def update_movement(movement_id: int, body: MovementUpdate, db: AsyncSessi
 
 
 @router.delete("/{movement_id}", status_code=204)
-async def delete_movement(movement_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_movement(movement_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     mv = await db.get(Movement, movement_id)
-    if not mv:
+    if not mv or mv.user_id != user.id:
         raise HTTPException(status_code=404, detail="Movement not found")
     await db.delete(mv)
     await db.commit()

@@ -10,3 +10,5 @@ pydantic-settings>=2.5.2
 python-dotenv>=1.0.1
 python-multipart>=0.0.9
 openpyxl>=3.1.2
+fastapi-users[sqlalchemy,oauth]>=12.1.0
+httpx-oauth>=0.14.0

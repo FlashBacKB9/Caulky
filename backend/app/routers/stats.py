@@ -1,3 +1,4 @@
+import uuid
 from datetime import date
 from typing import Optional
 from fastapi import APIRouter, Depends, Query
@@ -11,6 +12,8 @@ from app.models.movement import Movement
 from app.models.account import Account
 from app.services.calculations import compute_dinero, MONTH_NAMES, monthly_value
 from app.routers.accounts import _compute_balances
+from app.auth.setup import current_active_user
+from app.models.user import User
 
 router = APIRouter(prefix="/stats", tags=["stats"])
 
@@ -18,7 +21,6 @@ SAVINGS_GROUPS = {"Ahorro", "Gastos Anuales", "Inversión"}
 
 
 def _effective_money(mv) -> float:
-    """Money used for stats: full amount for account balance, shared part for category stats."""
     money = float(mv.money)
     if not mv.is_shared:
         return money
@@ -29,16 +31,20 @@ def _effective_money(mv) -> float:
     return money
 
 
-def _groups_with_year(year: int):
-    """Build a query that loads groups+types+movements filtered to the given year at the DB level."""
+def _groups_with_year(year: int, user_id: uuid.UUID):
     return (
         select(IncomeExpenseGroup)
-        .outerjoin(MovementType, MovementType.income_expense_group_id == IncomeExpenseGroup.id)
+        .where(IncomeExpenseGroup.user_id == user_id)
+        .outerjoin(MovementType, and_(
+            MovementType.income_expense_group_id == IncomeExpenseGroup.id,
+            MovementType.user_id == user_id,
+        ))
         .outerjoin(
             Movement,
             and_(
                 Movement.movement_type_id == MovementType.id,
                 extract("year", Movement.date) == year,
+                Movement.user_id == user_id,
             ),
         )
         .options(
@@ -50,8 +56,12 @@ def _groups_with_year(year: int):
 
 
 @router.get("/annual")
-async def annual_stats(year: int = Query(default=date.today().year), db: AsyncSession = Depends(get_db)):
-    result = await db.execute(_groups_with_year(year))
+async def annual_stats(
+    year: int = Query(default=date.today().year),
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    result = await db.execute(_groups_with_year(year, user.id))
     groups = result.unique().scalars().all()
 
     output = []
@@ -110,12 +120,13 @@ async def dashboard(
     year: int = Query(default=date.today().year),
     month: Optional[int] = Query(default=None),
     db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
 ):
     today = date.today()
     current_month = month if month is not None else today.month
     current_month_name = MONTH_NAMES[current_month - 1]
 
-    result = await db.execute(_groups_with_year(year))
+    result = await db.execute(_groups_with_year(year, user.id))
     groups = result.unique().scalars().all()
 
     annual = {"income": 0.0, "expenses": 0.0, "savings": 0.0}
@@ -157,9 +168,11 @@ async def dashboard(
                 "percent": min(100, round(abs(group_monthly) / float(group.budget) * 100, 1)),
             })
 
-    accounts_result = await db.execute(select(Account).order_by(Account.sort_order))
+    accounts_result = await db.execute(
+        select(Account).where(Account.user_id == user.id).order_by(Account.sort_order)
+    )
     accounts = accounts_result.scalars().all()
-    balances = await _compute_balances(db)
+    balances = await _compute_balances(db, user.id)
     account_map = {a.name: float(a.initial_balance) + balances.get(a.id, 0.0) for a in accounts}
 
     uso_balance = account_map.get("De uso", 0.0)

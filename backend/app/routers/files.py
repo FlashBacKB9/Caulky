@@ -7,6 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.movement import Movement
 from app.models.movement_file import MovementFile
+from app.auth.setup import current_active_user
+from app.models.user import User
 
 UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -15,9 +17,14 @@ router = APIRouter(prefix="/movements", tags=["files"])
 
 
 @router.post("/{movement_id}/files")
-async def upload_files(movement_id: int, files: list[UploadFile], db: AsyncSession = Depends(get_db)):
+async def upload_files(
+    movement_id: int,
+    files: list[UploadFile],
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
     mv = await db.get(Movement, movement_id)
-    if not mv:
+    if not mv or mv.user_id != user.id:
         raise HTTPException(status_code=404, detail="Movement not found")
 
     saved = []
@@ -43,7 +50,14 @@ async def upload_files(movement_id: int, files: list[UploadFile], db: AsyncSessi
 
 
 @router.get("/{movement_id}/files")
-async def list_files(movement_id: int, db: AsyncSession = Depends(get_db)):
+async def list_files(
+    movement_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    mv = await db.get(Movement, movement_id)
+    if not mv or mv.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Movement not found")
     result = await db.execute(
         select(MovementFile).where(MovementFile.movement_id == movement_id)
     )
@@ -54,10 +68,13 @@ async def list_files(movement_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.get("/files/{file_id}/download")
-async def download_file(file_id: int, db: AsyncSession = Depends(get_db)):
+async def download_file(file_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     f = await db.get(MovementFile, file_id)
     if not f:
         raise HTTPException(status_code=404, detail="File not found")
+    mv = await db.get(Movement, f.movement_id)
+    if not mv or mv.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     path = os.path.join(UPLOAD_DIR, f.filename)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="File missing on disk")
@@ -65,10 +82,13 @@ async def download_file(file_id: int, db: AsyncSession = Depends(get_db)):
 
 
 @router.delete("/files/{file_id}", status_code=204)
-async def delete_file(file_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_file(file_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     f = await db.get(MovementFile, file_id)
     if not f:
         raise HTTPException(status_code=404, detail="File not found")
+    mv = await db.get(Movement, f.movement_id)
+    if not mv or mv.user_id != user.id:
+        raise HTTPException(status_code=403, detail="Forbidden")
     path = os.path.join(UPLOAD_DIR, f.filename)
     if os.path.exists(path):
         os.remove(path)

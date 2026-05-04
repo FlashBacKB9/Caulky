@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import Sidebar from './components/Sidebar'
 import Dashboard from './pages/Dashboard'
@@ -12,14 +12,16 @@ import Investments from './pages/Investments'
 import Documentation from './pages/Documentation'
 import Comparaciones from './pages/Comparaciones'
 import AccountsPage from './pages/AccountsPage'
+import LoginPage from './pages/LoginPage'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import { useDarkMode } from './hooks/useDarkMode'
 import { useUiZoom } from './hooks/useUiZoom'
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 60_000,  // 1 min — no refetch on quick navigation
-      gcTime:    300_000, // 5 min — keep in memory while browsing
+      staleTime: 60_000,
+      gcTime:    300_000,
     },
   },
 })
@@ -49,11 +51,32 @@ function Layout() {
   )
 }
 
+function AppRoutes() {
+  const { user, loading } = useAuth()
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
+        <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-800 dark:border-t-white rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <Routes>
+      <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/*" element={user ? <Layout /> : <Navigate to="/login" replace />} />
+    </Routes>
+  )
+}
+
 export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <Layout />
+        <AuthProvider>
+          <AppRoutes />
+        </AuthProvider>
       </BrowserRouter>
     </QueryClientProvider>
   )

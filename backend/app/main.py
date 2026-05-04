@@ -3,7 +3,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 from alembic.config import Config
 from alembic import command
-from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments
+from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin
+from app.auth.setup import fastapi_users, auth_backend, google_oauth_client
+from app.auth.schemas import UserRead, UserCreate, UserUpdate
 from app.config import settings
 
 
@@ -14,7 +16,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="Caulky API", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Caulky API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -24,6 +26,35 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ── Auth routes ────────────────────────────────────────────────────────────────
+app.include_router(
+    fastapi_users.get_auth_router(auth_backend),
+    prefix="/api/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_register_router(UserRead, UserCreate),
+    prefix="/api/auth",
+    tags=["auth"],
+)
+app.include_router(
+    fastapi_users.get_users_router(UserRead, UserUpdate),
+    prefix="/api/users",
+    tags=["users"],
+)
+app.include_router(
+    fastapi_users.get_oauth_router(
+        google_oauth_client,
+        auth_backend,
+        settings.SECRET_KEY,
+        associate_by_email=True,
+        is_verified_by_default=True,
+    ),
+    prefix="/api/auth/google",
+    tags=["auth"],
+)
+
+# ── Data routes ────────────────────────────────────────────────────────────────
 app.include_router(income_expense_groups.router, prefix="/api")
 app.include_router(movement_types.router, prefix="/api")
 app.include_router(movements.router, prefix="/api")
@@ -33,6 +64,7 @@ app.include_router(accounts.router, prefix="/api")
 app.include_router(import_excel.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
 app.include_router(investments.router, prefix="/api")
+app.include_router(admin.router, prefix="/api")
 
 
 @app.get("/health")

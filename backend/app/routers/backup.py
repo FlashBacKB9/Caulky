@@ -1,5 +1,6 @@
 import datetime
 import decimal
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends
@@ -14,6 +15,8 @@ from app.models.investment import InvestmentFund, InvestmentPurchase
 from app.models.movement import Movement
 from app.models.movement_file import MovementFile
 from app.models.movement_type import MovementType
+from app.auth.setup import current_active_user
+from app.models.user import User
 
 router = APIRouter(prefix="/backup", tags=["backup"])
 
@@ -29,6 +32,8 @@ def _clean(obj) -> dict[str, Any]:
             result[k] = v.isoformat()
         elif isinstance(v, decimal.Decimal):
             result[k] = float(v)
+        elif isinstance(v, uuid.UUID):
+            result[k] = str(v)
         else:
             result[k] = v
     return result
@@ -58,23 +63,30 @@ async def _fix_sequences(db: AsyncSession) -> None:
 
 
 @router.get("/export")
-async def export_backup(db: AsyncSession = Depends(get_db)):
-    groups    = (await db.execute(select(IncomeExpenseGroup).order_by(IncomeExpenseGroup.id))).scalars().all()
-    accounts  = (await db.execute(select(Account).order_by(Account.id))).scalars().all()
-    types     = (await db.execute(select(MovementType).order_by(MovementType.id))).scalars().all()
-    movements = (await db.execute(select(Movement).order_by(Movement.id))).scalars().all()
-    inv_funds = (await db.execute(select(InvestmentFund).order_by(InvestmentFund.id))).scalars().all()
-    inv_purchases = (await db.execute(select(InvestmentPurchase).order_by(InvestmentPurchase.id))).scalars().all()
+async def export_backup(db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    uid = user.id
+    groups    = (await db.execute(select(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == uid).order_by(IncomeExpenseGroup.id))).scalars().all()
+    accounts  = (await db.execute(select(Account).where(Account.user_id == uid).order_by(Account.id))).scalars().all()
+    types     = (await db.execute(select(MovementType).where(MovementType.user_id == uid).order_by(MovementType.id))).scalars().all()
+    movements = (await db.execute(select(Movement).where(Movement.user_id == uid).order_by(Movement.id))).scalars().all()
+
+    mv_ids = [m.id for m in movements]
+    inv_funds = (await db.execute(select(InvestmentFund).where(InvestmentFund.user_id == uid).order_by(InvestmentFund.id))).scalars().all()
+    inv_purchases = []
+    if mv_ids:
+        inv_purchases = (await db.execute(
+            select(InvestmentPurchase).where(InvestmentPurchase.movement_id.in_(mv_ids)).order_by(InvestmentPurchase.id)
+        )).scalars().all()
 
     return {
         "version": "2",
         "created_at": datetime.datetime.now().isoformat(),
         "db": {
-            "groups":             [_clean(g) for g in groups],
-            "accounts":           [_clean(a) for a in accounts],
-            "types":              [_clean(t) for t in types],
-            "movements":          [_clean(m) for m in movements],
-            "investment_funds":   [_clean(f) for f in inv_funds],
+            "groups":               [_clean(g) for g in groups],
+            "accounts":             [_clean(a) for a in accounts],
+            "types":                [_clean(t) for t in types],
+            "movements":            [_clean(m) for m in movements],
+            "investment_funds":     [_clean(f) for f in inv_funds],
             "investment_purchases": [_clean(p) for p in inv_purchases],
         },
     }
@@ -91,65 +103,66 @@ class RestorePayload(BaseModel):
 
 
 @router.post("/restore", status_code=204)
-async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get_db)):
+async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    uid = user.id
     rg = payload.restore_groups
     ra = payload.restore_accounts
     rt = payload.restore_types
     rm = payload.restore_movements
     ri = payload.restore_investments
 
-    # Delete in safe FK order — most-dependent tables first.
-    # investment_purchases FK → movements (CASCADE), so delete before movements.
-    # investment_funds FK → movement_types (SET NULL), independent.
-    del_inv_purchases = ri or rm or rt or ra or rg  # purchases gone whenever movements are wiped
-    del_inv_funds     = ri
-    del_movements     = rm or rt or ra or rg
-    del_types         = rt or ra or rg
-    del_accounts      = ra or rg
-    del_groups        = rg
-
-    if del_inv_purchases:
-        await db.execute(sa_delete(InvestmentPurchase))
-    if del_inv_funds:
-        await db.execute(sa_delete(InvestmentFund))
-    if del_movements:
-        await db.execute(sa_delete(MovementFile))
-        await db.execute(sa_delete(Movement))
-    if del_types:
-        await db.execute(sa_delete(MovementType))
-    if del_accounts:
-        await db.execute(sa_delete(Account))
-    if del_groups:
-        await db.execute(sa_delete(IncomeExpenseGroup))
+    # Delete user's data in FK order
+    if ri or rm or rt or ra or rg:
+        mv_ids_res = await db.execute(select(Movement.id).where(Movement.user_id == uid))
+        mv_ids = [r[0] for r in mv_ids_res.all()]
+        if mv_ids:
+            await db.execute(sa_delete(InvestmentPurchase).where(InvestmentPurchase.movement_id.in_(mv_ids)))
+    if ri:
+        await db.execute(sa_delete(InvestmentFund).where(InvestmentFund.user_id == uid))
+    if rm or rt or ra or rg:
+        mv_ids_res2 = await db.execute(select(Movement.id).where(Movement.user_id == uid))
+        mv_ids2 = [r[0] for r in mv_ids_res2.all()]
+        if mv_ids2:
+            await db.execute(sa_delete(MovementFile).where(MovementFile.movement_id.in_(mv_ids2)))
+        await db.execute(sa_delete(Movement).where(Movement.user_id == uid))
+    if rt or ra or rg:
+        await db.execute(sa_delete(MovementType).where(MovementType.user_id == uid))
+    if ra or rg:
+        await db.execute(sa_delete(Account).where(Account.user_id == uid))
+    if rg:
+        await db.execute(sa_delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == uid))
     await db.flush()
 
-    # Insert in FK order
     if rg:
         for g in payload.db.get("groups", []):
-            db.add(IncomeExpenseGroup(**g))
+            g = {k: v for k, v in g.items() if k != "user_id"}
+            db.add(IncomeExpenseGroup(**g, user_id=uid))
         await db.flush()
 
     if ra:
         for a in payload.db.get("accounts", []):
-            db.add(Account(**a))
+            a = {k: v for k, v in a.items() if k != "user_id"}
+            db.add(Account(**a, user_id=uid))
         await db.flush()
 
     if rt:
         for t in payload.db.get("types", []):
-            db.add(MovementType(**t))
+            t = {k: v for k, v in t.items() if k != "user_id"}
+            db.add(MovementType(**t, user_id=uid))
         await db.flush()
 
     if rm:
         for m in payload.db.get("movements", []):
-            m = dict(m)
+            m = {k: v for k, v in m.items() if k != "user_id"}
             m["date"]      = _parse_date(m.get("date"))
             m["bank_date"] = _parse_date(m.get("bank_date"))
-            db.add(Movement(**m))
+            db.add(Movement(**m, user_id=uid))
         await db.flush()
 
     if ri:
         for f in payload.db.get("investment_funds", []):
-            db.add(InvestmentFund(**f))
+            f = {k: v for k, v in f.items() if k != "user_id"}
+            db.add(InvestmentFund(**f, user_id=uid))
         await db.flush()
         for p in payload.db.get("investment_purchases", []):
             db.add(InvestmentPurchase(**p))
@@ -159,10 +172,7 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
     await db.commit()
 
 
-async def _seed_defaults(db: AsyncSession) -> None:
-    """Insert sensible default groups, accounts and movement types."""
-
-    # ── Groups ────────────────────────────────────────────────────────────────
+async def _seed_defaults(db: AsyncSession, user_id: uuid.UUID) -> None:
     groups_data = [
         {"name": "Ingreso",       "color": "#22c55e"},
         {"name": "Ahorro",        "color": "#d97706"},
@@ -175,45 +185,35 @@ async def _seed_defaults(db: AsyncSession) -> None:
     ]
     groups = {}
     for g in groups_data:
-        obj = IncomeExpenseGroup(name=g["name"], color=g["color"])
+        obj = IncomeExpenseGroup(name=g["name"], color=g["color"], user_id=user_id)
         db.add(obj)
         groups[g["name"]] = obj
     await db.flush()
 
-    # ── Accounts ──────────────────────────────────────────────────────────────
-    main_acc    = Account(name="Cuenta principal", color="#3b82f6", icon="wallet",     initial_balance=0, sort_order=0, is_main=True)
-    savings_acc = Account(name="Ahorro",           color="#22c55e", icon="piggy-bank", initial_balance=0, sort_order=1, is_main=False)
+    main_acc    = Account(name="Cuenta principal", color="#3b82f6", icon="wallet",     initial_balance=0, sort_order=0, is_main=True,  user_id=user_id)
+    savings_acc = Account(name="Ahorro",           color="#22c55e", icon="piggy-bank", initial_balance=0, sort_order=1, is_main=False, user_id=user_id)
     db.add(main_acc)
     db.add(savings_acc)
     await db.flush()
 
-    # ── Movement types ────────────────────────────────────────────────────────
     types_data = [
-        # Ingresos
-        ("Nómina",              "Ingreso",     "Ingreso",     None),
-        ("Freelance",           "Ingreso",     "Ingreso",     None),
-        ("Otros ingresos",      "Ingreso",     "Ingreso",     None),
-        # Ahorro
-        ("Ahorro",              "Ahorro",      "Ahorro",      savings_acc),
-        # Vivienda
-        ("Alquiler / Hipoteca", "Vivienda",    "Gasto Casa",  None),
-        ("Suministros",         "Vivienda",    "Gasto Casa",  None),
+        ("Nómina",              "Ingreso",     "Ingreso",      None),
+        ("Freelance",           "Ingreso",     "Ingreso",      None),
+        ("Otros ingresos",      "Ingreso",     "Ingreso",      None),
+        ("Ahorro",              "Ahorro",      "Ahorro",       savings_acc),
+        ("Alquiler / Hipoteca", "Vivienda",    "Gasto Casa",   None),
+        ("Suministros",         "Vivienda",    "Gasto Casa",   None),
         ("Internet",            "Vivienda",    "Suscripciones", None),
-        # Alimentación
-        ("Supermercado",        "Alimentación","Vida Diaria", None),
-        ("Restaurantes",        "Alimentación","Vida Diaria", None),
-        # Transporte
-        ("Gasolina",            "Transporte",  "Transporte",  None),
-        ("Transporte público",  "Transporte",  "Transporte",  None),
-        # Ocio
+        ("Supermercado",        "Alimentación","Vida Diaria",  None),
+        ("Restaurantes",        "Alimentación","Vida Diaria",  None),
+        ("Gasolina",            "Transporte",  "Transporte",   None),
+        ("Transporte público",  "Transporte",  "Transporte",   None),
         ("Entretenimiento",     "Ocio",        "Entretenimiento", None),
-        ("Viajes",              "Ocio",        "Vacaciones",  None),
+        ("Viajes",              "Ocio",        "Vacaciones",   None),
         ("Suscripciones",       "Ocio",        "Suscripciones", None),
-        # Salud
-        ("Farmacia",            "Salud",       "Salud",       None),
-        ("Médico",              "Salud",       "Salud",       None),
-        # Otros
-        ("Otros gastos",        "Otros",       "Vida Diaria", None),
+        ("Farmacia",            "Salud",       "Salud",        None),
+        ("Médico",              "Salud",       "Salud",        None),
+        ("Otros gastos",        "Otros",       "Vida Diaria",  None),
     ]
     for name, group_name, category, linked_acc in types_data:
         db.add(MovementType(
@@ -221,22 +221,26 @@ async def _seed_defaults(db: AsyncSession) -> None:
             category=category,
             income_expense_group_id=groups[group_name].id,
             linked_account_id=linked_acc.id if linked_acc else None,
+            user_id=user_id,
         ))
     await db.flush()
 
 
 @router.post("/reset", status_code=204)
-async def reset_system(db: AsyncSession = Depends(get_db)):
-    """Delete all user data, reset sequences and seed defaults."""
-    await db.execute(sa_delete(InvestmentPurchase))
-    await db.execute(sa_delete(InvestmentFund))
-    await db.execute(sa_delete(MovementFile))
-    await db.execute(sa_delete(Movement))
-    await db.execute(sa_delete(MovementType))
-    await db.execute(sa_delete(Account))
-    await db.execute(sa_delete(IncomeExpenseGroup))
+async def reset_system(db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    uid = user.id
+    mv_ids_res = await db.execute(select(Movement.id).where(Movement.user_id == uid))
+    mv_ids = [r[0] for r in mv_ids_res.all()]
+    if mv_ids:
+        await db.execute(sa_delete(InvestmentPurchase).where(InvestmentPurchase.movement_id.in_(mv_ids)))
+        await db.execute(sa_delete(MovementFile).where(MovementFile.movement_id.in_(mv_ids)))
+    await db.execute(sa_delete(InvestmentFund).where(InvestmentFund.user_id == uid))
+    await db.execute(sa_delete(Movement).where(Movement.user_id == uid))
+    await db.execute(sa_delete(MovementType).where(MovementType.user_id == uid))
+    await db.execute(sa_delete(Account).where(Account.user_id == uid))
+    await db.execute(sa_delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == uid))
     await db.flush()
     await _fix_sequences(db)
-    await _seed_defaults(db)
+    await _seed_defaults(db, uid)
     await _fix_sequences(db)
     await db.commit()

@@ -18,6 +18,8 @@ from app.models.movement import Movement
 from app.models.movement_type import MovementType
 from app.models.income_expense_group import IncomeExpenseGroup
 from app.models.account import Account
+from app.auth.setup import current_active_user
+from app.models.user import User
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -51,7 +53,7 @@ def _parse_csv(content: bytes) -> list[list[str]]:
 
 
 @router.post("/parse")
-async def parse_excel(file: UploadFile = File(...)):
+async def parse_excel(file: UploadFile = File(...), user: User = Depends(current_active_user)):
     session_id = str(uuid.uuid4())
     filename = (file.filename or "").lower()
     is_csv = filename.endswith(".csv")
@@ -82,16 +84,11 @@ async def parse_excel(file: UploadFile = File(...)):
     columns = [c.strip() or f"Columna {i + 1}" for i, c in enumerate(all_rows[0])]
     rows = [row for row in all_rows[1:] if any(c.strip() for c in row)]
 
-    return {
-        "session_id": session_id,
-        "columns": columns,
-        "rows": rows,
-        "total": len(rows),
-    }
+    return {"session_id": session_id, "columns": columns, "rows": rows, "total": len(rows)}
 
 
 class TypeMapping(BaseModel):
-    action: str  # "auto" | "existing" | "skip" | "create"
+    action: str
     type_id: Optional[int] = None
     group_id: Optional[int] = None
 
@@ -114,7 +111,7 @@ class RunImportRequest(BaseModel):
 
 
 def _parse_money(s: str) -> float:
-    s = s.strip().replace(" ", "").replace(" ", "").replace("€", "").replace("$", "").replace("+", "")
+    s = s.strip().replace(" ", "").replace(" ", "").replace("€", "").replace("$", "").replace("+", "")
     if not s:
         raise ValueError("Importe vacío")
     if "," in s and "." in s:
@@ -133,11 +130,11 @@ _MESES_ES = {
     "septiembre": 9, "octubre": 10, "noviembre": 11, "diciembre": 12,
 }
 
+
 def _parse_date(s: str) -> date_type:
-    # Normalise: strip, collapse unicode spaces, remove timezone in parens
     s = s.strip()
-    s_clean = re.sub(r"\s*\([^)]*\)\s*$", "", s).strip()  # drop "(CET)", "(UTC+1)", …
-    s_clean = re.sub(r"\s+", " ", s_clean)                # collapse multiple spaces
+    s_clean = re.sub(r"\s*\([^)]*\)\s*$", "", s).strip()
+    s_clean = re.sub(r"\s+", " ", s_clean)
 
     for fmt in [
         "%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d/%m/%y",
@@ -151,7 +148,6 @@ def _parse_date(s: str) -> date_type:
         except ValueError:
             continue
 
-    # "22 de octubre de 2025"
     match = re.fullmatch(r"(\d{1,2})\s+de\s+(\w+)\s+de\s+(\d{4})", s_clean, re.IGNORECASE)
     if match:
         day = int(match.group(1))
@@ -160,7 +156,6 @@ def _parse_date(s: str) -> date_type:
         if month_name in _MESES_ES:
             return date_type(year, _MESES_ES[month_name], day)
 
-    # Last resort: extract first YYYY-MM-DD or YYYY/MM/DD anywhere in the string
     iso = re.search(r"(\d{4})[/\-](\d{1,2})[/\-](\d{1,2})", s_clean)
     if iso:
         return date_type(int(iso.group(1)), int(iso.group(2)), int(iso.group(3)))
@@ -169,7 +164,7 @@ def _parse_date(s: str) -> date_type:
 
 
 @router.post("/run")
-async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db)):
+async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     temp_path = next(
         (TEMP_DIR / f"{req.session_id}{ext}" for ext in (".xlsx", ".csv")
          if (TEMP_DIR / f"{req.session_id}{ext}").exists()),
@@ -178,15 +173,15 @@ async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db)):
     if temp_path is None:
         raise HTTPException(status_code=404, detail="Sesión expirada, sube el archivo de nuevo")
 
-    # Resolve account: use provided account_id or fall back to main account
     account_id = req.account_id
     if account_id is None:
-        res = await db.execute(select(Account).where(Account.is_main == True))
+        res = await db.execute(
+            select(Account).where(Account.is_main == True, Account.user_id == user.id)
+        )
         main_account = res.scalar_one_or_none()
         if main_account:
             account_id = main_account.id
 
-    # Create new movement types (skip on dry_run)
     new_type_ids: dict[str, int] = {}
     if not req.dry_run:
         for type_name, mapping in req.type_map.items():
@@ -196,23 +191,26 @@ async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db)):
                     name=type_name,
                     category=grp.name if grp else "Otros",
                     income_expense_group_id=mapping.group_id,
+                    user_id=user.id,
                 )
                 db.add(mt)
                 await db.flush()
                 new_type_ids[type_name] = mt.id
 
-    # Resolve "auto" mappings
     auto_ids: dict[str, int] = {}
     auto_names = [n for n, m in req.type_map.items() if m.action == "auto"]
     if auto_names:
-        res = await db.execute(select(MovementType).where(MovementType.name.in_(auto_names)))
+        res = await db.execute(
+            select(MovementType).where(MovementType.name.in_(auto_names), MovementType.user_id == user.id)
+        )
         for mt in res.scalars().all():
             auto_ids[mt.name] = mt.id
 
-    # Build existing fingerprints for duplicate detection
     existing: set[tuple] = set()
     if req.skip_duplicates and not req.dry_run:
-        res = await db.execute(select(Movement.name, Movement.date, Movement.money))
+        res = await db.execute(
+            select(Movement.name, Movement.date, Movement.money).where(Movement.user_id == user.id)
+        )
         existing = {(r[0], str(r[1]), float(r[2])) for r in res.all()}
 
     try:
@@ -305,6 +303,7 @@ async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db)):
                     is_shared=is_shared,
                     shared_between=shared_between,
                     my_share=my_share,
+                    user_id=user.id,
                 ))
                 imported += 1
         except Exception as e:

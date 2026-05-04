@@ -11,19 +11,15 @@ from app.models.movement import Movement
 from app.schemas.investment import (
     FundCreate, FundPatch, FundRead, PurchasePatch, PurchaseRead,
 )
+from app.auth.setup import current_active_user
+from app.models.user import User
 
 router = APIRouter(prefix="/investments", tags=["investments"])
 
 YAHOO_HEADERS = {"User-Agent": "Mozilla/5.0"}
 
 
-# ── Computation helpers ────────────────────────────────────────────────────────
-
-def _compute_fund(
-    fund: InvestmentFund,
-    movements: list,
-    supplements: dict,  # movement_id → InvestmentPurchase
-) -> FundRead:
+def _compute_fund(fund: InvestmentFund, movements: list, supplements: dict) -> FundRead:
     total_invested = sum(float(m.money) for m in movements)
 
     tracked = [
@@ -81,8 +77,10 @@ def _compute_fund(
     )
 
 
-async def _load_all_funds(db: AsyncSession) -> list[FundRead]:
-    funds_res = await db.execute(select(InvestmentFund).order_by(InvestmentFund.id))
+async def _load_all_funds(db: AsyncSession, user_id) -> list[FundRead]:
+    funds_res = await db.execute(
+        select(InvestmentFund).where(InvestmentFund.user_id == user_id).order_by(InvestmentFund.id)
+    )
     funds = funds_res.scalars().all()
 
     type_ids = [f.movement_type_id for f in funds if f.movement_type_id is not None]
@@ -95,6 +93,7 @@ async def _load_all_funds(db: AsyncSession) -> list[FundRead]:
             select(Movement)
             .where(
                 Movement.movement_type_id.in_(type_ids),
+                Movement.user_id == user_id,
                 Movement.paid == True,
                 Movement.no_count == False,
                 or_(Movement.bank_date.is_(None), Movement.bank_date <= today),
@@ -151,16 +150,14 @@ async def _yahoo_historical(ticker: str, on_date: date_type) -> float:
     return float(closes[0])
 
 
-# ── Funds ──────────────────────────────────────────────────────────────────────
-
 @router.get("/funds", response_model=list[FundRead])
-async def list_funds(db: AsyncSession = Depends(get_db)):
-    return await _load_all_funds(db)
+async def list_funds(db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    return await _load_all_funds(db, user.id)
 
 
 @router.post("/funds", response_model=FundRead, status_code=201)
-async def create_fund(body: FundCreate, db: AsyncSession = Depends(get_db)):
-    fund = InvestmentFund(**body.model_dump())
+async def create_fund(body: FundCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    fund = InvestmentFund(**body.model_dump(), user_id=user.id)
     db.add(fund)
     await db.commit()
     await db.refresh(fund)
@@ -168,32 +165,30 @@ async def create_fund(body: FundCreate, db: AsyncSession = Depends(get_db)):
 
 
 @router.put("/funds/{fund_id}", response_model=FundRead)
-async def update_fund(fund_id: int, body: FundPatch, db: AsyncSession = Depends(get_db)):
+async def update_fund(fund_id: int, body: FundPatch, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     fund = await db.get(InvestmentFund, fund_id)
-    if not fund:
+    if not fund or fund.user_id != user.id:
         raise HTTPException(404, "Fondo no encontrado")
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(fund, k, v)
     await db.commit()
-    await db.refresh(fund)
-    # reload with movements
-    all_funds = await _load_all_funds(db)
+    all_funds = await _load_all_funds(db, user.id)
     return next(f for f in all_funds if f.id == fund_id)
 
 
 @router.delete("/funds/{fund_id}", status_code=204)
-async def delete_fund(fund_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_fund(fund_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     fund = await db.get(InvestmentFund, fund_id)
-    if not fund:
+    if not fund or fund.user_id != user.id:
         raise HTTPException(404, "Fondo no encontrado")
     await db.delete(fund)
     await db.commit()
 
 
 @router.post("/funds/{fund_id}/fetch-price", response_model=FundRead)
-async def fetch_current_price(fund_id: int, db: AsyncSession = Depends(get_db)):
+async def fetch_current_price(fund_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     fund = await db.get(InvestmentFund, fund_id)
-    if not fund:
+    if not fund or fund.user_id != user.id:
         raise HTTPException(404, "Fondo no encontrado")
     if not fund.ticker:
         raise HTTPException(400, "El fondo no tiene ticker configurado")
@@ -203,11 +198,9 @@ async def fetch_current_price(fund_id: int, db: AsyncSession = Depends(get_db)):
         raise HTTPException(502, f"Error al obtener precio: {e}")
     fund.current_price = price  # type: ignore[assignment]
     await db.commit()
-    all_funds = await _load_all_funds(db)
+    all_funds = await _load_all_funds(db, user.id)
     return next(f for f in all_funds if f.id == fund_id)
 
-
-# ── Purchase supplements ───────────────────────────────────────────────────────
 
 def _purchase_read(movement: Movement, sup: InvestmentPurchase | None) -> PurchaseRead:
     return PurchaseRead(
@@ -222,9 +215,9 @@ def _purchase_read(movement: Movement, sup: InvestmentPurchase | None) -> Purcha
 
 
 @router.put("/purchases/{movement_id}", response_model=PurchaseRead)
-async def upsert_purchase_supplement(movement_id: int, body: PurchasePatch, db: AsyncSession = Depends(get_db)):
+async def upsert_purchase_supplement(movement_id: int, body: PurchasePatch, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     movement = await db.get(Movement, movement_id)
-    if not movement:
+    if not movement or movement.user_id != user.id:
         raise HTTPException(404, "Movimiento no encontrado")
 
     sup_res = await db.execute(
@@ -238,7 +231,6 @@ async def upsert_purchase_supplement(movement_id: int, body: PurchasePatch, db: 
     for k, v in body.model_dump(exclude_unset=True).items():
         setattr(sup, k, v)
 
-    # Auto-calc units from price if price set but units not
     if sup.price_at_purchase and not sup.units:
         sup.units = float(movement.money) / float(sup.price_at_purchase)  # type: ignore
 
@@ -248,7 +240,10 @@ async def upsert_purchase_supplement(movement_id: int, body: PurchasePatch, db: 
 
 
 @router.delete("/purchases/{movement_id}", status_code=204)
-async def delete_purchase_supplement(movement_id: int, db: AsyncSession = Depends(get_db)):
+async def delete_purchase_supplement(movement_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    movement = await db.get(Movement, movement_id)
+    if not movement or movement.user_id != user.id:
+        raise HTTPException(404, "Movimiento no encontrado")
     sup_res = await db.execute(
         select(InvestmentPurchase).where(InvestmentPurchase.movement_id == movement_id)
     )
@@ -259,9 +254,9 @@ async def delete_purchase_supplement(movement_id: int, db: AsyncSession = Depend
 
 
 @router.post("/purchases/{movement_id}/fetch-price", response_model=PurchaseRead)
-async def fetch_purchase_price(movement_id: int, db: AsyncSession = Depends(get_db)):
+async def fetch_purchase_price(movement_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     movement = await db.get(Movement, movement_id)
-    if not movement:
+    if not movement or movement.user_id != user.id:
         raise HTTPException(404, "Movimiento no encontrado")
 
     fund_res = await db.execute(
@@ -291,11 +286,9 @@ async def fetch_purchase_price(movement_id: int, db: AsyncSession = Depends(get_
     return _purchase_read(movement, sup)
 
 
-# ── Summary ────────────────────────────────────────────────────────────────────
-
 @router.get("/summary")
-async def get_summary(db: AsyncSession = Depends(get_db)):
-    funds = await _load_all_funds(db)
+async def get_summary(db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    funds = await _load_all_funds(db, user.id)
     total_invested = sum(f.total_invested for f in funds)
     has_value = any(f.current_value is not None for f in funds)
     total_current = sum(f.current_value for f in funds if f.current_value is not None)
