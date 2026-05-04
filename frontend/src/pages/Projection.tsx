@@ -661,14 +661,14 @@ export default function Projection() {
                 const yearOptions = Array.from({ length: 41 }, (_, i) => now.getFullYear() + i)
                 return (
                   <div className="flex items-center gap-3 px-4 py-3">
-                    <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">Fin Fase 1</span>
-                    <div className="flex items-center gap-1.5">
+                    <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">Fin Fase 1</span>
+                    <div className="flex items-center gap-1 ml-auto">
                       <select className={INP_SM} value={selMonth}
                         onChange={e => {
                           const m = parseInt(e.target.value)
                           setPhase(0, { durationMonths: toMonths(`${selYear}-${String(m).padStart(2, '0')}`) })
                         }}>
-                        {MONTH_NAMES.map((name, i) => (
+                        {MONTHS_SHORT.map((name, i) => (
                           <option key={i} value={i + 1}>{name}</option>
                         ))}
                       </select>
