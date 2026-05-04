@@ -15,6 +15,7 @@ import Documentation from './pages/Documentation'
 import Comparaciones from './pages/Comparaciones'
 import AccountsPage from './pages/AccountsPage'
 import Projection from './pages/Projection'
+import QuickAdd from './pages/QuickAdd'
 import LoginPage from './pages/LoginPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { useDarkMode } from './hooks/useDarkMode'
@@ -73,6 +74,7 @@ function Layout() {
             <Route path="/docs" element={<Documentation />} />
             <Route path="/comparaciones" element={<Comparaciones />} />
             <Route path="/proyeccion" element={<Projection />} />
+            <Route path="/quick" element={<QuickAdd />} />
           </Routes>
         </main>
       </div>
