@@ -607,16 +607,20 @@ function SubtypesByGroupChart({ filtered, typeToGroup, groupById, typeById, mode
 
 // ── ChartWithFilter (built-in charts) ─────────────────────────────────────────
 
-function ChartWithFilter({ title, groups, types, allYears, modes, onDelete, onGripMouseDown, render: Render }: {
+function ChartWithFilter({ title, groups, types, allYears, modes, onDelete, onGripMouseDown,
+  showFilterBtn = true, onToggleFilterBtn, render: Render }: {
   title: string; groups: Group[]; types: MovementType[]; allYears: number[]
   modes?: ModeOption[]; onDelete?: () => void; onGripMouseDown?: () => void
+  showFilterBtn?: boolean; onToggleFilterBtn?: (v: boolean) => void
   render: (props: ChartProps) => React.ReactNode
 }) {
-  const [showFilters,    setShowFilters]    = useState(false)
-  const [showYearPicker, setShowYearPicker] = useState(false)
-  const [year,           setYear]           = useState<number | null>(CUR_YEAR)
-  const [advFilter,      setAdvFilter]      = useState<AdvancedFilter>(EMPTY_FILTER)
-  const [mode,           setMode]           = useState<DisplayMode>(modes?.[0]?.id ?? 'bars')
+  const [showFilters,       setShowFilters]       = useState(false)
+  const [showYearPicker,    setShowYearPicker]    = useState(false)
+  const [confirmingDelete,  setConfirmingDelete]  = useState(false)
+  const [showConfig,        setShowConfig]        = useState(false)
+  const [year,              setYear]              = useState<number | null>(CUR_YEAR)
+  const [advFilter,         setAdvFilter]         = useState<AdvancedFilter>(EMPTY_FILTER)
+  const [mode,              setMode]              = useState<DisplayMode>(modes?.[0]?.id ?? 'bars')
 
   const { data: movements = [] } = useQuery({ queryKey:['movements',year], queryFn:()=>getMovements(year!==null?{year}:undefined) })
   const typeToGroup = useMemo(()=>Object.fromEntries(types.map(t=>[t.id,t.income_expense_group_id])),[types])
@@ -655,14 +659,47 @@ function ChartWithFilter({ title, groups, types, allYears, modes, onDelete, onGr
               </div>
             )}
           </div>
-          <button onClick={()=>setShowFilters(v=>!v)} title="Filtros avanzados" className={`relative p-1.5 rounded-lg transition-colors ${showFilters||activeCount>0?'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200':'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-            <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={1.5}/>
-            {activeCount>0&&!showFilters&&<span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-500 text-white text-[8px] flex items-center justify-center font-bold leading-none">{activeCount}</span>}
-          </button>
-          {onDelete && (
-            <button onClick={onDelete} title="Eliminar" className="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-              <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5}/>
+          {showFilterBtn && (
+            <button onClick={()=>setShowFilters(v=>!v)} title="Filtros avanzados" className={`relative p-1.5 rounded-lg transition-colors ${showFilters||activeCount>0?'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200':'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+              <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={1.5}/>
+              {activeCount>0&&!showFilters&&<span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-500 text-white text-[8px] flex items-center justify-center font-bold leading-none">{activeCount}</span>}
             </button>
+          )}
+          {onToggleFilterBtn && (
+            <div className="relative">
+              <button onClick={()=>setShowConfig(v=>!v)} title="Opciones" className={`p-1.5 rounded-lg transition-colors ${showConfig?'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-200':'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+                <Settings2 className="w-3.5 h-3.5" strokeWidth={1.5}/>
+              </button>
+              {showConfig && (
+                <>
+                  <div className="fixed inset-0 z-20" onClick={()=>setShowConfig(false)}/>
+                  <div className="absolute right-0 top-full mt-1 z-30 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-xl p-3 min-w-[200px]">
+                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
+                      <input type="checkbox" checked={showFilterBtn} onChange={e=>{onToggleFilterBtn(e.target.checked);setShowConfig(false)}}
+                        className="w-3.5 h-3.5 rounded accent-blue-500"/>
+                      <span className="text-sm text-gray-700 dark:text-gray-300">Mostrar botón de filtro</span>
+                    </label>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+          {onDelete && (
+            confirmingDelete ? (
+              <div className="flex items-center gap-1 shrink-0">
+                <button onClick={()=>{ onDelete(); setConfirmingDelete(false) }}
+                  className="px-2 py-1 text-xs rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors whitespace-nowrap">
+                  Ocultar
+                </button>
+                <button onClick={()=>setConfirmingDelete(false)} className="p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-gray-500 transition-colors">
+                  <X className="w-3 h-3" strokeWidth={1.5}/>
+                </button>
+              </div>
+            ) : (
+              <button onClick={()=>setConfirmingDelete(true)} title="Ocultar gráfico" className="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5}/>
+              </button>
+            )
           )}
         </div>
       </div>
@@ -1207,7 +1244,8 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
       <div className="flex flex-1 overflow-hidden">
 
         {/* Left: config panel */}
-        <div className="w-80 shrink-0 overflow-y-auto bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 p-5 space-y-5">
+        <div className="w-80 shrink-0 relative flex flex-col bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800">
+        <div className="flex-1 overflow-y-auto p-5 space-y-5 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
 
           <div className="space-y-1.5">
             <span className={labelCls}>Fuente de datos</span>
@@ -1493,10 +1531,12 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
             </div>
           )}
 
-        </div>
+        </div>{/* end inner scroll */}
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-gray-900 to-transparent" />
+        </div>{/* end sidebar wrapper */}
 
         {/* Right: preview */}
-        <div className="flex-1 overflow-auto p-8 flex flex-col items-center justify-start">
+        <div className="flex-1 overflow-auto p-8 flex flex-col items-center justify-start [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
           <div className="w-full max-w-3xl bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-6">
             <p className="text-xs text-gray-400 dark:text-gray-500 mb-4 uppercase tracking-wide font-medium">Vista previa</p>
             {chartEl}
@@ -1544,7 +1584,7 @@ export default function Charts() {
   const [hiddenBuiltins, setHiddenBuiltins] = useState<Set<string>>(()=>{
     try { return new Set(JSON.parse(localStorage.getItem('spendly-hidden-builtins') ?? '[]')) } catch { return new Set() }
   })
-  const [builtinCfg, setBuiltinCfg] = useState<Record<string,{ colSpan?:number; height?:number }>>(()=>{
+  const [builtinCfg, setBuiltinCfg] = useState<Record<string,{ colSpan?:number; height?:number; showFilter?:boolean }>>(()=>{
     try { return JSON.parse(localStorage.getItem('spendly-builtin-cfg') ?? '{}') } catch { return {} }
   })
   useEffect(()=>{ localStorage.setItem('spendly-builtin-cfg', JSON.stringify(builtinCfg)) },[builtinCfg])
@@ -1645,7 +1685,13 @@ export default function Charts() {
         {effectiveBuiltinOrder.filter(id=>!hiddenBuiltins.has(id)).map(id=>{
           const defaultWide = BUILTIN_DEFS.find(b=>b.id===id)?.wide ?? false
           const colSpan = builtinCfg[id]?.colSpan ?? (defaultWide ? 4 : 2)
-          const bp = { ...shared, onDelete:()=>hideBuiltin(id) }
+          const showFilterBtn = builtinCfg[id]?.showFilter !== false
+          const bp = {
+            ...shared,
+            onDelete: ()=>hideBuiltin(id),
+            showFilterBtn,
+            onToggleFilterBtn: (v: boolean) => setBuiltinCfg(c=>({ ...c, [id]:{ ...c[id], showFilter:v } })),
+          }
           const renderMap: Record<string,(g:()=>void)=>React.ReactNode> = {
             monthly:      g=><ChartWithFilter title="Ingresos y gastos por mes"      {...bp} modes={[M_BARS,M_STACKED,M_LINES,M_COMBO]} onGripMouseDown={g} render={p=><MonthlyBarChart {...p}/>}/>,
             net:          g=><ChartWithFilter title="Balance neto por mes"           {...bp}                                            onGripMouseDown={g} render={p=><NetMonthlyChart {...p}/>}/>,
