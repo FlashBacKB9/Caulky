@@ -1,22 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from contextlib import asynccontextmanager
-from alembic.config import Config
-from alembic import command
 from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin
 from app.auth.setup import fastapi_users, auth_backend
 from app.auth.schemas import UserRead, UserCreate, UserUpdate
 from app.config import settings
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    cfg = Config("alembic.ini")
-    command.upgrade(cfg, "head")
-    yield
-
-
-app = FastAPI(title="Caulky API", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="Caulky API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
