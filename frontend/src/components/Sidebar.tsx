@@ -103,13 +103,13 @@ export default function Sidebar() {
   return (
     <>
       {showInfo && <InfoModal onClose={() => setShowInfo(false)} />}
-      <aside className="w-56 h-screen sticky top-0 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex flex-col overflow-y-auto">
-        <div className="px-5 py-5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2.5">
+      <aside className="w-56 h-screen sticky top-0 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex flex-col">
+        <div className="px-5 py-5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2.5 shrink-0">
           <Wallet className="w-5 h-5 text-gray-800 dark:text-white" strokeWidth={1.5} />
           <span className="font-bold text-lg text-gray-800 dark:text-white">Caulky</span>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1">
+        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {visibleLinks.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
@@ -123,7 +123,7 @@ export default function Sidebar() {
           ))}
         </nav>
 
-        <div className="px-3 pb-4 border-t border-gray-100 dark:border-gray-800 pt-3 space-y-1">
+        <div className="px-3 pb-4 border-t border-gray-100 dark:border-gray-800 pt-3 space-y-1 shrink-0">
           <NavLink
             to="/settings"
             className={({ isActive }) => linkCls(isActive)}
