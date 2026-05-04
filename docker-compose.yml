@@ -19,6 +19,8 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://spendly:spendly@db:5432/spendly
       CORS_ORIGINS: "*"
+      SECRET_KEY: ${SECRET_KEY}
+      COOKIE_SECURE: "false"
     depends_on:
       db:
         condition: service_healthy
