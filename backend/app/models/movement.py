@@ -1,7 +1,7 @@
 import uuid
 from datetime import date
 from sqlalchemy import Boolean, Date, ForeignKey, Integer, Numeric, String, Text
-from sqlalchemy.dialects.postgresql import UUID as PUUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -27,7 +27,7 @@ class Movement(Base):
     shared_between: Mapped[int | None] = mapped_column(Integer, nullable=True)
     my_share: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
-        PUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
 
     movement_type: Mapped["MovementType | None"] = relationship(back_populates="movements")

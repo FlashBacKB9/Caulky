@@ -10,7 +10,9 @@ from app.models.movement_file import MovementFile
 from app.auth.setup import current_active_user
 from app.models.user import User
 
-UPLOAD_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads")
+UPLOAD_DIR = os.environ.get("CAULKY_UPLOADS_DIR") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads"
+)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 router = APIRouter(prefix="/movements", tags=["files"])

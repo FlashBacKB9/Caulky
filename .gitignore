@@ -19,6 +19,18 @@ backend/update_account_icons.py
 frontend/node_modules/
 frontend/dist/
 
+# PyInstaller output
+dist/
+build/
+*.spec.bak
+
 # OS
 .DS_Store
 Thumbs.db
+
+# Personal data / analysis scripts (not part of the app)
+*.csv
+analyze_*.py
+compare_*.py
+check_*.py
+find_*.py

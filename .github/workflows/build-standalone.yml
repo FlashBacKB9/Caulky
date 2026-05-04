@@ -1,0 +1,98 @@
+name: Build standalone
+
+on:
+  push:
+    tags:
+      - "v*"           # trigger on version tags: v1.0, v1.2.3, etc.
+  workflow_dispatch:   # also allow manual trigger from GitHub UI
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - os: windows-latest
+            artifact: Caulky.exe
+            label: windows
+          - os: ubuntu-latest
+            artifact: Caulky
+            label: linux
+          - os: macos-latest
+            artifact: Caulky
+            label: macos
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      # ── Checkout ──────────────────────────────────────────────────────────
+      - uses: actions/checkout@v4
+
+      # ── Build frontend ────────────────────────────────────────────────────
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend deps
+        working-directory: frontend
+        run: npm ci
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+      # ── Set up Python ─────────────────────────────────────────────────────
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: backend/requirements-standalone.txt
+
+      - name: Install Python deps
+        run: pip install pyinstaller -r backend/requirements-standalone.txt
+
+      # ── Build executable ──────────────────────────────────────────────────
+      - name: Build with PyInstaller
+        run: pyinstaller caulky-standalone.spec
+
+      # ── Rename artifact with platform label ───────────────────────────────
+      - name: Rename artifact (Windows)
+        if: matrix.os == 'windows-latest'
+        run: mv dist/Caulky.exe dist/Caulky-windows.exe
+
+      - name: Rename artifact (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: mv dist/Caulky dist/Caulky-linux
+
+      - name: Rename artifact (macOS)
+        if: matrix.os == 'macos-latest'
+        run: mv dist/Caulky dist/Caulky-macos
+
+      # ── Upload to GitHub Release ──────────────────────────────────────────
+      - name: Upload release asset (Windows)
+        if: matrix.os == 'windows-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Caulky-windows.exe
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release asset (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Caulky-linux
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload release asset (macOS)
+        if: matrix.os == 'macos-latest'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/Caulky-macos
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

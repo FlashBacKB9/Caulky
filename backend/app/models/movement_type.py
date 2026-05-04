@@ -1,6 +1,6 @@
 import uuid
 from sqlalchemy import ForeignKey, String
-from sqlalchemy.dialects.postgresql import UUID as PUUID
+from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -25,7 +25,7 @@ class MovementType(Base):
         ForeignKey("accounts.id"), nullable=True
     )
     user_id: Mapped[uuid.UUID | None] = mapped_column(
-        PUUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
+        Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
 
     income_expense_group: Mapped["IncomeExpenseGroup"] = relationship(
