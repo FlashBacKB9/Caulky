@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 
-const ZOOM_KEY = 'ui-zoom'
-const ZOOM_MIN = 80
-const ZOOM_MAX = 150
+const ZOOM_KEY  = 'ui-zoom-v2'   // v2: 100 display → 120% actual
+const ZOOM_MIN  = 70
+const ZOOM_MAX  = 130
 const ZOOM_STEP = 10
+const ZOOM_SCALE = 1.2            // multiply display value to get actual CSS zoom
 
 export function useUiZoom() {
   const [zoom, setZoomState] = useState<number>(() => {
@@ -12,17 +13,16 @@ export function useUiZoom() {
   })
 
   useEffect(() => {
-    document.documentElement.style.zoom = zoom + '%'
-    // When zoomed out, the html element is smaller than the viewport, leaving empty space.
-    // Setting min-height to 100/zoom compensates so the layout still fills the full screen.
-    document.documentElement.style.minHeight = zoom < 100 ? `${(100 * 100 / zoom).toFixed(2)}%` : ''
+    const actual = zoom * ZOOM_SCALE
+    document.documentElement.style.zoom = actual + '%'
+    document.documentElement.style.minHeight = actual < 100 ? `${(100 * 100 / actual).toFixed(2)}%` : ''
     localStorage.setItem(ZOOM_KEY, String(zoom))
   }, [zoom])
 
-  const setZoom = (v: number) => setZoomState(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, v)))
-  const inc = () => setZoom(zoom + ZOOM_STEP)
-  const dec = () => setZoom(zoom - ZOOM_STEP)
+  const setZoom = (v: number) => setZoomState(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(v))))
+  const inc   = () => setZoom(zoom + ZOOM_STEP)
+  const dec   = () => setZoom(zoom - ZOOM_STEP)
   const reset = () => setZoom(100)
 
-  return { zoom, inc, dec, reset, min: ZOOM_MIN, max: ZOOM_MAX }
+  return { zoom, setZoom, inc, dec, reset, min: ZOOM_MIN, max: ZOOM_MAX }
 }

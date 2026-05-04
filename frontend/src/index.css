@@ -10,6 +10,13 @@
   box-sizing: border-box;
 }
 
+html {
+  background-color: #f9fafb;
+}
+html.dark {
+  background-color: #030712;
+}
+
 body {
   margin: 0;
   font-family: 'IBM Plex Mono', monospace;

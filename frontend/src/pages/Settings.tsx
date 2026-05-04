@@ -1087,7 +1087,7 @@ export default function Settings() {
   const { dark, toggle } = useDarkMode()
   const { currency, setCurrency, fmt, currencies } = useCurrency()
   const { format: dateFormat, setFormat: setDateFormat } = useDateFormat()
-  const { zoom, inc: zoomIn, dec: zoomOut, reset: zoomReset, min: zoomMin, max: zoomMax } = useUiZoom()
+  const { zoom, setZoom, inc: zoomIn, dec: zoomOut, reset: zoomReset, min: zoomMin, max: zoomMax } = useUiZoom()
   const { data, isLoading } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
   const navigate = useNavigate()
   const [showInvestments, setShowInvestments] = useState(
@@ -1164,10 +1164,15 @@ export default function Settings() {
                 <div className="flex items-center gap-2">
                   <button onClick={zoomOut} disabled={zoom <= zoomMin}
                     className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 text-base font-medium flex items-center justify-center transition-colors">−</button>
-                  <button onClick={zoomReset}
-                    className="w-12 text-center text-xs font-mono font-medium text-gray-700 dark:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-lg py-1 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                    {zoom}%
-                  </button>
+                  <div className="flex items-center border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 overflow-hidden">
+                    <input
+                      type="number" min={zoomMin} max={zoomMax} value={zoom}
+                      onChange={e => setZoom(parseInt(e.target.value) || zoom)}
+                      onBlur={e => setZoom(parseInt(e.target.value) || zoom)}
+                      className="w-10 text-center text-xs font-mono font-medium text-gray-700 dark:text-gray-200 bg-transparent focus:outline-none py-1 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                    />
+                    <span className="text-xs text-gray-400 dark:text-gray-500 pr-1.5">%</span>
+                  </div>
                   <button onClick={zoomIn} disabled={zoom >= zoomMax}
                     className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 text-base font-medium flex items-center justify-center transition-colors">+</button>
                 </div>
