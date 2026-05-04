@@ -1566,18 +1566,10 @@ export default function Charts() {
   const shared   = { groups, types, allYears }
 
   const BUILTIN_DEFS = useMemo(()=>[
-    { id:'monthly',      wide:true  },
-    { id:'net',          wide:false },
-    { id:'cumulative',   wide:false },
-    { id:'expdnt',       wide:false },
-    { id:'incdnt',       wide:false },
-    { id:'top',          wide:false },
-    { id:'savings',      wide:false },
-    { id:'trend',        wide:true  },
-    { id:'subtypes',     wide:true  },
-    { id:'dash-line',    wide:true  },
-    { id:'dash-pie',     wide:false },
-    { id:'dash-balance', wide:false },
+    { id:'monthly',    wide:true  },
+    { id:'expdnt',     wide:false },
+    { id:'net',        wide:false },
+    { id:'cumulative', wide:false },
   ],[])
 
   const [hiddenBuiltins, setHiddenBuiltins] = useState<Set<string>>(()=>{
