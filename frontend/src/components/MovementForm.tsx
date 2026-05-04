@@ -35,6 +35,18 @@ function FileTypeIcon({ mime }: { mime: string }) {
   return <Paperclip className={cls} strokeWidth={1.5} />
 }
 
+function Toggle({ value, onChange, color = '#3b82f6' }: {
+  value: boolean; onChange: (v: boolean) => void; color?: string
+}) {
+  return (
+    <button type="button" onClick={() => onChange(!value)}
+      className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors duration-200 focus:outline-none ${!value ? 'bg-gray-300 dark:bg-gray-600' : ''}`}
+      style={value ? { backgroundColor: color } : {}}>
+      <span className={`absolute top-0.5 h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${value ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+    </button>
+  )
+}
+
 function TypeSelect({ value, onChange, types, byCategory }: {
   value: string; onChange: (v: string) => void
   types: MovementType[]; byCategory: Record<string, MovementType[]>
@@ -471,11 +483,9 @@ export default function MovementForm({ onClose }: Props) {
                     rows={2} placeholder="Opcional..." className={INP + ' resize-none'} />
                 </div>
                 <div>
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
-                      <input type="checkbox" checked={form.is_shared} onChange={e => set('is_shared', e.target.checked)} className="rounded" />
-                      Compartido
-                    </label>
+                  <div className="flex items-center gap-2.5">
+                    <Toggle value={form.is_shared} onChange={v => set('is_shared', v)} color="#3b82f6" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Compartido</span>
                   </div>
                   {form.is_shared && (
                     <div className="mt-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 space-y-2">
@@ -536,15 +546,15 @@ export default function MovementForm({ onClose }: Props) {
                     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={e => addFiles(e.target.files)} />
                   </div>
                 </div>
-                <div className="flex gap-6">
-                  <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
-                    <input type="checkbox" checked={form.paid} onChange={e => set('paid', e.target.checked)} className="rounded" />
-                    Pagado
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
-                    <input type="checkbox" checked={form.no_count} onChange={e => set('no_count', e.target.checked)} className="rounded" />
-                    No contar
-                  </label>
+                <div className="flex gap-5">
+                  <div className="flex items-center gap-2.5">
+                    <Toggle value={form.paid} onChange={v => set('paid', v)} color="#22c55e" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Pagado</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <Toggle value={form.no_count} onChange={v => set('no_count', v)} color="#f59e0b" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">No contar</span>
+                  </div>
                 </div>
                 <div className="flex justify-end gap-3 pt-2">
                   <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Cancelar</button>
@@ -618,15 +628,15 @@ export default function MovementForm({ onClose }: Props) {
                     <SavingsHint typeId={tplDraft.movement_type_id} money={tplDraft.money} />
                   </div>
                 </div>
-                <div className="flex gap-6">
-                  <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
-                    <input type="checkbox" checked={tplDraft.paid} onChange={e => setTpl('paid', e.target.checked)} className="rounded" />
-                    Pagado
-                  </label>
-                  <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer">
-                    <input type="checkbox" checked={tplDraft.no_count} onChange={e => setTpl('no_count', e.target.checked)} className="rounded" />
-                    No contar
-                  </label>
+                <div className="flex gap-5">
+                  <div className="flex items-center gap-2.5">
+                    <Toggle value={tplDraft.paid} onChange={v => setTpl('paid', v)} color="#22c55e" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">Pagado</span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <Toggle value={tplDraft.no_count} onChange={v => setTpl('no_count', v)} color="#f59e0b" />
+                    <span className="text-sm text-gray-600 dark:text-gray-400">No contar</span>
+                  </div>
                 </div>
                 <div>
                   <label className={LBL}>Notas</label>

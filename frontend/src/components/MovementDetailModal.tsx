@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { updateMovement, deleteMovement, createMovement, type Movement } from '../api/movements'
 import { type MovementType } from '../api/movementTypes'
@@ -63,6 +63,18 @@ export function duplicatePayload(mv: Movement) {
   }
 }
 
+function Toggle({ value, onChange, color = '#3b82f6' }: {
+  value: boolean; onChange: (v: boolean) => void; color?: string
+}) {
+  return (
+    <button type="button" onClick={() => onChange(!value)}
+      className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors duration-200 focus:outline-none ${!value ? 'bg-gray-300 dark:bg-gray-600' : ''}`}
+      style={value ? { backgroundColor: color } : {}}>
+      <span className={`absolute top-0.5 h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${value ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+    </button>
+  )
+}
+
 export default function MovementDetailModal({ movement, types, onClose }: {
   movement: Movement
   types: MovementType[]
@@ -74,6 +86,17 @@ export default function MovementDetailModal({ movement, types, onClose }: {
   const accounts = accountsSummary?.accounts ?? []
   const setField = <K extends keyof DraftRow>(k: K, v: DraftRow[K]) =>
     setDraft(d => ({ ...d, [k]: v }))
+
+  const byCategory = useMemo(() => {
+    const map: Record<string, MovementType[]> = {}
+    for (const t of types) {
+      if (!map[t.category]) map[t.category] = []
+      map[t.category].push(t)
+    }
+    return map
+  }, [types])
+
+  const selType = types.find(t => String(t.id) === draft.movement_type_id)
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['movements'] })
@@ -101,7 +124,8 @@ export default function MovementDetailModal({ movement, types, onClose }: {
   }
 
   const IN = 'w-full bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600'
-  const TOGGLE = (active: boolean) => `flex-1 py-1.5 rounded-lg text-xs font-medium transition-colors ${active ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700'}`
+
+  const linkedAcc = selType?.linked_account_id ? accounts.find(a => a.id === selType.linked_account_id) : null
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onMouseDown={onClose}>
@@ -122,103 +146,99 @@ export default function MovementDetailModal({ movement, types, onClose }: {
             <input className={IN} value={draft.name} onChange={e => setField('name', e.target.value)} />
           </div>
 
-          {/* Importe + Fecha */}
+          {/* Importe + Tipo */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Importe</label>
               <input type="number" step="0.01" className={IN} value={draft.money} onChange={e => setField('money', e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Fecha</label>
-              <input type="date" className={IN} value={draft.date} onChange={e => setField('date', e.target.value)} />
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tipo</label>
+              <div className="relative">
+                {selType && <span className="absolute left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full z-10 pointer-events-none" style={{ backgroundColor: selType.color }} />}
+                <select className={IN + (selType ? ' pl-8' : '')} value={draft.movement_type_id} onChange={e => setField('movement_type_id', e.target.value)}>
+                  <option value="">Sin tipo</option>
+                  {Object.entries(byCategory).map(([cat, items]) => (
+                    <optgroup key={cat} label={cat}>
+                      {items.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </optgroup>
+                  ))}
+                </select>
+              </div>
+              {linkedAcc && (
+                <div className="mt-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 rounded-lg text-xs text-blue-600 dark:text-blue-400">
+                  {parseFloat(draft.money) < 0
+                    ? <><span className="font-semibold">{linkedAcc.name}</span> → De uso</>
+                    : <>De uso → <span className="font-semibold">{linkedAcc.name}</span></>}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Fecha banco + Tipo */}
+          {/* Fecha + Fecha banco */}
           <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Fecha</label>
+              <input type="date" className={IN} value={draft.date} onChange={e => setField('date', e.target.value)} />
+            </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Fecha banco</label>
               <input type="date" className={IN} value={draft.bank_date} onChange={e => setField('bank_date', e.target.value)} />
             </div>
+          </div>
+
+          {/* Pagado / No contar / Compartido */}
+          <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tipo</label>
-              <select className={IN} value={draft.movement_type_id} onChange={e => setField('movement_type_id', e.target.value)}>
-                <option value="">Sin tipo</option>
-                {types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-              </select>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Pagado</label>
+              <Toggle value={draft.paid} onChange={v => setField('paid', v)} color="#22c55e" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">No contar</label>
+              <Toggle value={draft.no_count} onChange={v => setField('no_count', v)} color="#f59e0b" />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Compartido</label>
+              <Toggle
+                value={draft.is_shared}
+                onChange={v => setDraft(d => ({ ...d, is_shared: v, ...(v ? {} : { shared_between: '2', my_share: '' }) }))}
+                color="#3b82f6"
+              />
+            </div>
+          </div>
+
+          {/* Shared detail */}
+          {draft.is_shared && (
+            <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 space-y-2">
+              <p className="text-xs text-blue-600 dark:text-blue-400">El importe total resta del balance. Solo tu parte cuenta en las estadísticas.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Nº personas</label>
+                  <input type="number" min={2} max={99} className={IN + ' text-sm'}
+                    value={draft.shared_between}
+                    onChange={e => setDraft(d => ({ ...d, shared_between: e.target.value, my_share: '' }))}
+                    placeholder="2" />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">O mi importe</label>
+                  <input type="number" step="0.01" min={0} className={IN + ' text-sm'}
+                    value={draft.my_share}
+                    onChange={e => setDraft(d => ({ ...d, my_share: e.target.value, shared_between: e.target.value ? '' : d.shared_between }))}
+                    placeholder="ej. 10.00" />
+                </div>
+              </div>
               {(() => {
-                const selType = types.find(t => String(t.id) === draft.movement_type_id)
-                const linkedAcc = selType?.linked_account_id ? accounts.find(a => a.id === selType.linked_account_id) : null
-                return linkedAcc ? (
-                  <div className="mt-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 rounded-lg text-xs text-blue-600 dark:text-blue-400">
-                    {parseFloat(draft.money) < 0
-                      ? <><span className="font-semibold">{linkedAcc.name}</span> → De uso</>
-                      : <>De uso → <span className="font-semibold">{linkedAcc.name}</span></>}
-                  </div>
-                ) : null
+                const total = Math.abs(parseFloat(draft.money) || 0)
+                if (draft.my_share) {
+                  const share = parseFloat(draft.my_share) || 0
+                  return <p className="text-xs text-blue-500 dark:text-blue-400">Tu parte: <strong>{share.toFixed(2)}€</strong> de {total.toFixed(2)}€</p>
+                }
+                const n = parseInt(draft.shared_between) || 2
+                const share = total / n
+                return <p className="text-xs text-blue-500 dark:text-blue-400">Tu parte: <strong>{share.toFixed(2)}€</strong> ({n} personas)</p>
               })()}
             </div>
-          </div>
-
-          {/* Pagado / No contar */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Pagado</label>
-              <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                <button className={TOGGLE(draft.paid)} onClick={() => setField('paid', true)}>Sí</button>
-                <button className={TOGGLE(!draft.paid)} onClick={() => setField('paid', false)}>No</button>
-              </div>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">No contar</label>
-              <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                <button className={TOGGLE(draft.no_count)} onClick={() => setField('no_count', true)}>Sí</button>
-                <button className={TOGGLE(!draft.no_count)} onClick={() => setField('no_count', false)}>No</button>
-              </div>
-            </div>
-          </div>
-
-          {/* Compartido */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Compartido</label>
-              <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-                <button className={TOGGLE(draft.is_shared)} onClick={() => setDraft(d => ({ ...d, is_shared: true, my_share: '', shared_between: d.shared_between || '2' }))}>Sí</button>
-                <button className={TOGGLE(!draft.is_shared)} onClick={() => setDraft(d => ({ ...d, is_shared: false, shared_between: '2', my_share: '' }))}>No</button>
-              </div>
-            </div>
-            {draft.is_shared && (
-              <div className="mt-1.5 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 space-y-2">
-                <p className="text-xs text-blue-600 dark:text-blue-400">El importe total resta del balance. Solo tu parte cuenta en las estadísticas.</p>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Nº personas</label>
-                    <input type="number" min={2} max={99} className={IN + ' text-sm'}
-                      value={draft.shared_between}
-                      onChange={e => setDraft(d => ({ ...d, shared_between: e.target.value, my_share: '' }))}
-                      placeholder="2" />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">O mi importe</label>
-                    <input type="number" step="0.01" min={0} className={IN + ' text-sm'}
-                      value={draft.my_share}
-                      onChange={e => setDraft(d => ({ ...d, my_share: e.target.value, shared_between: e.target.value ? '' : d.shared_between }))}
-                      placeholder="ej. 10.00" />
-                  </div>
-                </div>
-                {draft.is_shared && (() => {
-                  const total = Math.abs(parseFloat(draft.money) || 0)
-                  if (draft.my_share) {
-                    const share = parseFloat(draft.my_share) || 0
-                    return <p className="text-xs text-blue-500 dark:text-blue-400">Tu parte: <strong>{share.toFixed(2)}€</strong> de {total.toFixed(2)}€</p>
-                  }
-                  const n = parseInt(draft.shared_between) || 2
-                  const share = total / n
-                  return <p className="text-xs text-blue-500 dark:text-blue-400">Tu parte: <strong>{share.toFixed(2)}€</strong> ({n} personas)</p>
-                })()}
-              </div>
-            )}
-          </div>
+          )}
 
           {/* Notas */}
           <div>
