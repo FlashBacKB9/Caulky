@@ -4,7 +4,7 @@ from contextlib import asynccontextmanager
 from alembic.config import Config
 from alembic import command
 from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin
-from app.auth.setup import fastapi_users, auth_backend, google_oauth_client
+from app.auth.setup import fastapi_users, auth_backend
 from app.auth.schemas import UserRead, UserCreate, UserUpdate
 from app.config import settings
 
@@ -41,17 +41,6 @@ app.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate),
     prefix="/api/users",
     tags=["users"],
-)
-app.include_router(
-    fastapi_users.get_oauth_router(
-        google_oauth_client,
-        auth_backend,
-        settings.SECRET_KEY,
-        associate_by_email=True,
-        is_verified_by_default=True,
-    ),
-    prefix="/api/auth/google",
-    tags=["auth"],
 )
 
 # ── Data routes ────────────────────────────────────────────────────────────────

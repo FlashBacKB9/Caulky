@@ -1,7 +1,6 @@
 import uuid
 from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend, CookieTransport, JWTStrategy
-from httpx_oauth.clients.google import GoogleOAuth2
 from app.auth.manager import get_user_manager
 from app.models.user import User
 from app.config import settings
@@ -23,11 +22,6 @@ auth_backend = AuthenticationBackend(
     name="cookie",
     transport=cookie_transport,
     get_strategy=get_jwt_strategy,
-)
-
-google_oauth_client = GoogleOAuth2(
-    client_id=settings.GOOGLE_CLIENT_ID,
-    client_secret=settings.GOOGLE_CLIENT_SECRET,
 )
 
 fastapi_users = FastAPIUsers[User, uuid.UUID](
