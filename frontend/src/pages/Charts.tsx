@@ -161,7 +161,9 @@ function computeChartData(
     const fallback = (def.defaultDisplay === 'donut' || def.defaultDisplay === 'pie') ? 'bar' : def.defaultDisplay
     return { key, label: ov?.label ?? info.label, color: ov?.color ?? info.color, display: ov?.display ?? fallback, stacked: ov?.stacked ?? false }
   }
-  const val = (mv: Movement) => def.metric === 'count' ? 1 : Math.abs(mv.dinero)
+  // Use signed dinero so refunds/returns properly cancel out within a category.
+  // We take Math.abs of the final accumulated value per bucket so bars are always positive.
+  const val = (mv: Movement) => def.metric === 'count' ? 1 : mv.dinero
 
   // Collect unique keys in appearance order
   const keyOrder: string[] = []; const keySeen = new Set<string>()
@@ -172,7 +174,7 @@ function computeChartData(
     for (const mv of movements) { const k = seriesKey(mv); if (k) byKey[k] = (byKey[k] ?? 0) + val(mv) }
     const data = keyOrder.map(key => {
       const info = baseInfo(key); const ov = overrideMap[key]
-      return { name: ov?.label ?? info.label, value: byKey[key] ?? 0, color: ov?.color ?? info.color }
+      return { name: ov?.label ?? info.label, value: Math.abs(byKey[key] ?? 0), color: ov?.color ?? info.color }
     }).sort((a, b) => (b.value as number) - (a.value as number))
     return { data, series: keyOrder.map(makeSeries) }
   }
@@ -191,7 +193,7 @@ function computeChartData(
     byBucket[bucket][k] = (byBucket[bucket][k] ?? 0) + val(mv)
   }
   const data = xBuckets.map(({ key, label }) => ({
-    x: label, ...Object.fromEntries(keyOrder.map(k => [k, byBucket[key]?.[k] ?? 0]))
+    x: label, ...Object.fromEntries(keyOrder.map(k => [k, Math.abs(byBucket[key]?.[k] ?? 0)]))
   }))
   return { data, series: keyOrder.map(makeSeries) }
 }
@@ -345,6 +347,17 @@ function DonutLayout({ data, mode, fmt, outerR, side, onLayoutChange }: {
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
   const dragZoneRef = useRef<typeof dragZone>(null)
+  const listScrollRef = useRef<HTMLDivElement>(null)
+  const [listOverflows, setListOverflows] = useState(false)
+  const [listAtBottom, setListAtBottom] = useState(true)
+  const checkListScroll = () => {
+    const el = listScrollRef.current
+    if (!el) return
+    const overflows = el.scrollHeight > el.clientHeight + 2
+    setListOverflows(overflows)
+    setListAtBottom(!overflows || el.scrollHeight - el.scrollTop <= el.clientHeight + 2)
+  }
+  useEffect(() => { checkListScroll() }, [data, outerR, side])
 
   const innerR    = mode === 'donut' ? Math.round(outerR * 0.57) : 0
   const boxSize   = outerR * 2 + 16
@@ -412,8 +425,10 @@ function DonutLayout({ data, mode, fmt, outerR, side, onLayoutChange }: {
 
   const listBlock = (
     <div key="list" className="flex-1 min-w-0 relative" style={isRow ? { maxHeight: boxSize } : {}}>
-      <div className={`space-y-1.5 ${isRow ? 'overflow-y-auto h-full [&::-webkit-scrollbar]:hidden' : ''}`}
-        style={isRow ? { maxHeight: boxSize, scrollbarWidth: 'none' } : {}}>
+      <div ref={listScrollRef}
+        className={`space-y-1.5 ${isRow ? 'overflow-y-auto h-full [&::-webkit-scrollbar]:hidden' : ''}`}
+        style={isRow ? { maxHeight: boxSize, scrollbarWidth: 'none' } : {}}
+        onScroll={checkListScroll}>
         {data.map(d => (
           <div key={d.name} className="flex items-center gap-2 text-xs">
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: d.color }}/>
@@ -422,7 +437,7 @@ function DonutLayout({ data, mode, fmt, outerR, side, onLayoutChange }: {
           </div>
         ))}
       </div>
-      {isRow && (
+      {isRow && listOverflows && !listAtBottom && (
         <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white dark:from-gray-900 to-transparent rounded-b" />
       )}
     </div>
@@ -608,16 +623,14 @@ function SubtypesByGroupChart({ filtered, typeToGroup, groupById, typeById, mode
 // ── ChartWithFilter (built-in charts) ─────────────────────────────────────────
 
 function ChartWithFilter({ title, groups, types, allYears, modes, onDelete, onGripMouseDown,
-  showFilterBtn = true, onToggleFilterBtn, render: Render }: {
+  render: Render }: {
   title: string; groups: Group[]; types: MovementType[]; allYears: number[]
   modes?: ModeOption[]; onDelete?: () => void; onGripMouseDown?: () => void
-  showFilterBtn?: boolean; onToggleFilterBtn?: (v: boolean) => void
   render: (props: ChartProps) => React.ReactNode
 }) {
   const [showFilters,       setShowFilters]       = useState(false)
   const [showYearPicker,    setShowYearPicker]    = useState(false)
   const [confirmingDelete,  setConfirmingDelete]  = useState(false)
-  const [showConfig,        setShowConfig]        = useState(false)
   const [year,              setYear]              = useState<number | null>(CUR_YEAR)
   const [advFilter,         setAdvFilter]         = useState<AdvancedFilter>(EMPTY_FILTER)
   const [mode,              setMode]              = useState<DisplayMode>(modes?.[0]?.id ?? 'bars')
@@ -659,31 +672,10 @@ function ChartWithFilter({ title, groups, types, allYears, modes, onDelete, onGr
               </div>
             )}
           </div>
-          {showFilterBtn && (
-            <button onClick={()=>setShowFilters(v=>!v)} title="Filtros avanzados" className={`relative p-1.5 rounded-lg transition-colors ${showFilters||activeCount>0?'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200':'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-              <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={1.5}/>
-              {activeCount>0&&!showFilters&&<span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-500 text-white text-[8px] flex items-center justify-center font-bold leading-none">{activeCount}</span>}
-            </button>
-          )}
-          {onToggleFilterBtn && (
-            <div className="relative">
-              <button onClick={()=>setShowConfig(v=>!v)} title="Opciones" className={`p-1.5 rounded-lg transition-colors ${showConfig?'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-200':'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                <Settings2 className="w-3.5 h-3.5" strokeWidth={1.5}/>
-              </button>
-              {showConfig && (
-                <>
-                  <div className="fixed inset-0 z-20" onClick={()=>setShowConfig(false)}/>
-                  <div className="absolute right-0 top-full mt-1 z-30 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-xl p-3 min-w-[200px]">
-                    <label className="flex items-center gap-2.5 cursor-pointer select-none">
-                      <input type="checkbox" checked={showFilterBtn} onChange={e=>{onToggleFilterBtn(e.target.checked);setShowConfig(false)}}
-                        className="w-3.5 h-3.5 rounded accent-blue-500"/>
-                      <span className="text-sm text-gray-700 dark:text-gray-300">Mostrar botón de filtro</span>
-                    </label>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+          <button onClick={()=>setShowFilters(v=>!v)} title="Filtros avanzados" className={`relative p-1.5 rounded-lg transition-colors ${showFilters||activeCount>0?'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200':'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+            <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={1.5}/>
+            {activeCount>0&&!showFilters&&<span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-500 text-white text-[8px] flex items-center justify-center font-bold leading-none">{activeCount}</span>}
+          </button>
           {onDelete && (
             confirmingDelete ? (
               <div className="flex items-center gap-1 shrink-0">
@@ -1065,6 +1057,13 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
   const { fmt, fmtK } = useCurrency()
   const [showFilter,   setShowFilter]  = useState(false)
   const [colorPickKey, setColorPickKey] = useState<string|null>(null)
+  const sidebarRef = useRef<HTMLDivElement>(null)
+  const [sidebarAtBottom, setSidebarAtBottom] = useState(true)
+  const checkSidebar = () => {
+    const el = sidebarRef.current
+    if (!el) return
+    setSidebarAtBottom(el.scrollHeight <= el.clientHeight + 2 || el.scrollHeight - el.scrollTop <= el.clientHeight + 2)
+  }
 
   const upd = useCallback((patch: Partial<CustomChartDef>) => onUpdate({ ...def, ...patch }), [def, onUpdate])
 
@@ -1245,7 +1244,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
 
         {/* Left: config panel */}
         <div className="w-80 shrink-0 relative flex flex-col bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800">
-        <div className="flex-1 overflow-y-auto p-5 space-y-5 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }}>
+        <div ref={sidebarRef} className="flex-1 overflow-y-auto p-5 space-y-5 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }} onScroll={checkSidebar}>
 
           <div className="space-y-1.5">
             <span className={labelCls}>Fuente de datos</span>
@@ -1532,7 +1531,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
           )}
 
         </div>{/* end inner scroll */}
-        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-gray-900 to-transparent" />
+        {!sidebarAtBottom && <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-12 bg-gradient-to-t from-white dark:from-gray-900 to-transparent" />}
         </div>{/* end sidebar wrapper */}
 
         {/* Right: preview */}
@@ -1584,7 +1583,7 @@ export default function Charts() {
   const [hiddenBuiltins, setHiddenBuiltins] = useState<Set<string>>(()=>{
     try { return new Set(JSON.parse(localStorage.getItem('spendly-hidden-builtins') ?? '[]')) } catch { return new Set() }
   })
-  const [builtinCfg, setBuiltinCfg] = useState<Record<string,{ colSpan?:number; height?:number; showFilter?:boolean }>>(()=>{
+  const [builtinCfg, setBuiltinCfg] = useState<Record<string,{ colSpan?:number; height?:number }>>(()=>{
     try { return JSON.parse(localStorage.getItem('spendly-builtin-cfg') ?? '{}') } catch { return {} }
   })
   useEffect(()=>{ localStorage.setItem('spendly-builtin-cfg', JSON.stringify(builtinCfg)) },[builtinCfg])
@@ -1685,12 +1684,9 @@ export default function Charts() {
         {effectiveBuiltinOrder.filter(id=>!hiddenBuiltins.has(id)).map(id=>{
           const defaultWide = BUILTIN_DEFS.find(b=>b.id===id)?.wide ?? false
           const colSpan = builtinCfg[id]?.colSpan ?? (defaultWide ? 4 : 2)
-          const showFilterBtn = builtinCfg[id]?.showFilter !== false
           const bp = {
             ...shared,
             onDelete: ()=>hideBuiltin(id),
-            showFilterBtn,
-            onToggleFilterBtn: (v: boolean) => setBuiltinCfg(c=>({ ...c, [id]:{ ...c[id], showFilter:v } })),
           }
           const renderMap: Record<string,(g:()=>void)=>React.ReactNode> = {
             monthly:      g=><ChartWithFilter title="Ingresos y gastos por mes"      {...bp} modes={[M_BARS,M_STACKED,M_LINES,M_COMBO]} onGripMouseDown={g} render={p=><MonthlyBarChart {...p}/>}/>,

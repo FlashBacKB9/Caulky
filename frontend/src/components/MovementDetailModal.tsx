@@ -146,12 +146,20 @@ export default function MovementDetailModal({ movement, types, onClose }: {
             <input className={IN} value={draft.name} onChange={e => setField('name', e.target.value)} />
           </div>
 
-          {/* Importe + Tipo */}
+          {/* Importe + Fecha */}
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Importe</label>
               <input type="number" step="0.01" className={IN} value={draft.money} onChange={e => setField('money', e.target.value)} />
             </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Fecha</label>
+              <input type="date" className={IN} value={draft.date} onChange={e => setField('date', e.target.value)} />
+            </div>
+          </div>
+
+          {/* Tipo + Fecha banco */}
+          <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tipo</label>
               <div className="relative">
@@ -172,14 +180,6 @@ export default function MovementDetailModal({ movement, types, onClose }: {
                     : <>De uso → <span className="font-semibold">{linkedAcc.name}</span></>}
                 </div>
               )}
-            </div>
-          </div>
-
-          {/* Fecha + Fecha banco */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Fecha</label>
-              <input type="date" className={IN} value={draft.date} onChange={e => setField('date', e.target.value)} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Fecha banco</label>

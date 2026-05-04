@@ -459,65 +459,77 @@ export default function MovementForm({ onClose }: Props) {
                     </div>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Negativo = devolución</p>
                   </div>
-                  <div className="space-y-2">
-                    <div>
-                      <label className={LBL}>Fecha *</label>
-                      <input type="date" value={form.date} onChange={e => set('date', e.target.value)} className={INP} />
-                    </div>
-                    <div>
-                      <label className={LBL}>Fecha banco</label>
-                      <input type="date" value={form.bank_date} onChange={e => set('bank_date', e.target.value)} className={INP} />
-                    </div>
+                  <div>
+                    <label className={LBL}>Fecha *</label>
+                    <input type="date" value={form.date} onChange={e => set('date', e.target.value)} className={INP} />
                   </div>
                 </div>
-                <div>
-                  <label className={LBL}>Tipo de movimiento</label>
-                  <div className="space-y-1.5">
-                    <TypeSelect value={form.movement_type_id} onChange={v => set('movement_type_id', v)} types={types} byCategory={byCategory} />
-                    <SavingsHint typeId={form.movement_type_id} money={form.money} />
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={LBL}>Tipo de movimiento</label>
+                    <div className="space-y-1.5">
+                      <TypeSelect value={form.movement_type_id} onChange={v => set('movement_type_id', v)} types={types} byCategory={byCategory} />
+                      <SavingsHint typeId={form.movement_type_id} money={form.money} />
+                    </div>
+                  </div>
+                  <div>
+                    <label className={LBL}>Fecha banco</label>
+                    <input type="date" value={form.bank_date} onChange={e => set('bank_date', e.target.value)} className={INP} />
                   </div>
                 </div>
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Compartido</label>
+                    <Toggle
+                      value={form.is_shared}
+                      onChange={v => setForm(f => ({ ...f, is_shared: v, ...(v ? {} : { shared_between: '2', my_share: '' }) }))}
+                      color="#3b82f6"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Pagado</label>
+                    <Toggle value={form.paid} onChange={v => set('paid', v)} color="#22c55e" />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">No contar</label>
+                    <Toggle value={form.no_count} onChange={v => set('no_count', v)} color="#f59e0b" />
+                  </div>
+                </div>
+                {form.is_shared && (
+                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 space-y-2">
+                    <p className="text-xs text-blue-600 dark:text-blue-400">El importe total resta del balance. Solo tu parte cuenta en las estadísticas.</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Nº personas</label>
+                        <input type="number" min={2} max={99} className={INP}
+                          value={form.shared_between}
+                          onChange={e => setForm(f => ({ ...f, shared_between: e.target.value, my_share: '' }))}
+                          placeholder="2" />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">O mi importe</label>
+                        <input type="number" step="0.01" min={0} className={INP}
+                          value={form.my_share}
+                          onChange={e => setForm(f => ({ ...f, my_share: e.target.value, shared_between: e.target.value ? '' : f.shared_between }))}
+                          placeholder="ej. 10.00" />
+                      </div>
+                    </div>
+                    {(() => {
+                      const total = Math.abs(parseFloat(form.money) || 0)
+                      if (form.my_share) {
+                        const share = parseFloat(form.my_share) || 0
+                        return <p className="text-xs text-blue-500">Tu parte: <strong>{share.toFixed(2)}€</strong> de {total.toFixed(2)}€</p>
+                      }
+                      const n = parseInt(form.shared_between) || 2
+                      const share = total / n
+                      return <p className="text-xs text-blue-500">Tu parte: <strong>{share.toFixed(2)}€</strong> ({n} personas)</p>
+                    })()}
+                  </div>
+                )}
                 <div>
                   <label className={LBL}>Notas</label>
                   <textarea value={form.notes} onChange={e => set('notes', e.target.value)}
                     rows={2} placeholder="Opcional..." className={INP + ' resize-none'} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2.5">
-                    <Toggle value={form.is_shared} onChange={v => set('is_shared', v)} color="#3b82f6" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Compartido</span>
-                  </div>
-                  {form.is_shared && (
-                    <div className="mt-2 p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 space-y-2">
-                      <p className="text-xs text-blue-600 dark:text-blue-400">El importe total resta del balance. Solo tu parte cuenta en las estadísticas.</p>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Nº personas</label>
-                          <input type="number" min={2} max={99} className={INP}
-                            value={form.shared_between}
-                            onChange={e => setForm(f => ({ ...f, shared_between: e.target.value, my_share: '' }))}
-                            placeholder="2" />
-                        </div>
-                        <div>
-                          <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">O mi importe</label>
-                          <input type="number" step="0.01" min={0} className={INP}
-                            value={form.my_share}
-                            onChange={e => setForm(f => ({ ...f, my_share: e.target.value, shared_between: e.target.value ? '' : f.shared_between }))}
-                            placeholder="ej. 10.00" />
-                        </div>
-                      </div>
-                      {(() => {
-                        const total = Math.abs(parseFloat(form.money) || 0)
-                        if (form.my_share) {
-                          const share = parseFloat(form.my_share) || 0
-                          return <p className="text-xs text-blue-500">Tu parte: <strong>{share.toFixed(2)}€</strong> de {total.toFixed(2)}€</p>
-                        }
-                        const n = parseInt(form.shared_between) || 2
-                        const share = total / n
-                        return <p className="text-xs text-blue-500">Tu parte: <strong>{share.toFixed(2)}€</strong> ({n} personas)</p>
-                      })()}
-                    </div>
-                  )}
                 </div>
                 <div>
                   <label className={LBL}>Adjuntos</label>
@@ -544,16 +556,6 @@ export default function MovementForm({ onClose }: Props) {
                       Arrastra o haz clic para adjuntar
                     </span>
                     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={e => addFiles(e.target.files)} />
-                  </div>
-                </div>
-                <div className="flex gap-5">
-                  <div className="flex items-center gap-2.5">
-                    <Toggle value={form.paid} onChange={v => set('paid', v)} color="#22c55e" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Pagado</span>
-                  </div>
-                  <div className="flex items-center gap-2.5">
-                    <Toggle value={form.no_count} onChange={v => set('no_count', v)} color="#f59e0b" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">No contar</span>
                   </div>
                 </div>
                 <div className="flex justify-end gap-3 pt-2">
