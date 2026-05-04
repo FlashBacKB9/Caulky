@@ -94,7 +94,7 @@ export default function Sidebar() {
     .map(e => ({ to: e.id, ...PAGE_META[e.id] }))
 
   const linkCls = (isActive: boolean) =>
-    `flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+    `flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
       isActive
         ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
         : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200'
@@ -109,7 +109,7 @@ export default function Sidebar() {
           <span className="font-bold text-lg text-gray-800 dark:text-white">Caulky</span>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        <nav className="flex-1 px-3 py-4 space-y-0.5 min-h-0">
           {visibleLinks.map(({ to, label, Icon }) => (
             <NavLink
               key={to}
