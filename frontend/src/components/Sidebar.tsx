@@ -103,7 +103,7 @@ export default function Sidebar() {
   return (
     <>
       {showInfo && <InfoModal onClose={() => setShowInfo(false)} />}
-      <aside className="w-56 h-screen sticky top-0 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex flex-col">
+      <aside className="w-56 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 flex flex-col overflow-hidden">
         <div className="px-5 py-5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2.5 shrink-0">
           <Wallet className="w-5 h-5 text-gray-800 dark:text-white" strokeWidth={1.5} />
           <span className="font-bold text-lg text-gray-800 dark:text-white">Caulky</span>
