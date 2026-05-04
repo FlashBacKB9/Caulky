@@ -13,6 +13,9 @@ export function useUiZoom() {
 
   useEffect(() => {
     document.documentElement.style.zoom = zoom + '%'
+    // When zoomed out, the html element is smaller than the viewport, leaving empty space.
+    // Setting min-height to 100/zoom compensates so the layout still fills the full screen.
+    document.documentElement.style.minHeight = zoom < 100 ? `${(100 * 100 / zoom).toFixed(2)}%` : ''
     localStorage.setItem(ZOOM_KEY, String(zoom))
   }, [zoom])
 

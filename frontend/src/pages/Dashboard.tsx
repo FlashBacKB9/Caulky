@@ -275,6 +275,79 @@ function BalanceEvolutionChart({ groups, year, initialTotal, height = 260 }: { g
   )
 }
 
+// ── Account balance history chart ────────────────────────────────────────────
+
+function AccountBalanceHistoryChart({ accounts, movements, combined = false, height = 260 }: {
+  accounts: Account[]
+  movements: Movement[]
+  combined?: boolean
+  height?: number
+}) {
+  const { fmt, fmtK } = useCurrency()
+
+  const { chartData } = useMemo(() => {
+    if (accounts.length === 0) return { chartData: [] }
+    const sorted = [...movements].sort((a, b) => a.date.localeCompare(b.date))
+    if (sorted.length === 0) return { chartData: [] }
+
+    const firstDate = new Date(sorted[0].date + 'T00:00:00')
+    const now = new Date()
+    const balances: Record<number, number> = {}
+    for (const acc of accounts) balances[acc.id] = acc.initial_balance
+
+    let mvIdx = 0
+    const result: Record<string, number | string>[] = []
+
+    for (let y = firstDate.getFullYear(); y <= now.getFullYear(); y++) {
+      const mStart = y === firstDate.getFullYear() ? firstDate.getMonth() : 0
+      const mEnd   = y === now.getFullYear() ? now.getMonth() : 11
+      for (let m = mStart; m <= mEnd; m++) {
+        while (mvIdx < sorted.length) {
+          const mv = sorted[mvIdx]
+          const d = new Date(mv.date + 'T00:00:00')
+          if (d.getFullYear() > y || (d.getFullYear() === y && d.getMonth() > m)) break
+          if (mv.account_id != null) balances[mv.account_id] = (balances[mv.account_id] ?? 0) + mv.dinero
+          mvIdx++
+        }
+        const label = `${MONTHS_SHORT[m]} ${String(y).slice(2)}`
+        const entry: Record<string, number | string> = { label }
+        let total = 0
+        for (const acc of accounts) {
+          const v = Math.round((balances[acc.id] ?? 0) * 100) / 100
+          if (!combined) entry[acc.name] = v
+          total += v
+        }
+        if (combined) entry['Total'] = Math.round(total * 100) / 100
+        result.push(entry)
+      }
+    }
+    return { chartData: result }
+  }, [accounts, movements, combined])
+
+  const lines = combined
+    ? [{ key: 'Total', color: '#3b82f6' }]
+    : accounts.map(a => ({ key: a.name, color: a.color }))
+
+  const allVals = chartData.flatMap(d => lines.map(l => d[l.key] as number)).filter(v => typeof v === 'number')
+  const minV = Math.min(...allVals), maxV = Math.max(...allVals)
+  const pad  = (maxV - minV) * 0.1 || 100
+
+  return (
+    <ResponsiveContainer width="100%" height={height}>
+      <LineChart data={chartData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" vertical={false} />
+        <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+        <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={48} domain={[minV - pad, maxV + pad]} />
+        <Tooltip formatter={(v: unknown, name) => [fmt(v as number), String(name ?? '')]} labelStyle={{ color: '#6b7280', fontSize: 11 }} contentStyle={{ borderRadius: 12, border: '1px solid #f3f4f6', fontSize: 12 }} />
+        {!combined && <Legend />}
+        {lines.map(l => (
+          <Line key={l.key} type="linear" dataKey={l.key} stroke={l.color} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: l.color }} isAnimationActive={false} />
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  )
+}
+
 // ── ResizableWrapper (same pattern as Charts.tsx) ─────────────────────────────
 
 function ResizableWrapper({ colSpan, height, onUpdateColSpan, onUpdateHeight, isDragging, isDragOver,
@@ -842,9 +915,11 @@ function PeriodToggle({ period, onChange }: { period: 'month' | 'year'; onChange
 // ── Chart options ─────────────────────────────────────────────────────────────
 
 const BUILTIN_CHART_DEFS: { id: string; label: string; desc: string; Icon: LucideIcon; defaultColSpan: number }[] = [
-  { id: 'chart-expenses-line', label: 'Gastos por categoría',           desc: 'Líneas por grupo a lo largo del año',          Icon: BarChart2,  defaultColSpan: 4 },
-  { id: 'chart-expenses-pie',  label: 'Distribución de gastos',         desc: 'Donut con el total anual por grupo',            Icon: PieIcon,    defaultColSpan: 2 },
-  { id: 'chart-balance',       label: 'Evolución del balance',          desc: 'Área con la evolución mensual del saldo',       Icon: TrendingUp, defaultColSpan: 2 },
+  { id: 'chart-expenses-line',      label: 'Gastos por categoría',          desc: 'Líneas por grupo a lo largo del año',           Icon: BarChart2,  defaultColSpan: 4 },
+  { id: 'chart-expenses-pie',       label: 'Distribución de gastos',        desc: 'Donut con el total anual por grupo',             Icon: PieIcon,    defaultColSpan: 2 },
+  { id: 'chart-balance',            label: 'Evolución del balance',         desc: 'Área con la evolución mensual del saldo',        Icon: TrendingUp, defaultColSpan: 2 },
+  { id: 'chart-balance-accounts',   label: 'Histórico de balance',          desc: 'Balance histórico por cuenta (todas las cuentas)', Icon: TrendingUp, defaultColSpan: 4 },
+  { id: 'chart-balance-combined',   label: 'Balance total histórico',       desc: 'Evolución del balance total de todas las cuentas', Icon: TrendingUp, defaultColSpan: 2 },
   { id: 'charts-monthly',      label: 'Ingresos y gastos por mes',      desc: 'Barras de ingresos y gastos mensuales',         Icon: BarChart2,  defaultColSpan: 4 },
   { id: 'charts-net',          label: 'Balance neto por mes',           desc: 'Balance neto por cada mes',                    Icon: TrendingUp, defaultColSpan: 2 },
   { id: 'charts-cumulative',   label: 'Balance acumulado',              desc: 'Balance acumulado de todos los movimientos',    Icon: TrendingUp, defaultColSpan: 2 },
@@ -1246,14 +1321,15 @@ export default function Dashboard() {
   const { data: annualData }   = useQuery({ queryKey: ['annual', year],              queryFn: () => getAnnualStats(year) })
   const { data: accountsData } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
 
-  const hasBudgetWidgets    = config.widgets.some(w => !w.id.startsWith('stat-') && !w.id.startsWith('chart-') && !w.id.startsWith('charts-') && !customChartDefs.some(c => c.id === w.id))
-  const hasChartsBuiltins   = config.widgets.some(w => w.id.startsWith('charts-'))
+  const hasBudgetWidgets      = config.widgets.some(w => !w.id.startsWith('stat-') && !w.id.startsWith('chart-') && !w.id.startsWith('charts-') && !customChartDefs.some(c => c.id === w.id))
+  const hasChartsBuiltins     = config.widgets.some(w => w.id.startsWith('charts-'))
+  const hasBalanceHistory     = config.widgets.some(w => w.id === 'chart-balance-accounts' || w.id === 'chart-balance-combined')
   const hasCustomChartWidgets = config.widgets.some(w => customChartDefs.some(c => c.id === w.id))
-  const needsChartsData     = hasChartsBuiltins || hasCustomChartWidgets
+  const needsChartsData       = hasChartsBuiltins || hasCustomChartWidgets
 
   const { data: movements = [] } = useQuery({
     queryKey: ['movements'], queryFn: () => getMovements(),
-    enabled: hasBudgetWidgets || hasChartsBuiltins,
+    enabled: hasBudgetWidgets || hasChartsBuiltins || hasBalanceHistory,
   })
   const { data: apiGroups = [] } = useQuery({
     queryKey: ['groups'], queryFn: getGroups, enabled: needsChartsData,
@@ -1341,6 +1417,18 @@ export default function Dashboard() {
       <div className={PANEL}>
         <h2 className={`${TITLE} mb-4`}>Evolución del balance — {year}</h2>
         <BalanceEvolutionChart groups={annualData?.groups ?? []} year={year} initialTotal={initialTotal} height={chartH} />
+      </div>
+    )
+    if (w.id === 'chart-balance-accounts') return (
+      <div className={PANEL}>
+        <h2 className={`${TITLE} mb-4`}>Histórico de balance por cuenta</h2>
+        <AccountBalanceHistoryChart accounts={allAccounts} movements={movements} combined={false} height={chartH} />
+      </div>
+    )
+    if (w.id === 'chart-balance-combined') return (
+      <div className={PANEL}>
+        <h2 className={`${TITLE} mb-4`}>Balance total histórico</h2>
+        <AccountBalanceHistoryChart accounts={allAccounts} movements={movements} combined={true} height={chartH} />
       </div>
     )
 
