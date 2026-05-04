@@ -25,13 +25,20 @@ const BLOCKED_PATTERNS: { re: RegExp; msg: string }[] = [
   { re: /document\.documentElement\b/,            msg: 'Accede al elemento raíz <html> directamente' },
   { re: /\beval\s*\(/,                            msg: 'Usa eval() — ejecución de código arbitrario' },
   { re: /document\.write\s*\(/,                   msg: 'Usa document.write() — bloquea el renderizado' },
+  // Hiding structural layout containers breaks the whole UI
+  { re: /\.closest\s*\(\s*['"][^'"]*(?:\.flex|\.flex-col|\.space-y|\.gap-|\.grid)/, msg: 'Usa .closest() con clases de layout (.flex, .grid…) — puede ocultar secciones enteras de la app' },
+  // Searching elements by text content and hiding them is too broad
+  { re: /\.textContent[\s\S]{0,80}\.includes\s*\([\s\S]{0,200}\.style\.\w+\s*=/, msg: 'Busca elementos por textContent y modifica su estilo — puede romper la UI al afectar contenedores de la app' },
 ]
 
 const WARN_PATTERNS: { re: RegExp; msg: string }[] = [
-  { re: /\.innerHTML\s*=/,                                              msg: 'Usa innerHTML — asegúrate de apuntar a un elemento concreto' },
-  { re: /querySelectorAll?\s*\(\s*['"](?:\*|div|span|body|html|\.flex)/, msg: 'Selector muy genérico — puede afectar a toda la app' },
-  { re: /\bsetInterval\s*\(/,                                           msg: 'Usa setInterval — recuerda limpiarlo en __cleanup()' },
-  { re: /history\.pushState|history\.replaceState/,                     msg: 'Modifica el historial — recuerda restaurarlo en __cleanup()' },
+  { re: /\.innerHTML\s*=/,                                                        msg: 'Usa innerHTML — asegúrate de apuntar a un elemento concreto' },
+  // Match generic selectors anywhere in the string, not just at the start
+  { re: /querySelectorAll?\s*\(\s*['"][^'"]*(?:\*|\bdiv\b|\bspan\b|\bbody\b|\bhtml\b|\.flex)/, msg: 'Selector muy genérico — puede afectar a toda la app' },
+  { re: /\bsetInterval\s*\(/,                                                     msg: 'Usa setInterval — recuerda limpiarlo en __cleanup()' },
+  { re: /history\.pushState|history\.replaceState/,                               msg: 'Modifica el historial — recuerda restaurarlo en __cleanup()' },
+  { re: /\.style\.display\s*=\s*['"]none['"]/,                                   msg: 'Oculta elementos con style.display — asegúrate de apuntar a elementos propios del plugin, no de la app' },
+  { re: /\.parentElement\s*[;.]/,                                                 msg: 'Accede a parentElement — puede modificar contenedores de la app accidentalmente' },
 ]
 
 function hasCleanup(code: string) {
