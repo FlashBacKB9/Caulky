@@ -1087,7 +1087,7 @@ export default function Settings() {
   const { dark, toggle } = useDarkMode()
   const { currency, setCurrency, fmt, currencies } = useCurrency()
   const { format: dateFormat, setFormat: setDateFormat } = useDateFormat()
-  const { zoom, setZoom, inc: zoomIn, dec: zoomOut, reset: zoomReset, min: zoomMin, max: zoomMax } = useUiZoom()
+  const { zoom, setZoom, inc: zoomIn, dec: zoomOut, min: zoomMin, max: zoomMax } = useUiZoom()
   const { data, isLoading } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
   const navigate = useNavigate()
   const [showInvestments, setShowInvestments] = useState(

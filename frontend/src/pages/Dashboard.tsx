@@ -244,7 +244,7 @@ function ExpensesPieChart({ groups, height = 200 }: { groups: Group[]; height?: 
 }
 
 function BalanceEvolutionChart({ groups, year, initialTotal, height = 260 }: { groups: Group[]; year: number; initialTotal: number; height?: number }) {
-  const { fmt, fmtK } = useCurrency()
+  const { fmtK } = useCurrency()
   const curMonth  = new Date().getFullYear() === year ? new Date().getMonth() : 11
   const netGroups = groups.filter(g => !BALANCE_EXCLUDE.has(g.name) && g.name !== 'Total')
   let running = initialTotal
@@ -315,7 +315,7 @@ function BalanceLineChart({ data, lines, height }: {
   lines: { key: string; color: string }[]
   height: number
 }) {
-  const { fmt, fmtK } = useCurrency()
+  const { fmtK } = useCurrency()
   const allVals = data.flatMap(d => lines.map(l => d[l.key] as number)).filter(v => typeof v === 'number')
   const minV = allVals.length ? Math.min(...allVals) : 0
   const maxV = allVals.length ? Math.max(...allVals) : 0
@@ -657,7 +657,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
   chartId: string; allMvs: Movement[]; apiGroups: ApiGroup[]; types: MovementType[]
   height: number; period: 'month' | 'year'; selDate: { year: number; month: number }
 }) {
-  const { fmt, fmtK } = useCurrency()
+  const { fmtK } = useCurrency()
   const curYear  = selDate.year
   const curMonth = selDate.month
 
@@ -922,7 +922,6 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
 
   const visible  = series.filter(s => s.display !== 'hidden')
   const lt       = def.lineType ?? 'monotone'
-  const mFmt     = def.metric === 'count' ? (v: number) => String(Math.round(v)) : fmt
   const mFmtK    = def.metric === 'count' ? (v: number) => String(Math.round(v)) : fmtK
 
   if (def.xAxis === 'none') {
