@@ -16,6 +16,7 @@ import LoginPage from './pages/LoginPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { useDarkMode } from './hooks/useDarkMode'
 import { useUiZoom } from './hooks/useUiZoom'
+import { usePluginLoader } from './hooks/usePlugins'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -29,6 +30,7 @@ export const queryClient = new QueryClient({
 function Layout() {
   useDarkMode()
   useUiZoom()
+  usePluginLoader()
   return (
     <div className="flex h-full overflow-hidden bg-gray-50 dark:bg-gray-950">
       <Sidebar />

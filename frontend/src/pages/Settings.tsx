@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useRef, useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { getAccountsSummary, createAccount, updateAccountFull, deleteAccount, type Account } from '../api/accounts'
@@ -15,8 +15,9 @@ import { useUiZoom } from '../hooks/useUiZoom'
 import { loadNavConfig, saveNavConfig, PAGE_META, type NavEntry } from '../hooks/useNavConfig'
 import {
   Pencil, Sun, Moon, Lock, Trash2, Plus, Check, X, ChevronRight, ChevronDown, ChevronUp,
-  LayoutDashboard, Download, Upload, AlertTriangle,
+  LayoutDashboard, Download, Upload, AlertTriangle, Puzzle,
 } from 'lucide-react'
+import { usePlugins } from '../hooks/usePlugins'
 import AppIcon, { ICON_KEYS } from '../components/AppIcon'
 
 // ── Account Card ──────────────────────────────────────────────────────────────
@@ -1046,6 +1047,70 @@ function BackupSection() {
   )
 }
 
+// ── Plugins section ───────────────────────────────────────────────────────────
+
+function PluginsSection() {
+  const { plugins, addPlugin, removePlugin, togglePlugin } = usePlugins()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  const handleFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setError(null)
+    try { await addPlugin(file) }
+    catch { setError('No se pudo cargar el plugin') }
+  }, [addPlugin])
+
+  return (
+    <div className="space-y-2">
+      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
+        {plugins.length === 0 && (
+          <p className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500">No hay plugins instalados.</p>
+        )}
+        {plugins.map(p => (
+          <div key={p.id} className="flex items-center gap-3 px-4 py-3">
+            <div className="w-7 h-7 rounded-lg bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center shrink-0">
+              <Puzzle className="w-3.5 h-3.5 text-purple-500" strokeWidth={1.5} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{p.name}</p>
+              {p.description && (
+                <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{p.description}</p>
+              )}
+            </div>
+            <span className="text-xs text-gray-300 dark:text-gray-600 shrink-0">v{p.version}</span>
+            <button
+              onClick={() => togglePlugin(p.id)}
+              className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none shrink-0 ${
+                p.enabled ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'
+              }`}
+            >
+              <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                p.enabled ? 'translate-x-4' : 'translate-x-0.5'
+              }`} />
+            </button>
+            <button onClick={() => removePlugin(p.id)} className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 rounded transition-colors shrink-0">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      <input ref={fileRef} type="file" accept=".js" onChange={handleFile} className="sr-only" />
+      <button
+        onClick={() => fileRef.current?.click()}
+        className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
+      >
+        <Upload className="w-4 h-4" />
+        Instalar plugin (.js)
+      </button>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+    </div>
+  )
+}
+
 // ── Reset section ─────────────────────────────────────────────────────────────
 
 function ResetSection() {
@@ -1258,6 +1323,13 @@ export default function Settings() {
 
           <Section title="Copia de seguridad">
             <BackupSection />
+          </Section>
+
+          <Section title="Plugins">
+            <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
+              Extiende la app subiendo archivos .js. Los plugins se guardan en tu navegador.
+            </p>
+            <PluginsSection />
           </Section>
 
           <Section title="Zona de peligro">
