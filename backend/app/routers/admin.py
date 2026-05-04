@@ -1,6 +1,6 @@
 """Admin endpoints — e.g. claim pre-existing unclaimed data after first login."""
 from fastapi import APIRouter, Depends
-from sqlalchemy import update as sa_update
+from sqlalchemy import update as sa_update, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -11,6 +11,7 @@ from app.models.movement import Movement
 from app.models.movement_type import MovementType
 from app.auth.setup import current_active_user
 from app.models.user import User
+from app.routers.backup import _seed_defaults
 
 router = APIRouter(prefix="/admin", tags=["admin"])
 
@@ -21,7 +22,7 @@ async def claim_unclaimed_data(
     user: User = Depends(current_active_user),
 ):
     """Assign all rows with user_id=NULL to the current user.
-    Call this once after first login to adopt pre-existing data."""
+    If no pre-existing data exists, seed defaults for a new user."""
     uid = user.id
     counts: dict[str, int] = {}
     for Model, label in [
@@ -35,6 +36,11 @@ async def claim_unclaimed_data(
             sa_update(Model).where(Model.user_id.is_(None)).values(user_id=uid).returning(Model.id)
         )
         counts[label] = len(result.fetchall())
+
+    has_accounts = (await db.execute(select(Account.id).where(Account.user_id == uid).limit(1))).first()
+    if not has_accounts:
+        await _seed_defaults(db, uid)
+        counts["seeded"] = True
 
     await db.commit()
     return {"claimed": counts}
