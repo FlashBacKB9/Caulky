@@ -74,7 +74,7 @@ function Layout() {
             <Route path="/docs" element={<Documentation />} />
             <Route path="/comparaciones" element={<Comparaciones />} />
             <Route path="/proyeccion" element={<Projection />} />
-            <Route path="/quick" element={<QuickAdd />} />
+            <Route path="/speedmode" element={<QuickAdd />} />
           </Routes>
         </main>
       </div>
