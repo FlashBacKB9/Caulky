@@ -1113,7 +1113,15 @@ function PluginsSection() {
           className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors whitespace-nowrap"
         >
           <Download className="w-4 h-4" />
-          Plugin ejemplo
+          Ejemplo
+        </a>
+        <a
+          href="/plugins/plugin-dev-guide.md"
+          download="plugin-dev-guide.md"
+          className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors whitespace-nowrap"
+        >
+          <Download className="w-4 h-4" />
+          Guía IA
         </a>
       </div>
       {error && <p className="text-xs text-red-500">{error}</p>}
