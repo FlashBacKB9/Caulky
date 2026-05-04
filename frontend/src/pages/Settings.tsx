@@ -12,12 +12,13 @@ import { useDarkMode } from '../hooks/useDarkMode'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat, DATE_FORMATS } from '../hooks/useDateFormat'
 import { useUiZoom } from '../hooks/useUiZoom'
+import { useSharedMovements } from '../hooks/useSharedMovements'
 import { loadNavConfig, saveNavConfig, PAGE_META, type NavEntry } from '../hooks/useNavConfig'
 import {
   Pencil, Sun, Moon, Lock, Trash2, Plus, Check, X, ChevronRight, ChevronDown, ChevronUp,
   LayoutDashboard, Download, Upload, AlertTriangle, Puzzle,
 } from 'lucide-react'
-import { usePlugins } from '../hooks/usePlugins'
+import { usePlugins, type PluginScanResult } from '../hooks/usePlugins'
 import AppIcon, { ICON_KEYS } from '../components/AppIcon'
 
 // ── Account Card ──────────────────────────────────────────────────────────────
@@ -1050,18 +1051,27 @@ function BackupSection() {
 // ── Plugins section ───────────────────────────────────────────────────────────
 
 function PluginsSection() {
-  const { plugins, addPlugin, removePlugin, togglePlugin } = usePlugins()
+  const { plugins, addPlugin, removePlugin, togglePlugin, removeAll } = usePlugins()
   const fileRef = useRef<HTMLInputElement>(null)
-  const [error, setError] = useState<string | null>(null)
+  const [scan, setScan] = useState<PluginScanResult | null>(null)
+  const [generalError, setGeneralError] = useState<string | null>(null)
 
   const handleFile = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
-    setError(null)
-    try { await addPlugin(file) }
-    catch { setError('No se pudo cargar el plugin') }
+    setScan(null)
+    setGeneralError(null)
+    try {
+      const result = await addPlugin(file)
+      if (result.blocked.length > 0 || result.warnings.length > 0) setScan(result)
+    } catch {
+      setGeneralError('No se pudo cargar el plugin')
+    }
   }, [addPlugin])
+
+  const blocked  = scan?.blocked  ?? []
+  const warnings = scan?.warnings ?? []
 
   return (
     <div className="space-y-2">
@@ -1075,7 +1085,14 @@ function PluginsSection() {
               <Puzzle className="w-3.5 h-3.5 text-purple-500" strokeWidth={1.5} />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{p.name}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{p.name}</p>
+                {p.autoDisabled && (
+                  <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
+                    Auto-desactivado
+                  </span>
+                )}
+              </div>
               {p.description && (
                 <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{p.description}</p>
               )}
@@ -1083,6 +1100,7 @@ function PluginsSection() {
             <span className="text-xs text-gray-300 dark:text-gray-600 shrink-0">v{p.version}</span>
             <button
               onClick={() => togglePlugin(p.id)}
+              title={p.autoDisabled ? 'Reactivar plugin' : undefined}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none shrink-0 ${
                 p.enabled ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'
               }`}
@@ -1097,6 +1115,26 @@ function PluginsSection() {
           </div>
         ))}
       </div>
+
+      {blocked.length > 0 && (
+        <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-3 space-y-1">
+          <p className="text-xs font-semibold text-red-600 dark:text-red-400">Plugin bloqueado — no se ha instalado:</p>
+          {blocked.map((msg, i) => (
+            <p key={i} className="text-xs text-red-500 dark:text-red-400 flex gap-1.5"><span>•</span>{msg}</p>
+          ))}
+        </div>
+      )}
+
+      {warnings.length > 0 && blocked.length === 0 && (
+        <div className="rounded-xl border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 space-y-1">
+          <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">Plugin instalado con advertencias:</p>
+          {warnings.map((msg, i) => (
+            <p key={i} className="text-xs text-amber-600 dark:text-amber-400 flex gap-1.5"><span>•</span>{msg}</p>
+          ))}
+        </div>
+      )}
+
+      {generalError && <p className="text-xs text-red-500">{generalError}</p>}
 
       <input ref={fileRef} type="file" accept=".js" onChange={handleFile} className="sr-only" />
       <div className="flex gap-2">
@@ -1124,7 +1162,16 @@ function PluginsSection() {
           Guía IA
         </a>
       </div>
-      {error && <p className="text-xs text-red-500">{error}</p>}
+
+      {plugins.length > 0 && (
+        <button
+          onClick={() => { if (confirm('¿Eliminar todos los plugins? Esta acción no se puede deshacer.')) removeAll() }}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
+        >
+          <Trash2 className="w-3 h-3" />
+          Eliminar todos los plugins
+        </button>
+      )}
     </div>
   )
 }
@@ -1229,6 +1276,7 @@ export default function Settings() {
   const { currency, setCurrency, fmt, currencies } = useCurrency()
   const { format: dateFormat, setFormat: setDateFormat } = useDateFormat()
   const { zoom, setZoom, inc: zoomIn, dec: zoomOut, min: zoomMin, max: zoomMax } = useUiZoom()
+  const { sharedEnabled, setSharedEnabled } = useSharedMovements()
   const { data, isLoading } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
   const navigate = useNavigate()
   const [navEntries, setNavEntries] = useState<NavEntry[]>(loadNavConfig)
@@ -1313,6 +1361,33 @@ export default function Settings() {
                   <button onClick={zoomIn} disabled={zoom >= zoomMax}
                     className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 text-base font-medium flex items-center justify-center transition-colors">+</button>
                 </div>
+              </div>
+            </div>
+          </Section>
+
+          <Section title="Movimientos">
+            <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
+              <div className="flex items-start justify-between gap-4 px-4 py-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Movimientos compartidos</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 leading-relaxed">
+                    Activa los campos de compartido al añadir un movimiento. Útil cuando pagas el total
+                    pero solo deberías contar tu parte: la app resta el importe completo del balance pero
+                    solo tu parte cuenta en estadísticas. Cuando te devuelvan lo que no te corresponde,
+                    regístralo con el subtipo <span className="font-medium text-gray-500 dark:text-gray-400">Devolución de dinero</span>.
+                    Sin esta opción, la devolución se anota como un movimiento negativo del mismo tipo que el gasto original.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setSharedEnabled(!sharedEnabled)}
+                  className={`relative mt-0.5 inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none ${
+                    sharedEnabled ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'
+                  }`}
+                >
+                  <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+                    sharedEnabled ? 'translate-x-4' : 'translate-x-0.5'
+                  }`} />
+                </button>
               </div>
             </div>
           </Section>

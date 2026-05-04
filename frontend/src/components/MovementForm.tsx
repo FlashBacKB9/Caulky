@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useSharedMovements } from '../hooks/useSharedMovements'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { createMovement } from '../api/movements'
@@ -163,6 +164,7 @@ type PanelMode = 'form' | 'template' | 'recurrence' | 'multibulk'
 export default function MovementForm({ onClose }: Props) {
   const qc = useQueryClient()
   const today = new Date().toLocaleDateString('en-CA')
+  const { sharedEnabled } = useSharedMovements()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [dragging, setDragging] = useState(false)
@@ -477,15 +479,17 @@ export default function MovementForm({ onClose }: Props) {
                     <input type="date" value={form.bank_date} onChange={e => set('bank_date', e.target.value)} className={INP} />
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Compartido</label>
-                    <Toggle
-                      value={form.is_shared}
-                      onChange={v => setForm(f => ({ ...f, is_shared: v, ...(v ? {} : { shared_between: '2', my_share: '' }) }))}
-                      color="#3b82f6"
-                    />
-                  </div>
+                <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                  {sharedEnabled && (
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Compartido</label>
+                      <Toggle
+                        value={form.is_shared}
+                        onChange={v => setForm(f => ({ ...f, is_shared: v, ...(v ? {} : { shared_between: '2', my_share: '' }) }))}
+                        color="#3b82f6"
+                      />
+                    </div>
+                  )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Pagado</label>
                     <Toggle value={form.paid} onChange={v => set('paid', v)} color="#22c55e" />
@@ -495,7 +499,7 @@ export default function MovementForm({ onClose }: Props) {
                     <Toggle value={form.no_count} onChange={v => set('no_count', v)} color="#f59e0b" />
                   </div>
                 </div>
-                {form.is_shared && (
+                {sharedEnabled && form.is_shared && (
                   <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 space-y-2">
                     <p className="text-xs text-blue-600 dark:text-blue-400">El importe total resta del balance. Solo tu parte cuenta en las estadísticas.</p>
                     <div className="grid grid-cols-2 gap-2">
