@@ -17,6 +17,7 @@ from app.database import get_db
 from app.models.movement import Movement
 from app.models.movement_type import MovementType
 from app.models.income_expense_group import IncomeExpenseGroup
+from app.models.account import Account
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -177,6 +178,14 @@ async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db)):
     if temp_path is None:
         raise HTTPException(status_code=404, detail="Sesión expirada, sube el archivo de nuevo")
 
+    # Resolve account: use provided account_id or fall back to main account
+    account_id = req.account_id
+    if account_id is None:
+        res = await db.execute(select(Account).where(Account.is_main == True))
+        main_account = res.scalar_one_or_none()
+        if main_account:
+            account_id = main_account.id
+
     # Create new movement types (skip on dry_run)
     new_type_ids: dict[str, int] = {}
     if not req.dry_run:
@@ -289,7 +298,7 @@ async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db)):
                     date=parsed_date,
                     bank_date=bank_date,
                     movement_type_id=type_id,
-                    account_id=req.account_id,
+                    account_id=account_id,
                     paid=True,
                     no_count=False,
                     notes=notes,
