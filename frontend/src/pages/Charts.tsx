@@ -1446,8 +1446,8 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                         >{icon}</button>
                       ))}
                       <span className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0"/>
-                      <button onClick={()=>upd({ overrides: accSeries.map(s=>({ ...(def.overrides.find(o=>o.key===s.key)??{ key:s.key, color:s.color, label:s.label, display:s.display }), stacked:true })) })}
-                        title="Apilar todo" className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                      <button onClick={()=>{ const allStacked=accSeries.every(s=>s.stacked); upd({ overrides: accSeries.map(s=>({ ...(def.overrides.find(o=>o.key===s.key)??{ key:s.key, color:s.color, label:s.label, display:s.display }), stacked:!allStacked })) }) }}
+                        title={accSeries.every(s=>s.stacked)?'Desapilar todo':'Apilar todo'} className={`p-1.5 rounded-lg border transition-colors ${accSeries.every(s=>s.stacked)?'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-500':'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                         <Layers className="w-3.5 h-3.5"/>
                       </button>
                     </div>
@@ -1502,8 +1502,8 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                         >{icon}</button>
                       ))}
                       <span className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0"/>
-                      <button onClick={()=>upd({ overrides: series.map(s => ({ ...(def.overrides.find(o=>o.key===s.key) ?? { key:s.key, color:s.color, label:s.label, display:s.display }), stacked:true })) })}
-                        title="Apilar todo" className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                      <button onClick={()=>{ const allStacked=series.every(s=>s.stacked); upd({ overrides: series.map(s => ({ ...(def.overrides.find(o=>o.key===s.key) ?? { key:s.key, color:s.color, label:s.label, display:s.display }), stacked:!allStacked })) }) }}
+                        title={series.every(s=>s.stacked)?'Desapilar todo':'Apilar todo'} className={`p-1.5 rounded-lg border transition-colors ${series.every(s=>s.stacked)?'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-500':'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                         <Layers className="w-3.5 h-3.5"/>
                       </button>
                       <button onClick={()=>upd({ overrides: series.map(s => ({ ...(def.overrides.find(o=>o.key===s.key) ?? { key:s.key, color:s.color, label:s.label, display:s.display }), cumulative:!series.every(x=>x.cumulative) })) })}
