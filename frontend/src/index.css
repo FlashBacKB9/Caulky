@@ -11,13 +11,20 @@
 }
 
 html {
+  height: 100%;
   background-color: #f9fafb;
 }
 html.dark {
   background-color: #030712;
 }
 
+#root {
+  height: 100%;
+}
+
 body {
+  height: 100%;
+  overflow: hidden;
   margin: 0;
   font-family: 'IBM Plex Mono', monospace;
   background-color: #f9fafb;

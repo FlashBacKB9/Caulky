@@ -23,7 +23,7 @@ function buildAccountHistory(
   typeById: Record<number, MovementType>,
 ): { label: string; balance: number; year: number; month: number }[] {
   if (sorted.length === 0) return []
-  const firstDate = new Date(sorted[0].date + 'T00:00:00')
+  const firstDate = new Date((sorted[0].bank_date ?? sorted[0].date) + 'T00:00:00')
   const now = new Date()
   let bal = acc.initial_balance
   let mi = 0
@@ -34,7 +34,7 @@ function buildAccountHistory(
     for (let m = mStart; m <= mEnd; m++) {
       while (mi < sorted.length) {
         const mv = sorted[mi]
-        const d = new Date(mv.date + 'T00:00:00')
+        const d = new Date((mv.bank_date ?? mv.date) + 'T00:00:00')
         if (d.getFullYear() > y || (d.getFullYear() === y && d.getMonth() > m)) break
         if (acc.is_main) {
           bal += mv.dinero
@@ -102,7 +102,7 @@ export default function AccountsPage() {
     [movementTypes],
   )
   const sorted = useMemo(
-    () => [...movements].sort((a, b) => a.date.localeCompare(b.date)),
+    () => [...movements].sort((a, b) => (a.bank_date ?? a.date).localeCompare(b.bank_date ?? b.date)),
     [movements],
   )
 

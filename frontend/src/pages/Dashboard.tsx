@@ -25,7 +25,7 @@ import {
   BarChart, Bar,
   ComposedChart,
   PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, Legend, CartesianGrid, ReferenceArea,
+  XAxis, YAxis, Tooltip, Legend, CartesianGrid, ReferenceArea, ReferenceLine,
 } from 'recharts'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -283,7 +283,7 @@ function buildAccountHistory(
   typeById: Record<number, MovementType>,
 ): { label: string; balance: number }[] {
   if (sorted.length === 0) return []
-  const firstDate = new Date(sorted[0].date + 'T00:00:00')
+  const firstDate = new Date((sorted[0].bank_date ?? sorted[0].date) + 'T00:00:00')
   const now = new Date()
   let bal = acc.initial_balance
   let mi = 0
@@ -294,7 +294,7 @@ function buildAccountHistory(
     for (let m = mStart; m <= mEnd; m++) {
       while (mi < sorted.length) {
         const mv = sorted[mi]
-        const d = new Date(mv.date + 'T00:00:00')
+        const d = new Date((mv.bank_date ?? mv.date) + 'T00:00:00')
         if (d.getFullYear() > y || (d.getFullYear() === y && d.getMonth() > m)) break
         if (acc.is_main) {
           bal += mv.dinero
@@ -327,6 +327,7 @@ function BalanceLineChart({ data, lines, height }: {
         <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
         <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={48} domain={[minV - pad, maxV + pad]} />
         <Tooltip content={<ChartTooltip />}/>
+        <ReferenceLine y={0} stroke="#f3f4f6" strokeWidth={1} />
         {lines.length > 1 && <Legend />}
         {lines.map(l => (
           <Line key={l.key} type="linear" dataKey={l.key} stroke={l.color} strokeWidth={2} dot={false} activeDot={{ r: 4, strokeWidth: 0, fill: l.color }} isAnimationActive={false} />
@@ -344,7 +345,7 @@ function AccountBalanceHistoryChart({ accounts, movements, movementTypes, height
   height?: number
 }) {
   const typeById = useMemo(() => Object.fromEntries(movementTypes.map(t => [t.id, t])), [movementTypes])
-  const sorted   = useMemo(() => [...movements].sort((a, b) => a.date.localeCompare(b.date)), [movements])
+  const sorted   = useMemo(() => [...movements].sort((a, b) => (a.bank_date ?? a.date).localeCompare(b.bank_date ?? b.date)), [movements])
 
   const { data, lines } = useMemo(() => {
     if (accounts.length === 0 || sorted.length === 0) return { data: [], lines: [] }
@@ -369,7 +370,7 @@ function CombinedBalanceHistoryChart({ accounts, movements, movementTypes, heigh
   height?: number
 }) {
   const typeById = useMemo(() => Object.fromEntries(movementTypes.map(t => [t.id, t])), [movementTypes])
-  const sorted   = useMemo(() => [...movements].sort((a, b) => a.date.localeCompare(b.date)), [movements])
+  const sorted   = useMemo(() => [...movements].sort((a, b) => (a.bank_date ?? a.date).localeCompare(b.bank_date ?? b.date)), [movements])
 
   const { data } = useMemo(() => {
     if (accounts.length === 0 || sorted.length === 0) return { data: [] }
@@ -395,7 +396,7 @@ function CyclingBalanceHistoryChart({ accounts, movements, movementTypes, height
   const { fmt } = useCurrency()
   const [idx, setIdx] = useState(0)
   const typeById = useMemo(() => Object.fromEntries(movementTypes.map(t => [t.id, t])), [movementTypes])
-  const sorted   = useMemo(() => [...movements].sort((a, b) => a.date.localeCompare(b.date)), [movements])
+  const sorted   = useMemo(() => [...movements].sort((a, b) => (a.bank_date ?? a.date).localeCompare(b.bank_date ?? b.date)), [movements])
 
   const safeIdx = Math.min(idx, Math.max(0, accounts.length - 1))
   const acc     = accounts[safeIdx]
@@ -964,6 +965,7 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
         <YAxis tickFormatter={mFmtK} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={52}
           domain={def.yMax != null ? [0, def.yMax] : undefined}/>
         <Tooltip content={<ChartTooltip />}/>
+        <ReferenceLine y={0} stroke={GRID_CLR} strokeWidth={1} />
         {visible.length > 1 && <Legend wrapperStyle={{ fontSize: 11, paddingTop: 4 }}/>}
         {visible.map(s => {
           const d = dm ?? s.display
