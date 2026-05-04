@@ -14,6 +14,7 @@ import Investments from './pages/Investments'
 import Documentation from './pages/Documentation'
 import Comparaciones from './pages/Comparaciones'
 import AccountsPage from './pages/AccountsPage'
+import Projection from './pages/Projection'
 import LoginPage from './pages/LoginPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import { useDarkMode } from './hooks/useDarkMode'
@@ -71,6 +72,7 @@ function Layout() {
             <Route path="/inversiones" element={<Investments />} />
             <Route path="/docs" element={<Documentation />} />
             <Route path="/comparaciones" element={<Comparaciones />} />
+            <Route path="/proyeccion" element={<Projection />} />
           </Routes>
         </main>
       </div>

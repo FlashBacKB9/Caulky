@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import {
   Home, List, Landmark, BarChart2, LineChart, GitCompare,
-  ChartCandlestick, TrendingUp, Upload, BookOpen,
+  ChartCandlestick, TrendingUp, Upload, BookOpen, Telescope,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -19,6 +19,7 @@ export const PAGE_META: Record<string, NavPageMeta> = {
   '/budgets':       { label: 'Presupuestos',      Icon: ChartCandlestick },
   '/inversiones':   { label: 'Inversiones',      Icon: TrendingUp },
   '/import':        { label: 'Importar Excel',   Icon: Upload },
+  '/proyeccion':    { label: 'Proyección',       Icon: Telescope },
   '/docs':          { label: 'Documentación',    Icon: BookOpen },
 }
 
