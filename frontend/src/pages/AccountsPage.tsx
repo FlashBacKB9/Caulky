@@ -155,8 +155,7 @@ export default function AccountsPage() {
   )
 
   const totalBalance = accounts.reduce((s, a) => s + a.balance, 0)
-  const totalInitial = accounts.reduce((s, a) => s + a.initial_balance, 0)
-  const totalChange  = totalBalance - totalInitial
+  const totalChange  = totalBalance - accounts.reduce((s, a) => s + a.initial_balance, 0)
 
   if (loadingAccounts || loadingMovements) {
     return (
@@ -178,8 +177,6 @@ export default function AccountsPage() {
   const TITLE = 'text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
   const GRID  = '#e5e7eb'
   const TICK  = { fontSize: 11, fill: '#9ca3af' }
-
-  const cardCols = Math.min(accounts.length + 1, 5)
 
   return (
     <div className="p-6 space-y-5">
@@ -214,25 +211,25 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      {/* ── Summary cards ──────────────────────────────────────────── */}
-      <div
-        className="grid gap-4"
-        style={{ gridTemplateColumns: `repeat(${cardCols}, minmax(0, 1fr))` }}
-      >
-        {/* Total */}
-        <div className={`${PANEL} p-4`}>
-          <p className={`${TITLE} mb-3`}>Total</p>
-          <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white mb-1">
+      {/* ── Total card ─────────────────────────────────────────────── */}
+      <div className={`${PANEL} p-5 flex items-center gap-6`}>
+        <div className="flex-1">
+          <p className={`${TITLE} mb-2`}>Patrimonio total</p>
+          <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">
             {fmt(totalBalance)}
           </p>
-          <div className={`flex items-center gap-1 text-xs font-medium ${totalChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {totalChange >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-            <span>{totalChange >= 0 ? '+' : ''}{fmt(totalChange)}</span>
-          </div>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">vs inicial {fmt(totalInitial)}</p>
         </div>
+        <div className={`flex items-center gap-1.5 text-sm font-semibold ${totalChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+          {totalChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+          <span>{totalChange >= 0 ? '+' : ''}{fmt(totalChange)} desde inicio</span>
+        </div>
+      </div>
 
-        {/* Per-account */}
+      {/* ── Account cards ──────────────────────────────────────────── */}
+      <div
+        className="grid gap-4"
+        style={{ gridTemplateColumns: `repeat(${Math.min(accounts.length, 5)}, minmax(0, 1fr))` }}
+      >
         {accounts.map(acc => {
           const change = acc.balance - acc.initial_balance
           return (
@@ -250,7 +247,6 @@ export default function AccountsPage() {
                   {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
                   <span>{change >= 0 ? '+' : ''}{fmt(change)}</span>
                 </div>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">inicial {fmt(acc.initial_balance)}</p>
               </div>
             </div>
           )

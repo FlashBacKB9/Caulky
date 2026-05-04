@@ -9,7 +9,7 @@ import { getGroups, type Group as ApiGroup } from '../api/groups'
 import {
   CreditCard, ArrowUpRight, ArrowDownRight, type LucideIcon,
   Plus, X, BarChart2, PieChart as PieIcon, TrendingUp,
-  GripVertical, ChartCandlestick, Check,
+  GripVertical, ChartCandlestick, Check, Landmark,
   ChevronDown, ChevronLeft, ChevronRight,
 } from 'lucide-react'
 import AppIcon from '../components/AppIcon'
@@ -1020,8 +1020,9 @@ const METRIC_STAT_OPTIONS = [
 ]
 
 const SPECIAL_STAT_OPTIONS = [
-  { id: 'stat-uso',      label: 'Cuenta de uso',   desc: 'Saldo de la cuenta principal',            Icon: CreditCard,      color: '#3b82f6' },
-  { id: 'stat-accounts', label: 'Panel de ahorro', desc: 'Cuentas de ahorro con selector cíclico',  Icon: ChartCandlestick, color: '#f59e0b' },
+  { id: 'stat-uso',           label: 'Cuenta de uso',     desc: 'Saldo de la cuenta principal',            Icon: CreditCard,      color: '#3b82f6' },
+  { id: 'stat-accounts',      label: 'Panel de ahorro',   desc: 'Cuentas de ahorro con selector cíclico',  Icon: ChartCandlestick, color: '#f59e0b' },
+  { id: 'stat-total-balance', label: 'Patrimonio total',  desc: 'Suma del saldo de todas las cuentas',     Icon: Landmark,        color: '#8b5cf6' },
 ]
 
 const BALANCE_HISTORY_OPTIONS = [
@@ -1490,7 +1491,8 @@ export default function Dashboard() {
     if (w.id === 'stat-uso')      return <StaticPanel title="De uso"   value={data!.uso_balance}      color="#3b82f6" Icon={CreditCard}     />
     if (w.id === 'stat-income')   return <StaticPanel title="Ingresos del año"  value={data!.annual.income}    color="#22c55e" Icon={ArrowUpRight}   />
     if (w.id === 'stat-expense')  return <StaticPanel title="Gastos del año"    value={data!.annual.expenses}  color="#ef4444" Icon={ArrowDownRight} />
-    if (w.id === 'stat-accounts') return <CyclingPanel accounts={savingsAccounts} />
+    if (w.id === 'stat-accounts')      return <CyclingPanel accounts={savingsAccounts} />
+    if (w.id === 'stat-total-balance') return <StaticPanel title="Patrimonio total" value={accountsData?.total ?? 0} color="#8b5cf6" Icon={Landmark} />
     if (w.id === 'stat-income-monthly')  return <StaticPanel title="Ingresos del mes"     value={data!.monthly.income}                         color="#22c55e" Icon={ArrowUpRight}   />
     if (w.id === 'stat-expense-monthly') return <StaticPanel title="Gastos del mes"       value={data!.monthly.expenses}                       color="#ef4444" Icon={ArrowDownRight} />
     if (w.id === 'stat-net-annual') {
