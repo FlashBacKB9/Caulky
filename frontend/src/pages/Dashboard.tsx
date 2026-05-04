@@ -1424,7 +1424,8 @@ export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [editMode, setEditMode] = useState(() => searchParams.get('edit') === '1')
   const [addMode, setAddMode]   = useState<AddMode | null>(null)
-  const [budgets, setBudgets]   = useState<StoredBudget[]>(() => readBudgets())
+  const [budgets, setBudgets]     = useState<StoredBudget[]>(() => readBudgets())
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [customChartDefs]       = useState<CustomChartDef[]>(() => readCustomCharts())
   const [selDate, setSelDate]   = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() } })
   const [showPicker, setShowPicker] = useState(false)
@@ -1475,7 +1476,7 @@ export default function Dashboard() {
     save({ widgets: config.widgets.map(w => w.id === id ? { ...w, ...patch } : w) })
   }
 
-  const exitEdit  = () => { setEditMode(false); setSearchParams({}) }
+  const exitEdit  = () => { setEditMode(false); setSearchParams({}); setConfirmDeleteId(null) }
 
   const existingIds = useMemo(() => new Set(config.widgets.map(w => w.id)), [config.widgets])
 
@@ -1778,11 +1779,25 @@ export default function Dashboard() {
                       >
                         <GripVertical className="w-3.5 h-3.5 text-gray-400" />
                       </button>
-                      <button onClick={() => removeWidget(w.id)}
-                        className="absolute top-2 right-4 z-20 p-1.5 bg-white/90 dark:bg-gray-800/90 rounded-lg shadow border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-300 dark:hover:border-red-700 text-gray-400 hover:text-red-500 transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
+                      {confirmDeleteId === w.id ? (
+                        <div className="absolute top-2 right-4 z-20 flex items-center gap-1 bg-white/95 dark:bg-gray-800/95 rounded-lg shadow border border-red-200 dark:border-red-700 px-2 py-1">
+                          <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">¿Eliminar?</span>
+                          <button onClick={() => { removeWidget(w.id); setConfirmDeleteId(null) }}
+                            className="text-xs font-medium text-red-500 hover:text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
+                            Sí
+                          </button>
+                          <button onClick={() => setConfirmDeleteId(null)}
+                            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-1.5 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                            No
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmDeleteId(w.id)}
+                          className="absolute top-2 right-4 z-20 p-1.5 bg-white/90 dark:bg-gray-800/90 rounded-lg shadow border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-300 dark:hover:border-red-700 text-gray-400 hover:text-red-500 transition-colors"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   )}
                 </ResizableWrapper>
