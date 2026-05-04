@@ -5,7 +5,6 @@ import { Upload, ChevronRight, ChevronLeft, Check, AlertCircle, FileSpreadsheet,
 import { parseExcel, runImport, type ParseResult, type TypeMapping, type TypeAction, type DryRunResult, type RunResult } from '../api/importExcel'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getGroups, type Group } from '../api/groups'
-import { getAccountsSummary, type Account } from '../api/accounts'
 
 // ── API helpers ──────────────────────────────────────────────────────────────
 
@@ -502,12 +501,10 @@ export default function Import() {
   const [parsed, setParsed] = useState<ParseResult | null>(null)
   const [colMap, setColMap] = useState<ColMap>({ date: null, name: null, money: null, bankDate: null, type: null, notes: null, shared: null, sharedBetween: null, myShare: null })
   const [typeMap, setTypeMap] = useState<Record<string, TypeMapping>>({})
-  const [accountId, setAccountId] = useState<number | null>(null)
+  const [accountId] = useState<number | null>(null)
 
   const { data: types = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
   const { data: groups = [] } = useQuery({ queryKey: ['groups'], queryFn: getGroups })
-  const { data: accountsSummary } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
-  const accounts = accountsSummary?.accounts ?? []
 
   const uniqueTypes: { name: string; count: number }[] = (() => {
     if (!parsed || colMap.type === null) return []
