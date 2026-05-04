@@ -157,23 +157,6 @@ function CalendarView({ movements, types, selectedYear }: {
   }, [selectedYear])
   const [dateField, setDateField] = useState<'date' | 'bank_date'>('date')
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
-  const [showCalYearPicker, setShowCalYearPicker] = useState(false)
-  const calYearPickerRef = useRef<HTMLDivElement>(null)
-
-  const calYears = useMemo(() => {
-    const years = new Set(movements.map(mv => parseInt(mv.date.slice(0, 4))))
-    years.add(today.getFullYear())
-    return [...years].sort((a, b) => a - b)
-  }, [movements])
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (calYearPickerRef.current && !calYearPickerRef.current.contains(e.target as Node))
-        setShowCalYearPicker(false)
-    }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
-  }, [])
 
   const byDate = useMemo(() => {
     const map: Record<string, Movement[]> = {}
@@ -256,31 +239,7 @@ function CalendarView({ movements, types, selectedYear }: {
             <ChevronLeft className="w-4 h-4 text-gray-500" />
           </button>
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-1">
-              {MONTHS_ES[calMonth]}
-              <div ref={calYearPickerRef} className="relative">
-                <button
-                  onClick={() => setShowCalYearPicker(v => !v)}
-                  className="flex items-center gap-0.5 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
-                >
-                  {calYear}
-                  <ChevronDown className="w-3 h-3" />
-                </button>
-                {showCalYearPicker && (
-                  <div className="absolute left-1/2 -translate-x-1/2 top-full mt-1 z-30 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-lg py-1 min-w-[90px]">
-                    {calYears.map(y => (
-                      <button
-                        key={y}
-                        onClick={() => { setCalYear(y); setCalMonth(0); setShowCalYearPicker(false) }}
-                        className={`w-full text-left px-4 py-1.5 text-sm transition-colors ${y === calYear ? 'font-semibold text-gray-900 dark:text-white bg-gray-50 dark:bg-gray-800' : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}
-                      >
-                        {y}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </span>
+            <span className="text-sm font-semibold text-gray-800 dark:text-white">{MONTHS_ES[calMonth]} {calYear}</span>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
               <button className={btnCls(dateField === 'date')} onClick={() => setDateField('date')}>Fecha</button>
               <button className={btnCls(dateField === 'bank_date')} onClick={() => setDateField('bank_date')}>Fecha banco</button>
