@@ -141,15 +141,20 @@ function MovementContextMenu({ menu, onDuplicate, onDelete, onClose }: {
 
 // ── Calendar view ────────────────────────────────────────────────────────────
 
-function CalendarView({ movements, types }: {
+function CalendarView({ movements, types, selectedYear }: {
   movements: Movement[]
   types: MovementType[]
+  selectedYear?: number | null
 }) {
   const { fmt } = useCurrency()
   const fmtCal = (v: number) => (v >= 0 ? '+' : '') + fmt(v)
   const today = new Date()
-  const [calYear, setCalYear] = useState(today.getFullYear())
-  const [calMonth, setCalMonth] = useState(today.getMonth())
+  const [calYear, setCalYear] = useState(selectedYear ?? today.getFullYear())
+  const [calMonth, setCalMonth] = useState(selectedYear != null ? 0 : today.getMonth())
+
+  useEffect(() => {
+    if (selectedYear != null) { setCalYear(selectedYear); setCalMonth(0) }
+  }, [selectedYear])
   const [dateField, setDateField] = useState<'date' | 'bank_date'>('date')
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
   const [showCalYearPicker, setShowCalYearPicker] = useState(false)
@@ -1320,7 +1325,7 @@ export default function Movements() {
       )}
 
       {viewMode === 'calendar' && (
-        <CalendarView movements={filteredMovements} types={types} />
+        <CalendarView movements={filteredMovements} types={types} selectedYear={year} />
       )}
 
       {viewMode === 'kanban' && (
