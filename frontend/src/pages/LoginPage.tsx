@@ -28,9 +28,7 @@ export default function LoginPage() {
         await login(email, password)
       }
       const u = await getMe()
-      if (mode === 'register') {
-        await claimData().catch(() => {})
-      }
+      await claimData().catch(() => {})
       setUser(u)
       navigate('/', { replace: true })
     } catch (err: any) {
