@@ -20,7 +20,7 @@ function saveLS(key: string, value: unknown) {
 
 export default function Annual() {
   const { fmt: fmtMoney } = useCurrency()
-  const fmt = (v: number) => v === 0 ? 'â€”' : fmtMoney(v, 0)
+  const fmt = (v: number) => v === 0 ? '—' : fmtMoney(v, 0)
   const currentYear = new Date().getFullYear()
   const [year, setYear] = useState(currentYear)
   const [showYearPicker, setShowYearPicker] = useState(false)
@@ -101,7 +101,7 @@ export default function Annual() {
     setShowGroups(prev => { saveLS('annual-show-groups', !prev); return !prev })
   }
 
-  // â”€â”€ Drag handlers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Drag handlers ──────────────────────────────────────────────────────────────
 
   function onGroupDragStart(idx: number) { dragging.current = { kind: 'group', idx } }
   function onGroupDragOver(e: React.DragEvent, idx: number) { e.preventDefault(); setDropTarget(`g-${idx}`) }
@@ -138,10 +138,10 @@ export default function Annual() {
 
   function onDragEnd() { dragging.current = null; setDropTarget(null) }
 
-  // â”€â”€ Export â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // ── Export ─────────────────────────────────────────────────────────────────────
 
   function exportCSV() {
-    const rows: string[][] = [['CategorÃ­a / Tipo', ...MONTHS.map(m => m.slice(0, 3)), 'Media', 'Total']]
+    const rows: string[][] = [['Categoría / Tipo', ...MONTHS.map(m => m.slice(0, 3)), 'Media', 'Total']]
     for (const g of sortedGroups) {
       if (showGroups)
         rows.push([g.name, ...MONTHS.map(m => String(g.monthly[m] ?? 0)), String(Math.round(g.media)), String(g.total)])
@@ -149,7 +149,7 @@ export default function Annual() {
         rows.push([showGroups ? `  ${mt.name}` : mt.name, ...MONTHS.map(m => String(mt.monthly[m] ?? 0)), String(mt.media), String(mt.total)])
     }
     const csv = rows.map(r => r.map(c => `"${c}"`).join(',')).join('\n')
-    const blob = new Blob(['ï»¿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
     a.href = url; a.download = `finanzas-${year}.csv`; a.click()
@@ -212,7 +212,7 @@ export default function Annual() {
             <tr>
               <th className="w-6 px-0"></th>
               <th className="w-1 px-0"></th>
-              <th className="px-4 py-3 text-left min-w-[180px]">CategorÃ­a / Tipo</th>
+              <th className="px-4 py-3 text-left min-w-[180px]">Categoría / Tipo</th>
               {MONTHS.map(m => <th key={m} className="px-3 py-3 text-right capitalize">{m.slice(0,3)}</th>)}
               <th className="px-3 py-3 text-right">Media</th>
               <th className="px-3 py-3 text-right">Total</th>
@@ -221,7 +221,7 @@ export default function Annual() {
           <tbody className="bg-white dark:bg-gray-950">
             {sortedGroups.map((group, gIdx) => (
               <React.Fragment key={group.id}>
-                {/* â”€â”€ Group header â”€â”€ */}
+                {/* ── Group header ── */}
                 {showGroups && (
                   <tr
                     draggable
@@ -261,7 +261,7 @@ export default function Annual() {
                   </tr>
                 )}
 
-                {/* â”€â”€ Subtypes â”€â”€ */}
+                {/* ── Subtypes ── */}
                 {(!showGroups || !collapsed.has(group.id)) && group.movement_types.map((mt, tIdx) => (
                   <tr
                     key={mt.id}
@@ -299,4 +299,3 @@ export default function Annual() {
     </div>
   )
 }
-

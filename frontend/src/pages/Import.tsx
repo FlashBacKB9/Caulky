@@ -6,13 +6,13 @@ import { parseExcel, runImport, type ParseResult, type TypeMapping, type TypeAct
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getGroups, type Group } from '../api/groups'
 
-// â”€â”€ API helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── API helpers ──────────────────────────────────────────────────────────────
 
 type ColMap = { date: number | null; name: number | null; money: number | null; bankDate: number | null; type: number | null; notes: number | null; shared: number | null; sharedBetween: number | null; myShare: number | null }
 
 const PREVIEW_ROWS = 5
 
-// â”€â”€ Step indicator â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Step indicator ───────────────────────────────────────────────────────────
 
 function Steps({ current, hasTypes }: { current: number; hasTypes: boolean }) {
   const steps = ['Archivo', 'Columnas', ...(hasTypes ? ['Tipos'] : []), 'Importar']
@@ -42,7 +42,7 @@ function Steps({ current, hasTypes }: { current: number; hasTypes: boolean }) {
   )
 }
 
-// â”€â”€ Step 1: Upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Step 1: Upload ───────────────────────────────────────────────────────────
 
 function StepUpload({ onParsed }: { onParsed: (r: ParseResult) => void }) {
   const inputRef = useRef<HTMLInputElement>(null)
@@ -92,8 +92,8 @@ function StepUpload({ onParsed }: { onParsed: (r: ParseResult) => void }) {
           <div className="space-y-3">
             <FileSpreadsheet className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600" strokeWidth={1} />
             <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Arrastra tu Excel aquÃ­</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">o haz clic para seleccionar Â· .xlsx Â· .csv</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Arrastra tu Excel aquí</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">o haz clic para seleccionar · .xlsx · .csv</p>
             </div>
           </div>
         )}
@@ -109,7 +109,7 @@ function StepUpload({ onParsed }: { onParsed: (r: ParseResult) => void }) {
   )
 }
 
-// â”€â”€ Step 2: Map columns â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Step 2: Map columns ──────────────────────────────────────────────────────
 
 const FIELDS: { key: keyof ColMap; label: string; required: boolean; tooltip?: string }[] = [
   { key: 'name',          label: 'Nombre',              required: true  },
@@ -119,10 +119,10 @@ const FIELDS: { key: keyof ColMap; label: string; required: boolean; tooltip?: s
   { key: 'bankDate',      label: 'Fecha banco',         required: false },
   { key: 'notes',         label: 'Notas',               required: false },
   { key: 'shared',        label: 'Compartido',          required: false },
-  { key: 'sharedBetween', label: 'NÂº personas',         required: false,
-    tooltip: 'NÃºmero de personas entre las que se divide el gasto. Si estÃ¡ vacÃ­o y Compartido es verdadero, se divide entre 2.' },
+  { key: 'sharedBetween', label: 'Nº personas',         required: false,
+    tooltip: 'Número de personas entre las que se divide el gasto. Si está vacío y Compartido es verdadero, se divide entre 2.' },
   { key: 'myShare',       label: 'Mi importe',          required: false,
-    tooltip: 'Importe del gasto que te corresponde a ti para las estadÃ­sticas.' },
+    tooltip: 'Importe del gasto que te corresponde a ti para las estadísticas.' },
 ]
 
 function StepColumns({
@@ -166,7 +166,7 @@ function StepColumns({
                 onChange={e => set(field.key, e.target.value === '' ? null : Number(e.target.value))}
                 className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
               >
-                <option value="">â€” Sin asignar â€”</option>
+                <option value="">— Sin asignar —</option>
                 {parsed.columns.map((col, i) => (
                   <option key={i} value={i}>{col}</option>
                 ))}
@@ -180,7 +180,7 @@ function StepColumns({
       {preview.length > 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-50 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">PrevisualizaciÃ³n ({parsed.total} filas)</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">Previsualización ({parsed.total} filas)</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -211,7 +211,7 @@ function StepColumns({
 
       <div className="flex justify-between">
         <button onClick={onBack} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
-          <ChevronLeft className="w-4 h-4" /> AtrÃ¡s
+          <ChevronLeft className="w-4 h-4" /> Atrás
         </button>
         <button onClick={onNext} disabled={!valid}
           className="flex items-center gap-1.5 px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-xl hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
@@ -222,7 +222,7 @@ function StepColumns({
   )
 }
 
-// â”€â”€ Step 3: Map types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Step 3: Map types ────────────────────────────────────────────────────────
 
 function StepTypes({
   uniqueTypes, types, groups, typeMap, setTypeMap, onNext, onBack,
@@ -273,7 +273,7 @@ function StepTypes({
                     <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{name}</span>
                     <span className="ml-2 text-xs text-gray-400">{count} movimiento{count !== 1 ? 's' : ''}</span>
                     {isAuto && mapping.action === 'auto' && (
-                      <span className="ml-2 text-xs text-green-600 dark:text-green-400 font-medium">Â· coincidencia automÃ¡tica</span>
+                      <span className="ml-2 text-xs text-green-600 dark:text-green-400 font-medium">· coincidencia automática</span>
                     )}
                   </div>
 
@@ -301,7 +301,7 @@ function StepTypes({
                       onChange={e => set(name, { action: 'existing', type_id: Number(e.target.value) || undefined })}
                       className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
                     >
-                      <option value="">â€” Selecciona tipo existente â€”</option>
+                      <option value="">— Selecciona tipo existente —</option>
                       {types.map(t => (
                         <option key={t.id} value={t.id}>{t.category} / {t.name}</option>
                       ))}
@@ -316,7 +316,7 @@ function StepTypes({
                       onChange={e => set(name, { action: 'create', group_id: Number(e.target.value) || undefined })}
                       className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
                     >
-                      <option value="">â€” Selecciona grupo â€”</option>
+                      <option value="">— Selecciona grupo —</option>
                       {groups.map(g => (
                         <option key={g.id} value={g.id}>{g.name}</option>
                       ))}
@@ -331,7 +331,7 @@ function StepTypes({
 
       <div className="flex justify-between">
         <button onClick={onBack} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
-          <ChevronLeft className="w-4 h-4" /> AtrÃ¡s
+          <ChevronLeft className="w-4 h-4" /> Atrás
         </button>
         <button onClick={onNext}
           className="flex items-center gap-1.5 px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-xl hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors">
@@ -342,7 +342,7 @@ function StepTypes({
   )
 }
 
-// â”€â”€ Step 4: Preview + Import â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Step 4: Preview + Import ─────────────────────────────────────────────────
 
 function StepImport({
   parsed, colMap, typeMap, accountId, onCancel, onDone,
@@ -493,7 +493,7 @@ function StepImport({
   )
 }
 
-// â”€â”€ Main page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Main page ────────────────────────────────────────────────────────────────
 
 export default function Import() {
   const navigate = useNavigate()
@@ -584,4 +584,3 @@ export default function Import() {
     </div>
   )
 }
-

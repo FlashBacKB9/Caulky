@@ -17,7 +17,7 @@ import {
   GripVertical, Sigma,
 } from 'lucide-react'
 
-// â”€â”€ Constants â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Constants ─────────────────────────────────────────────────────────────────
 
 const MONTHS   = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const GRID     = '#e5e7eb'
@@ -30,7 +30,7 @@ const PALETTE  = [
 ]
 const selectCls = 'px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-300 focus:outline-none'
 
-// â”€â”€ Built-in chart types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Built-in chart types ──────────────────────────────────────────────────────
 
 type DisplayMode = 'bars' | 'stacked' | 'lines' | 'area' | 'donut' | 'combo'
 interface ModeOption { id: DisplayMode; icon: React.ReactNode; label: string }
@@ -51,12 +51,12 @@ const ComboIcon = () => (
 )
 const M_BARS:    ModeOption = { id:'bars',    icon:<BarChart2  className="w-3.5 h-3.5"/>, label:'Columnas' }
 const M_STACKED: ModeOption = { id:'stacked', icon:<Layers     className="w-3.5 h-3.5"/>, label:'Apilado'  }
-const M_LINES:   ModeOption = { id:'lines',   icon:<Activity   className="w-3.5 h-3.5"/>, label:'LÃ­neas'   }
-const M_AREA:    ModeOption = { id:'area',    icon:<TrendingUp className="w-3.5 h-3.5"/>, label:'Ãrea'     }
+const M_LINES:   ModeOption = { id:'lines',   icon:<Activity   className="w-3.5 h-3.5"/>, label:'Líneas'   }
+const M_AREA:    ModeOption = { id:'area',    icon:<TrendingUp className="w-3.5 h-3.5"/>, label:'Área'     }
 const M_DONUT:   ModeOption = { id:'donut',   icon:<PieIcon    className="w-3.5 h-3.5"/>, label:'Donut'    }
 const M_COMBO:   ModeOption = { id:'combo',   icon:<ComboIcon/>,                           label:'Mixto'    }
 
-// â”€â”€ Custom chart types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Custom chart types ────────────────────────────────────────────────────────
 
 type XAxisType   = 'month' | 'year' | 'none'
 type SplitByType = 'none' | 'group' | 'type' | 'account'
@@ -86,7 +86,7 @@ interface ComputedSeries {
 function genId() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 function newCustomChart(): CustomChartDef {
   return {
-    id: genId(), title: 'Mi grÃ¡fico', colSpan: 2, year: CUR_YEAR,
+    id: genId(), title: 'Mi gráfico', colSpan: 2, year: CUR_YEAR,
     filter: EMPTY_FILTER, sign: 'expense', xAxis: 'month', splitBy: 'none',
     metric: 'sum', defaultDisplay: 'bar', defaultColor: '#3b82f6', overrides: [],
     dataSource: 'movements',
@@ -94,7 +94,7 @@ function newCustomChart(): CustomChartDef {
 }
 function effectiveColSpan(def: CustomChartDef) { return def.colSpan ?? (def.wide ? 4 : 2) }
 
-// â”€â”€ Shared UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Shared UI ─────────────────────────────────────────────────────────────────
 
 function CT({ active, payload, label, fmt }: {
   active?: boolean; payload?: { name: string; value: number; color: string }[]
@@ -118,7 +118,7 @@ function Empty({ h = 200 }: { h?: number }) {
   return <div className="flex items-center justify-center text-gray-300 dark:text-gray-600 text-sm" style={{ height: h }}>Sin datos</div>
 }
 
-// â”€â”€ Month helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Month helpers ─────────────────────────────────────────────────────────────
 
 function monthCutoff(year: number | null) { return year === null || year < CUR_YEAR ? 11 : new Date().getMonth() }
 
@@ -134,7 +134,7 @@ function mvMonthKey(mv: Movement, year: number | null): string {
   return year !== null ? String(+mv.date.slice(5, 7) - 1) : mv.date.slice(0, 7)
 }
 
-// â”€â”€ computeChartData â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── computeChartData ──────────────────────────────────────────────────────────
 
 function computeChartData(
   def: CustomChartDef, movements: Movement[],
@@ -212,10 +212,10 @@ function applyCumulative(data: Record<string,unknown>[], series: ComputedSeries[
   })
 }
 
-// â”€â”€ Dashboard-native chart types (ported as built-ins) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Dashboard-native chart types (ported as built-ins) ────────────────────────
 
-const DASH_EXCLUDE_GROUPS  = new Set(['Ingreso','Total','Ahorro','Gastos Anuales','InversiÃ³n'])
-const DASH_BALANCE_EXCLUDE = new Set(['Total','Ahorro','Gastos Anuales','InversiÃ³n'])
+const DASH_EXCLUDE_GROUPS  = new Set(['Ingreso','Total','Ahorro','Gastos Anuales','Inversión'])
+const DASH_BALANCE_EXCLUDE = new Set(['Total','Ahorro','Gastos Anuales','Inversión'])
 
 function buildGroupStats(
   movements: Movement[], typeToGroup: Record<number,number>, groupById: Record<number,Group>,
@@ -348,7 +348,7 @@ function DashBalanceChart({ filtered, typeToGroup, groupById, year, accounts }: 
   )
 }
 
-// â”€â”€ Built-in chart components â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Built-in chart components ─────────────────────────────────────────────────
 
 function DonutLayout({ data, mode, fmt, outerR, side, onLayoutChange }: {
   data: { name: string; value: number; color: string }[]
@@ -634,7 +634,7 @@ function SubtypesByGroupChart({ filtered, typeToGroup, groupById, typeById, mode
   return (<ResponsiveContainer width="100%" height={240}><BarChart data={data} barCategoryGap="25%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="group" tick={{ fontSize:10 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Legend wrapperStyle={{ fontSize:11, paddingTop:6 }}/>{subtypes.map((s,i)=><Bar key={s.key} dataKey={s.key} name={s.name} fill={s.color} stackId={isStacked?'g':undefined} radius={isStacked?(i===subtypes.length-1?[4,4,0,0]:[0,0,0,0]):[4,4,0,0]} maxBarSize={isStacked?60:20}/>)}</BarChart></ResponsiveContainer>)
 }
 
-// â”€â”€ ChartWithFilter (built-in charts) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ChartWithFilter (built-in charts) ─────────────────────────────────────────
 
 function ChartWithFilter({ title, groups, types, allYears, modes, onDelete, onGripMouseDown,
   render: Render }: {
@@ -702,7 +702,7 @@ function ChartWithFilter({ title, groups, types, allYears, modes, onDelete, onGr
                 </button>
               </div>
             ) : (
-              <button onClick={()=>setConfirmingDelete(true)} title="Ocultar grÃ¡fico" className="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+              <button onClick={()=>setConfirmingDelete(true)} title="Ocultar gráfico" className="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                 <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5}/>
               </button>
             )
@@ -721,7 +721,7 @@ function ChartWithFilter({ title, groups, types, allYears, modes, onDelete, onGr
   )
 }
 
-// â”€â”€ ResizableWrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ResizableWrapper ─────────────────────────────────────────────────────────
 
 function ResizableWrapper({ colSpan, height, onUpdateColSpan, onUpdateHeight, isDragging, isDragOver,
   onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, children }: {
@@ -805,7 +805,7 @@ function ResizableWrapper({ colSpan, height, onUpdateColSpan, onUpdateHeight, is
   )
 }
 
-// â”€â”€ CustomChartCard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── CustomChartCard ───────────────────────────────────────────────────────────
 
 function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onHide, onEdit, allYears, groups, types, accounts }: {
   def: CustomChartDef; chartH: number; onGripMouseDown: () => void
@@ -969,7 +969,7 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
 
   const modeOptions = def.xAxis==='none'
     ? [['bar','Columnas',BarChart2],['donut','Donut',PieIcon]] as const
-    : [['bar','Columnas',BarChart2],['line','LÃ­neas',Activity],['area','Ãrea',TrendingUp]] as const
+    : [['bar','Columnas',BarChart2],['line','Líneas',Activity],['area','Área',TrendingUp]] as const
 
   return (
     <div className="relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
@@ -999,7 +999,7 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
             <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5 gap-0.5">
               <button onClick={()=>upd({ noneAxisPeriod:'year' })}
                 className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${(def.noneAxisPeriod??'year')==='year'?'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100':'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
-                AÃ±o
+                Año
               </button>
               <button onClick={()=>upd({ noneAxisPeriod:'month' })}
                 className={`px-2 py-0.5 rounded-md text-[11px] font-medium transition-colors ${def.noneAxisPeriod==='month'?'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100':'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
@@ -1017,7 +1017,7 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
                   </button>
                 ))
               ) : (<>
-                {([['bar','Columnas',BarChart2],['line','LÃ­neas',Activity],['area','Ãrea',TrendingUp]] as const).map(([id,,Icon])=>(
+                {([['bar','Columnas',BarChart2],['line','Líneas',Activity],['area','Área',TrendingUp]] as const).map(([id,,Icon])=>(
                   <button key={id} onClick={()=>upd({ displayMode: id })}
                     className={`p-1 rounded-md transition-colors ${def.displayMode===id?'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 shadow-sm':'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
                     <Icon className="w-3 h-3"/>
@@ -1032,7 +1032,7 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
               </>)}
             </div>
           )}
-          <button onClick={onEdit} title="Editar grÃ¡fico" className="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+          <button onClick={onEdit} title="Editar gráfico" className="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
             <Settings2 className="w-3.5 h-3.5" strokeWidth={1.5}/>
           </button>
           {confirmingDelete ? (
@@ -1063,7 +1063,7 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
   )
 }
 
-// â”€â”€ ChartBuilderScreen â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── ChartBuilderScreen ────────────────────────────────────────────────────────
 
 function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups, types, accounts }: {
   def: CustomChartDef; onUpdate: (d: CustomChartDef) => void; onSave: () => void; onCancel: () => void
@@ -1247,7 +1247,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
           <X className="w-4 h-4"/> Cancelar
         </button>
         <input
-          value={def.title} onChange={e=>upd({ title:e.target.value })} placeholder="TÃ­tulo del grÃ¡fico"
+          value={def.title} onChange={e=>upd({ title:e.target.value })} placeholder="Título del gráfico"
           className="flex-1 min-w-0 text-base font-semibold text-gray-800 dark:text-white bg-transparent text-center focus:outline-none placeholder:text-gray-300"
         />
         <button onClick={onSave} className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gray-800 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors shrink-0">
@@ -1279,8 +1279,8 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                 <option value="all">Todos</option>
               </select>
               <select value={def.metric} onChange={e=>upd({ metric:e.target.value as MetricType })} className={`w-full ${selectCls}`}>
-                <option value="sum">Suma (â‚¬)</option>
-                <option value="count">NÂº movimientos</option>
+                <option value="sum">Suma (€)</option>
+                <option value="count">Nº movimientos</option>
               </select>
             </>)}
           </div>
@@ -1296,13 +1296,13 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
               })
             }} className={`w-full ${selectCls}`}>
               <option value="month">Eje: mes</option>
-              <option value="year">Eje: aÃ±o</option>
+              <option value="year">Eje: año</option>
               <option value="none">Sin eje temporal</option>
             </select>
             {!isAccounts && (
               <select value={def.splitBy} onChange={e=>upd({ splitBy:e.target.value as SplitByType, overrides:[] })} className={`w-full ${selectCls}`}>
                 <option value="none">Sin desglose</option>
-                <option value="group">Por categorÃ­a</option>
+                <option value="group">Por categoría</option>
                 <option value="type">Por subtipo</option>
               </select>
             )}
@@ -1310,7 +1310,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
               <>
                 {!isAccounts && (
                   <div className="flex items-center gap-2 pt-1">
-                    <label className="text-[11px] text-gray-400 shrink-0">MÃ¡x. eje Y</label>
+                    <label className="text-[11px] text-gray-400 shrink-0">Máx. eje Y</label>
                     <input
                       type="number" min="0" placeholder="Auto"
                       value={def.yMax ?? ''} onChange={e=>upd({ yMax: e.target.value==='' ? undefined : +e.target.value })}
@@ -1319,7 +1319,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                   </div>
                 )}
                 <div className="flex items-center gap-2 pt-1">
-                  <label className="text-[11px] text-gray-400 shrink-0">LÃ­neas</label>
+                  <label className="text-[11px] text-gray-400 shrink-0">Líneas</label>
                   {(['monotone','linear'] as const).map(lt=>(
                     <button key={lt} onClick={()=>upd({ lineType:lt })}
                       className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors ${(def.lineType??'monotone')===lt?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
@@ -1349,7 +1349,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                 <div className="flex gap-1.5 pt-0.5">
                   <button onClick={()=>upd({ noneAxisPeriod:'year' })}
                     className={`flex-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${(def.noneAxisPeriod??'year')==='year'?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'}`}>
-                    AÃ±o completo
+                    Año completo
                   </button>
                   <button onClick={()=>upd({ noneAxisPeriod:'month' })}
                     className={`flex-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${def.noneAxisPeriod==='month'?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'}`}>
@@ -1372,7 +1372,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
 
           {(series.length>0 || isAccounts) && (
             <div className="space-y-2">
-              <span className={labelCls}>{isAccounts?'Tipo de grÃ¡fico':def.splitBy==='none'?'Tipo de grÃ¡fico':`Series (${series.length})`}</span>
+              <span className={labelCls}>{isAccounts?'Tipo de gráfico':def.splitBy==='none'?'Tipo de gráfico':`Series (${series.length})`}</span>
 
               {(isAccounts || def.splitBy==='none' || def.xAxis==='none') && (
                 <div className="flex flex-wrap gap-1.5">
@@ -1381,15 +1381,15 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                        { id:'donut', icon:<PieIcon   className="w-3.5 h-3.5"/>, label:'Donut'  },
                        { id:'pie',   icon:<PieIcon   className="w-3.5 h-3.5"/>, label:'Tarta'  }]
                     : [{ id:'bar',   icon:<BarChart2  className="w-3.5 h-3.5"/>, label:'Columnas' },
-                       { id:'line',  icon:<Activity   className="w-3.5 h-3.5"/>, label:'LÃ­neas'   },
-                       { id:'area',  icon:<TrendingUp className="w-3.5 h-3.5"/>, label:'Ãrea'     }]
+                       { id:'line',  icon:<Activity   className="w-3.5 h-3.5"/>, label:'Líneas'   },
+                       { id:'area',  icon:<TrendingUp className="w-3.5 h-3.5"/>, label:'Área'     }]
                   ).map(m=>(
                     <button key={m.id} onClick={()=>upd({ defaultDisplay:m.id as CustomChartDef['defaultDisplay'] })}
                       className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${def.defaultDisplay===m.id?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'}`}
                     >{m.icon}{m.label}</button>
                   ))}
                   {(def.defaultDisplay==='donut'||def.defaultDisplay==='pie') && def.xAxis==='none' && (
-                    <p className="text-[11px] text-gray-400 w-full pt-0.5">Arrastra el cÃ­rculo en la vista previa para reposicionarlo y redimensionarlo.</p>
+                    <p className="text-[11px] text-gray-400 w-full pt-0.5">Arrastra el círculo en la vista previa para reposicionarlo y redimensionarlo.</p>
                   )}
                   {!isAccounts && def.splitBy==='none' && def.xAxis!=='none' && (
                     <div className="relative">
@@ -1440,7 +1440,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                   <div className="space-y-3">
                     <div className="flex items-center gap-1">
                       <span className="text-[11px] text-gray-400 shrink-0 mr-0.5">Todos:</span>
-                      {([['bar',<BarChart2 className="w-3.5 h-3.5"/>,'Columnas'],['line',<Activity className="w-3.5 h-3.5"/>,'LÃ­neas'],['area',<TrendingUp className="w-3.5 h-3.5"/>,'Ãrea'],['hidden',<X className="w-3.5 h-3.5"/>,'Ocultar']] as const).map(([d,icon,label])=>(
+                      {([['bar',<BarChart2 className="w-3.5 h-3.5"/>,'Columnas'],['line',<Activity className="w-3.5 h-3.5"/>,'Líneas'],['area',<TrendingUp className="w-3.5 h-3.5"/>,'Área'],['hidden',<X className="w-3.5 h-3.5"/>,'Ocultar']] as const).map(([d,icon,label])=>(
                         <button key={d} onClick={()=>setAllAccDisplay(d)} title={label}
                           className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                         >{icon}</button>
@@ -1465,7 +1465,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                           <span className="flex-1 text-xs text-gray-600 dark:text-gray-400 truncate min-w-0">{s.label}</span>
                           <div className="flex items-center gap-0.5 shrink-0">
                             {(['bar','line','area'] as const).map(d=>(
-                              <button key={d} onClick={()=>setAccOverride(s.key,{ display:d })} title={d==='bar'?'Columnas':d==='line'?'LÃ­neas':'Ãrea'}
+                              <button key={d} onClick={()=>setAccOverride(s.key,{ display:d })} title={d==='bar'?'Columnas':d==='line'?'Líneas':'Área'}
                                 className={`p-1.5 rounded transition-colors ${s.display===d?'bg-gray-800 dark:bg-white text-white dark:text-gray-900':'text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400'}`}
                               >{dispIcons[d]}</button>
                             ))}
@@ -1496,7 +1496,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                     {/* Change all row */}
                     <div className="flex items-center gap-1">
                       <span className="text-[11px] text-gray-400 shrink-0 mr-0.5">Todos:</span>
-                      {([['bar',<BarChart2 className="w-3.5 h-3.5"/>,'Columnas'],['line',<Activity className="w-3.5 h-3.5"/>,'LÃ­neas'],['area',<TrendingUp className="w-3.5 h-3.5"/>,'Ãrea'],['hidden',<X className="w-3.5 h-3.5"/>,'Ocultar']] as const).map(([d,icon,label])=>(
+                      {([['bar',<BarChart2 className="w-3.5 h-3.5"/>,'Columnas'],['line',<Activity className="w-3.5 h-3.5"/>,'Líneas'],['area',<TrendingUp className="w-3.5 h-3.5"/>,'Área'],['hidden',<X className="w-3.5 h-3.5"/>,'Ocultar']] as const).map(([d,icon,label])=>(
                         <button key={d} onClick={()=>setAllDisplay(d)} title={label}
                           className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                         >{icon}</button>
@@ -1526,7 +1526,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                           <span className="flex-1 text-xs text-gray-600 dark:text-gray-400 truncate min-w-0">{s.label}</span>
                           <div className="flex items-center gap-0.5 shrink-0">
                             {(['bar','line','area'] as const).map(d=>(
-                              <button key={d} onClick={()=>setSeriesOverride(s.key,{ display:d })} title={d==='bar'?'Columnas':d==='line'?'LÃ­neas':'Ãrea'}
+                              <button key={d} onClick={()=>setSeriesOverride(s.key,{ display:d })} title={d==='bar'?'Columnas':d==='line'?'Líneas':'Área'}
                                 className={`p-1.5 rounded transition-colors ${s.display===d?'bg-gray-800 dark:bg-white text-white dark:text-gray-900':'text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400'}`}
                               >{dispIcons[d]}</button>
                             ))}
@@ -1572,7 +1572,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
   )
 }
 
-// â”€â”€ Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function Charts() {
   const [customCharts, setCustomCharts] = useState<CustomChartDef[]>(() => {
@@ -1680,8 +1680,8 @@ export default function Charts() {
     <div className="p-3 md:p-6 space-y-4">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">GrÃ¡ficos</h1>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">Filtros y vista independientes por grÃ¡fico</p>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Gráficos</h1>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">Filtros y vista independientes por gráfico</p>
         </div>
         <div className="flex items-center gap-2">
           {(hiddenBuiltins.size + hiddenCustom.size) > 0 && (
@@ -1693,7 +1693,7 @@ export default function Charts() {
             </button>
           )}
           <button onClick={addChart} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-800 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors shadow-sm">
-            <Plus className="w-4 h-4"/> AÃ±adir grÃ¡fico
+            <Plus className="w-4 h-4"/> Añadir gráfico
           </button>
         </div>
       </div>
@@ -1710,15 +1710,15 @@ export default function Charts() {
             monthly:      g=><ChartWithFilter title="Ingresos y gastos por mes"      {...bp} modes={[M_BARS,M_STACKED,M_LINES,M_COMBO]} onGripMouseDown={g} render={p=><MonthlyBarChart {...p}/>}/>,
             net:          g=><ChartWithFilter title="Balance neto por mes"           {...bp}                                            onGripMouseDown={g} render={p=><NetMonthlyChart {...p}/>}/>,
             cumulative:   g=><ChartWithFilter title="Balance acumulado"              {...bp} modes={[M_AREA,M_LINES]}                  onGripMouseDown={g} render={p=><CumulativeChart {...p}/>}/>,
-            expdnt:       g=><ChartWithFilter title="Gastos por categorÃ­a"           {...bp} modes={[M_DONUT,M_BARS]}                  onGripMouseDown={g} render={p=><ExpenseDonutChart {...p}/>}/>,
-            incdnt:       g=><ChartWithFilter title="Ingresos por categorÃ­a"         {...bp} modes={[M_DONUT,M_BARS]}                  onGripMouseDown={g} render={p=><IncomeDonutChart {...p}/>}/>,
+            expdnt:       g=><ChartWithFilter title="Gastos por categoría"           {...bp} modes={[M_DONUT,M_BARS]}                  onGripMouseDown={g} render={p=><ExpenseDonutChart {...p}/>}/>,
+            incdnt:       g=><ChartWithFilter title="Ingresos por categoría"         {...bp} modes={[M_DONUT,M_BARS]}                  onGripMouseDown={g} render={p=><IncomeDonutChart {...p}/>}/>,
             top:          g=><ChartWithFilter title="Top subtipos de gasto"          {...bp}                                            onGripMouseDown={g} render={p=><TopTypesChart {...p}/>}/>,
             savings:      g=><ChartWithFilter title="Ahorro vs gasto mensual"        {...bp} modes={[M_STACKED,M_BARS,M_COMBO]}        onGripMouseDown={g} render={p=><SavingsChart {...p}/>}/>,
-            trend:        g=><ChartWithFilter title="Tendencia mensual por categorÃ­a"{...bp} modes={[M_LINES,M_AREA,M_BARS,M_COMBO]}   onGripMouseDown={g} render={p=><TrendLineChart {...p}/>}/>,
-            subtypes:     g=><ChartWithFilter title="Subtipos de gasto por categorÃ­a"{...bp} modes={[M_STACKED,M_BARS,M_LINES]}        onGripMouseDown={g} render={p=><SubtypesByGroupChart {...p}/>}/>,
-            'dash-line':  g=><ChartWithFilter title="Gastos por categorÃ­a vs Ingresos" {...bp}                                         onGripMouseDown={g} render={p=><DashExpLineChart {...p}/>}/>,
-            'dash-pie':   g=><ChartWithFilter title="DistribuciÃ³n de gastos"           {...bp}                                         onGripMouseDown={g} render={p=><DashExpPieChart {...p}/>}/>,
-            'dash-balance':g=><ChartWithFilter title="EvoluciÃ³n del balance"           {...bp}                                         onGripMouseDown={g} render={p=><DashBalanceChart {...p} accounts={accounts}/>}/>,
+            trend:        g=><ChartWithFilter title="Tendencia mensual por categoría"{...bp} modes={[M_LINES,M_AREA,M_BARS,M_COMBO]}   onGripMouseDown={g} render={p=><TrendLineChart {...p}/>}/>,
+            subtypes:     g=><ChartWithFilter title="Subtipos de gasto por categoría"{...bp} modes={[M_STACKED,M_BARS,M_LINES]}        onGripMouseDown={g} render={p=><SubtypesByGroupChart {...p}/>}/>,
+            'dash-line':  g=><ChartWithFilter title="Gastos por categoría vs Ingresos" {...bp}                                         onGripMouseDown={g} render={p=><DashExpLineChart {...p}/>}/>,
+            'dash-pie':   g=><ChartWithFilter title="Distribución de gastos"           {...bp}                                         onGripMouseDown={g} render={p=><DashExpPieChart {...p}/>}/>,
+            'dash-balance':g=><ChartWithFilter title="Evolución del balance"           {...bp}                                         onGripMouseDown={g} render={p=><DashBalanceChart {...p} accounts={accounts}/>}/>,
           }
           const renderFn = renderMap[id]; if (!renderFn) return null
           return (
@@ -1769,4 +1769,3 @@ export default function Charts() {
     </div>
   )
 }
-
