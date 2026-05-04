@@ -3,7 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, CartesianGrid, PieChart, Pie, Cell, Legend,
-  LineChart, Line, ComposedChart,
+  LineChart, Line, ComposedChart, ReferenceLine,
 } from 'recharts'
 import { getMovements, type Movement } from '../api/movements'
 import { getGroups, type Group } from '../api/groups'
@@ -14,7 +14,7 @@ import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } f
 import {
   SlidersHorizontal, ChevronDown, Plus, Trash2, X, Settings2,
   BarChart2, Layers, TrendingUp, Activity, PieChart as PieIcon,
-  GripVertical,
+  GripVertical, Sigma,
 } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -64,7 +64,7 @@ type SignType    = 'all' | 'expense' | 'income'
 type MetricType  = 'sum' | 'count'
 
 interface SeriesOverride {
-  key: string; display: 'bar' | 'line' | 'area' | 'hidden'; color: string; label: string; stacked?: boolean
+  key: string; display: 'bar' | 'line' | 'area' | 'hidden'; color: string; label: string; stacked?: boolean; cumulative?: boolean
 }
 interface CustomChartDef {
   id: string; title: string; colSpan: number; year: number | null
@@ -80,7 +80,7 @@ interface CustomChartDef {
   noneAxisPeriod?: 'year' | 'month'
 }
 interface ComputedSeries {
-  key: string; label: string; color: string; display: 'bar' | 'line' | 'area' | 'hidden'; stacked: boolean
+  key: string; label: string; color: string; display: 'bar' | 'line' | 'area' | 'hidden'; stacked: boolean; cumulative: boolean
 }
 
 function genId() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
@@ -159,7 +159,7 @@ function computeChartData(
   function makeSeries(key: string): ComputedSeries {
     const info = baseInfo(key); const ov = overrideMap[key]
     const fallback = (def.defaultDisplay === 'donut' || def.defaultDisplay === 'pie') ? 'bar' : def.defaultDisplay
-    return { key, label: ov?.label ?? info.label, color: ov?.color ?? info.color, display: ov?.display ?? fallback, stacked: ov?.stacked ?? false }
+    return { key, label: ov?.label ?? info.label, color: ov?.color ?? info.color, display: ov?.display ?? fallback, stacked: ov?.stacked ?? false, cumulative: ov?.cumulative ?? false }
   }
   // Use signed dinero so refunds/returns properly cancel out within a category.
   // We take Math.abs of the final accumulated value per bucket so bars are always positive.
@@ -196,6 +196,20 @@ function computeChartData(
     x: label, ...Object.fromEntries(keyOrder.map(k => [k, Math.abs(byBucket[key]?.[k] ?? 0)]))
   }))
   return { data, series: keyOrder.map(makeSeries) }
+}
+
+function applyCumulative(data: Record<string,unknown>[], series: ComputedSeries[]): Record<string,unknown>[] {
+  const cumKeys = series.filter(s => s.cumulative && s.display !== 'hidden').map(s => s.key)
+  if (cumKeys.length === 0) return data
+  const running: Record<string,number> = {}
+  return data.map(row => {
+    const newRow = { ...row }
+    for (const k of cumKeys) {
+      running[k] = (running[k] ?? 0) + ((row[k] as number) ?? 0)
+      newRow[k] = running[k]
+    }
+    return newRow
+  })
 }
 
 // ── Dashboard-native chart types (ported as built-ins) ────────────────────────
@@ -514,7 +528,7 @@ function NetMonthlyChart({ filtered, year }: ChartProps) {
     return series.map(({ key, label }) => ({ month:label, net:m[key] }))
   }, [filtered, year])
   const tt = (p: unknown) => <CT {...(p as Parameters<typeof CT>[0])} fmt={fmt}/>
-  return (<ResponsiveContainer width="100%" height={220}><BarChart data={data} barCategoryGap="35%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Bar dataKey="net" name="Neto" radius={[4,4,0,0]} maxBarSize={40}>{data.map((d,i)=><Cell key={i} fill={d.net>=0?'#22c55e':'#ef4444'}/>)}</Bar></BarChart></ResponsiveContainer>)
+  return (<ResponsiveContainer width="100%" height={220}><BarChart data={data} barCategoryGap="35%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><ReferenceLine y={0} stroke="#9ca3af" strokeWidth={1}/><Bar dataKey="net" name="Neto" radius={[4,4,0,0]} maxBarSize={40}>{data.map((d,i)=><Cell key={i} fill={d.net>=0?'#22c55e':'#ef4444'}/>)}</Bar></BarChart></ResponsiveContainer>)
 }
 
 function CumulativeChart({ filtered, year, mode }: ChartProps) {
@@ -821,10 +835,11 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
     return signed
   }, [isAccounts, movements, def.filter, def.sign, typeToGroup, def.xAxis, def.noneAxisPeriod])
 
-  const { data: chartData, series } = useMemo(
+  const { data: rawChartData, series } = useMemo(
     ()=>isAccounts ? { data:[], series:[] } : computeChartData(def, baseFiltered, typeToGroup, groupById, typeById, accountById),
     [isAccounts, def, baseFiltered, typeToGroup, groupById, typeById, accountById]
   )
+  const chartData = useMemo(()=>applyCumulative(rawChartData, series), [rawChartData, series])
 
   const accountsCurrentData = useMemo(()=>{
     if (!isAccounts || def.xAxis!=='none') return null
@@ -851,7 +866,7 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
     const defDisp = (d: string): ComputedSeries['display'] => d==='bar'?'bar':d==='area'?'area':'line'
     if (def.splitBy==='none') {
       const data = xBuckets.map(({ key, label }) => ({ x:label, total:accounts.reduce((s,acc)=>s+balAt(acc,key),0) }))
-      const accSeries: ComputedSeries[] = [{ key:'total', label:'Total cuentas', color:def.defaultColor, display:defDisp(def.defaultDisplay), stacked:false }]
+      const accSeries: ComputedSeries[] = [{ key:'total', label:'Total cuentas', color:def.defaultColor, display:defDisp(def.defaultDisplay), stacked:false, cumulative:false }]
       return { data, accSeries }
     }
     const data = xBuckets.map(({ key, label }) => {
@@ -861,7 +876,7 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
     })
     const accSeries: ComputedSeries[] = accounts.map(acc=>{
       const k = `a${acc.id}`; const ov = ovMap[k]
-      return { key:k, label:ov?.label??acc.name, color:ov?.color??acc.color, display:defDisp(ov?.display??def.defaultDisplay), stacked:ov?.stacked??false }
+      return { key:k, label:ov?.label??acc.name, color:ov?.color??acc.color, display:defDisp(ov?.display??def.defaultDisplay), stacked:ov?.stacked??false, cumulative:false }
     })
     return { data, accSeries }
   }, [isAccounts, def.xAxis, def.splitBy, def.overrides, def.defaultDisplay, def.defaultColor, movementsAll, accounts, types])
@@ -1084,10 +1099,11 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
     return signed
   }, [isAccounts, movements, def.filter, def.sign, typeToGroup, def.xAxis, def.noneAxisPeriod])
 
-  const { data: chartData, series } = useMemo(
+  const { data: rawChartData, series } = useMemo(
     ()=>isAccounts ? { data:[], series:[] } : computeChartData(def, baseFiltered, typeToGroup, groupById, typeById, accountById),
     [isAccounts, def, baseFiltered, typeToGroup, groupById, typeById, accountById]
   )
+  const chartData = useMemo(()=>applyCumulative(rawChartData, series), [rawChartData, series])
 
   const accountsCurrentData = useMemo(()=>{
     if (!isAccounts || def.xAxis!=='none') return null
@@ -1114,7 +1130,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
     const defDisp = (d: string): ComputedSeries['display'] => d==='bar'?'bar':d==='area'?'area':'line'
     if (def.splitBy==='none') {
       const data = xBuckets.map(({ key, label }) => ({ x:label, total:accounts.reduce((s,acc)=>s+balAt(acc,key),0) }))
-      const accSeries: ComputedSeries[] = [{ key:'total', label:'Total cuentas', color:def.defaultColor, display:defDisp(def.defaultDisplay), stacked:false }]
+      const accSeries: ComputedSeries[] = [{ key:'total', label:'Total cuentas', color:def.defaultColor, display:defDisp(def.defaultDisplay), stacked:false, cumulative:false }]
       return { data, accSeries }
     }
     const data = xBuckets.map(({ key, label }) => {
@@ -1124,7 +1140,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
     })
     const accSeries: ComputedSeries[] = accounts.map(acc=>{
       const k = `a${acc.id}`; const ov = ovMap[k]
-      return { key:k, label:ov?.label??acc.name, color:ov?.color??acc.color, display:defDisp(ov?.display??def.defaultDisplay), stacked:ov?.stacked??false }
+      return { key:k, label:ov?.label??acc.name, color:ov?.color??acc.color, display:defDisp(ov?.display??def.defaultDisplay), stacked:ov?.stacked??false, cumulative:false }
     })
     return { data, accSeries }
   }, [isAccounts, def.xAxis, def.splitBy, def.overrides, def.defaultDisplay, def.defaultColor, movementsAll, accounts, types])
@@ -1490,6 +1506,10 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                         title="Apilar todo" className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                         <Layers className="w-3.5 h-3.5"/>
                       </button>
+                      <button onClick={()=>upd({ overrides: series.map(s => ({ ...(def.overrides.find(o=>o.key===s.key) ?? { key:s.key, color:s.color, label:s.label, display:s.display }), cumulative:!series.every(x=>x.cumulative) })) })}
+                        title="Acumulativo todo" className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                        <Sigma className="w-3.5 h-3.5"/>
+                      </button>
                     </div>
                     {/* Per-series */}
                     {series.map(s=>(
@@ -1516,6 +1536,12 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                               title={s.stacked?'Dejar de apilar':'Apilar'}
                               className={`p-1.5 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${s.stacked&&s.display!=='line'&&s.display!=='hidden'?'bg-blue-500 text-white':'text-gray-400 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400'}`}
                             ><Layers className="w-3.5 h-3.5"/></button>
+                            <button
+                              onClick={()=>setSeriesOverride(s.key,{ cumulative:!s.cumulative })}
+                              disabled={s.display==='hidden' || def.xAxis==='none'}
+                              title={s.cumulative?'Quitar acumulativo':'Acumulativo'}
+                              className={`p-1.5 rounded transition-colors disabled:opacity-30 disabled:cursor-not-allowed ${s.cumulative&&s.display!=='hidden'?'bg-indigo-500 text-white':'text-gray-400 dark:text-gray-600 hover:text-indigo-500 dark:hover:text-indigo-400'}`}
+                            ><Sigma className="w-3.5 h-3.5"/></button>
                             <button onClick={()=>setSeriesOverride(s.key,{ display:s.display==='hidden'?(def.defaultDisplay==='donut'||def.defaultDisplay==='pie')?'bar':def.defaultDisplay:'hidden' })}
                               title={s.display==='hidden'?'Mostrar':'Ocultar'}
                               className={`p-1.5 rounded transition-colors ${s.display==='hidden'?'text-gray-300 hover:text-gray-500':'text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400'}`}
