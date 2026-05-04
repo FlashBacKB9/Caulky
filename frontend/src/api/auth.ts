@@ -15,10 +15,10 @@ export const login = (email: string, password: string) => {
   const form = new FormData()
   form.append('username', email)
   form.append('password', password)
-  return api.post('/auth/cookie/login', form)
+  return api.post('/auth/login', form)
 }
 
-export const logout = () => api.post('/auth/cookie/logout')
+export const logout = () => api.post('/auth/logout')
 
 export const register = (email: string, password: string, displayName?: string) =>
   api.post<UserRead>('/auth/register', { email, password, display_name: displayName ?? null })
