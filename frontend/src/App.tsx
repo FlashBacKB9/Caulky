@@ -11,6 +11,7 @@ import Import from './pages/Import'
 import Investments from './pages/Investments'
 import Documentation from './pages/Documentation'
 import Comparaciones from './pages/Comparaciones'
+import AccountsPage from './pages/AccountsPage'
 import { useDarkMode } from './hooks/useDarkMode'
 import { useUiZoom } from './hooks/useUiZoom'
 
@@ -33,6 +34,7 @@ function Layout() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/movements" element={<Movements />} />
+          <Route path="/cuentas" element={<AccountsPage />} />
           <Route path="/annual" element={<Annual />} />
           <Route path="/charts" element={<Charts />} />
           <Route path="/budgets" element={<Budgets />} />

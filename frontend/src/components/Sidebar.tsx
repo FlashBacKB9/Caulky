@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
-import { Home, List, BarChart2, LineChart, Settings, Wallet, Upload, ChartCandlestick, TrendingUp, Info, X, ExternalLink, BookOpen, GitCompare } from 'lucide-react'
+import { Home, List, BarChart2, LineChart, Settings, Wallet, Upload, ChartCandlestick, TrendingUp, Info, X, ExternalLink, BookOpen, GitCompare, Landmark } from 'lucide-react'
 
 const BASE_LINKS = [
   { to: '/',          label: 'Dashboard',       Icon: Home },
   { to: '/movements', label: 'Movimientos',      Icon: List },
+  { to: '/cuentas',   label: 'Cuentas',          Icon: Landmark },
   { to: '/annual',    label: 'Finanzas del Año', Icon: BarChart2 },
   { to: '/charts',        label: 'Gráficos',         Icon: LineChart },
   { to: '/comparaciones', label: 'Comparaciones',    Icon: GitCompare },
