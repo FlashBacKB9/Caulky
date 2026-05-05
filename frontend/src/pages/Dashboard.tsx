@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { GridLayout, useContainerWidth, verticalCompactor, type LayoutItem } from 'react-grid-layout'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { GridLayout, verticalCompactor, type LayoutItem } from 'react-grid-layout'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { getDashboard, getAnnualStats } from '../api/stats'
@@ -36,7 +36,7 @@ const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct
 const EXCLUDE_GROUPS  = new Set(['Ingreso','Total','Ahorro','Gastos Anuales','Inversión'])
 const BALANCE_EXCLUDE = new Set(['Total','Ahorro','Gastos Anuales','Inversión'])
 const GRID_CLR = '#e5e7eb'
-const DASH_ROW_H = 150
+const DASH_ROW_H = 100
 const DASH_HEADER_H = 60
 const DASH_LAYOUT_KEY = 'spendly-dashboard-layout-v1'
 
@@ -1363,6 +1363,27 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
   )
 }
 
+// ── Dashboard grid width — measured synchronously before first paint ──────────
+
+function useDashWidth() {
+  const ref = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+
+  useLayoutEffect(() => {
+    const el = ref.current
+    if (!el) return
+    setWidth(el.offsetWidth)
+    const ro = new ResizeObserver(entries => {
+      const w = entries[0]?.contentRect.width
+      if (w != null && w > 0) setWidth(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  return { ref, width }
+}
+
 // ── Dashboard ─────────────────────────────────────────────────────────────────
 
 export default function Dashboard() {
@@ -1401,7 +1422,7 @@ export default function Dashboard() {
     enabled: needsChartsData || hasBalanceHistory || (editMode && addMode === 'budget'),
   })
 
-  const { width: dashGridWidth, containerRef: dashContainerRef } = useContainerWidth()
+  const { width: dashGridWidth, ref: dashContainerRef } = useDashWidth()
 
   const [dashLayout, setDashLayout] = useState<readonly LayoutItem[]>(() => {
     const customIds = new Set(readCustomCharts().map(c => c.id))
@@ -1744,9 +1765,9 @@ export default function Dashboard() {
         </p>
       )}
 
-      {/* Widget grid */}
-      {config.widgets.length > 0 ? (
-        <div ref={dashContainerRef}>
+      {/* Widget grid — ref div always rendered so useDashWidth measures correct width */}
+      <div ref={dashContainerRef}>
+      {config.widgets.length > 0 && dashGridWidth > 0 ? (
           <GridLayout
             width={dashGridWidth}
             gridConfig={{ cols: 4, rowHeight: DASH_ROW_H, margin: [16, 16], containerPadding: [0, 0] }}
@@ -1794,7 +1815,6 @@ export default function Dashboard() {
               )
             })}
           </GridLayout>
-        </div>
       ) : (
         !editMode && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -1803,6 +1823,7 @@ export default function Dashboard() {
           </div>
         )
       )}
+      </div>
 
       {/* Backend budget groups (only in view mode) */}
       {!editMode && data.budget_groups.length > 0 && (
