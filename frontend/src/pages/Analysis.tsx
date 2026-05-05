@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -66,7 +66,8 @@ function sumRealIncome(
     .reduce((s, m) => s + m.dinero, 0)
 }
 
-// Sum of outflows to savings (savings group movements with negative dinero = transfers TO savings)
+// Net savings = deposits (dinero < 0, savings group) minus withdrawals (dinero > 0, savings group).
+// Using -m.dinero: deposits contribute positive, withdrawals contribute negative.
 function sumActualSavings(
   movements: Movement[],
   typeGroupMap: Map<number, number>,
@@ -74,8 +75,8 @@ function sumActualSavings(
 ): number {
   if (savingsGroupIdSet.size === 0) return 0
   return movements
-    .filter(m => m.dinero < 0 && isSavingsMovement(m, typeGroupMap, savingsGroupIdSet))
-    .reduce((s, m) => s + Math.abs(m.dinero), 0)
+    .filter(m => isSavingsMovement(m, typeGroupMap, savingsGroupIdSet))
+    .reduce((s, m) => s - m.dinero, 0)
 }
 
 function buildRealExpenseMovements(
@@ -95,6 +96,15 @@ function monthsInRange(start: string, end: string): number {
 }
 
 const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+
+const TOOLTIP_STYLE: React.CSSProperties = {
+  backgroundColor: '#1f2937',
+  border: '1px solid #374151',
+  borderRadius: 8,
+  fontSize: 11,
+  color: '#f9fafb',
+}
+const TOOLTIP_CURSOR = { fill: 'rgba(255,255,255,0.04)' }
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
 
@@ -454,6 +464,8 @@ function PatronesDeGasto({ realExpenseMovements, fmt }: {
               const p = payload?.[0]?.payload as { yearsCount?: number } | undefined
               return `${l}${p?.yearsCount && p.yearsCount > 1 ? ` (media ${p.yearsCount} años)` : ''}`
             }}
+            contentStyle={TOOLTIP_STYLE}
+            cursor={TOOLTIP_CURSOR}
           />
           <Bar dataKey="avg" name="Media gastos" fill="#60a5fa" radius={[3, 3, 0, 0]} />
         </BarChart>
@@ -552,7 +564,7 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
               </Pie>
               <Tooltip
                 formatter={(v) => fmt(v as number)}
-                contentStyle={{ fontSize: 11 }}
+                contentStyle={TOOLTIP_STYLE}
               />
             </PieChart>
           </ResponsiveContainer>
@@ -653,7 +665,7 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
           <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
           <XAxis dataKey="label" tick={{ fontSize: 10 }} />
           <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} width={40} />
-          <Tooltip formatter={(v) => fmt(v as number)} />
+          <Tooltip formatter={(v) => fmt(v as number)} contentStyle={TOOLTIP_STYLE} cursor={TOOLTIP_CURSOR} />
           <Area type="monotone" dataKey="balance" name="Patrimonio"
             stroke={positive ? '#60a5fa' : '#f87171'} fill="url(#projGrad)" strokeWidth={2} />
         </AreaChart>
