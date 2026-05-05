@@ -17,6 +17,10 @@ const INCOME_CATEGORIES = new Set(['Ingreso'])
 
 const today = () => new Date().toISOString().slice(0, 10)
 
+const KIND_LABELS: Record<Kind, string> = {
+  gasto: 'Gasto', ingreso: 'Ingreso', devolucion: 'Devolución',
+}
+
 // ── Numpad ────────────────────────────────────────────────────────────────────
 
 const KEYS = [
@@ -57,6 +61,41 @@ function useAmountInput() {
   const value = parseFloat(raw.replace(',', '.')) || 0
 
   return { raw, press, reset, value, setAmount }
+}
+
+// ── Segmented kind control ────────────────────────────────────────────────────
+
+function KindToggle({ kind, onChange }: { kind: Kind; onChange: (k: Kind) => void }) {
+  const idx = kind === 'gasto' ? 0 : kind === 'ingreso' ? 1 : 2
+  const isGreen = kind !== 'gasto'
+
+  return (
+    <div className="relative flex bg-gray-100 dark:bg-gray-800 rounded-2xl p-1">
+      {/* sliding pill */}
+      <div
+        className={`absolute top-1 bottom-1 rounded-xl transition-all duration-200 ease-in-out ${
+          isGreen ? 'bg-green-500' : 'bg-red-500'
+        }`}
+        style={{
+          left:  `calc(${idx} * (100% - 8px) / 3 + 4px)`,
+          right: `calc(${2 - idx} * (100% - 8px) / 3 + 4px)`,
+        }}
+      />
+      {(['gasto', 'ingreso', 'devolucion'] as Kind[]).map(k => (
+        <button
+          key={k}
+          onClick={() => onChange(k)}
+          className={`flex-1 py-2.5 rounded-xl text-sm font-semibold relative z-10 transition-colors active:scale-95 ${
+            kind === k
+              ? 'text-white'
+              : 'text-gray-500 dark:text-gray-400'
+          }`}
+        >
+          {KIND_LABELS[k]}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 // ── Type picker (bottom sheet) ────────────────────────────────────────────────
@@ -135,26 +174,30 @@ function TemplatePicker({ templates, onApply, onClose }: {
         <div className="overflow-y-auto flex-1 p-2">
           {templates.length === 0 ? (
             <p className="text-sm text-gray-400 dark:text-gray-500 px-3 py-4 text-center">
-              No hay plantillas de gasto guardadas
+              No hay plantillas guardadas
             </p>
           ) : (
-            templates.map(tpl => (
-              <button
-                key={tpl.id}
-                onClick={() => onApply(tpl)}
-                className="w-full text-left flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-gray-800 dark:text-white">{tpl.label}</p>
-                  {tpl.name && tpl.name !== tpl.label && (
-                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{tpl.name}</p>
-                  )}
-                </div>
-                <span className="text-sm font-semibold text-red-500 ml-3 shrink-0">
-                  {Math.abs(parseFloat(tpl.money) || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
-                </span>
-              </button>
-            ))
+            templates.map(tpl => {
+              const money = parseFloat(tpl.money) || 0
+              const isNeg = money < 0
+              return (
+                <button
+                  key={tpl.id}
+                  onClick={() => onApply(tpl)}
+                  className="w-full text-left flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                >
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800 dark:text-white">{tpl.label}</p>
+                    {tpl.name && tpl.name !== tpl.label && (
+                      <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{tpl.name}</p>
+                    )}
+                  </div>
+                  <span className={`text-sm font-semibold ml-3 shrink-0 ${isNeg ? 'text-green-500' : 'text-red-500'}`}>
+                    {isNeg ? '+' : '−'}{Math.abs(money).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                  </span>
+                </button>
+              )
+            })
           )}
         </div>
       </div>
@@ -194,8 +237,7 @@ export default function QuickAdd() {
     isIncomeKind ? INCOME_CATEGORIES.has(t.category) : !INCOME_CATEGORIES.has(t.category)
   )
 
-  // Expense templates only (money < 0)
-  const expenseTemplates = loadTemplates().filter(t => parseFloat(t.money) < 0)
+  const allTemplates = loadTemplates()
 
   // Reset type when switching to incompatible kind
   useEffect(() => {
@@ -206,8 +248,17 @@ export default function QuickAdd() {
   }, [isIncomeKind, allTypes, typeId])
 
   const applyTemplate = (tpl: MovementTemplate) => {
-    const money = parseFloat(tpl.money)
-    setKind(money < 0 ? 'gasto' : 'ingreso')
+    const money = parseFloat(tpl.money) || 0
+    const tplType = allTypes.find(t => t.id === parseInt(tpl.movement_type_id || ''))
+    let newKind: Kind
+    if (tplType && INCOME_CATEGORIES.has(tplType.category)) {
+      newKind = 'ingreso'
+    } else if (money < 0) {
+      newKind = 'devolucion'
+    } else {
+      newKind = 'gasto'
+    }
+    setKind(newKind)
     setAmount(Math.abs(money))
     setDescription(tpl.name || tpl.label)
     setTypeId(tpl.movement_type_id ? parseInt(tpl.movement_type_id) : null)
@@ -253,18 +304,15 @@ export default function QuickAdd() {
   const clrBg        = isGreen ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20'
   const selectedType = allTypes.find(t => t.id === typeId)
 
-  const KIND_LABELS: Record<Kind, string> = {
-    gasto: 'Gasto', ingreso: 'Ingreso', devolucion: 'Devolución',
-  }
-
   return (
-    <div className="flex flex-col bg-white dark:bg-gray-950 max-w-md mx-auto h-screen overflow-hidden">
+    // h-full respects CSS zoom unlike h-screen (100vh ignores zoom on <html>)
+    <div className="flex flex-col bg-white dark:bg-gray-950 max-w-md mx-auto h-full overflow-hidden">
 
       {/* Scrollable content */}
       <div className="flex-1 overflow-y-auto">
 
         {/* Cancel */}
-        <div className="flex items-center px-5 pt-5 pb-1 shrink-0">
+        <div className="flex items-center px-5 pt-5 pb-1">
           <button
             onClick={() => navigate(-1)}
             className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
@@ -292,23 +340,9 @@ export default function QuickAdd() {
           <span className={`text-3xl font-light ml-2 ${clrText}`}>€</span>
         </div>
 
-        {/* Kind toggle */}
-        <div className="flex gap-2 px-5 py-4">
-          {(['gasto', 'ingreso', 'devolucion'] as Kind[]).map(k => (
-            <button
-              key={k}
-              onClick={() => setKind(k)}
-              className={`flex-1 py-2.5 rounded-2xl text-sm font-semibold transition-all active:scale-95 ${
-                kind === k
-                  ? k === 'gasto'
-                    ? 'bg-red-500 text-white shadow-sm'
-                    : 'bg-green-500 text-white shadow-sm'
-                  : 'bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400'
-              }`}
-            >
-              {KIND_LABELS[k]}
-            </button>
-          ))}
+        {/* Kind toggle — segmented control */}
+        <div className="px-5 py-4">
+          <KindToggle kind={kind} onChange={setKind} />
         </div>
 
         {/* Numpad */}
@@ -395,7 +429,6 @@ export default function QuickAdd() {
           )}
         </div>
 
-        {/* Bottom spacer so content doesn't hide behind save button */}
         <div className="h-4" />
       </div>
 
@@ -432,7 +465,7 @@ export default function QuickAdd() {
 
       {showTemplatePicker && (
         <TemplatePicker
-          templates={expenseTemplates}
+          templates={allTemplates}
           onApply={applyTemplate}
           onClose={() => setShowTemplatePicker(false)}
         />
