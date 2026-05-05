@@ -4,6 +4,7 @@ import { updateMovement, deleteMovement, createMovement, type Movement } from '.
 import { type MovementType } from '../api/movementTypes'
 import FileUpload from './FileUpload'
 import { X, Trash2, Copy } from 'lucide-react'
+import { useSharedMovements } from '../hooks/useSharedMovements'
 
 export interface DraftRow {
   id: number
@@ -81,6 +82,7 @@ export default function MovementDetailModal({ movement, types, onClose }: {
   onClose: () => void
 }) {
   const qc = useQueryClient()
+  const { sharedEnabled } = useSharedMovements()
   const [draft, setDraft] = useState<DraftRow>(() => toDraft(movement))
   const { data: accountsSummary } = useQuery({ queryKey: ['accounts-summary'], queryFn: () => import('../api/accounts').then(m => m.getAccountsSummary()) })
   const accounts = accountsSummary?.accounts ?? []
@@ -188,7 +190,7 @@ export default function MovementDetailModal({ movement, types, onClose }: {
           </div>
 
           {/* Pagado / No contar / Compartido */}
-          <div className="grid grid-cols-3 gap-3">
+          <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Pagado</label>
               <Toggle value={draft.paid} onChange={v => setField('paid', v)} color="#22c55e" />
@@ -197,18 +199,20 @@ export default function MovementDetailModal({ movement, types, onClose }: {
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">No contar</label>
               <Toggle value={draft.no_count} onChange={v => setField('no_count', v)} color="#f59e0b" />
             </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Compartido</label>
-              <Toggle
-                value={draft.is_shared}
-                onChange={v => setDraft(d => ({ ...d, is_shared: v, ...(v ? {} : { shared_between: '2', my_share: '' }) }))}
-                color="#3b82f6"
-              />
-            </div>
+            {sharedEnabled && (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Compartido</label>
+                <Toggle
+                  value={draft.is_shared}
+                  onChange={v => setDraft(d => ({ ...d, is_shared: v, ...(v ? {} : { shared_between: '2', my_share: '' }) }))}
+                  color="#3b82f6"
+                />
+              </div>
+            )}
           </div>
 
           {/* Shared detail */}
-          {draft.is_shared && (
+          {sharedEnabled && draft.is_shared && (
             <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 space-y-2">
               <p className="text-xs text-blue-600 dark:text-blue-400">El importe total resta del balance. Solo tu parte cuenta en las estadísticas.</p>
               <div className="grid grid-cols-2 gap-2">

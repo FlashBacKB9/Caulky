@@ -33,7 +33,7 @@ async def _compute_balances(db: AsyncSession, user_id: uuid.UUID) -> dict[int, f
 
     main_res = await db.execute(
         select(func.coalesce(func.sum(dinero_expr), 0))
-        .where(Movement.user_id == user_id)
+        .where(Movement.user_id == user_id, Movement.no_count == False)
         .outerjoin(MovementType, Movement.movement_type_id == MovementType.id)
         .outerjoin(IncomeExpenseGroup, MovementType.income_expense_group_id == IncomeExpenseGroup.id)
     )
@@ -44,7 +44,7 @@ async def _compute_balances(db: AsyncSession, user_id: uuid.UUID) -> dict[int, f
     savings_res = await db.execute(
         select(MovementType.linked_account_id, func.sum(Movement.money))
         .join(Movement, Movement.movement_type_id == MovementType.id)
-        .where(MovementType.linked_account_id.is_not(None), Movement.user_id == user_id)
+        .where(MovementType.linked_account_id.is_not(None), Movement.user_id == user_id, Movement.no_count == False)
         .group_by(MovementType.linked_account_id)
     )
     for account_id, total in savings_res.all():
