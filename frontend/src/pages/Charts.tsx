@@ -23,6 +23,7 @@ import {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const ROW_H = 150
+const CARD_HEADER_H = 60  // approx card header + padding height in px
 
 const MONTHS   = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const GRID     = '#e5e7eb'
@@ -664,7 +665,7 @@ function ChartWithFilter({ title, groups, types, allYears, modes, onDelete,
   const activeCount = condCount + (year!==CUR_YEAR?1:0)
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+    <div className="h-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-5 pt-4 pb-1 gap-2">
         <div className="flex items-center gap-2 min-w-0">
           <GripVertical className="drag-handle w-3.5 h-3.5 text-gray-200 dark:text-gray-700 shrink-0 cursor-grab" strokeWidth={1.5}/>
@@ -909,7 +910,7 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
     : [['bar','Columnas',BarChart2],['line','Líneas',Activity],['area','Área',TrendingUp]] as const
 
   return (
-    <div className="relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
+    <div className="relative h-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
       {/* Header */}
       <div className="flex items-center px-4 pt-3 pb-2 gap-2">
         <GripVertical className="drag-handle w-3.5 h-3.5 text-gray-200 dark:text-gray-700 shrink-0 cursor-grab" strokeWidth={1.5}/>
@@ -1595,11 +1596,11 @@ export default function Charts() {
     return buildPackedLayout([
       ...IDS.filter(id=>!hidB.has(id)).map(id=>({
         i: id, w: bCfg[id]?.colSpan ?? (WIDE[id] ? 4 : 2),
-        h: Math.max(1, Math.round((bCfg[id]?.height ?? 300) / ROW_H)),
+        h: Math.max(3, Math.ceil(((bCfg[id]?.height ?? 300) + CARD_HEADER_H) / ROW_H)),
       })),
       ...cCharts.filter(d=>!hidC.has(d.id)).map(d=>({
         i: d.id, w: d.colSpan ?? (d.wide ? 4 : 2),
-        h: Math.max(1, Math.round((d.height ?? 300) / ROW_H)),
+        h: Math.max(3, Math.ceil(((d.height ?? 300) + CARD_HEADER_H) / ROW_H)),
       })),
     ])
   })
@@ -1633,7 +1634,7 @@ export default function Charts() {
       setCustomCharts(cs => [...cs, draftChart])
       setLayout(prev => {
         const maxY = prev.reduce((m, l) => Math.max(m, l.y + l.h), 0)
-        return [...prev, { i: draftChart.id, x: 0, y: maxY, w: effectiveColSpan(draftChart), h: 2 }]
+        return [...prev, { i: draftChart.id, x: 0, y: maxY, w: effectiveColSpan(draftChart), h: 3 }]
       })
     }
     setDraftChart(null); setEditingId(null)
@@ -1665,8 +1666,8 @@ export default function Charts() {
                 const maxY = prev.reduce((m, l) => Math.max(m, l.y + l.h), 0)
                 const WIDE: Record<string,boolean> = { monthly: true }
                 const toAdd = [
-                  ...restB.map(id => ({ i: id, w: builtinCfg[id]?.colSpan ?? (WIDE[id] ? 4 : 2), h: 2 })),
-                  ...restC.map(id => { const d = customCharts.find(c => c.id === id); return { i: id, w: d ? effectiveColSpan(d) : 2, h: 2 } }),
+                  ...restB.map(id => ({ i: id, w: builtinCfg[id]?.colSpan ?? (WIDE[id] ? 4 : 2), h: 3 })),
+                  ...restC.map(id => { const d = customCharts.find(c => c.id === id); return { i: id, w: d ? effectiveColSpan(d) : 2, h: 3 } }),
                 ]
                 return [...prev, ...buildPackedLayout(toAdd).map(item => ({ ...item, y: item.y + maxY }))]
               })
@@ -1707,14 +1708,14 @@ export default function Charts() {
             'dash-balance':()=><ChartWithFilter title="Evolución del balance"            {...bp}                                             render={p=><DashBalanceChart {...p} accounts={accounts}/>}/>,
           }
           const renderFn = renderMap[id]; if (!renderFn) return null
-          return <div key={id}>{renderFn()}</div>
+          return <div key={id} className="h-full overflow-hidden">{renderFn()}</div>
         })}
 
         {customCharts.filter(def=>!hiddenCustom.has(def.id)).map(def=>{
           const item = layout.find(l => l.i === def.id)
-          const chartH = item ? item.h * ROW_H : 300
+          const chartH = item ? Math.max(80, item.h * ROW_H - CARD_HEADER_H) : 240
           return (
-            <div key={def.id}>
+            <div key={def.id} className="h-full overflow-hidden">
               <CustomChartCard
                 def={def}
                 chartH={chartH}
