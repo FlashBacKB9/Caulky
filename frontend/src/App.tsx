@@ -76,7 +76,6 @@ function Layout() {
             <Route path="/comparaciones" element={<Comparaciones />} />
             <Route path="/proyeccion" element={<Projection />} />
             <Route path="/analisis" element={<Analysis />} />
-            <Route path="/speedmode" element={<QuickAdd />} />
           </Routes>
         </main>
       </div>
@@ -98,6 +97,7 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <LoginPage />} />
+      <Route path="/speedmode" element={user ? <QuickAdd /> : <Navigate to="/login" replace />} />
       <Route path="/*" element={user ? <Layout /> : <Navigate to="/login" replace />} />
     </Routes>
   )
