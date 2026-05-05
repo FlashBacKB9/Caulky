@@ -78,6 +78,7 @@ interface CustomChartDef {
   donutSide?: 'left' | 'right' | 'top' | 'bottom'
   dataSource?: 'movements' | 'accounts'
   noneAxisPeriod?: 'year' | 'month'
+  period?: 'current_year' | 'current_month'
 }
 interface ComputedSeries {
   key: string; label: string; color: string; display: 'bar' | 'line' | 'area' | 'hidden'; stacked: boolean; cumulative: boolean
@@ -819,7 +820,8 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
   const upd = useCallback((patch: Partial<CustomChartDef>) => onUpdate({ ...def, ...patch }), [def, onUpdate])
 
   const isAccounts = (def.dataSource ?? 'movements') === 'accounts'
-  const { data: movements = [] } = useQuery({ queryKey:['movements',def.year], queryFn:()=>getMovements(def.year!==null?{year:def.year}:undefined) })
+  const effectiveYear_c = def.period ? CUR_YEAR : def.year
+  const { data: movements = [] } = useQuery({ queryKey:['movements',effectiveYear_c], queryFn:()=>getMovements(effectiveYear_c!==null?{year:effectiveYear_c}:undefined) })
   const { data: movementsAll = [] } = useQuery({ queryKey:['movements',null], queryFn:()=>getMovements(), enabled: isAccounts && def.xAxis!=='none' })
   const typeToGroup  = useMemo(()=>Object.fromEntries(types.map(t=>[t.id,t.income_expense_group_id])),[types])
   const groupById    = useMemo(()=>Object.fromEntries(groups.map(g=>[g.id,g])),[groups])
@@ -830,10 +832,12 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
     if (isAccounts) return []
     const f = applyAdvancedFilter(movements, def.filter, typeToGroup)
     const signed = def.sign==='all' ? f : f.filter(mv=>def.sign==='expense'?mv.dinero<0:mv.dinero>0)
+    if (def.period === 'current_month')
+      return signed.filter(mv => mv.date.startsWith(`${CUR_YEAR}-${CUR_MONTH}`))
     if (def.xAxis==='none' && def.noneAxisPeriod==='month')
       return signed.filter(mv => mv.date.slice(5,7) === CUR_MONTH)
     return signed
-  }, [isAccounts, movements, def.filter, def.sign, typeToGroup, def.xAxis, def.noneAxisPeriod])
+  }, [isAccounts, movements, def.filter, def.sign, typeToGroup, def.xAxis, def.noneAxisPeriod, def.period])
 
   const { data: rawChartData, series } = useMemo(
     ()=>isAccounts ? { data:[], series:[] } : computeChartData(def, baseFiltered, typeToGroup, groupById, typeById, accountById),
@@ -980,14 +984,21 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
         <div className="flex items-center gap-0.5 shrink-0">
           {def.xAxis!=='year' && (
             <div className="relative">
-              <button onClick={()=>setShowYearPicker(v=>!v)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${showYearPicker||def.year!==CUR_YEAR?'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200':'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600'}`}>
-                {def.year??'Todos'} <ChevronDown className="w-3 h-3"/>
+              <button onClick={()=>setShowYearPicker(v=>!v)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${showYearPicker||def.period||def.year!==CUR_YEAR?'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200':'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600'}`}>
+                {def.period==='current_year'?'Año actual':def.period==='current_month'?'Mes actual':(def.year??'Todos')} <ChevronDown className="w-3 h-3"/>
               </button>
               {showYearPicker && (
-                <div className="absolute right-0 top-8 z-20 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-0.5 min-w-[80px]">
+                <div className="absolute right-0 top-8 z-20 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-0.5 min-w-[90px]">
+                  {([['current_year','Año actual'],['current_month','Mes actual']] as const).map(([p,label])=>(
+                    <button key={p} onClick={()=>{ upd({ period:p, year:CUR_YEAR }); setShowYearPicker(false) }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-colors ${def.period===p?'bg-gray-800 dark:bg-white text-white dark:text-gray-900':'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+                      {label}
+                    </button>
+                  ))}
+                  <div className="h-px bg-gray-100 dark:bg-gray-700 my-0.5"/>
                   {[null,...allYears].map(y=>(
-                    <button key={y??'all'} onClick={()=>{ upd({ year:y }); setShowYearPicker(false) }}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-colors ${def.year===y?'bg-gray-800 dark:bg-white text-white dark:text-gray-900':'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+                    <button key={y??'all'} onClick={()=>{ upd({ year:y, period:undefined }); setShowYearPicker(false) }}
+                      className={`px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-colors ${!def.period&&def.year===y?'bg-gray-800 dark:bg-white text-white dark:text-gray-900':'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
                       {y??'Todos'}
                     </button>
                   ))}
@@ -1083,7 +1094,8 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
   const upd = useCallback((patch: Partial<CustomChartDef>) => onUpdate({ ...def, ...patch }), [def, onUpdate])
 
   const isAccounts = (def.dataSource ?? 'movements') === 'accounts'
-  const { data: movements = [] } = useQuery({ queryKey:['movements',def.year], queryFn:()=>getMovements(def.year!==null?{year:def.year}:undefined) })
+  const effectiveYear_b = def.period ? CUR_YEAR : def.year
+  const { data: movements = [] } = useQuery({ queryKey:['movements',effectiveYear_b], queryFn:()=>getMovements(effectiveYear_b!==null?{year:effectiveYear_b}:undefined) })
   const { data: movementsAll = [] } = useQuery({ queryKey:['movements',null], queryFn:()=>getMovements(), enabled: isAccounts && def.xAxis!=='none' })
   const typeToGroup = useMemo(()=>Object.fromEntries(types.map(t=>[t.id,t.income_expense_group_id])),[types])
   const groupById   = useMemo(()=>Object.fromEntries(groups.map(g=>[g.id,g])),[groups])
@@ -1094,10 +1106,12 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
     if (isAccounts) return []
     const f = applyAdvancedFilter(movements, def.filter, typeToGroup)
     const signed = def.sign==='all' ? f : f.filter(mv=>def.sign==='expense'?mv.dinero<0:mv.dinero>0)
+    if (def.period === 'current_month')
+      return signed.filter(mv => mv.date.startsWith(`${CUR_YEAR}-${CUR_MONTH}`))
     if (def.xAxis==='none' && def.noneAxisPeriod==='month')
       return signed.filter(mv => mv.date.slice(5,7) === CUR_MONTH)
     return signed
-  }, [isAccounts, movements, def.filter, def.sign, typeToGroup, def.xAxis, def.noneAxisPeriod])
+  }, [isAccounts, movements, def.filter, def.sign, typeToGroup, def.xAxis, def.noneAxisPeriod, def.period])
 
   const { data: rawChartData, series } = useMemo(
     ()=>isAccounts ? { data:[], series:[] } : computeChartData(def, baseFiltered, typeToGroup, groupById, typeById, accountById),
@@ -1341,11 +1355,14 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
             <div className="space-y-1.5">
               <span className={labelCls}>Periodo</span>
               <div className="flex flex-wrap gap-1">
+                {([['current_year','Año actual'],['current_month','Mes actual']] as const).map(([p,label])=>(
+                  <button key={p} onClick={()=>upd({ period:p, year:CUR_YEAR })} className={`px-2.5 py-0.5 rounded-lg text-[11px] font-medium border transition-colors ${def.period===p?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{label}</button>
+                ))}
                 {[null,...allYears].map(y=>(
-                  <button key={y??'all'} onClick={()=>upd({ year:y })} className={`px-2.5 py-0.5 rounded-lg text-[11px] font-medium border transition-colors ${def.year===y?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{y??'Todos'}</button>
+                  <button key={y??'all'} onClick={()=>upd({ year:y, period:undefined })} className={`px-2.5 py-0.5 rounded-lg text-[11px] font-medium border transition-colors ${!def.period&&def.year===y?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{y??'Todos'}</button>
                 ))}
               </div>
-              {def.xAxis==='none' && (
+              {!def.period && def.xAxis==='none' && (
                 <div className="flex gap-1.5 pt-0.5">
                   <button onClick={()=>upd({ noneAxisPeriod:'year' })}
                     className={`flex-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${(def.noneAxisPeriod??'year')==='year'?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'}`}>
