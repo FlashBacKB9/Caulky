@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
   ResponsiveContainer, AreaChart, Area,
+  PieChart, Pie, Cell,
 } from 'recharts'
 import {
   Heart, Activity, Target, TrendingUp, Sparkles,
@@ -463,20 +464,19 @@ function PatronesDeGasto({ realExpenseMovements, fmt }: {
 
 // ── 3. Regla 50/30/20 ─────────────────────────────────────────────────────────
 
-type RuleBucket = 'necesidades' | 'deseos' | 'ahorro' | 'ingreso' | 'unassigned'
+type RuleBucket = 'necesidades' | 'deseos' | 'ahorro' | 'unassigned'
 const RULE_KEY = 'spendly-5030-assignment'
 
-const BUCKETS: { id: RuleBucket; label: string; target: number; barColor: string; textColor: string }[] = [
-  { id: 'necesidades', label: 'Necesidades', target: 50, barColor: 'bg-blue-500',   textColor: 'text-blue-600 dark:text-blue-400' },
-  { id: 'deseos',      label: 'Deseos',       target: 30, barColor: 'bg-violet-500', textColor: 'text-violet-600 dark:text-violet-400' },
-  { id: 'ahorro',      label: 'Ahorro/Inv.',  target: 20, barColor: 'bg-green-500',  textColor: 'text-green-600 dark:text-green-400' },
+const BUCKETS: { id: RuleBucket; label: string; target: number; color: string; textColor: string }[] = [
+  { id: 'necesidades', label: 'Necesidades', target: 50, color: '#3b82f6', textColor: 'text-blue-600 dark:text-blue-400' },
+  { id: 'deseos',      label: 'Deseos',       target: 30, color: '#8b5cf6', textColor: 'text-violet-600 dark:text-violet-400' },
+  { id: 'ahorro',      label: 'Ahorro/Inv.',  target: 20, color: '#22c55e', textColor: 'text-green-600 dark:text-green-400' },
 ]
 
-function Regla502030({ realExpenseMovements, groups, types, income, actualSavings, fmt }: {
+function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }: {
   realExpenseMovements: Movement[]
   groups: Group[]
   types: MovementType[]
-  income: number
   actualSavings: number
   fmt: (v: number) => string
 }) {
@@ -494,14 +494,12 @@ function Regla502030({ realExpenseMovements, groups, types, income, actualSaving
   }
 
   const byBucket = useMemo(() => {
-    // Ahorro starts with the actual savings-group outflows (auto-detected)
-    const map: Record<RuleBucket, number> = { necesidades: 0, deseos: 0, ahorro: actualSavings, ingreso: 0, unassigned: 0 }
+    const map: Record<RuleBucket, number> = { necesidades: 0, deseos: 0, ahorro: actualSavings, unassigned: 0 }
     realExpenseMovements.forEach(m => {
       if (m.movement_type_id == null) { map.unassigned += Math.abs(m.dinero); return }
       const t = types.find(t => t.id === m.movement_type_id)
       if (!t) { map.unassigned += Math.abs(m.dinero); return }
       const bucket: RuleBucket = assignment[t.income_expense_group_id] ?? 'unassigned'
-      if (bucket === 'ingreso') return
       map[bucket] += Math.abs(m.dinero)
     })
     return map
@@ -512,64 +510,77 @@ function Regla502030({ realExpenseMovements, groups, types, income, actualSaving
     return groups.filter(g => !g.is_total && usedGroupIds.has(g.id))
   }, [groups, types])
 
-  const totalAssigned = byBucket.necesidades + byBucket.deseos + byBucket.ahorro
-  const unassignedPct = income > 0 ? (byBucket.unassigned / income) * 100 : 0
+  const total = byBucket.necesidades + byBucket.deseos + byBucket.ahorro + byBucket.unassigned
+
+  const pieData = useMemo(() => {
+    const slices = [
+      ...BUCKETS.map(b => ({ name: b.label, value: byBucket[b.id], color: b.color, target: b.target, textColor: b.textColor })),
+      ...(byBucket.unassigned > 0 ? [{ name: 'Sin asignar', value: byBucket.unassigned, color: '#f59e0b', target: 0, textColor: 'text-yellow-600 dark:text-yellow-400' }] : []),
+    ]
+    return slices.filter(s => s.value > 0)
+  }, [byBucket])
+
+  if (total === 0) {
+    return <p className="text-sm text-gray-400 text-center py-8">Sin datos para el período seleccionado</p>
+  }
 
   return (
     <div className="space-y-5">
-      <p className="text-xs text-gray-500 dark:text-gray-400">
-        Base: {fmt(income)} de ingresos = 100%. El ahorro se toma automáticamente de las categorías de ahorro configuradas.
-      </p>
-      <div className="space-y-3">
-        {BUCKETS.map(bucket => {
-          const actual = byBucket[bucket.id]
-          const pct = income > 0 ? (actual / income) * 100 : 0
-          const over = pct > bucket.target
-          return (
-            <div key={bucket.id}>
-              <div className="flex items-center justify-between text-xs mb-1">
-                <span className={`font-medium ${bucket.textColor}`}>{bucket.label}</span>
-                <span className="text-gray-500 dark:text-gray-400">
-                  {fmt(actual)} · {pct.toFixed(1)}%{' '}
-                  <span className="text-gray-400 dark:text-gray-500">(obj. {bucket.target}%)</span>
-                </span>
-              </div>
-              <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                <div
-                  className={`h-full rounded-full transition-all ${bucket.barColor} ${over ? 'opacity-70' : ''}`}
-                  style={{ width: `${income > 0 ? Math.min((actual / income) * 100, 100) : 0}%` }}
-                />
-              </div>
-              {over && (
-                <p className="text-xs text-red-400 dark:text-red-500 mt-0.5">
-                  +{(pct - bucket.target).toFixed(1)}% sobre el objetivo
-                </p>
-              )}
-            </div>
-          )
-        })}
-        {byBucket.unassigned > 0 && (
-          <div>
-            <div className="flex items-center justify-between text-xs mb-1">
-              <span className="font-medium text-yellow-600 dark:text-yellow-400">Sin asignar</span>
-              <span className="text-gray-500 dark:text-gray-400">
-                {fmt(byBucket.unassigned)} · {unassignedPct.toFixed(1)}%
-                <span className="text-gray-400 dark:text-gray-500"> — asigna las categorías abajo</span>
-              </span>
-            </div>
-            <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-yellow-400 dark:bg-yellow-600"
-                style={{ width: `${Math.min(unassignedPct, 100)}%` }}
+      <div className="flex flex-col sm:flex-row gap-5 items-center">
+        <div className="shrink-0">
+          <ResponsiveContainer width={200} height={200}>
+            <PieChart>
+              <Pie
+                data={pieData}
+                cx="50%"
+                cy="50%"
+                innerRadius={55}
+                outerRadius={90}
+                dataKey="value"
+                strokeWidth={2}
+                stroke="transparent"
+              >
+                {pieData.map((entry, i) => (
+                  <Cell key={i} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                formatter={(v) => fmt(v as number)}
+                contentStyle={{ fontSize: 11 }}
               />
-            </div>
-          </div>
-        )}
-        {income > 0 && (
-          <p className="text-xs text-gray-400 dark:text-gray-500 text-right">
-            Total asignado: {income > 0 ? ((totalAssigned / income) * 100).toFixed(1) : 0}% de los ingresos
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+
+        <div className="flex-1 space-y-2 w-full">
+          {pieData.map(entry => {
+            const pct = total > 0 ? (entry.value / total) * 100 : 0
+            const over = entry.target > 0 && pct > entry.target
+            const under = entry.target > 0 && pct < entry.target
+            return (
+              <div key={entry.name} className="flex items-center gap-3 text-xs">
+                <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                <span className={`w-24 font-medium shrink-0 ${entry.textColor}`}>{entry.name}</span>
+                <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all"
+                    style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: entry.color, opacity: over ? 0.7 : 1 }}
+                  />
+                </div>
+                <span className="text-gray-600 dark:text-gray-300 w-10 text-right shrink-0">{pct.toFixed(1)}%</span>
+                <span className="text-gray-400 dark:text-gray-500 shrink-0">{fmt(entry.value)}</span>
+                {entry.target > 0 && (
+                  <span className={`shrink-0 ${over ? 'text-red-400' : under ? 'text-gray-400 dark:text-gray-500' : 'text-green-500'}`}>
+                    {over ? `+${(pct - entry.target).toFixed(0)}%` : under ? `obj. ${entry.target}%` : '✓'}
+                  </span>
+                )}
+              </div>
+            )
+          })}
+          <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
+            Total: {fmt(total)}
           </p>
-        )}
+        </div>
       </div>
 
       <div>
@@ -591,7 +602,6 @@ function Regla502030({ realExpenseMovements, groups, types, income, actualSaving
                 >
                   <option value="unassigned">Sin asignar</option>
                   {BUCKETS.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
-                  <option value="ingreso">Ingreso (excluir)</option>
                 </select>
               </div>
             ))}
@@ -942,7 +952,6 @@ export default function Analysis() {
           realExpenseMovements={realExpenseMovements}
           groups={groups}
           types={types}
-          income={income}
           actualSavings={actualSavings}
           fmt={fmt}
         />
