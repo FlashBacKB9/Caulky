@@ -443,7 +443,7 @@ function ResizableWrapper({ colSpan, height, onUpdateColSpan, onUpdateHeight, is
   onDragOver: (e: React.DragEvent) => void
   onDragLeave: (e: React.DragEvent) => void
   onDrop: () => void; onDragEnd: () => void
-  children: (chartH: number, onGripMouseDown: () => void) => React.ReactNode
+  children: (chartH: number, onGripMouseDown: () => void, resizeHandles: React.ReactNode) => React.ReactNode
 }) {
   const wrapRef    = useRef<HTMLDivElement>(null)
   const gripActive = useRef(false)
@@ -484,12 +484,8 @@ function ResizableWrapper({ colSpan, height, onUpdateColSpan, onUpdateHeight, is
     window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
   }
 
-  return (
-    <div ref={wrapRef} draggable style={rowStyle}
-      className={`relative ${colCls} ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'ring-2 ring-blue-400 rounded-2xl' : ''} transition-opacity`}
-      onDragStart={handleDragStart} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} onDragEnd={handleDragEnd}
-    >
-      {children(chartH, onGripMouseDown)}
+  const resizeHandles = (
+    <>
       {onUpdateHeight && (
         <div className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize group z-10" onMouseDown={startHeightResize}>
           <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full bg-gray-200 dark:bg-gray-700 group-hover:bg-blue-400 transition-colors" />
@@ -498,6 +494,15 @@ function ResizableWrapper({ colSpan, height, onUpdateColSpan, onUpdateHeight, is
       <div className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize group z-10" onMouseDown={startWidthResize}>
         <div className="absolute right-0.5 top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-gray-200 dark:bg-gray-700 group-hover:bg-blue-400 transition-colors" />
       </div>
+    </>
+  )
+
+  return (
+    <div ref={wrapRef} draggable style={rowStyle}
+      className={`relative ${colCls} ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'ring-2 ring-blue-400 rounded-2xl' : ''} transition-opacity`}
+      onDragStart={handleDragStart} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} onDragEnd={handleDragEnd}
+    >
+      {children(chartH, onGripMouseDown, resizeHandles)}
     </div>
   )
 }
@@ -1194,9 +1199,11 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
 
   const allChartOptions = useMemo(() => {
     const custom = readCustomCharts()
+    const hiddenBuiltins = new Set<string>(JSON.parse(localStorage.getItem('spendly-hidden-builtins') ?? '[]'))
+    const hiddenCustoms  = new Set<string>(JSON.parse(localStorage.getItem('spendly-hidden-customs') ?? '[]'))
     return [
-      ...BUILTIN_CHART_DEFS,
-      ...custom.map(c => ({ id: c.id, label: c.title, desc: 'Gráfico personalizado', Icon: BarChart2, defaultColSpan: c.colSpan ?? 2 })),
+      ...BUILTIN_CHART_DEFS.filter(c => !hiddenBuiltins.has(c.id)),
+      ...custom.filter(c => !hiddenCustoms.has(c.id)).map(c => ({ id: c.id, label: c.title, desc: 'Gráfico personalizado', Icon: BarChart2, defaultColSpan: c.colSpan ?? 2 })),
     ]
   }, [])
 
@@ -1767,11 +1774,12 @@ export default function Dashboard() {
                   onDrop={() => handleDrop(w.id)}
                   onDragEnd={() => { dragIdRef.current = null; setDragId(null); setDragOver(null) }}
                 >
-                  {(chartH, onGripMouseDown) => (
-                    <div className="relative h-full">
+                  {(chartH, onGripMouseDown, resizeHandles) => (
+                    <div className="relative">
                       {renderContent(w, chartH)}
+                      {resizeHandles}
                       <button onMouseDown={onGripMouseDown}
-                        className="absolute top-2 left-2 z-20 p-1.5 bg-white/90 dark:bg-gray-800/90 rounded-lg shadow border border-gray-200 dark:border-gray-700 cursor-grab hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                        className="absolute top-3 left-3 z-20 p-1.5 bg-white/90 dark:bg-gray-800/90 rounded-lg shadow border border-gray-200 dark:border-gray-700 cursor-grab hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
                       >
                         <GripVertical className="w-3.5 h-3.5 text-gray-400" />
                       </button>
