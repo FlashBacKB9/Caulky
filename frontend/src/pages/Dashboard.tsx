@@ -1410,7 +1410,10 @@ export default function Dashboard() {
       const saved = localStorage.getItem(DASH_LAYOUT_KEY)
       if (saved) {
         const parsed = JSON.parse(saved) as LayoutItem[]
-        const filtered = parsed.filter(item => currentIds.has(item.i))
+        // Strip any stale static/isDraggable/isResizable flags
+        const filtered = parsed
+          .filter(item => currentIds.has(item.i))
+          .map(({ i, x, y, w, h }) => ({ i, x, y, w, h }))
         if (filtered.length === config.widgets.length) return filtered
       }
     } catch {}
@@ -1418,8 +1421,10 @@ export default function Dashboard() {
   })
 
   function handleDashLayoutChange(newLayout: readonly LayoutItem[]) {
-    setDashLayout(newLayout)
-    localStorage.setItem(DASH_LAYOUT_KEY, JSON.stringify(newLayout))
+    // Only save clean positional data — never persist static/enabled flags
+    const clean = newLayout.map(({ i, x, y, w, h }) => ({ i, x, y, w, h }))
+    setDashLayout(clean)
+    localStorage.setItem(DASH_LAYOUT_KEY, JSON.stringify(clean))
     const customIds = new Set(readCustomCharts().map(c => c.id))
     save({
       widgets: config.widgets.map(w => {
@@ -1725,10 +1730,10 @@ export default function Dashboard() {
           <GridLayout
             width={dashGridWidth}
             gridConfig={{ cols: 4, rowHeight: DASH_ROW_H, margin: [16, 16], containerPadding: [0, 0] }}
-            dragConfig={{ handle: '.dash-grip' }}
-            resizeConfig={{ handles: ['s', 'e'] }}
+            dragConfig={{ enabled: editMode, handle: '.dash-grip' }}
+            resizeConfig={{ enabled: editMode, handles: ['s', 'e'] }}
             compactor={verticalCompactor}
-            layout={editMode ? dashLayout : dashLayout.map(l => ({ ...l, static: true }))}
+            layout={dashLayout}
             onLayoutChange={handleDashLayoutChange}
           >
             {config.widgets.map(w => {
