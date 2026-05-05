@@ -149,12 +149,20 @@ function CalendarView({ movements, types, selectedYear }: {
   const { fmt } = useCurrency()
   const fmtCal = (v: number) => (v >= 0 ? '+' : '') + fmt(v)
   const today = new Date()
-  const [calYear, setCalYear] = useState(selectedYear ?? today.getFullYear())
-  const [calMonth, setCalMonth] = useState(selectedYear != null ? 0 : today.getMonth())
+  const curYear = today.getFullYear()
+  const curMonth = today.getMonth()
+  const [calYear, setCalYear] = useState(selectedYear ?? curYear)
+  const [calMonth, setCalMonth] = useState(
+    selectedYear != null && selectedYear !== curYear ? 0 : curMonth
+  )
+  const [formDate, setFormDate] = useState<string | null>(null)
 
   useEffect(() => {
-    if (selectedYear != null) { setCalYear(selectedYear); setCalMonth(0) }
-  }, [selectedYear])
+    if (selectedYear != null) {
+      setCalYear(selectedYear)
+      setCalMonth(selectedYear !== curYear ? 0 : curMonth)
+    }
+  }, [selectedYear, curYear, curMonth])
   const [dateField, setDateField] = useState<'date' | 'bank_date'>('date')
   const [expandedDays, setExpandedDays] = useState<Set<string>>(new Set())
 
@@ -225,6 +233,7 @@ function CalendarView({ movements, types, selectedYear }: {
   return (
     <>
       {selectedMv && <MovementDetailModal movement={selectedMv} types={types} onClose={() => setSelectedMv(null)} />}
+      {formDate && <MovementForm initialDate={formDate} onClose={() => setFormDate(null)} />}
       {ctxMenu && (
         <MovementContextMenu
           menu={ctxMenu}
@@ -271,10 +280,11 @@ function CalendarView({ movements, types, selectedYear }: {
                   if (draggingId !== null) moveDateMut.mutate({ id: draggingId, date: cell.dateStr })
                   setDraggingId(null); setDragOverDate(null)
                 }}
+                onDoubleClick={() => cell.current && setFormDate(cell.dateStr)}
                 className={`min-h-[110px] border-r border-b border-gray-100 dark:border-gray-800 p-1.5 transition-colors ${
                   isDropTarget ? 'bg-blue-50 dark:bg-blue-950/40 ring-1 ring-inset ring-blue-300 dark:ring-blue-700' :
                   isToday ? 'bg-blue-50/60 dark:bg-blue-950/20' :
-                  !cell.current ? 'bg-gray-50/50 dark:bg-gray-800/30' : ''
+                  !cell.current ? 'bg-gray-50/50 dark:bg-gray-800/30' : 'cursor-pointer'
                 }`}>
                 <div className={`text-xs font-medium text-right mb-1 ${
                   isToday ? 'text-blue-600 dark:text-blue-400 font-bold'

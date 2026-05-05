@@ -15,7 +15,7 @@ import {
   type MovementTemplate, type RecurrenceRule, type TemplateRecurrence,
 } from '../utils/recurringTemplates'
 
-interface Props { onClose: () => void }
+interface Props { onClose: () => void; initialDate?: string }
 
 // ── Shared constants ───────────────────────────────────────────────────────────
 
@@ -161,7 +161,7 @@ function RuleEditor({ rule, onChange }: { rule: RecurrenceRule; onChange: (r: Re
 
 type PanelMode = 'form' | 'template' | 'recurrence' | 'multibulk'
 
-export default function MovementForm({ onClose }: Props) {
+export default function MovementForm({ onClose, initialDate }: Props) {
   const qc = useQueryClient()
   const today = new Date().toLocaleDateString('en-CA')
   const { sharedEnabled } = useSharedMovements()
@@ -170,8 +170,9 @@ export default function MovementForm({ onClose }: Props) {
   const [dragging, setDragging] = useState(false)
 
   // ── Main form ────────────────────────────────────────────────────────────────
+  const startDate = initialDate ?? today
   const [form, setForm] = useState({
-    name: '', money: '', date: today, bank_date: '',
+    name: '', money: '', date: startDate, bank_date: startDate,
     movement_type_id: '', paid: true, no_count: false, notes: '',
     is_shared: false, shared_between: '2', my_share: '',
   })
