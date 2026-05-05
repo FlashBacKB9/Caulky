@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, Link } from 'react-router-dom'
 import { getAccountsSummary, createAccount, updateAccountFull, deleteAccount, type Account } from '../api/accounts'
 import { getGroups, createGroup, updateGroup, deleteGroup, type Group } from '../api/groups'
 import {
@@ -755,11 +755,11 @@ function NavSection({ entries, onChange }: { entries: NavEntry[]; onChange: (e: 
               </button>
             </div>
             <Icon className="w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0" strokeWidth={1.5} />
-            <span className={`flex-1 text-sm transition-colors ${
+            <Link to={entry.id} className={`flex-1 text-sm transition-colors hover:underline underline-offset-2 ${
               entry.visible ? 'text-gray-700 dark:text-gray-200' : 'text-gray-300 dark:text-gray-600'
             }`}>
               {meta.label}
-            </span>
+            </Link>
             <button
               onClick={() => toggle(entry.id)}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none shrink-0 ${

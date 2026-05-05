@@ -10,6 +10,14 @@
     <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <script>
+      // Apply zoom before React renders so grid layout measures correct widths
+      ;(function(){
+        var s = localStorage.getItem('ui-zoom-v2')
+        var z = s ? Math.max(70, Math.min(130, parseInt(s, 10))) : 100
+        document.documentElement.style.zoom = (z * 1.2) + '%'
+      })()
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

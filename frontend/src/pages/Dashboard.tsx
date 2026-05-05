@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { GridLayout, useContainerWidth, verticalCompactor, type LayoutItem } from 'react-grid-layout'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { GridLayout, verticalCompactor, type LayoutItem } from 'react-grid-layout'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { getDashboard, getAnnualStats } from '../api/stats'
@@ -36,7 +36,7 @@ const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct
 const EXCLUDE_GROUPS  = new Set(['Ingreso','Total','Ahorro','Gastos Anuales','Inversión'])
 const BALANCE_EXCLUDE = new Set(['Total','Ahorro','Gastos Anuales','Inversión'])
 const GRID_CLR = '#e5e7eb'
-const DASH_ROW_H = 150
+const DASH_ROW_H = 120
 const DASH_HEADER_H = 60
 const DASH_LAYOUT_KEY = 'spendly-dashboard-layout-v1'
 
@@ -1134,6 +1134,34 @@ function MonthPicker({ year, month, onChange, onClose }: {
 
 type AddMode = 'chart' | 'stat' | 'budget'
 
+function ModalItem({ iconBg, iconColor, Icon, label, desc, onClick }: {
+  iconBg: string; iconColor: string; Icon: LucideIcon
+  label: string; desc?: string; onClick: () => void
+}) {
+  return (
+    <button onClick={onClick}
+      className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left w-full"
+    >
+      <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: iconBg }}>
+        <Icon className="w-4 h-4 shrink-0" style={{ color: iconColor }} strokeWidth={1.5} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium text-gray-800 dark:text-white leading-snug">{label}</p>
+        {desc && <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 leading-snug">{desc}</p>}
+      </div>
+      <Plus className="w-3.5 h-3.5 text-gray-300 shrink-0" />
+    </button>
+  )
+}
+
+function ModalSection({ label, first }: { label: string; first?: boolean }) {
+  return (
+    <p className={`text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-1 pb-1 ${first ? 'pt-1' : 'pt-3 border-t border-gray-100 dark:border-gray-800 mt-2'}`}>
+      {label}
+    </p>
+  )
+}
+
 function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, onClose }: {
   mode: AddMode; existingIds: Set<string>; budgets: StoredBudget[]
   types: MovementType[]; accounts: Account[]
@@ -1163,43 +1191,35 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30 dark:bg-black/50 backdrop-blur-sm" onClick={onClose} />
-      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 w-full max-w-sm max-h-[85vh] flex flex-col overflow-hidden">
+      <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
           <h2 className="text-sm font-semibold text-gray-800 dark:text-white">{title}</h2>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="overflow-y-auto flex-1 min-h-0 p-3 space-y-1">
+        <div className="overflow-y-auto flex-1 min-h-0 p-4">
 
           {/* Chart options */}
           {mode === 'chart' && (
             <>
               <button onClick={() => { onClose(); navigate('/charts') }}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-left">
-                <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-left mb-3">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
                   <Plus className="w-4 h-4 text-blue-500" />
                 </div>
                 <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Crear nuevo gráfico</span>
               </button>
               {availChartOptions.length === 0 ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500 px-4 py-3 border-t border-gray-100 dark:border-gray-800 mt-1 pt-3">Todos los gráficos ya están en el dashboard</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 px-1 py-2">Todos los gráficos ya están en el dashboard</p>
               ) : (
-                <div className="border-t border-gray-100 dark:border-gray-800 pt-1 mt-1">
+                <div className="grid grid-cols-2 gap-1">
                   {availChartOptions.map(o => (
-                    <button key={o.id}
+                    <ModalItem key={o.id}
+                      iconBg="#3b82f620" iconColor="#3b82f6" Icon={o.Icon}
+                      label={o.label} desc={o.desc}
                       onClick={() => { onAdd({ id: o.id, colSpan: o.defaultColSpan }); onClose() }}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
-                    >
-                      <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
-                        <o.Icon className="w-4 h-4 text-blue-500" strokeWidth={1.5} />
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-gray-800 dark:text-white">{o.label}</p>
-                        <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{o.desc}</p>
-                      </div>
-                      <Plus className="w-4 h-4 text-gray-300 shrink-0" />
-                    </button>
+                    />
                   ))}
                 </div>
               )}
@@ -1209,87 +1229,63 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
           {/* Stat options */}
           {mode === 'stat' && (
             availMetrics.length === 0 && availAccounts.length === 0 && availSpecial.length === 0 && availBalanceHist.length === 0 ? (
-              <p className="text-sm text-gray-400 dark:text-gray-500 px-4 py-3">Todos los paneles de estadística ya están en el dashboard</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 px-1 py-2">Todos los paneles de estadística ya están en el dashboard</p>
             ) : (
               <>
                 {availMetrics.length > 0 && (
                   <>
-                    <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-4 pt-2 pb-1">Métricas</p>
-                    {availMetrics.map(o => (
-                      <button key={o.id}
-                        onClick={() => { onAdd({ id: o.id, colSpan: 1 }); onClose() }}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
-                      >
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: o.color + '20' }}>
-                          <o.Icon className="w-4 h-4" style={{ color: o.color }} strokeWidth={1.5} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-800 dark:text-white">{o.label}</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{o.desc}</p>
-                        </div>
-                        <Plus className="w-4 h-4 text-gray-300 shrink-0" />
-                      </button>
-                    ))}
+                    <ModalSection label="Métricas" first />
+                    <div className="grid grid-cols-2 gap-1">
+                      {availMetrics.map(o => (
+                        <ModalItem key={o.id}
+                          iconBg={o.color + '20'} iconColor={o.color} Icon={o.Icon}
+                          label={o.label} desc={o.desc}
+                          onClick={() => { onAdd({ id: o.id, colSpan: 1 }); onClose() }}
+                        />
+                      ))}
+                    </div>
                   </>
                 )}
                 {availAccounts.length > 0 && (
                   <>
-                    <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-4 pt-3 pb-1 border-t border-gray-100 dark:border-gray-800 mt-1">Cuentas</p>
-                    {availAccounts.map(a => (
-                      <button key={a.id}
-                        onClick={() => { onAdd({ id: `stat-account-${a.id}`, colSpan: 1 }); onClose() }}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
-                      >
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: a.color + '20' }}>
-                          <CreditCard className="w-4 h-4" style={{ color: a.color }} strokeWidth={1.5} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-800 dark:text-white">{a.name}</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Saldo de la cuenta</p>
-                        </div>
-                        <Plus className="w-4 h-4 text-gray-300 shrink-0" />
-                      </button>
-                    ))}
+                    <ModalSection label="Cuentas" first={availMetrics.length === 0} />
+                    <div className="grid grid-cols-2 gap-1">
+                      {availAccounts.map(a => (
+                        <ModalItem key={a.id}
+                          iconBg={a.color + '20'} iconColor={a.color} Icon={CreditCard}
+                          label={a.name} desc="Saldo de la cuenta"
+                          onClick={() => { onAdd({ id: `stat-account-${a.id}`, colSpan: 1 }); onClose() }}
+                        />
+                      ))}
+                    </div>
                   </>
                 )}
                 {availSpecial.length > 0 && (
                   <>
-                    <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-4 pt-3 pb-1 border-t border-gray-100 dark:border-gray-800 mt-1">Paneles especiales</p>
-                    {availSpecial.map(o => (
-                      <button key={o.id}
-                        onClick={() => { onAdd({ id: o.id, colSpan: 1 }); onClose() }}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
-                      >
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: o.color + '20' }}>
-                          <o.Icon className="w-4 h-4" style={{ color: o.color }} strokeWidth={1.5} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-800 dark:text-white">{o.label}</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{o.desc}</p>
-                        </div>
-                        <Plus className="w-4 h-4 text-gray-300 shrink-0" />
-                      </button>
-                    ))}
+                    <ModalSection label="Paneles especiales" first={availMetrics.length === 0 && availAccounts.length === 0} />
+                    <div className="grid grid-cols-2 gap-1">
+                      {availSpecial.map(o => (
+                        <ModalItem key={o.id}
+                          iconBg={o.color + '20'} iconColor={o.color} Icon={o.Icon}
+                          label={o.label} desc={o.desc}
+                          onClick={() => { onAdd({ id: o.id, colSpan: 1 }); onClose() }}
+                        />
+                      ))}
+                    </div>
                   </>
                 )}
                 {availBalanceHist.length > 0 && (
                   <>
-                    <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest px-4 pt-3 pb-1 border-t border-gray-100 dark:border-gray-800 mt-1">Histórico</p>
-                    {availBalanceHist.map(o => (
-                      <button key={o.id}
-                        onClick={() => { onAdd({ id: o.id, colSpan: o.defaultColSpan }); onClose() }}
-                        className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
-                      >
-                        <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: o.color + '20' }}>
-                          <o.Icon className="w-4 h-4" style={{ color: o.color }} strokeWidth={1.5} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-800 dark:text-white">{o.label}</p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{o.desc}</p>
-                        </div>
-                        <Plus className="w-4 h-4 text-gray-300 shrink-0" />
-                      </button>
-                    ))}
+                    <ModalSection label="Histórico" first={availMetrics.length === 0 && availAccounts.length === 0 && availSpecial.length === 0} />
+                    <div className="grid grid-cols-2 gap-1">
+                      {availBalanceHist.map(o => (
+                        <ModalItem key={o.id}
+                          iconBg={o.color + '20'} iconColor={o.color} Icon={o.Icon}
+                          label={o.label} desc={o.desc}
+                          onClick={() => { onAdd({ id: o.id, colSpan: o.defaultColSpan }); onClose() }}
+                        />
+                      ))}
+                    </div>
                   </>
                 )}
               </>
@@ -1299,47 +1295,34 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
           {/* Budget list */}
           {mode === 'budget' && !showNewBudget && (
             <>
-              {/* Always-visible create button at top */}
               <button onClick={() => setShowNewBudget(true)}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-left"
+                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors text-left mb-3"
               >
-                <div className="w-9 h-9 rounded-xl bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
                   <Plus className="w-4 h-4 text-blue-500" />
                 </div>
                 <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Crear nuevo presupuesto</span>
               </button>
-              {/* Combined all-budgets card */}
               {budgets.length > 0 && !existingIds.has('budget-all') && (
-                <button
+                <ModalItem
+                  iconBg="#10b98120" iconColor="#10b981" Icon={BarChart2}
+                  label="Todos los presupuestos" desc="Tarjeta combinada con todos en una"
                   onClick={() => { onAdd({ id: 'budget-all', colSpan: 4 }); onClose() }}
-                  className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left border-t border-gray-100 dark:border-gray-800 mt-1 pt-2"
-                >
-                  <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-                    <BarChart2 className="w-4 h-4 text-emerald-500" strokeWidth={1.5} />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-800 dark:text-white">Todos los presupuestos</p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Tarjeta combinada con todos en una</p>
-                  </div>
-                  <Plus className="w-4 h-4 text-gray-300 shrink-0" />
-                </button>
+                />
               )}
-
               {availBudgets.length > 0 && (
-                <div className="border-t border-gray-100 dark:border-gray-800 pt-1 mt-1">
-                  {availBudgets.map(b => (
-                    <button key={b.id}
-                      onClick={() => { onAdd({ id: b.id, colSpan: 2 }); onClose() }}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
-                    >
-                      <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-                        <ChartCandlestick className="w-4 h-4 text-emerald-500" strokeWidth={1.5} />
-                      </div>
-                      <span className="flex-1 text-sm font-medium text-gray-800 dark:text-white">{b.name}</span>
-                      <Plus className="w-4 h-4 text-gray-300 shrink-0" />
-                    </button>
-                  ))}
-                </div>
+                <>
+                  <ModalSection label="Presupuestos" first={!budgets.length || existingIds.has('budget-all')} />
+                  <div className="grid grid-cols-2 gap-1">
+                    {availBudgets.map(b => (
+                      <ModalItem key={b.id}
+                        iconBg="#10b98120" iconColor="#10b981" Icon={ChartCandlestick}
+                        label={b.name}
+                        onClick={() => { onAdd({ id: b.id, colSpan: 2 }); onClose() }}
+                      />
+                    ))}
+                  </div>
+                </>
               )}
             </>
           )}
@@ -1361,6 +1344,41 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
       </div>
     </div>
   )
+}
+
+// ── Dashboard grid width ──────────────────────────────────────────────────────
+// <main> is part of Layout and is always mounted — its clientWidth is correct
+// even on page reload (unlike measuring the dashboard's own container, which
+// is inside <main> and has zero dimensions during the same commit phase).
+// useLayoutEffect fires before paint, so the grid gets the right width on
+// first render with no visible blank frame.
+
+function useDashWidth() {
+  const ref = useRef<HTMLDivElement>(null)
+  const [width, setWidth] = useState(0)
+
+  useLayoutEffect(() => {
+    const main = document.querySelector<HTMLElement>('main')
+    if (!main) return
+
+    const measure = () => {
+      const mainW = main.clientWidth
+      if (mainW <= 0) return
+      const parent = ref.current?.parentElement
+      const style = parent ? getComputedStyle(parent) : null
+      const pad = style
+        ? parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
+        : 0
+      setWidth(Math.max(100, mainW - pad))
+    }
+
+    measure()
+    const ro = new ResizeObserver(measure)
+    ro.observe(main)
+    return () => ro.disconnect()
+  }, [])
+
+  return { ref, width }
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
@@ -1401,7 +1419,11 @@ export default function Dashboard() {
     enabled: needsChartsData || hasBalanceHistory || (editMode && addMode === 'budget'),
   })
 
-  const { width: dashGridWidth, containerRef: dashContainerRef } = useContainerWidth()
+  const { width: dashGridWidth, ref: dashContainerRef } = useDashWidth()
+
+  // On narrow screens use 2 columns so widgets aren't squished to ~80px
+  const gridCols   = dashGridWidth > 0 && dashGridWidth < 640 ? 2 : 4
+  const isMobile   = gridCols === 2
 
   const [dashLayout, setDashLayout] = useState<readonly LayoutItem[]>(() => {
     const customIds = new Set(readCustomCharts().map(c => c.id))
@@ -1434,7 +1456,21 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.widgets])
 
+  // On mobile reflow the 4-col layout into 2 cols without modifying saved state
+  const displayLayout = useMemo(() => {
+    if (!isMobile) return dashLayout
+    let x = 0, y = 0, rowH = 0
+    return dashLayout.map(item => {
+      const w = Math.min(item.w, 2)
+      if (x + w > 2) { x = 0; y += rowH; rowH = 0 }
+      const mapped = { ...item, x, y, w }
+      x += w; rowH = Math.max(rowH, item.h)
+      return mapped
+    })
+  }, [dashLayout, isMobile])
+
   function handleDashLayoutChange(newLayout: readonly LayoutItem[]) {
+    if (isMobile) return  // mobile layout is derived; don't overwrite desktop state
     // Only save clean positional data — never persist static/enabled flags
     const clean = newLayout.map(({ i, x, y, w, h }) => ({ i, x, y, w, h }))
     setDashLayout(clean)
@@ -1744,16 +1780,17 @@ export default function Dashboard() {
         </p>
       )}
 
-      {/* Widget grid */}
+      {/* Widget grid — ref div always rendered so useDashWidth measures correct width */}
+      <div ref={dashContainerRef}>
       {config.widgets.length > 0 ? (
-        <div ref={dashContainerRef}>
+        dashGridWidth > 0 ? (
           <GridLayout
             width={dashGridWidth}
-            gridConfig={{ cols: 4, rowHeight: DASH_ROW_H, margin: [16, 16], containerPadding: [0, 0] }}
-            dragConfig={{ enabled: editMode, handle: '.dash-grip' }}
-            resizeConfig={{ enabled: editMode, handles: ['s', 'e'] }}
+            gridConfig={{ cols: gridCols, rowHeight: DASH_ROW_H, margin: [16, 16], containerPadding: [0, 0] }}
+            dragConfig={{ enabled: editMode && !isMobile, handle: '.dash-grip' }}
+            resizeConfig={{ enabled: editMode && !isMobile, handles: ['s', 'e'] }}
             compactor={verticalCompactor}
-            layout={dashLayout}
+            layout={displayLayout}
             onLayoutChange={handleDashLayoutChange}
           >
             {config.widgets.map(w => {
@@ -1794,7 +1831,7 @@ export default function Dashboard() {
               )
             })}
           </GridLayout>
-        </div>
+        ) : null
       ) : (
         !editMode && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
@@ -1803,6 +1840,7 @@ export default function Dashboard() {
           </div>
         )
       )}
+      </div>
 
       {/* Backend budget groups (only in view mode) */}
       {!editMode && data.budget_groups.length > 0 && (
