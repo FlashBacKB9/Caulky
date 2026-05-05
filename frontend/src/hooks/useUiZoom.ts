@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useLayoutEffect, useState } from 'react'
 
 const ZOOM_KEY  = 'ui-zoom-v2'   // v2: 100 display → 120% actual
 const ZOOM_MIN  = 70
@@ -12,7 +12,7 @@ export function useUiZoom() {
     return s ? Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, parseInt(s, 10))) : 100
   })
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const actual = zoom * ZOOM_SCALE
     document.documentElement.style.zoom = actual + '%'
     document.documentElement.style.minHeight = actual < 100 ? `${(100 * 100 / actual).toFixed(2)}%` : ''
