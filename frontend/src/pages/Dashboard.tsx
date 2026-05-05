@@ -1368,26 +1368,31 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
 // (always > 0, so the grid renders immediately). A ResizeObserver then corrects
 // the exact value once the flex layout is computed.
 
+function getZoomFactor() {
+  const s = localStorage.getItem('ui-zoom-v2')
+  const display = s ? Math.max(70, Math.min(130, parseInt(s, 10))) : 100
+  return display * 1.2 / 100
+}
+
 function useDashWidth() {
   const ref = useRef<HTMLDivElement>(null)
-  // document.documentElement.clientWidth is the layout-viewport width in CSS px,
-  // already adjusted for CSS zoom in modern Chrome — always > 0 from the start.
   const [width, setWidth] = useState(() =>
-    Math.max(200, document.documentElement.clientWidth - 224 - 48)
+    // clientWidth / zoomFactor gives the CSS layout width.
+    // Dividing is always safe: underestimate → ResizeObserver corrects up.
+    // Overestimate → scroll overflow → feedback loop that never corrects.
+    Math.max(200, Math.floor(document.documentElement.clientWidth / getZoomFactor()) - 224 - 48)
   )
 
   useEffect(() => {
     const measure = () => {
-      // Prefer the actual element width; fall back to document viewport
       const el = ref.current
       const w = el && el.offsetWidth > 0
         ? el.offsetWidth
-        : Math.max(200, document.documentElement.clientWidth - 224 - 48)
+        : Math.max(200, Math.floor(document.documentElement.clientWidth / getZoomFactor()) - 224 - 48)
       setWidth(w)
     }
 
     window.addEventListener('resize', measure)
-
     const ro = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect.width
       if (w != null && w > 0) setWidth(w)
