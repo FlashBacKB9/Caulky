@@ -41,14 +41,27 @@ function filterMovements(movements: Movement[], start: string, end: string) {
   return movements.filter(m => !m.no_count && m.date >= start && m.date <= end)
 }
 
-function sumIncome(movements: Movement[]) {
-  return movements.filter(m => m.dinero > 0).reduce((s, m) => s + m.dinero, 0)
+// Exclude savings-group movements from BOTH income and expenses.
+// This prevents savings account credits (e.g. transfer received from savings)
+// from inflating income, and savings debits from inflating expenses.
+function isSavingsMovement(
+  m: Movement,
+  typeGroupMap: Map<number, number>,
+  savingsGroupIdSet: Set<number>,
+): boolean {
+  if (!m.movement_type_id || savingsGroupIdSet.size === 0) return false
+  const gid = typeGroupMap.get(m.movement_type_id)
+  return gid != null && savingsGroupIdSet.has(gid)
 }
 
-function monthsInRange(start: string, end: string): number {
-  const s = new Date(start)
-  const e = new Date(end)
-  return Math.max(1, (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1)
+function sumRealIncome(
+  movements: Movement[],
+  typeGroupMap: Map<number, number>,
+  savingsGroupIdSet: Set<number>,
+): number {
+  return movements
+    .filter(m => m.dinero > 0 && !isSavingsMovement(m, typeGroupMap, savingsGroupIdSet))
+    .reduce((s, m) => s + m.dinero, 0)
 }
 
 function buildRealExpenseMovements(
@@ -56,12 +69,15 @@ function buildRealExpenseMovements(
   typeGroupMap: Map<number, number>,
   savingsGroupIdSet: Set<number>,
 ): Movement[] {
-  return movements.filter(m => {
-    if (m.dinero >= 0) return false
-    if (!m.movement_type_id) return true
-    const gid = typeGroupMap.get(m.movement_type_id)
-    return gid == null || !savingsGroupIdSet.has(gid)
-  })
+  return movements.filter(m =>
+    m.dinero < 0 && !isSavingsMovement(m, typeGroupMap, savingsGroupIdSet)
+  )
+}
+
+function monthsInRange(start: string, end: string): number {
+  const s = new Date(start)
+  const e = new Date(end)
+  return Math.max(1, (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1)
 }
 
 const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -199,8 +215,9 @@ function ConfigPanel({ config, onChange, accounts, groups, types, fmt }: {
 
 // ── 1. Salud Financiera ────────────────────────────────────────────────────────
 
-function SaludFinanciera({ realExpenseMovements, income, realExpenses, savings, savingsRate, emergencyBalance, avgMonthlyExpenses, months, fmt }: {
+function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, realExpenses, savings, savingsRate, emergencyBalance, avgMonthlyExpenses, months, fmt }: {
   realExpenseMovements: Movement[]
+  incomeMovementsCount: number
   income: number
   realExpenses: number
   savings: number
@@ -308,6 +325,10 @@ function SaludFinanciera({ realExpenseMovements, income, realExpenses, savings, 
       <div className="bg-blue-50 dark:bg-blue-950 rounded-xl px-4 py-3 text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
         {summary}
       </div>
+      <p className="text-xs text-gray-400 dark:text-gray-500 text-right">
+        {incomeMovementsCount} movimiento{incomeMovementsCount !== 1 ? 's' : ''} de ingreso ·{' '}
+        {realExpenseMovements.length} de gasto real usados en el cálculo
+      </p>
     </div>
   )
 }
@@ -576,7 +597,7 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, fmt }: {
     [movements, typeGroupMap, savingsGroupIdSet]
   )
 
-  const income   = sumIncome(movements)
+  const income   = sumRealIncome(movements, typeGroupMap, savingsGroupIdSet)
   const realExpenses = realExpenseMovements.reduce((s, m) => s + Math.abs(m.dinero), 0)
   const savings  = income - realExpenses
   const savingsRate = income > 0 ? (savings / income) * 100 : 0
@@ -711,7 +732,10 @@ export default function Analysis() {
     [movements, typeGroupMap, savingsGroupIdSet]
   )
 
-  const income       = useMemo(() => sumIncome(movements), [movements])
+  const income       = useMemo(
+    () => sumRealIncome(movements, typeGroupMap, savingsGroupIdSet),
+    [movements, typeGroupMap, savingsGroupIdSet]
+  )
   const realExpenses = useMemo(
     () => realExpenseMovements.reduce((s, m) => s + Math.abs(m.dinero), 0),
     [realExpenseMovements]
@@ -726,6 +750,10 @@ export default function Analysis() {
     return accountsSummary?.accounts.find(a => a.id === analysisConfig.emergencyAccountId)?.balance ?? 0
   }, [analysisConfig.emergencyAccountId, accountsSummary, totalBalance])
 
+  const incomeMovementsCount = useMemo(
+    () => movements.filter(m => m.dinero > 0 && !isSavingsMovement(m, typeGroupMap, savingsGroupIdSet)).length,
+    [movements, typeGroupMap, savingsGroupIdSet]
+  )
   const avgMonthlyExpenses = realExpenses / months
   const monthlySavings     = savings / months
 
@@ -757,6 +785,7 @@ export default function Analysis() {
       <SectionCard title="Salud Financiera" icon={Heart}>
         <SaludFinanciera
           realExpenseMovements={realExpenseMovements}
+          incomeMovementsCount={incomeMovementsCount}
           income={income}
           realExpenses={realExpenses}
           savings={savings}
