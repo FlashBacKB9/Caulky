@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
+import { GridLayout, useContainerWidth, verticalCompactor, type LayoutItem } from 'react-grid-layout'
+import 'react-grid-layout/css/styles.css'
+import 'react-resizable/css/styles.css'
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   AreaChart, Area, CartesianGrid, PieChart, Pie, Cell, Legend,
@@ -18,6 +21,8 @@ import {
 } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
+
+const ROW_H = 150
 
 const MONTHS   = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const GRID     = '#e5e7eb'
@@ -637,10 +642,10 @@ function SubtypesByGroupChart({ filtered, typeToGroup, groupById, typeById, mode
 
 // ── ChartWithFilter (built-in charts) ─────────────────────────────────────────
 
-function ChartWithFilter({ title, groups, types, allYears, modes, onDelete, onGripMouseDown,
+function ChartWithFilter({ title, groups, types, allYears, modes, onDelete,
   render: Render }: {
   title: string; groups: Group[]; types: MovementType[]; allYears: number[]
-  modes?: ModeOption[]; onDelete?: () => void; onGripMouseDown?: () => void
+  modes?: ModeOption[]; onDelete?: () => void
   render: (props: ChartProps) => React.ReactNode
 }) {
   const [showFilters,       setShowFilters]       = useState(false)
@@ -662,7 +667,7 @@ function ChartWithFilter({ title, groups, types, allYears, modes, onDelete, onGr
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
       <div className="flex items-center justify-between px-5 pt-4 pb-1 gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          {onGripMouseDown && <GripVertical onMouseDown={onGripMouseDown} className="w-3.5 h-3.5 text-gray-200 dark:text-gray-700 shrink-0 cursor-grab" strokeWidth={1.5}/>}
+          <GripVertical className="drag-handle w-3.5 h-3.5 text-gray-200 dark:text-gray-700 shrink-0 cursor-grab" strokeWidth={1.5}/>
           <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 min-w-0 truncate">{title}</h3>
         </div>
         <div className="flex items-center gap-1.5 shrink-0">
@@ -724,92 +729,20 @@ function ChartWithFilter({ title, groups, types, allYears, modes, onDelete, onGr
 
 // ── ResizableWrapper ─────────────────────────────────────────────────────────
 
-function ResizableWrapper({ colSpan, height, onUpdateColSpan, onUpdateHeight, isDragging, isDragOver,
-  onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, children }: {
-  colSpan: number; height?: number
-  onUpdateColSpan: (n: number) => void
-  onUpdateHeight?: (h: number) => void
-  isDragging: boolean; isDragOver: boolean
-  onDragStart: () => void
-  onDragOver: (e: React.DragEvent) => void
-  onDragLeave: (e: React.DragEvent) => void
-  onDrop: () => void; onDragEnd: () => void
-  children: (chartH: number, onGripMouseDown: () => void) => React.ReactNode
-}) {
-  const wrapRef    = useRef<HTMLDivElement>(null)
-  const gripActive = useRef(false)
-  const [liveH, setLiveH] = useState<number | null>(null)
-  const chartH = liveH ?? height ?? 300
-  const colCls = (['', 'lg:col-span-1', 'lg:col-span-2', 'lg:col-span-3', 'lg:col-span-4'] as const)[colSpan] ?? 'lg:col-span-2'
-
-  function onGripMouseDown() { gripActive.current = true }
-
-  function handleDragStart(e: React.DragEvent) {
-    if (!gripActive.current) { e.preventDefault(); return }
-    gripActive.current = false
-    e.dataTransfer.effectAllowed = 'move'
-    onDragStart()
-  }
-  function handleDragEnd() { gripActive.current = false; onDragEnd() }
-
-  function startHeightResize(e: React.MouseEvent) {
-    e.preventDefault()
-    const startY = e.clientY, startH = chartH
-    const move = (ev: MouseEvent) => setLiveH(Math.max(150, Math.min(900, startH + ev.clientY - startY)))
-    const up   = (ev: MouseEvent) => {
-      window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up)
-      setLiveH(null); onUpdateHeight?.(Math.max(150, Math.min(900, startH + ev.clientY - startY)))
-    }
-    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
-  }
-
-  function startWidthResize(e: React.MouseEvent) {
-    e.preventDefault()
-    const el = wrapRef.current; if (!el) return
-    const startX   = e.clientX
-    const gridW    = (el.parentElement?.clientWidth ?? 800)
-    const colW     = gridW / 4
-    const move = (ev: MouseEvent) => {
-      const newSpan = Math.max(1, Math.min(4, Math.round((colSpan * colW + ev.clientX - startX) / colW)))
-      el.style.gridColumn = `span ${newSpan}`
-    }
-    const up = (ev: MouseEvent) => {
-      window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up)
-      const newSpan = Math.max(1, Math.min(4, Math.round((colSpan * colW + ev.clientX - startX) / colW)))
-      el.style.gridColumn = ''
-      onUpdateColSpan(newSpan)
-    }
-    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
-  }
-
-  return (
-    <div
-      ref={wrapRef}
-      draggable
-      className={`relative ${colCls} ${isDragging?'opacity-40':''} ${isDragOver?'ring-2 ring-blue-400 rounded-2xl':''} transition-opacity`}
-      onDragStart={handleDragStart}
-      onDragOver={onDragOver}
-      onDragLeave={onDragLeave}
-      onDrop={onDrop}
-      onDragEnd={handleDragEnd}
-    >
-      {children(chartH, onGripMouseDown)}
-      {onUpdateHeight && (
-        <div className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize group z-10" onMouseDown={startHeightResize}>
-          <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full bg-gray-200 dark:bg-gray-700 group-hover:bg-blue-400 transition-colors"/>
-        </div>
-      )}
-      <div className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize group z-10" onMouseDown={startWidthResize}>
-        <div className="absolute right-0.5 top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-gray-200 dark:bg-gray-700 group-hover:bg-blue-400 transition-colors"/>
-      </div>
-    </div>
-  )
+function buildPackedLayout(items: { i: string; w: number; h: number }[]): readonly LayoutItem[] {
+  let x = 0, y = 0, rowH = 0
+  return items.map(item => {
+    if (x + item.w > 4) { x = 0; y += rowH; rowH = 0 }
+    const pos = { i: item.i, x, y, w: item.w, h: item.h }
+    x += item.w; rowH = Math.max(rowH, item.h)
+    return pos
+  })
 }
 
 // ── CustomChartCard ───────────────────────────────────────────────────────────
 
-function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onHide, onEdit, allYears, groups, types, accounts }: {
-  def: CustomChartDef; chartH: number; onGripMouseDown: () => void
+function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allYears, groups, types, accounts }: {
+  def: CustomChartDef; chartH: number
   onUpdate: (d: CustomChartDef) => void; onDelete: () => void; onHide?: () => void; onEdit: () => void
   allYears: number[]; groups: Group[]; types: MovementType[]; accounts: Account[]
 }) {
@@ -979,7 +912,7 @@ function CustomChartCard({ def, chartH, onGripMouseDown, onUpdate, onDelete, onH
     <div className="relative bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
       {/* Header */}
       <div className="flex items-center px-4 pt-3 pb-2 gap-2">
-        <GripVertical onMouseDown={onGripMouseDown} className="w-3.5 h-3.5 text-gray-200 dark:text-gray-700 shrink-0 cursor-grab" strokeWidth={1.5}/>
+        <GripVertical className="drag-handle w-3.5 h-3.5 text-gray-200 dark:text-gray-700 shrink-0 cursor-grab" strokeWidth={1.5}/>
         <h3 className="flex-1 text-sm font-semibold text-gray-600 dark:text-gray-300 min-w-0 truncate">{def.title}</h3>
         <div className="flex items-center gap-0.5 shrink-0">
           {def.xAxis!=='year' && (
@@ -1607,6 +1540,7 @@ export default function Charts() {
 
   const allYears = useMemo(()=>[...new Set(allMovements.map(m=>+m.date.slice(0,4)))].sort((a,b)=>b-a),[allMovements])
   const shared   = { groups, types, allYears }
+  const { width: gridWidth, containerRef } = useContainerWidth()
 
   const BUILTIN_DEFS = useMemo(()=>[
     { id:'monthly',    wide:true  },
@@ -1623,20 +1557,10 @@ export default function Charts() {
   })
   useEffect(()=>{ localStorage.setItem('spendly-builtin-cfg', JSON.stringify(builtinCfg)) },[builtinCfg])
 
-  const [builtinOrder, setBuiltinOrder] = useState<string[]>(()=>{
-    try { const s=JSON.parse(localStorage.getItem('spendly-builtin-order')?? 'null'); return s ?? null } catch { return null }
-  })
-  const effectiveBuiltinOrder = useMemo(() => {
-    const allIds = BUILTIN_DEFS.map(b=>b.id)
-    if (!builtinOrder) return allIds
-    const kept   = builtinOrder.filter(id=>allIds.includes(id))
-    const newOnes = allIds.filter(id=>!kept.includes(id))
-    return [...kept, ...newOnes]
-  }, [builtinOrder, BUILTIN_DEFS])
-  useEffect(()=>{ if (builtinOrder) localStorage.setItem('spendly-builtin-order', JSON.stringify(builtinOrder)) },[builtinOrder])
 
   function hideBuiltin(id: string) {
     setHiddenBuiltins(prev=>{ const s=new Set(prev); s.add(id); localStorage.setItem('spendly-hidden-builtins', JSON.stringify([...s])); return s })
+    setLayout(prev => prev.filter(l => l.i !== id))
   }
 
   const [hiddenCustom, setHiddenCustom] = useState<Set<string>>(()=>{
@@ -1644,33 +1568,57 @@ export default function Charts() {
   })
   function hideCustomChart(id: string) {
     setHiddenCustom(prev=>{ const s=new Set(prev); s.add(id); localStorage.setItem('spendly-hidden-customs',JSON.stringify([...s])); return s })
+    setLayout(prev => prev.filter(l => l.i !== id))
   }
 
-  const [dragId,   setDragId]   = useState<string|null>(null)
-  const [dragOver, setDragOver] = useState<string|null>(null)
-  const dragIdRef = useRef<string|null>(null)
-  function handleDrop(targetId: string) {
-    const srcId = dragIdRef.current
-    if (!srcId || srcId === targetId) return
-    dragIdRef.current = null
-    const fromBuiltin = effectiveBuiltinOrder.includes(srcId)
-    const toBuiltin   = effectiveBuiltinOrder.includes(targetId)
-    if (fromBuiltin && toBuiltin) {
-      setBuiltinOrder(prev => {
-        const arr = [...(prev ?? BUILTIN_DEFS.map(b=>b.id))]
-        const from = arr.indexOf(srcId), to = arr.indexOf(targetId)
-        if (from<0||to<0) return prev
-        arr.splice(to, 0, arr.splice(from, 1)[0]); return arr
-      })
-    } else if (!fromBuiltin && !toBuiltin) {
-      setCustomCharts(cs => {
-        const from = cs.findIndex(c=>c.id===srcId)
-        const to   = cs.findIndex(c=>c.id===targetId)
-        if (from<0||to<0) return cs
-        const next = [...cs]; next.splice(to, 0, next.splice(from, 1)[0]); return next
-      })
-    }
-    setDragId(null); setDragOver(null)
+  // ── Layout state (react-grid-layout) ─────────────────────────────────────────
+  const [layout, setLayout] = useState<readonly LayoutItem[]>(() => {
+    try {
+      const saved = localStorage.getItem('spendly-charts-layout-v1')
+      if (saved) return JSON.parse(saved)
+    } catch { /* fall through */ }
+    // Derive from existing stored data
+    const bCfg: Record<string,{colSpan?:number;height?:number}> = (() => {
+      try { return JSON.parse(localStorage.getItem('spendly-builtin-cfg') ?? '{}') } catch { return {} }
+    })()
+    const cCharts: CustomChartDef[] = (() => {
+      try { return JSON.parse(localStorage.getItem('spendly-custom-charts-v2') ?? '[]') } catch { return [] }
+    })()
+    const hidB = new Set<string>((() => {
+      try { return JSON.parse(localStorage.getItem('spendly-hidden-builtins') ?? '[]') } catch { return [] }
+    })())
+    const hidC = new Set<string>((() => {
+      try { return JSON.parse(localStorage.getItem('spendly-hidden-customs') ?? '[]') } catch { return [] }
+    })())
+    const WIDE: Record<string,boolean> = { monthly: true }
+    const IDS  = ['monthly','expdnt','net','cumulative']
+    return buildPackedLayout([
+      ...IDS.filter(id=>!hidB.has(id)).map(id=>({
+        i: id, w: bCfg[id]?.colSpan ?? (WIDE[id] ? 4 : 2),
+        h: Math.max(1, Math.round((bCfg[id]?.height ?? 300) / ROW_H)),
+      })),
+      ...cCharts.filter(d=>!hidC.has(d.id)).map(d=>({
+        i: d.id, w: d.colSpan ?? (d.wide ? 4 : 2),
+        h: Math.max(1, Math.round((d.height ?? 300) / ROW_H)),
+      })),
+    ])
+  })
+  useEffect(() => { localStorage.setItem('spendly-charts-layout-v1', JSON.stringify(layout)) }, [layout])
+
+  function handleLayoutChange(newLayout: readonly LayoutItem[]) {
+    setLayout(newLayout)
+    setBuiltinCfg(prev => {
+      const next = { ...prev }
+      for (const item of newLayout) {
+        if (BUILTIN_DEFS.some(b => b.id === item.i))
+          next[item.i] = { ...next[item.i], colSpan: item.w, height: item.h * ROW_H }
+      }
+      return next
+    })
+    setCustomCharts(prev => prev.map(c => {
+      const item = newLayout.find(l => l.i === c.id)
+      return item ? { ...c, colSpan: item.w, height: item.h * ROW_H } : c
+    }))
   }
 
   const [editingId, setEditingId] = useState<string|null>(null)
@@ -1679,8 +1627,15 @@ export default function Charts() {
   function editChart(def: CustomChartDef) { setDraftChart({...def}); setEditingId(def.id) }
   function saveDraft() {
     if (!draftChart) return
-    if (editingId) setCustomCharts(cs=>cs.map(c=>c.id===editingId?draftChart:c))
-    else           setCustomCharts(cs=>[...cs, draftChart])
+    if (editingId) {
+      setCustomCharts(cs => cs.map(c => c.id === editingId ? draftChart : c))
+    } else {
+      setCustomCharts(cs => [...cs, draftChart])
+      setLayout(prev => {
+        const maxY = prev.reduce((m, l) => Math.max(m, l.y + l.h), 0)
+        return [...prev, { i: draftChart.id, x: 0, y: maxY, w: effectiveColSpan(draftChart), h: 2 }]
+      })
+    }
     setDraftChart(null); setEditingId(null)
   }
   function cancelDraft() { setDraftChart(null); setEditingId(null) }
@@ -1703,8 +1658,18 @@ export default function Charts() {
         <div className="flex items-center gap-2">
           {(hiddenBuiltins.size + hiddenCustom.size) > 0 && (
             <button onClick={()=>{
+              const restB = [...hiddenBuiltins], restC = [...hiddenCustom]
               setHiddenBuiltins(new Set()); localStorage.removeItem('spendly-hidden-builtins')
               setHiddenCustom(new Set()); localStorage.removeItem('spendly-hidden-customs')
+              setLayout(prev => {
+                const maxY = prev.reduce((m, l) => Math.max(m, l.y + l.h), 0)
+                const WIDE: Record<string,boolean> = { monthly: true }
+                const toAdd = [
+                  ...restB.map(id => ({ i: id, w: builtinCfg[id]?.colSpan ?? (WIDE[id] ? 4 : 2), h: 2 })),
+                  ...restC.map(id => { const d = customCharts.find(c => c.id === id); return { i: id, w: d ? effectiveColSpan(d) : 2, h: 2 } }),
+                ]
+                return [...prev, ...buildPackedLayout(toAdd).map(item => ({ ...item, y: item.y + maxY }))]
+              })
             }} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
               Restaurar ocultos ({hiddenBuiltins.size + hiddenCustom.size})
             </button>
@@ -1715,73 +1680,54 @@ export default function Charts() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-        {effectiveBuiltinOrder.filter(id=>!hiddenBuiltins.has(id)).map(id=>{
-          const defaultWide = BUILTIN_DEFS.find(b=>b.id===id)?.wide ?? false
-          const colSpan = builtinCfg[id]?.colSpan ?? (defaultWide ? 4 : 2)
-          const bp = {
-            ...shared,
-            onDelete: ()=>hideBuiltin(id),
-          }
-          const renderMap: Record<string,(g:()=>void)=>React.ReactNode> = {
-            monthly:      g=><ChartWithFilter title="Ingresos y gastos por mes"      {...bp} modes={[M_BARS,M_STACKED,M_LINES,M_COMBO]} onGripMouseDown={g} render={p=><MonthlyBarChart {...p}/>}/>,
-            net:          g=><ChartWithFilter title="Balance neto por mes"           {...bp}                                            onGripMouseDown={g} render={p=><NetMonthlyChart {...p}/>}/>,
-            cumulative:   g=><ChartWithFilter title="Balance acumulado"              {...bp} modes={[M_AREA,M_LINES]}                  onGripMouseDown={g} render={p=><CumulativeChart {...p}/>}/>,
-            expdnt:       g=><ChartWithFilter title="Gastos por categoría"           {...bp} modes={[M_DONUT,M_BARS]}                  onGripMouseDown={g} render={p=><ExpenseDonutChart {...p}/>}/>,
-            incdnt:       g=><ChartWithFilter title="Ingresos por categoría"         {...bp} modes={[M_DONUT,M_BARS]}                  onGripMouseDown={g} render={p=><IncomeDonutChart {...p}/>}/>,
-            top:          g=><ChartWithFilter title="Top subtipos de gasto"          {...bp}                                            onGripMouseDown={g} render={p=><TopTypesChart {...p}/>}/>,
-            savings:      g=><ChartWithFilter title="Ahorro vs gasto mensual"        {...bp} modes={[M_STACKED,M_BARS,M_COMBO]}        onGripMouseDown={g} render={p=><SavingsChart {...p}/>}/>,
-            trend:        g=><ChartWithFilter title="Tendencia mensual por categoría"{...bp} modes={[M_LINES,M_AREA,M_BARS,M_COMBO]}   onGripMouseDown={g} render={p=><TrendLineChart {...p}/>}/>,
-            subtypes:     g=><ChartWithFilter title="Subtipos de gasto por categoría"{...bp} modes={[M_STACKED,M_BARS,M_LINES]}        onGripMouseDown={g} render={p=><SubtypesByGroupChart {...p}/>}/>,
-            'dash-line':  g=><ChartWithFilter title="Gastos por categoría vs Ingresos" {...bp}                                         onGripMouseDown={g} render={p=><DashExpLineChart {...p}/>}/>,
-            'dash-pie':   g=><ChartWithFilter title="Distribución de gastos"           {...bp}                                         onGripMouseDown={g} render={p=><DashExpPieChart {...p}/>}/>,
-            'dash-balance':g=><ChartWithFilter title="Evolución del balance"           {...bp}                                         onGripMouseDown={g} render={p=><DashBalanceChart {...p} accounts={accounts}/>}/>,
+      <div ref={containerRef}>
+      {gridWidth > 0 && <GridLayout
+        layout={layout}
+        width={gridWidth}
+        gridConfig={{ cols: 4, rowHeight: ROW_H, margin: [16, 16] as [number,number], containerPadding: [0, 0] as [number,number] }}
+        dragConfig={{ handle: '.drag-handle' }}
+        resizeConfig={{ handles: ['s', 'e'] }}
+        compactor={verticalCompactor}
+        onLayoutChange={handleLayoutChange}
+      >
+        {BUILTIN_DEFS.filter(b=>!hiddenBuiltins.has(b.id)).map(({id})=>{
+          const bp = { ...shared, onDelete: ()=>hideBuiltin(id) }
+          const renderMap: Record<string,()=>React.ReactNode> = {
+            monthly:       ()=><ChartWithFilter title="Ingresos y gastos por mes"       {...bp} modes={[M_BARS,M_STACKED,M_LINES,M_COMBO]} render={p=><MonthlyBarChart {...p}/>}/>,
+            net:           ()=><ChartWithFilter title="Balance neto por mes"            {...bp}                                             render={p=><NetMonthlyChart {...p}/>}/>,
+            cumulative:    ()=><ChartWithFilter title="Balance acumulado"               {...bp} modes={[M_AREA,M_LINES]}                   render={p=><CumulativeChart {...p}/>}/>,
+            expdnt:        ()=><ChartWithFilter title="Gastos por categoría"            {...bp} modes={[M_DONUT,M_BARS]}                   render={p=><ExpenseDonutChart {...p}/>}/>,
+            incdnt:        ()=><ChartWithFilter title="Ingresos por categoría"          {...bp} modes={[M_DONUT,M_BARS]}                   render={p=><IncomeDonutChart {...p}/>}/>,
+            top:           ()=><ChartWithFilter title="Top subtipos de gasto"           {...bp}                                             render={p=><TopTypesChart {...p}/>}/>,
+            savings:       ()=><ChartWithFilter title="Ahorro vs gasto mensual"         {...bp} modes={[M_STACKED,M_BARS,M_COMBO]}         render={p=><SavingsChart {...p}/>}/>,
+            trend:         ()=><ChartWithFilter title="Tendencia mensual por categoría" {...bp} modes={[M_LINES,M_AREA,M_BARS,M_COMBO]}    render={p=><TrendLineChart {...p}/>}/>,
+            subtypes:      ()=><ChartWithFilter title="Subtipos de gasto por categoría" {...bp} modes={[M_STACKED,M_BARS,M_LINES]}         render={p=><SubtypesByGroupChart {...p}/>}/>,
+            'dash-line':   ()=><ChartWithFilter title="Gastos por categoría vs Ingresos"{...bp}                                             render={p=><DashExpLineChart {...p}/>}/>,
+            'dash-pie':    ()=><ChartWithFilter title="Distribución de gastos"           {...bp}                                             render={p=><DashExpPieChart {...p}/>}/>,
+            'dash-balance':()=><ChartWithFilter title="Evolución del balance"            {...bp}                                             render={p=><DashBalanceChart {...p} accounts={accounts}/>}/>,
           }
           const renderFn = renderMap[id]; if (!renderFn) return null
-          return (
-            <ResizableWrapper key={id} colSpan={colSpan}
-              onUpdateColSpan={cs=>setBuiltinCfg(c=>({ ...c, [id]:{ ...c[id], colSpan:cs } }))}
-              isDragging={dragId===id} isDragOver={dragOver===id&&dragId!==id}
-              onDragStart={()=>{ dragIdRef.current=id; setDragId(id) }}
-              onDragOver={e=>{ e.preventDefault(); setDragOver(id) }}
-              onDragLeave={e=>{ if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(null) }}
-              onDrop={()=>handleDrop(id)}
-              onDragEnd={()=>{ dragIdRef.current=null; setDragId(null); setDragOver(null) }}
-            >
-              {(_h, g) => renderFn(g)}
-            </ResizableWrapper>
-          )
+          return <div key={id}>{renderFn()}</div>
         })}
 
-        {customCharts.filter(def=>!hiddenCustom.has(def.id)).map(def=>(
-          <ResizableWrapper
-            key={def.id}
-            colSpan={effectiveColSpan(def)}
-            height={def.height}
-            onUpdateColSpan={colSpan=>setCustomCharts(cs=>cs.map(c=>c.id===def.id?{...c,colSpan}:c))}
-            onUpdateHeight={height=>setCustomCharts(cs=>cs.map(c=>c.id===def.id?{...c,height}:c))}
-            isDragging={dragId===def.id}
-            isDragOver={dragOver===def.id&&dragId!==def.id}
-            onDragStart={()=>{ dragIdRef.current=def.id; setDragId(def.id) }}
-            onDragOver={e=>{ e.preventDefault(); setDragOver(def.id) }}
-            onDragLeave={e=>{ if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(null) }}
-            onDrop={()=>handleDrop(def.id)}
-            onDragEnd={()=>{ dragIdRef.current=null; setDragId(null); setDragOver(null) }}
-          >
-            {(chartH, onGripMouseDown) => (
+        {customCharts.filter(def=>!hiddenCustom.has(def.id)).map(def=>{
+          const item = layout.find(l => l.i === def.id)
+          const chartH = item ? item.h * ROW_H : 300
+          return (
+            <div key={def.id}>
               <CustomChartCard
                 def={def}
                 chartH={chartH}
-                onGripMouseDown={onGripMouseDown}
                 onUpdate={updated=>setCustomCharts(cs=>cs.map(c=>c.id===def.id?updated:c))}
-                onDelete={()=>setCustomCharts(cs=>cs.filter(c=>c.id!==def.id))}
+                onDelete={()=>{ setCustomCharts(cs=>cs.filter(c=>c.id!==def.id)); setLayout(prev=>prev.filter(l=>l.i!==def.id)) }}
                 onHide={()=>hideCustomChart(def.id)}
                 onEdit={()=>editChart(def)}
                 allYears={allYears} groups={groups} types={types} accounts={accounts}
               />
-            )}
-          </ResizableWrapper>
-        ))}
+            </div>
+          )
+        })}
+      </GridLayout>}
       </div>
     </div>
   )
