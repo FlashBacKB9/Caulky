@@ -520,12 +520,18 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
     return slices.filter(s => s.value > 0)
   }, [byBucket])
 
+  const [assignOpen, setAssignOpen] = useState(false)
+
   if (total === 0) {
     return <p className="text-sm text-gray-400 text-center py-8">Sin datos para el período seleccionado</p>
   }
 
   return (
     <div className="space-y-5">
+      <div className="bg-blue-50 dark:bg-blue-950 rounded-xl px-4 py-3 text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
+        La regla 50/30/20 sugiere destinar el <strong>50%</strong> de tus ingresos a <strong>necesidades</strong> (vivienda, alimentación, transporte), el <strong>30%</strong> a <strong>deseos</strong> (ocio, restaurantes, compras) y el <strong>20%</strong> a <strong>ahorro</strong>. Aquí se muestra la distribución real de tu dinero. El ahorro se detecta automáticamente desde las categorías marcadas como ahorro en la configuración.
+      </div>
+
       <div className="flex flex-col sm:flex-row gap-5 items-center">
         <div className="shrink-0">
           <ResponsiveContainer width={200} height={200}>
@@ -552,7 +558,7 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
           </ResponsiveContainer>
         </div>
 
-        <div className="flex-1 space-y-2 w-full">
+        <div className="flex-1 space-y-2.5 w-full">
           {pieData.map(entry => {
             const pct = total > 0 ? (entry.value / total) * 100 : 0
             const over = entry.target > 0 && pct > entry.target
@@ -561,34 +567,36 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
               <div key={entry.name} className="flex items-center gap-3 text-xs">
                 <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
                 <span className={`w-24 font-medium shrink-0 ${entry.textColor}`}>{entry.name}</span>
-                <div className="flex-1 h-2 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(pct, 100)}%`, backgroundColor: entry.color, opacity: over ? 0.7 : 1 }}
-                  />
-                </div>
-                <span className="text-gray-600 dark:text-gray-300 w-10 text-right shrink-0">{pct.toFixed(1)}%</span>
-                <span className="text-gray-400 dark:text-gray-500 shrink-0">{fmt(entry.value)}</span>
+                <span className="text-gray-600 dark:text-gray-300 w-12 text-right shrink-0 font-medium">{pct.toFixed(1)}%</span>
+                <span className="text-gray-400 dark:text-gray-500 flex-1">{fmt(entry.value)}</span>
                 {entry.target > 0 && (
                   <span className={`shrink-0 ${over ? 'text-red-400' : under ? 'text-gray-400 dark:text-gray-500' : 'text-green-500'}`}>
-                    {over ? `+${(pct - entry.target).toFixed(0)}%` : under ? `obj. ${entry.target}%` : '✓'}
+                    {over ? `+${(pct - entry.target).toFixed(0)}% obj.` : under ? `obj. ${entry.target}%` : '✓'}
                   </span>
                 )}
               </div>
             )
           })}
-          <p className="text-xs text-gray-400 dark:text-gray-500 pt-1">
+          <p className="text-xs text-gray-400 dark:text-gray-500 pt-1 border-t border-gray-100 dark:border-gray-800">
             Total: {fmt(total)}
           </p>
         </div>
       </div>
 
-      <div>
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Asignación de categorías de gasto</p>
+      <div className="border border-gray-100 dark:border-gray-800 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setAssignOpen(o => !o)}
+          className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+        >
+          <span className="font-medium text-gray-600 dark:text-gray-300">Asignación de categorías</span>
+          {assignOpen ? <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.5} /> : <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} />}
+        </button>
+        {assignOpen && (
+        <div className="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-gray-800">
         {expenseGroups.length === 0 ? (
           <p className="text-xs text-gray-400">No hay categorías de gasto disponibles</p>
         ) : (
-          <div className="space-y-1.5">
+          <div className="space-y-1.5 mt-2">
             {expenseGroups.map(g => (
               <div key={g.id} className="flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
                 <div className="flex items-center gap-2">
@@ -606,6 +614,8 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
               </div>
             ))}
           </div>
+        )}
+        </div>
         )}
       </div>
     </div>
