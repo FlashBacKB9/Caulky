@@ -6,6 +6,8 @@ import { createMovement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getAccountsSummary } from '../api/accounts'
 import { useCurrency } from '../hooks/useCurrency'
+import { useDarkMode } from '../hooks/useDarkMode'
+import { loadTemplates, type MovementTemplate } from '../utils/recurringTemplates'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -43,9 +45,18 @@ function useAmountInput() {
   }, [])
 
   const reset = useCallback(() => setRaw('0'), [])
+
+  const setAmount = useCallback((v: number) => {
+    const abs = Math.abs(v)
+    const s = abs % 1 === 0
+      ? String(abs)
+      : abs.toFixed(2).replace('.', ',')
+    setRaw(s || '0')
+  }, [])
+
   const value = parseFloat(raw.replace(',', '.')) || 0
 
-  return { raw, press, reset, value }
+  return { raw, press, reset, value, setAmount }
 }
 
 // ── Type picker (bottom sheet) ────────────────────────────────────────────────
@@ -64,7 +75,7 @@ function TypePicker({ types, selectedId, onSelect, onClose }: {
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
           <span className="text-sm font-semibold text-gray-800 dark:text-white">Tipo de movimiento</span>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors">
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -102,56 +113,109 @@ function TypePicker({ types, selectedId, onSelect, onClose }: {
   )
 }
 
+// ── Template picker (bottom sheet) ────────────────────────────────────────────
+
+function TemplatePicker({ templates, onApply, onClose }: {
+  templates: MovementTemplate[]
+  onApply: (tpl: MovementTemplate) => void
+  onClose: () => void
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40" onClick={onClose}>
+      <div
+        className="absolute inset-x-0 bottom-0 bg-white dark:bg-gray-900 rounded-t-2xl shadow-2xl border-t border-gray-100 dark:border-gray-800 max-h-[65vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
+          <span className="text-sm font-semibold text-gray-800 dark:text-white">Plantillas</span>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-2">
+          {templates.length === 0 ? (
+            <p className="text-sm text-gray-400 dark:text-gray-500 px-3 py-4 text-center">
+              No hay plantillas de gasto guardadas
+            </p>
+          ) : (
+            templates.map(tpl => (
+              <button
+                key={tpl.id}
+                onClick={() => onApply(tpl)}
+                className="w-full text-left flex items-center justify-between px-3 py-2.5 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-white">{tpl.label}</p>
+                  {tpl.name && tpl.name !== tpl.label && (
+                    <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{tpl.name}</p>
+                  )}
+                </div>
+                <span className="text-sm font-semibold text-red-500 ml-3 shrink-0">
+                  {Math.abs(parseFloat(tpl.money) || 0).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function QuickAdd() {
+  useDarkMode()
+
   const navigate = useNavigate()
   const qc = useQueryClient()
   const { fmt } = useCurrency()
-  const { raw, press, reset, value } = useAmountInput()
+  const { raw, press, reset, value, setAmount } = useAmountInput()
 
   const [kind, setKind]               = useState<Kind>('gasto')
   const [typeId, setTypeId]           = useState<number | null>(null)
   const [description, setDescription] = useState('')
-  const [accountId, setAccountId]     = useState<number | null>(null)
   const [date, setDate]               = useState(today())
   const [bankDate, setBankDate]       = useState(today())
   const [paid, setPaid]               = useState(true)
   const [showMore, setShowMore]       = useState(false)
-  const [showTypePicker, setShowTypePicker] = useState(false)
+  const [showTypePicker, setShowTypePicker]         = useState(false)
+  const [showTemplatePicker, setShowTemplatePicker] = useState(false)
   const [saved, setSaved]             = useState(false)
 
   const { data: allTypes = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
   const { data: summary }       = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
 
-  const accounts = summary?.accounts ?? []
+  const mainAccountId = (summary?.accounts ?? []).find(a => a.is_main)?.id
+    ?? (summary?.accounts?.[0]?.id ?? undefined)
 
   const isIncomeKind = kind === 'ingreso'
   const types = allTypes.filter(t =>
     isIncomeKind ? INCOME_CATEGORIES.has(t.category) : !INCOME_CATEGORIES.has(t.category)
   )
 
+  // Expense templates only (money < 0)
+  const expenseTemplates = loadTemplates().filter(t => parseFloat(t.money) < 0)
+
   // Reset type when switching to incompatible kind
   useEffect(() => {
     if (typeId === null) return
     const t = allTypes.find(x => x.id === typeId)
     if (!t) return
-    const belongsToIncome = INCOME_CATEGORIES.has(t.category)
-    if (belongsToIncome !== isIncomeKind) setTypeId(null)
+    if (INCOME_CATEGORIES.has(t.category) !== isIncomeKind) setTypeId(null)
   }, [isIncomeKind, allTypes, typeId])
 
-  useEffect(() => {
-    if (accounts.length && accountId === null) {
-      const main = accounts.find(a => a.is_main) ?? accounts[0]
-      setAccountId(main.id)
-    }
-  }, [accounts, accountId])
+  const applyTemplate = (tpl: MovementTemplate) => {
+    const money = parseFloat(tpl.money)
+    setKind(money < 0 ? 'gasto' : 'ingreso')
+    setAmount(Math.abs(money))
+    setDescription(tpl.name || tpl.label)
+    setTypeId(tpl.movement_type_id ? parseInt(tpl.movement_type_id) : null)
+    setShowTemplatePicker(false)
+  }
 
   const mutation = useMutation({
     mutationFn: () => {
-      // gasto   → positive money (expense type distinguishes it from income)
-      // ingreso → positive money (income type)
-      // devolucion → negative money (negative expense = refund in the system)
       const money = kind === 'devolucion' ? -Math.abs(value) : Math.abs(value)
       return createMovement({
         name: description.trim() || (allTypes.find(t => t.id === typeId)?.name ?? '—'),
@@ -159,7 +223,7 @@ export default function QuickAdd() {
         date,
         bank_date: bankDate,
         movement_type_id: typeId ?? undefined,
-        account_id: accountId ?? undefined,
+        account_id: mainAccountId,
         paid,
         no_count: false,
       })
@@ -182,29 +246,32 @@ export default function QuickAdd() {
     },
   })
 
-  const canSave   = value > 0
-  const isGreen   = kind === 'ingreso' || kind === 'devolucion'
-  const sign      = kind === 'gasto' ? '−' : '+'
-  const clrText   = isGreen ? 'text-green-500 dark:text-green-400' : 'text-red-500'
-  const clrBg     = isGreen ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20'
+  const canSave      = value > 0
+  const isGreen      = kind === 'ingreso' || kind === 'devolucion'
+  const sign         = kind === 'gasto' ? '−' : '+'
+  const clrText      = isGreen ? 'text-green-500 dark:text-green-400' : 'text-red-500'
+  const clrBg        = isGreen ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20'
   const selectedType = allTypes.find(t => t.id === typeId)
 
-  const KIND_LABELS: Record<Kind, string> = { gasto: 'Gasto', ingreso: 'Ingreso', devolucion: 'Devolución' }
+  const KIND_LABELS: Record<Kind, string> = {
+    gasto: 'Gasto', ingreso: 'Ingreso', devolucion: 'Devolución',
+  }
 
   return (
-    <div className="min-h-screen flex flex-col bg-white dark:bg-gray-950 max-w-md mx-auto">
+    <div className="flex flex-col bg-white dark:bg-gray-950 max-w-md mx-auto h-screen overflow-hidden">
 
-      {/* Minimal top bar */}
-      <div className="flex items-center px-4 pt-5 pb-1 shrink-0">
-        <button
-          onClick={() => navigate(-1)}
-          className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
-        >
-          Cancelar
-        </button>
-      </div>
+      {/* Scrollable content */}
+      <div className="flex-1 overflow-y-auto">
 
-      <div className="flex-1 flex flex-col overflow-y-auto">
+        {/* Cancel */}
+        <div className="flex items-center px-5 pt-5 pb-1 shrink-0">
+          <button
+            onClick={() => navigate(-1)}
+            className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+          >
+            Cancelar
+          </button>
+        </div>
 
         {/* Editable name */}
         <div className="px-6 pt-3 pb-2">
@@ -225,7 +292,7 @@ export default function QuickAdd() {
           <span className={`text-3xl font-light ml-2 ${clrText}`}>€</span>
         </div>
 
-        {/* Kind toggle: Gasto / Ingreso / Devolución */}
+        {/* Kind toggle */}
         <div className="flex gap-2 px-5 py-4">
           {(['gasto', 'ingreso', 'devolucion'] as Kind[]).map(k => (
             <button
@@ -245,7 +312,7 @@ export default function QuickAdd() {
         </div>
 
         {/* Numpad */}
-        <div className="px-5 pb-3 shrink-0">
+        <div className="px-5 pb-3">
           <div className="grid grid-cols-3 gap-2.5">
             {KEYS.flat().map(k => (
               <button
@@ -265,7 +332,6 @@ export default function QuickAdd() {
 
         {/* Type + Template row */}
         <div className="flex gap-2 px-5 pb-4">
-          {/* Type selector */}
           <button
             onClick={() => setShowTypePicker(true)}
             className="flex-1 flex items-center justify-between px-4 py-3 rounded-2xl bg-gray-100 dark:bg-gray-800 text-sm transition-colors hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-[0.98]"
@@ -281,18 +347,17 @@ export default function QuickAdd() {
             <ChevronDown className="w-4 h-4 text-gray-400 shrink-0 ml-2" />
           </button>
 
-          {/* Template — placeholder */}
           <button
-            disabled
-            className="flex-1 flex items-center justify-between px-4 py-3 rounded-2xl bg-gray-100 dark:bg-gray-800 text-sm text-gray-300 dark:text-gray-600 cursor-not-allowed"
+            onClick={() => setShowTemplatePicker(true)}
+            className="flex-1 flex items-center justify-between px-4 py-3 rounded-2xl bg-gray-100 dark:bg-gray-800 text-sm transition-colors hover:bg-gray-200 dark:hover:bg-gray-700 active:scale-[0.98]"
           >
-            <span>Plantilla</span>
-            <ChevronDown className="w-4 h-4 shrink-0 ml-2" />
+            <span className="text-gray-400 dark:text-gray-500 truncate">Plantilla</span>
+            <ChevronDown className="w-4 h-4 text-gray-400 shrink-0 ml-2" />
           </button>
         </div>
 
         {/* More options */}
-        <div className="border-t border-gray-100 dark:border-gray-800 shrink-0">
+        <div className="border-t border-gray-100 dark:border-gray-800">
           <button
             onClick={() => setShowMore(v => !v)}
             className="w-full flex items-center justify-between px-5 py-3 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors"
@@ -303,50 +368,20 @@ export default function QuickAdd() {
 
           {showMore && (
             <div className="px-5 pb-5 space-y-4 border-t border-gray-50 dark:border-gray-800">
-              {/* Account */}
-              {accounts.length > 1 && (
-                <div className="pt-3">
-                  <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Cuenta</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {accounts.map(a => (
-                      <button
-                        key={a.id}
-                        onClick={() => setAccountId(a.id)}
-                        className={`px-3 py-2 rounded-xl text-sm font-medium transition-all active:scale-95 ${
-                          accountId === a.id ? 'text-white shadow-sm' : 'bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300'
-                        }`}
-                        style={accountId === a.id ? { backgroundColor: a.color || '#3b82f6' } : {}}
-                      >
-                        {a.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Date */}
-              <div>
+              <div className="pt-3">
                 <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Fecha</p>
                 <input
-                  type="date"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
+                  type="date" value={date} onChange={e => setDate(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 />
               </div>
-
-              {/* Bank date */}
               <div>
                 <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Fecha banco</p>
                 <input
-                  type="date"
-                  value={bankDate}
-                  onChange={e => setBankDate(e.target.value)}
+                  type="date" value={bankDate} onChange={e => setBankDate(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 />
               </div>
-
-              {/* Paid */}
               <div className="flex items-center justify-between py-0.5">
                 <span className="text-sm text-gray-700 dark:text-gray-300">Pagado</span>
                 <button
@@ -360,11 +395,12 @@ export default function QuickAdd() {
           )}
         </div>
 
-        <div className="flex-1 min-h-4" />
+        {/* Bottom spacer so content doesn't hide behind save button */}
+        <div className="h-4" />
       </div>
 
-      {/* Save button */}
-      <div className="px-5 py-4 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800 shrink-0">
+      {/* Save button — always visible at bottom */}
+      <div className="shrink-0 px-5 py-4 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
         <button
           onClick={() => mutation.mutate()}
           disabled={!canSave || mutation.isPending || saved}
@@ -385,13 +421,20 @@ export default function QuickAdd() {
         </button>
       </div>
 
-      {/* Type picker sheet */}
       {showTypePicker && (
         <TypePicker
           types={types}
           selectedId={typeId}
           onSelect={setTypeId}
           onClose={() => setShowTypePicker(false)}
+        />
+      )}
+
+      {showTemplatePicker && (
+        <TemplatePicker
+          templates={expenseTemplates}
+          onApply={applyTemplate}
+          onClose={() => setShowTemplatePicker(false)}
         />
       )}
     </div>
