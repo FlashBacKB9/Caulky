@@ -472,11 +472,12 @@ const BUCKETS: { id: RuleBucket; label: string; target: number; barColor: string
   { id: 'ahorro',      label: 'Ahorro/Inv.',  target: 20, barColor: 'bg-green-500',  textColor: 'text-green-600 dark:text-green-400' },
 ]
 
-function Regla502030({ realExpenseMovements, groups, types, income, fmt }: {
+function Regla502030({ realExpenseMovements, groups, types, income, actualSavings, fmt }: {
   realExpenseMovements: Movement[]
   groups: Group[]
   types: MovementType[]
   income: number
+  actualSavings: number
   fmt: (v: number) => string
 }) {
   const [assignment, setAssignment] = useState<Record<number, RuleBucket>>(() => {
@@ -493,30 +494,37 @@ function Regla502030({ realExpenseMovements, groups, types, income, fmt }: {
   }
 
   const byBucket = useMemo(() => {
-    const map: Record<RuleBucket, number> = { necesidades: 0, deseos: 0, ahorro: 0, ingreso: 0, unassigned: 0 }
+    // Ahorro starts with the actual savings-group outflows (auto-detected)
+    const map: Record<RuleBucket, number> = { necesidades: 0, deseos: 0, ahorro: actualSavings, ingreso: 0, unassigned: 0 }
     realExpenseMovements.forEach(m => {
       if (m.movement_type_id == null) { map.unassigned += Math.abs(m.dinero); return }
       const t = types.find(t => t.id === m.movement_type_id)
       if (!t) { map.unassigned += Math.abs(m.dinero); return }
       const bucket: RuleBucket = assignment[t.income_expense_group_id] ?? 'unassigned'
+      if (bucket === 'ingreso') return
       map[bucket] += Math.abs(m.dinero)
     })
     return map
-  }, [realExpenseMovements, types, assignment])
+  }, [realExpenseMovements, types, assignment, actualSavings])
 
   const expenseGroups = useMemo(() => {
     const usedGroupIds = new Set(types.map(t => t.income_expense_group_id))
     return groups.filter(g => !g.is_total && usedGroupIds.has(g.id))
   }, [groups, types])
 
+  const totalAssigned = byBucket.necesidades + byBucket.deseos + byBucket.ahorro
+  const unassignedPct = income > 0 ? (byBucket.unassigned / income) * 100 : 0
+
   return (
     <div className="space-y-5">
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        Base: {fmt(income)} de ingresos = 100%. El ahorro se toma automáticamente de las categorías de ahorro configuradas.
+      </p>
       <div className="space-y-3">
         {BUCKETS.map(bucket => {
           const actual = byBucket[bucket.id]
           const pct = income > 0 ? (actual / income) * 100 : 0
           const over = pct > bucket.target
-          const fillPct = bucket.target > 0 ? Math.min((pct / bucket.target) * 100, 100) : 0
           return (
             <div key={bucket.id}>
               <div className="flex items-center justify-between text-xs mb-1">
@@ -529,7 +537,7 @@ function Regla502030({ realExpenseMovements, groups, types, income, fmt }: {
               <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
                 <div
                   className={`h-full rounded-full transition-all ${bucket.barColor} ${over ? 'opacity-70' : ''}`}
-                  style={{ width: `${fillPct}%` }}
+                  style={{ width: `${income > 0 ? Math.min((actual / income) * 100, 100) : 0}%` }}
                 />
               </div>
               {over && (
@@ -541,14 +549,31 @@ function Regla502030({ realExpenseMovements, groups, types, income, fmt }: {
           )
         })}
         {byBucket.unassigned > 0 && (
-          <p className="text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-950 rounded-lg px-3 py-2">
-            {fmt(byBucket.unassigned)} sin asignar — configura las categorías abajo
+          <div>
+            <div className="flex items-center justify-between text-xs mb-1">
+              <span className="font-medium text-yellow-600 dark:text-yellow-400">Sin asignar</span>
+              <span className="text-gray-500 dark:text-gray-400">
+                {fmt(byBucket.unassigned)} · {unassignedPct.toFixed(1)}%
+                <span className="text-gray-400 dark:text-gray-500"> — asigna las categorías abajo</span>
+              </span>
+            </div>
+            <div className="h-3 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-yellow-400 dark:bg-yellow-600"
+                style={{ width: `${Math.min(unassignedPct, 100)}%` }}
+              />
+            </div>
+          </div>
+        )}
+        {income > 0 && (
+          <p className="text-xs text-gray-400 dark:text-gray-500 text-right">
+            Total asignado: {income > 0 ? ((totalAssigned / income) * 100).toFixed(1) : 0}% de los ingresos
           </p>
         )}
       </div>
 
       <div>
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Asignación de categorías</p>
+        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Asignación de categorías de gasto</p>
         {expenseGroups.length === 0 ? (
           <p className="text-xs text-gray-400">No hay categorías de gasto disponibles</p>
         ) : (
@@ -566,7 +591,7 @@ function Regla502030({ realExpenseMovements, groups, types, income, fmt }: {
                 >
                   <option value="unassigned">Sin asignar</option>
                   {BUCKETS.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
-                  <option value="ingreso">Ingreso</option>
+                  <option value="ingreso">Ingreso (excluir)</option>
                 </select>
               </div>
             ))}
@@ -918,6 +943,7 @@ export default function Analysis() {
           groups={groups}
           types={types}
           income={income}
+          actualSavings={actualSavings}
           fmt={fmt}
         />
       </SectionCard>
