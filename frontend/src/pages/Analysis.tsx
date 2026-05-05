@@ -2,10 +2,10 @@ import { useState, useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area, Legend,
+  ResponsiveContainer, AreaChart, Area,
 } from 'recharts'
 import {
-  Heart, Activity, GitCompare, Shuffle, Target, TrendingUp, Sparkles,
+  Heart, Activity, Target, TrendingUp, Sparkles,
   Copy, Check, type LucideIcon,
 } from 'lucide-react'
 import { getMovements, type Movement } from '../api/movements'
@@ -42,6 +42,8 @@ function monthsInRange(start: string, end: string): number {
   const diff = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1
   return Math.max(1, diff)
 }
+
+const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 
 // ── Shared UI ──────────────────────────────────────────────────────────────────
 
@@ -86,291 +88,174 @@ function SaludFinanciera({ movements, income, expenses, savings, savingsRate, to
 }) {
   const months = Math.max(1, new Set(movements.map(m => monthKey(m.date))).size)
   const avgMonthlyExpenses = expenses / months
+  const avgMonthlyIncome   = income   / months
+  const avgMonthlySavings  = savings  / months
   const emergencyMonths = avgMonthlyExpenses > 0 ? totalBalance / avgMonthlyExpenses : 0
   const ratio = expenses > 0 ? income / expenses : 0
 
-  const metrics = [
-    {
-      label: 'Tasa de ahorro',
-      value: `${savingsRate.toFixed(1)}%`,
-      sub: savingsRate >= 20 ? 'Excelente' : savingsRate >= 10 ? 'Buena' : 'Mejorable',
-      color: savingsRate >= 20 ? 'text-green-500' : savingsRate >= 10 ? 'text-yellow-500' : 'text-red-500',
-    },
-    {
-      label: 'Fondo emergencia',
-      value: `${emergencyMonths.toFixed(1)} meses`,
-      sub: emergencyMonths >= 6 ? 'Suficiente' : emergencyMonths >= 3 ? 'Mínimo' : 'Insuficiente',
-      color: emergencyMonths >= 6 ? 'text-green-500' : emergencyMonths >= 3 ? 'text-yellow-500' : 'text-red-500',
-    },
-    {
-      label: 'Ratio ingreso/gasto',
-      value: ratio.toFixed(2),
-      sub: ratio >= 1.2 ? 'Saludable' : ratio >= 1 ? 'Ajustado' : 'Deficitario',
-      color: ratio >= 1.2 ? 'text-green-500' : ratio >= 1 ? 'text-yellow-500' : 'text-red-500',
-    },
-    {
-      label: 'Ahorro neto',
-      value: fmt(savings),
-      sub: `${fmt(income)} ingresos`,
-      color: savings >= 0 ? 'text-green-500' : 'text-red-500',
-    },
-  ]
-
-  return (
-    <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-      {metrics.map(m => (
-        <div key={m.label} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3.5">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{m.label}</p>
-          <p className={`text-lg font-bold ${m.color}`}>{m.value}</p>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{m.sub}</p>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── 2. Patrones de Gasto ───────────────────────────────────────────────────────
-
-const DAYS_ES = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom']
-
-function PatronesDeGasto({ movements, fmt }: { movements: Movement[]; fmt: (v: number) => string }) {
-  const expenses = movements.filter(m => m.dinero < 0)
-
-  const byDay = DAYS_ES.map((label, i) => {
-    const dayMovs = expenses.filter(m => {
-      const d = new Date(m.date + 'T12:00:00')
-      return (d.getDay() + 6) % 7 === i
-    })
-    const total = dayMovs.reduce((s, m) => s + Math.abs(m.dinero), 0)
-    const count = new Set(dayMovs.map(m => m.date)).size || 1
-    return { label, total, avg: total / count }
-  })
-
-  const maxTotal = Math.max(...byDay.map(d => d.total), 1)
-
-  return (
-    <div>
-      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">Gasto total por día de la semana</p>
-      <div className="space-y-2.5">
-        {byDay.map(({ label, total }) => (
-          <div key={label} className="flex items-center gap-3">
-            <span className="text-xs text-gray-500 dark:text-gray-400 w-7 shrink-0">{label}</span>
-            <div className="flex-1 bg-gray-100 dark:bg-gray-800 rounded-full h-5 overflow-hidden">
-              <div
-                className="h-5 rounded-full bg-blue-400 dark:bg-blue-600 transition-all"
-                style={{ width: `${(total / maxTotal) * 100}%` }}
-              />
-            </div>
-            <span className="text-xs text-gray-600 dark:text-gray-400 w-20 text-right shrink-0">{fmt(total)}</span>
-          </div>
-        ))}
-      </div>
-      <p className="text-xs text-gray-400 dark:text-gray-500 mt-3">
-        Día con más gasto: <span className="font-medium text-gray-600 dark:text-gray-300">
-          {byDay.reduce((a, b) => b.total > a.total ? b : a, byDay[0]).label}
-        </span>
-      </p>
-    </div>
-  )
-}
-
-// ── 3. Comparativa de Períodos ────────────────────────────────────────────────
-
-function ComparativaPeriodos({ allMovements, fmt }: {
-  allMovements: Movement[]
-  fmt: (v: number) => string
-}) {
-  const now = new Date()
-  const [periodA, setPeriodA] = useState({
-    start: localDateStr(new Date(now.getFullYear(), now.getMonth() - 1, 1)),
-    end:   localDateStr(new Date(now.getFullYear(), now.getMonth(), 0)),
-  })
-  const [periodB, setPeriodB] = useState({
-    start: localDateStr(new Date(now.getFullYear(), now.getMonth(), 1)),
-    end:   localDateStr(now),
-  })
-
-  function expensesByLabel(movements: Movement[]) {
+  // Top spending category
+  const topCat = useMemo(() => {
     const map = new Map<string, number>()
     movements.filter(m => m.dinero < 0).forEach(m => {
       const label = m.label || 'Sin categoría'
       map.set(label, (map.get(label) ?? 0) + Math.abs(m.dinero))
     })
-    return map
-  }
+    if (map.size === 0) return null
+    return [...map.entries()].reduce((a, b) => b[1] > a[1] ? b : a)
+  }, [movements])
 
-  const movA = useMemo(() => filterMovements(allMovements, periodA.start, periodA.end), [allMovements, periodA])
-  const movB = useMemo(() => filterMovements(allMovements, periodB.start, periodB.end), [allMovements, periodB])
-  const expA = useMemo(() => expensesByLabel(movA), [movA])
-  const expB = useMemo(() => expensesByLabel(movB), [movB])
-
-  const chartData = useMemo(() => {
-    const all = new Set([...expA.keys(), ...expB.keys()])
-    return [...all]
-      .sort((a, b) => ((expA.get(b) ?? 0) + (expB.get(b) ?? 0)) - ((expA.get(a) ?? 0) + (expB.get(a) ?? 0)))
-      .slice(0, 10)
-      .map(label => ({
-        label: label.length > 11 ? label.slice(0, 11) + '…' : label,
-        'Per. A': expA.get(label) ?? 0,
-        'Per. B': expB.get(label) ?? 0,
-      }))
-  }, [expA, expB])
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <div>
-          <p className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1.5">Período A</p>
-          <DateRangeInputs start={periodA.start} end={periodA.end}
-            onChange={(s, e) => setPeriodA({ start: s, end: e })} />
-        </div>
-        <div>
-          <p className="text-xs font-medium text-violet-600 dark:text-violet-400 mb-1.5">Período B</p>
-          <DateRangeInputs start={periodB.start} end={periodB.end}
-            onChange={(s, e) => setPeriodB({ start: s, end: e })} />
-        </div>
-      </div>
-
-      {chartData.length === 0 ? (
-        <p className="text-sm text-gray-400 text-center py-8">Sin datos para los períodos seleccionados</p>
-      ) : (
-        <ResponsiveContainer width="100%" height={260}>
-          <BarChart data={chartData} margin={{ top: 4, right: 0, left: 0, bottom: 44 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="label" tick={{ fontSize: 10 }} angle={-35} textAnchor="end" interval={0} />
-            <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} width={36} />
-            <Tooltip formatter={(v) => fmt(v as number)} />
-            <Legend wrapperStyle={{ fontSize: 11 }} />
-            <Bar dataKey="Per. A" fill="#60a5fa" radius={[3, 3, 0, 0]} />
-            <Bar dataKey="Per. B" fill="#a78bfa" radius={[3, 3, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      )}
-
-      <div className="grid grid-cols-2 gap-3">
-        {([
-          { label: 'Período A', mov: movA, color: 'text-blue-500' },
-          { label: 'Período B', mov: movB, color: 'text-violet-500' },
-        ] as const).map(({ label, mov, color }) => {
-          const inc = sumIncome(mov)
-          const exp = sumExpenses(mov)
-          return (
-            <div key={label} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3 space-y-1.5 text-xs">
-              <p className={`font-medium ${color}`}>{label}</p>
-              <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">Ingresos</span>
-                <span className="text-green-500">{fmt(inc)}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-500 dark:text-gray-400">Gastos</span>
-                <span className="text-red-500">{fmt(exp)}</span>
-              </div>
-              <div className="flex justify-between font-medium border-t border-gray-200 dark:border-gray-700 pt-1">
-                <span className="text-gray-600 dark:text-gray-300">Ahorro</span>
-                <span className={inc - exp >= 0 ? 'text-green-500' : 'text-red-500'}>{fmt(inc - exp)}</span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
-}
-
-// ── 4. Fijo vs Variable ───────────────────────────────────────────────────────
-
-function FijoVsVariable({ movements, allMovements, types, fmt }: {
-  movements: Movement[]; allMovements: Movement[]; types: MovementType[]; fmt: (v: number) => string
-}) {
-  const fixedTypeIds = useMemo(() => {
-    const typeMonths = new Map<number, Set<string>>()
-    allMovements.filter(m => m.dinero < 0 && !m.no_count && m.movement_type_id != null).forEach(m => {
-      const tid = m.movement_type_id!
-      if (!typeMonths.has(tid)) typeMonths.set(tid, new Set())
-      typeMonths.get(tid)!.add(monthKey(m.date))
-    })
-    const fixed = new Set<number>()
-    typeMonths.forEach((months, tid) => { if (months.size >= 2) fixed.add(tid) })
-    return fixed
-  }, [allMovements])
-
-  const expenseMov = movements.filter(m => m.dinero < 0)
-  const fixed   = expenseMov.filter(m => m.movement_type_id != null && fixedTypeIds.has(m.movement_type_id!))
-  const variable = expenseMov.filter(m => m.movement_type_id == null || !fixedTypeIds.has(m.movement_type_id!))
-
-  const totalFixed    = fixed.reduce((s, m) => s + Math.abs(m.dinero), 0)
-  const totalVariable = variable.reduce((s, m) => s + Math.abs(m.dinero), 0)
-  const total = totalFixed + totalVariable
-
-  const pieData = [
-    { name: 'Fijo',     value: totalFixed,    fill: '#60a5fa' },
-    { name: 'Variable', value: totalVariable, fill: '#f9a8d4' },
+  const metrics = [
+    {
+      label: 'Tasa de ahorro',
+      value: `${savingsRate.toFixed(1)}%`,
+      sub: savingsRate >= 20 ? 'Excelente (obj. >20%)' : savingsRate >= 10 ? 'Buena (obj. >20%)' : savingsRate >= 0 ? 'Mejorable (obj. >20%)' : 'Gastos > Ingresos',
+      color: savingsRate >= 20 ? 'text-green-500' : savingsRate >= 10 ? 'text-yellow-500' : 'text-red-500',
+      detail: `De cada 100€ ingresados, ahorras ${savingsRate.toFixed(0)}€`,
+    },
+    {
+      label: 'Fondo de emergencia',
+      value: `${emergencyMonths.toFixed(1)} meses`,
+      sub: emergencyMonths >= 6 ? 'Suficiente (obj. >6m)' : emergencyMonths >= 3 ? 'Mínimo (obj. >6m)' : 'Insuficiente (obj. >6m)',
+      color: emergencyMonths >= 6 ? 'text-green-500' : emergencyMonths >= 3 ? 'text-yellow-500' : 'text-red-500',
+      detail: `${fmt(totalBalance)} patrimonio ÷ ${fmt(avgMonthlyExpenses)}/mes`,
+    },
+    {
+      label: 'Ratio ingreso/gasto',
+      value: ratio.toFixed(2),
+      sub: ratio >= 1.2 ? 'Saludable (obj. >1.2)' : ratio >= 1 ? 'Ajustado (obj. >1.2)' : 'Deficitario',
+      color: ratio >= 1.2 ? 'text-green-500' : ratio >= 1 ? 'text-yellow-500' : 'text-red-500',
+      detail: `Por cada €1 gastado, ingresas €${ratio.toFixed(2)}`,
+    },
+    {
+      label: 'Media mensual',
+      value: fmt(avgMonthlySavings),
+      sub: `${months} ${months === 1 ? 'mes' : 'meses'} analizados`,
+      color: avgMonthlySavings >= 0 ? 'text-green-500' : 'text-red-500',
+      detail: `${fmt(avgMonthlyIncome)} ing. · ${fmt(avgMonthlyExpenses)} gasto`,
+    },
+    {
+      label: 'Mayor categoría',
+      value: topCat ? topCat[0] : '—',
+      sub: topCat ? fmt(topCat[1]) : 'Sin datos',
+      color: 'text-gray-700 dark:text-gray-200',
+      detail: topCat && expenses > 0 ? `${((topCat[1] / expenses) * 100).toFixed(0)}% del total de gastos` : '',
+    },
+    {
+      label: 'Ahorro neto total',
+      value: fmt(savings),
+      sub: savings >= 0 ? `+${fmt(savings - 0)} en el período` : 'Período deficitario',
+      color: savings >= 0 ? 'text-green-500' : 'text-red-500',
+      detail: `${fmt(income)} ingresos — ${fmt(expenses)} gastos`,
+    },
   ]
 
-  const fixedByType = new Map<string, number>()
-  fixed.forEach(m => {
-    const t = types.find(t => t.id === m.movement_type_id)
-    const name = t?.name ?? m.label ?? 'Sin tipo'
-    fixedByType.set(name, (fixedByType.get(name) ?? 0) + Math.abs(m.dinero))
-  })
-  const topFixed = [...fixedByType.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6)
+  // Dynamic summary text
+  const summary = useMemo(() => {
+    if (income === 0) return 'No hay ingresos registrados en el período seleccionado.'
+    const parts: string[] = []
+    if (savingsRate >= 20) {
+      parts.push(`Estás ahorrando el ${savingsRate.toFixed(0)}% de tus ingresos, por encima del objetivo recomendado del 20%.`)
+    } else if (savingsRate >= 10) {
+      parts.push(`Tu tasa de ahorro del ${savingsRate.toFixed(0)}% es positiva pero está por debajo del objetivo recomendado del 20%.`)
+    } else if (savingsRate >= 0) {
+      parts.push(`Tu tasa de ahorro del ${savingsRate.toFixed(0)}% es muy baja. Revisa si hay gastos que puedas reducir.`)
+    } else {
+      parts.push(`Tus gastos superan tus ingresos en ${fmt(Math.abs(savings))}. Situación deficitaria que requiere atención.`)
+    }
+    if (emergencyMonths >= 6) {
+      parts.push(`El fondo de emergencia cubre ${emergencyMonths.toFixed(1)} meses de gastos — solidez financiera correcta.`)
+    } else if (emergencyMonths >= 3) {
+      parts.push(`El fondo de emergencia cubre ${emergencyMonths.toFixed(1)} meses. Se recomienda llegar a al menos 6 meses.`)
+    } else {
+      parts.push(`El fondo de emergencia solo cubre ${emergencyMonths.toFixed(1)} meses. Prioriza aumentarlo hasta los 6 meses mínimos recomendados.`)
+    }
+    if (topCat) {
+      parts.push(`Tu mayor gasto es "${topCat[0]}" con ${fmt(topCat[1])} (${expenses > 0 ? ((topCat[1] / expenses) * 100).toFixed(0) : 0}% del total).`)
+    }
+    return parts.join(' ')
+  }, [income, savingsRate, savings, emergencyMonths, topCat, expenses, fmt])
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-        <ResponsiveContainer width="100%" height={200}>
-          <PieChart>
-            <Pie
-              data={pieData}
-              dataKey="value"
-              cx="50%"
-              cy="50%"
-              outerRadius={80}
-              label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
-              labelLine={false}
-            >
-              {pieData.map((entry, i) => <Cell key={i} fill={entry.fill} />)}
-            </Pie>
-            <Tooltip formatter={(v) => fmt(v as number)} />
-          </PieChart>
-        </ResponsiveContainer>
-
-        <div className="space-y-2">
-          <div className="bg-blue-50 dark:bg-blue-950 rounded-xl p-3.5">
-            <p className="text-xs text-blue-600 dark:text-blue-400 font-medium">Gastos fijos</p>
-            <p className="text-xl font-bold text-blue-700 dark:text-blue-300 mt-0.5">{fmt(totalFixed)}</p>
-            <p className="text-xs text-blue-500 dark:text-blue-400 mt-0.5">
-              {total > 0 ? ((totalFixed / total) * 100).toFixed(0) : 0}% del total
-            </p>
+      <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+        {metrics.map(m => (
+          <div key={m.label} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3.5">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{m.label}</p>
+            <p className={`text-base font-bold truncate ${m.color}`}>{m.value}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">{m.sub}</p>
+            {m.detail && <p className="text-xs text-gray-400 dark:text-gray-600 mt-1 truncate">{m.detail}</p>}
           </div>
-          <div className="bg-pink-50 dark:bg-pink-950 rounded-xl p-3.5">
-            <p className="text-xs text-pink-600 dark:text-pink-400 font-medium">Gastos variables</p>
-            <p className="text-xl font-bold text-pink-700 dark:text-pink-300 mt-0.5">{fmt(totalVariable)}</p>
-            <p className="text-xs text-pink-500 dark:text-pink-400 mt-0.5">
-              {total > 0 ? ((totalVariable / total) * 100).toFixed(0) : 0}% del total
-            </p>
-          </div>
-        </div>
+        ))}
       </div>
-
-      {topFixed.length > 0 && (
-        <div>
-          <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Gastos fijos recurrentes</p>
-          <div className="space-y-1.5">
-            {topFixed.map(([name, amount]) => (
-              <div key={name} className="flex items-center justify-between text-xs bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-                <span className="text-gray-700 dark:text-gray-300">{name}</span>
-                <span className="font-medium text-blue-600 dark:text-blue-400">{fmt(amount)}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      <div className="bg-blue-50 dark:bg-blue-950 rounded-xl px-4 py-3 text-sm text-blue-800 dark:text-blue-200 leading-relaxed">
+        {summary}
+      </div>
     </div>
   )
 }
 
-// ── 5. Regla 50/30/20 ─────────────────────────────────────────────────────────
+// ── 2. Patrones de Gasto por Mes ──────────────────────────────────────────────
+
+function PatronesDeGasto({ movements, fmt }: { movements: Movement[]; fmt: (v: number) => string }) {
+  const expenses = movements.filter(m => m.dinero < 0)
+
+  const byMonth = useMemo(() => {
+    const map = new Map<string, number>()
+    expenses.forEach(m => {
+      const key = monthKey(m.date)
+      map.set(key, (map.get(key) ?? 0) + Math.abs(m.dinero))
+    })
+    return [...map.entries()]
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, total]) => {
+        const [y, mo] = key.split('-').map(Number)
+        const label = `${MONTHS_SHORT[mo - 1]} ${String(y).slice(2)}`
+        return { key, label, total }
+      })
+  }, [expenses])
+
+  if (byMonth.length === 0) {
+    return <p className="text-sm text-gray-400 text-center py-8">Sin gastos en el período seleccionado</p>
+  }
+
+  const avg = byMonth.reduce((s, m) => s + m.total, 0) / byMonth.length
+  const max = byMonth.reduce((a, b) => b.total > a.total ? b : a, byMonth[0])
+  const min = byMonth.reduce((a, b) => b.total < a.total ? b : a, byMonth[0])
+
+  return (
+    <div className="space-y-4">
+      <ResponsiveContainer width="100%" height={220}>
+        <BarChart data={byMonth} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} width={36} />
+          <Tooltip formatter={(v) => fmt(v as number)} labelFormatter={l => `Gastos · ${l}`} />
+          <Bar dataKey="total" name="Gastos" fill="#60a5fa" radius={[3, 3, 0, 0]}
+            label={false} />
+        </BarChart>
+      </ResponsiveContainer>
+      <div className="grid grid-cols-3 gap-3 text-center text-xs">
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
+          <p className="text-gray-400 dark:text-gray-500 mb-0.5">Mes más alto</p>
+          <p className="font-semibold text-red-500">{max.label}</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-0.5">{fmt(max.total)}</p>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
+          <p className="text-gray-400 dark:text-gray-500 mb-0.5">Media mensual</p>
+          <p className="font-semibold text-blue-500">—</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-0.5">{fmt(avg)}</p>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
+          <p className="text-gray-400 dark:text-gray-500 mb-0.5">Mes más bajo</p>
+          <p className="font-semibold text-green-500">{min.label}</p>
+          <p className="text-gray-500 dark:text-gray-400 mt-0.5">{fmt(min.total)}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── 3. Regla 50/30/20 ─────────────────────────────────────────────────────────
 
 type RuleBucket = 'necesidades' | 'deseos' | 'ahorro' | 'unassigned'
 const RULE_KEY = 'spendly-5030-assignment'
@@ -483,7 +368,7 @@ function Regla502030({ movements, groups, types, income, fmt }: {
   )
 }
 
-// ── 6. Proyección de Patrimonio ───────────────────────────────────────────────
+// ── 4. Proyección de Patrimonio ───────────────────────────────────────────────
 
 function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
   monthlySavings: number; totalBalance: number; fmt: (v: number) => string
@@ -518,6 +403,7 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
           <Area
             type="monotone"
             dataKey="balance"
+            name="Patrimonio"
             stroke={positive ? '#60a5fa' : '#f87171'}
             fill="url(#projGrad)"
             strokeWidth={2}
@@ -538,7 +424,7 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
   )
 }
 
-// ── 7. Prompt IA ──────────────────────────────────────────────────────────────
+// ── 5. Prompt IA ──────────────────────────────────────────────────────────────
 
 function PromptIA({ allMovements, fmt }: {
   allMovements: Movement[]
@@ -579,21 +465,28 @@ function PromptIA({ allMovements, fmt }: {
     return [
       `Actúa como un asesor financiero personal experto. Analiza mis finanzas del ${start} al ${end} y dame un informe completo con recomendaciones accionables.`,
       '',
+      '## CONTEXTO IMPORTANTE SOBRE LOS DATOS',
+      '',
+      'Esta aplicación registra todas las salidas de dinero como "gastos", incluyendo transferencias a cuentas de ahorro o de inversión propias.',
+      'Esto significa que la "tasa de ahorro" calculada automáticamente puede estar artificialmente deprimida: si hago transferencias a mis propias cuentas de ahorro/inversión, esas aparecen como gasto aunque en realidad son ahorro.',
+      'Al analizar los datos, ten en cuenta que algunas categorías de "gasto" (especialmente las relacionadas con ahorro, inversión, fondos, o cuentas propias) son en realidad ahorro real.',
+      'Ajusta tu evaluación de la tasa de ahorro si detectas este patrón en las categorías.',
+      '',
       '## DATOS FINANCIEROS',
       '',
       '### Resumen del período',
       `- Ingresos totales: ${fmt(income)}`,
-      `- Gastos totales: ${fmt(expenses)}`,
-      `- Ahorro neto: ${fmt(savings)}`,
-      `- Tasa de ahorro: ${savingsRate.toFixed(1)}%`,
+      `- Salidas totales (gastos + transferencias a ahorro): ${fmt(expenses)}`,
+      `- Balance neto del período: ${fmt(savings)}`,
+      `- Tasa de ahorro aparente: ${savingsRate.toFixed(1)}% (puede ser superior si hay transferencias a ahorro)`,
       `- Total movimientos: ${movements.length}`,
       '',
-      '### Gastos por categoría',
+      '### Salidas por categoría (gastos y posibles ahorros)',
       ...byCategory.map(([cat, amount]) =>
         `- ${cat}: ${fmt(amount)}${income > 0 ? ` (${((amount / income) * 100).toFixed(1)}% sobre ingresos)` : ''}`
       ),
       '',
-      '### Top 10 gastos del período',
+      '### Top 10 salidas del período',
       ...topExpenses.map((m, i) =>
         `${i + 1}. ${m.name} — ${fmt(Math.abs(m.dinero))} (${m.date})${m.label ? ` [${m.label}]` : ''}`
       ),
@@ -601,9 +494,9 @@ function PromptIA({ allMovements, fmt }: {
       '## ANÁLISIS SOLICITADO',
       '',
       'Por favor proporciona:',
-      '1. **Evaluación general** de mi situación financiera en este período',
-      '2. **Análisis de gastos** — categorías preocupantes y por qué',
-      '3. **Tasa de ahorro** — si es adecuada y cómo mejorarla',
+      '1. **Evaluación general** — distingue entre gastos reales y posibles transferencias a ahorro según las categorías',
+      '2. **Tasa de ahorro real estimada** — ajustando si identificas categorías que son en realidad ahorro',
+      '3. **Análisis de gastos** — categorías preocupantes y por qué',
       '4. **3 recomendaciones concretas** y fáciles de implementar',
       '5. **Alertas** — patrones o gastos que deberían preocuparme',
       '6. **Proyección** — si continúo así, ¿dónde estaré en 6 y 12 meses?',
@@ -716,16 +609,8 @@ export default function Analysis() {
         />
       </SectionCard>
 
-      <SectionCard title="Patrones de Gasto" icon={Activity}>
+      <SectionCard title="Patrones de Gasto por Mes" icon={Activity}>
         <PatronesDeGasto movements={movements} fmt={fmt} />
-      </SectionCard>
-
-      <SectionCard title="Comparativa de Períodos" icon={GitCompare}>
-        <ComparativaPeriodos allMovements={allMovements} fmt={fmt} />
-      </SectionCard>
-
-      <SectionCard title="Fijo vs Variable" icon={Shuffle}>
-        <FijoVsVariable movements={movements} allMovements={allMovements} types={types} fmt={fmt} />
       </SectionCard>
 
       <SectionCard title="Regla 50/30/20" icon={Target}>
