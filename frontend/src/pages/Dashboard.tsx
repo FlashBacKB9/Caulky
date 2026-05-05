@@ -1304,7 +1304,7 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
                 <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Crear nuevo presupuesto</span>
               </button>
               {budgets.length > 0 && !existingIds.has('budget-all') && (
-                <Item
+                <ModalItem
                   iconBg="#10b98120" iconColor="#10b981" Icon={BarChart2}
                   label="Todos los presupuestos" desc="Tarjeta combinada con todos en una"
                   onClick={() => { onAdd({ id: 'budget-all', colSpan: 4 }); onClose() }}
