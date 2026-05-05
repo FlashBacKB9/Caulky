@@ -1384,12 +1384,22 @@ function useDashWidth() {
   useEffect(() => {
     const el = ref.current
     if (!el) return
+
+    const measure = () => {
+      const w = el.offsetWidth
+      if (w > 0) setWidth(w)
+    }
+
+    measure()
+    window.addEventListener('resize', measure)
+
     const ro = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect.width
       if (w != null && w > 0) setWidth(w)
     })
     ro.observe(el)
-    return () => ro.disconnect()
+
+    return () => { window.removeEventListener('resize', measure); ro.disconnect() }
   }, [])
 
   return { ref, width }
