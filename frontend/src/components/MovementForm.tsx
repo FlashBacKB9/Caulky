@@ -271,15 +271,15 @@ export default function MovementForm({ onClose, initialDate }: Props) {
 
   // ── Template helpers ─────────────────────────────────────────────────────────
   const applyTemplate = (tpl: MovementTemplate) => {
-    setForm({
+    setForm(prev => ({
       name: applyFormula(tpl.name),
       money: tpl.money,
-      date: tpl.dateMode === 'today' ? today : '',
-      bank_date: (tpl.bankDateMode ?? 'manual') === 'today' ? today : '',
+      date: prev.date || (tpl.dateMode === 'today' ? today : ''),
+      bank_date: prev.bank_date || ((tpl.bankDateMode ?? 'manual') === 'today' ? today : ''),
       movement_type_id: tpl.movement_type_id,
       paid: tpl.paid, no_count: tpl.no_count, notes: tpl.notes,
       is_shared: false, shared_between: '2', my_share: '',
-    })
+    }))
     setPanel('form')
   }
 
