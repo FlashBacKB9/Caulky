@@ -1,4 +1,5 @@
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { GridLayout, useContainerWidth, verticalCompactor, type LayoutItem } from 'react-grid-layout'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { getDashboard, getAnnualStats } from '../api/stats'
@@ -34,8 +35,27 @@ const MONTHS_FULL  = ['enero','febrero','marzo','abril','mayo','junio','julio','
 const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
 const EXCLUDE_GROUPS  = new Set(['Ingreso','Total','Ahorro','Gastos Anuales','Inversión'])
 const BALANCE_EXCLUDE = new Set(['Total','Ahorro','Gastos Anuales','Inversión'])
-const COL_CLS = ['','col-span-1','col-span-2','col-span-3','col-span-4'] as const
 const GRID_CLR = '#e5e7eb'
+const DASH_ROW_H = 150
+const DASH_HEADER_H = 60
+const DASH_LAYOUT_KEY = 'spendly-dashboard-layout-v1'
+
+function isDashChart(id: string, customIds: Set<string>) {
+  return id.startsWith('chart-') || id.startsWith('charts-') || id.startsWith('stat-balance-') || customIds.has(id)
+}
+function buildDashLayout(widgets: DashboardWidget[], customIds: Set<string>): readonly LayoutItem[] {
+  let x = 0, y = 0, rowH = 0
+  return widgets.map(w => {
+    const ww = w.colSpan
+    const hh = isDashChart(w.id, customIds)
+      ? Math.max(2, Math.ceil(((w.height ?? 300) + DASH_HEADER_H) / DASH_ROW_H))
+      : 2
+    if (x + ww > 4) { x = 0; y += rowH; rowH = 0 }
+    const item = { i: w.id, x, y, w: ww, h: hh }
+    x += ww; rowH = Math.max(rowH, hh)
+    return item
+  })
+}
 
 // ── Stat panels ───────────────────────────────────────────────────────────────
 
@@ -431,81 +451,6 @@ function CyclingBalanceHistoryChart({ accounts, movements, movementTypes, height
   )
 }
 
-// ── ResizableWrapper (same pattern as Charts.tsx) ─────────────────────────────
-
-function ResizableWrapper({ colSpan, height, onUpdateColSpan, onUpdateHeight, isDragging, isDragOver,
-  onDragStart, onDragOver, onDragLeave, onDrop, onDragEnd, children }: {
-  colSpan: number; height?: number
-  onUpdateColSpan: (n: number) => void
-  onUpdateHeight?: (h: number) => void
-  isDragging: boolean; isDragOver: boolean
-  onDragStart: () => void
-  onDragOver: (e: React.DragEvent) => void
-  onDragLeave: (e: React.DragEvent) => void
-  onDrop: () => void; onDragEnd: () => void
-  children: (chartH: number, onGripMouseDown: () => void, resizeHandles: React.ReactNode) => React.ReactNode
-}) {
-  const wrapRef    = useRef<HTMLDivElement>(null)
-  const gripActive = useRef(false)
-  const [liveH, setLiveH] = useState<number | null>(null)
-  const chartH = liveH ?? height ?? 300
-  const colCls = COL_CLS[colSpan] ?? 'col-span-2'
-  // Row span is derived from chart height: every 300px = 1 row
-  const effectiveRowSpan = onUpdateHeight ? Math.max(1, Math.ceil(chartH / 300)) : 1
-  const rowStyle = effectiveRowSpan > 1 ? { gridRow: `span ${effectiveRowSpan}` } : undefined
-
-  function onGripMouseDown() { gripActive.current = true }
-  function handleDragStart(e: React.DragEvent) {
-    if (!gripActive.current) { e.preventDefault(); return }
-    gripActive.current = false; e.dataTransfer.effectAllowed = 'move'; onDragStart()
-  }
-  function handleDragEnd() { gripActive.current = false; onDragEnd() }
-
-  function startHeightResize(e: React.MouseEvent) {
-    e.preventDefault()
-    const startY = e.clientY, startH = chartH
-    const move = (ev: MouseEvent) => setLiveH(Math.max(150, Math.min(900, startH + ev.clientY - startY)))
-    const up   = (ev: MouseEvent) => {
-      window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up)
-      setLiveH(null); onUpdateHeight?.(Math.max(150, Math.min(900, startH + ev.clientY - startY)))
-    }
-    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
-  }
-
-  function startWidthResize(e: React.MouseEvent) {
-    e.preventDefault()
-    const el = wrapRef.current; if (!el) return
-    const startX = e.clientX, gridW = el.parentElement?.clientWidth ?? 800, colW = gridW / 4
-    const move = (ev: MouseEvent) => { el.style.gridColumn = `span ${Math.max(1, Math.min(4, Math.round((colSpan * colW + ev.clientX - startX) / colW)))}` }
-    const up   = (ev: MouseEvent) => {
-      window.removeEventListener('mousemove', move); window.removeEventListener('mouseup', up)
-      el.style.gridColumn = ''; onUpdateColSpan(Math.max(1, Math.min(4, Math.round((colSpan * colW + ev.clientX - startX) / colW))))
-    }
-    window.addEventListener('mousemove', move); window.addEventListener('mouseup', up)
-  }
-
-  const resizeHandles = (
-    <>
-      {onUpdateHeight && (
-        <div className="absolute bottom-0 left-0 right-0 h-2 cursor-s-resize group z-10" onMouseDown={startHeightResize}>
-          <div className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full bg-gray-200 dark:bg-gray-700 group-hover:bg-blue-400 transition-colors" />
-        </div>
-      )}
-      <div className="absolute right-0 top-0 bottom-0 w-2 cursor-e-resize group z-10" onMouseDown={startWidthResize}>
-        <div className="absolute right-0.5 top-1/2 -translate-y-1/2 w-1 h-8 rounded-full bg-gray-200 dark:bg-gray-700 group-hover:bg-blue-400 transition-colors" />
-      </div>
-    </>
-  )
-
-  return (
-    <div ref={wrapRef} draggable style={rowStyle}
-      className={`relative ${colCls} ${isDragging ? 'opacity-40' : ''} ${isDragOver ? 'ring-2 ring-blue-400 rounded-2xl' : ''} transition-opacity`}
-      onDragStart={handleDragStart} onDragOver={onDragOver} onDragLeave={onDragLeave} onDrop={onDrop} onDragEnd={handleDragEnd}
-    >
-      {children(chartH, onGripMouseDown, resizeHandles)}
-    </div>
-  )
-}
 
 // ── Budget types & helpers ────────────────────────────────────────────────────
 
@@ -1225,7 +1170,7 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
             <X className="w-4 h-4" />
           </button>
         </div>
-        <div className="overflow-y-auto flex-1 p-3 space-y-1">
+        <div className="overflow-y-auto flex-1 min-h-0 p-3 space-y-1">
 
           {/* Chart options */}
           {mode === 'chart' && (
@@ -1456,24 +1401,52 @@ export default function Dashboard() {
     enabled: needsChartsData || hasBalanceHistory || (editMode && addMode === 'budget'),
   })
 
-  // Drag state
-  const [dragId,   setDragId]   = useState<string | null>(null)
-  const [dragOver, setDragOver] = useState<string | null>(null)
-  const dragIdRef = useRef<string | null>(null)
+  const { width: dashGridWidth, containerRef: dashContainerRef } = useContainerWidth()
 
-  function handleDrop(targetId: string) {
-    const srcId = dragIdRef.current
-    if (!srcId || srcId === targetId) return
-    dragIdRef.current = null
-    const arr  = [...config.widgets]
-    const from = arr.findIndex(w => w.id === srcId)
-    const to   = arr.findIndex(w => w.id === targetId)
-    if (from >= 0 && to >= 0) { arr.splice(to, 0, arr.splice(from, 1)[0]); save({ widgets: arr }) }
-    setDragId(null); setDragOver(null)
+  const [dashLayout, setDashLayout] = useState<readonly LayoutItem[]>(() => {
+    const customIds = new Set(readCustomCharts().map(c => c.id))
+    const currentIds = new Set(config.widgets.map(w => w.id))
+    try {
+      const saved = localStorage.getItem(DASH_LAYOUT_KEY)
+      if (saved) {
+        const parsed = JSON.parse(saved) as LayoutItem[]
+        const filtered = parsed.filter(item => currentIds.has(item.i))
+        if (filtered.length === config.widgets.length) return filtered
+      }
+    } catch {}
+    return buildDashLayout(config.widgets, customIds)
+  })
+
+  function handleDashLayoutChange(newLayout: readonly LayoutItem[]) {
+    setDashLayout(newLayout)
+    localStorage.setItem(DASH_LAYOUT_KEY, JSON.stringify(newLayout))
+    const customIds = new Set(readCustomCharts().map(c => c.id))
+    save({
+      widgets: config.widgets.map(w => {
+        const item = newLayout.find(l => l.i === w.id)
+        if (!item) return w
+        return {
+          ...w,
+          colSpan: item.w,
+          ...(isDashChart(w.id, customIds) ? { height: Math.max(150, item.h * DASH_ROW_H - DASH_HEADER_H) } : {}),
+        }
+      }),
+    })
   }
 
-  function removeWidget(id: string) { save({ widgets: config.widgets.filter(w => w.id !== id) }) }
-  function addWidget(w: DashboardWidget) { save({ widgets: [...config.widgets, w] }) }
+  function removeWidget(id: string) {
+    save({ widgets: config.widgets.filter(w => w.id !== id) })
+    setDashLayout(prev => prev.filter(l => l.i !== id))
+  }
+  function addWidget(w: DashboardWidget) {
+    save({ widgets: [...config.widgets, w] })
+    const customIds = new Set(readCustomCharts().map(c => c.id))
+    const hh = isDashChart(w.id, customIds)
+      ? Math.max(2, Math.ceil(((w.height ?? 300) + DASH_HEADER_H) / DASH_ROW_H))
+      : 2
+    const maxY = dashLayout.reduce((m, l) => Math.max(m, l.y + l.h), 0)
+    setDashLayout(prev => [...prev, { i: w.id, x: 0, y: maxY, w: w.colSpan, h: hh }])
+  }
   function updateWidget(id: string, patch: Partial<DashboardWidget>) {
     save({ widgets: config.widgets.map(w => w.id === id ? { ...w, ...patch } : w) })
   }
@@ -1491,8 +1464,6 @@ export default function Dashboard() {
 
   const PANEL = 'h-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5'
   const TITLE = 'text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500'
-
-  const isChartWidget = (id: string) => id.startsWith('chart-') || id.startsWith('charts-') || id.startsWith('stat-balance-') || customChartDefs.some(c => c.id === id)
 
   // Render widget content
   function renderContent(w: DashboardWidget, chartH: number) {
@@ -1744,76 +1715,60 @@ export default function Dashboard() {
       {/* Edit mode hint */}
       {editMode && (
         <p className="text-xs text-gray-400 dark:text-gray-500 -mt-3">
-          Arrastra los widgets para reordenarlos · Arrastra el borde derecho para cambiar el ancho · Arrastra el borde inferior para cambiar la altura (más alto = más filas del grid)
+          Arrastra los widgets desde el icono de grip · Arrastra los bordes inferior/derecho para cambiar el tamaño
         </p>
       )}
 
       {/* Widget grid */}
       {config.widgets.length > 0 ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-start [&>*]:max-sm:!col-span-1 [&>*]:sm:max-md:!col-span-1">
-          {config.widgets.map(w => {
-            const colCls = COL_CLS[w.colSpan] ?? 'col-span-2'
-            const hasResize = isChartWidget(w.id)
-            // For chart widgets, row span is derived from height; for stat/budget widgets always 1
-            const rs = hasResize ? Math.max(1, Math.ceil((w.height ?? 300) / 300)) : (w.rowSpan ?? 1)
-            const rowStyle = rs > 1 ? { gridRow: `span ${rs}` } : undefined
-
-            if (editMode) {
+        <div ref={dashContainerRef}>
+          <GridLayout
+            width={dashGridWidth}
+            gridConfig={{ cols: 4, rowHeight: DASH_ROW_H, margin: [16, 16], containerPadding: [0, 0] }}
+            dragConfig={{ handle: '.dash-grip' }}
+            resizeConfig={{ handles: ['s', 'e'] }}
+            compactor={verticalCompactor}
+            layout={editMode ? dashLayout : dashLayout.map(l => ({ ...l, static: true }))}
+            onLayoutChange={handleDashLayoutChange}
+          >
+            {config.widgets.map(w => {
+              const item = dashLayout.find(l => l.i === w.id)
+              const chartH = item ? Math.max(80, item.h * DASH_ROW_H - DASH_HEADER_H) : (w.height ?? 300)
               return (
-                <ResizableWrapper
-                  key={w.id}
-                  colSpan={w.colSpan}
-                  height={hasResize ? (w.height ?? 300) : undefined}
-                  onUpdateColSpan={cs => updateWidget(w.id, { colSpan: cs })}
-                  onUpdateHeight={hasResize ? h => updateWidget(w.id, { height: h }) : undefined}
-                  isDragging={dragId === w.id}
-                  isDragOver={dragOver === w.id && dragId !== w.id}
-                  onDragStart={() => { dragIdRef.current = w.id; setDragId(w.id) }}
-                  onDragOver={e => { e.preventDefault(); setDragOver(w.id) }}
-                  onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(null) }}
-                  onDrop={() => handleDrop(w.id)}
-                  onDragEnd={() => { dragIdRef.current = null; setDragId(null); setDragOver(null) }}
-                >
-                  {(chartH, onGripMouseDown, resizeHandles) => (
-                    <div className="relative">
-                      {renderContent(w, chartH)}
-                      {resizeHandles}
-                      <button onMouseDown={onGripMouseDown}
-                        className="absolute top-3 left-3 z-20 p-1.5 bg-white/90 dark:bg-gray-800/90 rounded-lg shadow border border-gray-200 dark:border-gray-700 cursor-grab hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        <GripVertical className="w-3.5 h-3.5 text-gray-400" />
-                      </button>
-                      {confirmDeleteId === w.id ? (
-                        <div className="absolute top-2 right-4 z-20 flex items-center gap-1 bg-white/95 dark:bg-gray-800/95 rounded-lg shadow border border-red-200 dark:border-red-700 px-2 py-1">
-                          <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">¿Eliminar?</span>
-                          <button onClick={() => { removeWidget(w.id); setConfirmDeleteId(null) }}
-                            className="text-xs font-medium text-red-500 hover:text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
-                            Sí
-                          </button>
-                          <button onClick={() => setConfirmDeleteId(null)}
-                            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-1.5 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                            No
-                          </button>
-                        </div>
-                      ) : (
-                        <button onClick={() => setConfirmDeleteId(w.id)}
-                          className="absolute top-2 right-4 z-20 p-1.5 bg-white/90 dark:bg-gray-800/90 rounded-lg shadow border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-300 dark:hover:border-red-700 text-gray-400 hover:text-red-500 transition-colors"
-                        >
-                          <X className="w-3.5 h-3.5" />
+                <div key={w.id} className="h-full overflow-hidden">
+                  <div className="relative h-full">
+                    {renderContent(w, chartH)}
+                    {editMode && (
+                      <>
+                        <button className="dash-grip absolute top-3 left-3 z-20 p-1.5 bg-white/90 dark:bg-gray-800/90 rounded-lg shadow border border-gray-200 dark:border-gray-700 cursor-grab hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                          <GripVertical className="w-3.5 h-3.5 text-gray-400" />
                         </button>
-                      )}
-                    </div>
-                  )}
-                </ResizableWrapper>
+                        {confirmDeleteId === w.id ? (
+                          <div className="absolute top-2 right-4 z-20 flex items-center gap-1 bg-white/95 dark:bg-gray-800/95 rounded-lg shadow border border-red-200 dark:border-red-700 px-2 py-1">
+                            <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">¿Eliminar?</span>
+                            <button onClick={() => { removeWidget(w.id); setConfirmDeleteId(null) }}
+                              className="text-xs font-medium text-red-500 hover:text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
+                              Sí
+                            </button>
+                            <button onClick={() => setConfirmDeleteId(null)}
+                              className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-1.5 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <button onClick={() => setConfirmDeleteId(w.id)}
+                            className="absolute top-2 right-4 z-20 p-1.5 bg-white/90 dark:bg-gray-800/90 rounded-lg shadow border border-gray-200 dark:border-gray-700 hover:bg-red-50 dark:hover:bg-red-900/30 hover:border-red-300 dark:hover:border-red-700 text-gray-400 hover:text-red-500 transition-colors"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
               )
-            }
-
-            return (
-              <div key={w.id} className={colCls} style={rowStyle}>
-                {renderContent(w, w.height ?? 300)}
-              </div>
-            )
-          })}
+            })}
+          </GridLayout>
         </div>
       ) : (
         !editMode && (
