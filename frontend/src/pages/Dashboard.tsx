@@ -1370,16 +1370,7 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
 
 function useDashWidth() {
   const ref = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(() => {
-    // Divide by zoom factor so the estimate never exceeds the actual container
-    // width — an over-estimate causes scroll overflow → feedback loop.
-    const zoomDisplay = (() => {
-      const s = localStorage.getItem('ui-zoom-v2')
-      return s ? Math.max(70, Math.min(130, parseInt(s, 10))) : 100
-    })()
-    const zoomFactor = zoomDisplay * 1.2 / 100
-    return Math.max(200, Math.floor(window.innerWidth / zoomFactor) - 224 - 48)
-  })
+  const [width, setWidth] = useState(0)
 
   useEffect(() => {
     const el = ref.current
@@ -1390,7 +1381,9 @@ function useDashWidth() {
       if (w > 0) setWidth(w)
     }
 
-    measure()
+    // useEffect fires after the first paint, so layout is already computed.
+    // One rAF defers to just before the second paint — guarantees a stable read.
+    const raf = requestAnimationFrame(measure)
     window.addEventListener('resize', measure)
 
     const ro = new ResizeObserver(entries => {
@@ -1399,7 +1392,7 @@ function useDashWidth() {
     })
     ro.observe(el)
 
-    return () => { window.removeEventListener('resize', measure); ro.disconnect() }
+    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', measure); ro.disconnect() }
   }, [])
 
   return { ref, width }
@@ -1789,6 +1782,7 @@ export default function Dashboard() {
       {/* Widget grid — ref div always rendered so useDashWidth measures correct width */}
       <div ref={dashContainerRef}>
       {config.widgets.length > 0 ? (
+        dashGridWidth > 0 ? (
           <GridLayout
             width={dashGridWidth}
             gridConfig={{ cols: 4, rowHeight: DASH_ROW_H, margin: [16, 16], containerPadding: [0, 0] }}
@@ -1836,6 +1830,7 @@ export default function Dashboard() {
               )
             })}
           </GridLayout>
+        ) : null
       ) : (
         !editMode && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
