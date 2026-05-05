@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { GridLayout, useContainerWidth, verticalCompactor, type LayoutItem } from 'react-grid-layout'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
@@ -1420,6 +1420,20 @@ export default function Dashboard() {
     return buildDashLayout(config.widgets, customIds)
   })
 
+  // Rebuild layout whenever config.widgets changes in a way that mismatches the current layout
+  useEffect(() => {
+    const layoutIds = new Set(dashLayout.map(l => l.i))
+    const widgetIds = new Set(config.widgets.map(w => w.id))
+    const orphaned = dashLayout.some(l => !widgetIds.has(l.i))
+    const missing  = config.widgets.some(w => !layoutIds.has(w.id))
+    if (!orphaned && !missing) return
+    const customIds = new Set(readCustomCharts().map(c => c.id))
+    const newLayout = buildDashLayout(config.widgets, customIds)
+    setDashLayout(newLayout)
+    localStorage.setItem(DASH_LAYOUT_KEY, JSON.stringify(newLayout))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [config.widgets])
+
   function handleDashLayoutChange(newLayout: readonly LayoutItem[]) {
     // Only save clean positional data — never persist static/enabled flags
     const clean = newLayout.map(({ i, x, y, w, h }) => ({ i, x, y, w, h }))
@@ -1703,7 +1717,13 @@ export default function Dashboard() {
             >
               <Plus className="w-3.5 h-3.5" /> Presupuesto
             </button>
-            <button onClick={() => save(DEFAULT_DASHBOARD_CONFIG)}
+            <button onClick={() => {
+              save(DEFAULT_DASHBOARD_CONFIG)
+              const customIds = new Set(readCustomCharts().map(c => c.id))
+              const nl = buildDashLayout(DEFAULT_DASHBOARD_CONFIG.widgets, customIds)
+              setDashLayout(nl)
+              localStorage.setItem(DASH_LAYOUT_KEY, JSON.stringify(nl))
+            }}
               className="px-3 py-1.5 rounded-xl text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-700 transition-colors"
             >
               Restablecer
