@@ -233,7 +233,7 @@ function CalendarView({ movements, types, selectedYear }: {
   return (
     <>
       {selectedMv && <MovementDetailModal movement={selectedMv} types={types} onClose={() => setSelectedMv(null)} />}
-      {formDate && <MovementForm initialDate={formDate} onClose={() => setFormDate(null)} />}
+      {formDate && <MovementForm key={formDate} initialDate={formDate} onClose={() => setFormDate(null)} />}
       {ctxMenu && (
         <MovementContextMenu
           menu={ctxMenu}
