@@ -1370,29 +1370,31 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
 
 function useDashWidth() {
   const ref = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(0)
+  // document.documentElement.clientWidth is the layout-viewport width in CSS px,
+  // already adjusted for CSS zoom in modern Chrome — always > 0 from the start.
+  const [width, setWidth] = useState(() =>
+    Math.max(200, document.documentElement.clientWidth - 224 - 48)
+  )
 
   useEffect(() => {
-    const el = ref.current
-    if (!el) return
-
     const measure = () => {
-      const w = el.offsetWidth
-      if (w > 0) setWidth(w)
+      // Prefer the actual element width; fall back to document viewport
+      const el = ref.current
+      const w = el && el.offsetWidth > 0
+        ? el.offsetWidth
+        : Math.max(200, document.documentElement.clientWidth - 224 - 48)
+      setWidth(w)
     }
 
-    // useEffect fires after the first paint, so layout is already computed.
-    // One rAF defers to just before the second paint — guarantees a stable read.
-    const raf = requestAnimationFrame(measure)
     window.addEventListener('resize', measure)
 
     const ro = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect.width
       if (w != null && w > 0) setWidth(w)
     })
-    ro.observe(el)
+    if (ref.current) ro.observe(ref.current)
 
-    return () => { cancelAnimationFrame(raf); window.removeEventListener('resize', measure); ro.disconnect() }
+    return () => { window.removeEventListener('resize', measure); ro.disconnect() }
   }, [])
 
   return { ref, width }
@@ -1782,7 +1784,6 @@ export default function Dashboard() {
       {/* Widget grid — ref div always rendered so useDashWidth measures correct width */}
       <div ref={dashContainerRef}>
       {config.widgets.length > 0 ? (
-        dashGridWidth > 0 ? (
           <GridLayout
             width={dashGridWidth}
             gridConfig={{ cols: 4, rowHeight: DASH_ROW_H, margin: [16, 16], containerPadding: [0, 0] }}
@@ -1830,7 +1831,6 @@ export default function Dashboard() {
               )
             })}
           </GridLayout>
-        ) : null
       ) : (
         !editMode && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
