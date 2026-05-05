@@ -1370,7 +1370,16 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
 
 function useDashWidth() {
   const ref = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(() => Math.max(200, window.innerWidth - 224 - 48))
+  const [width, setWidth] = useState(() => {
+    // Divide by zoom factor so the estimate never exceeds the actual container
+    // width — an over-estimate causes scroll overflow → feedback loop.
+    const zoomDisplay = (() => {
+      const s = localStorage.getItem('ui-zoom-v2')
+      return s ? Math.max(70, Math.min(130, parseInt(s, 10))) : 100
+    })()
+    const zoomFactor = zoomDisplay * 1.2 / 100
+    return Math.max(200, Math.floor(window.innerWidth / zoomFactor) - 224 - 48)
+  })
 
   useEffect(() => {
     const el = ref.current
