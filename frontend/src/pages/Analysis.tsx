@@ -6,13 +6,30 @@ import {
 } from 'recharts'
 import {
   Heart, Activity, Target, TrendingUp, Sparkles,
-  Copy, Check, type LucideIcon,
+  Copy, Check, Settings, ChevronDown, ChevronUp, type LucideIcon,
 } from 'lucide-react'
 import { getMovements, type Movement } from '../api/movements'
 import { getGroups, type Group } from '../api/groups'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
-import { getAccountsSummary } from '../api/accounts'
+import { getAccountsSummary, type Account } from '../api/accounts'
 import { useCurrency } from '../hooks/useCurrency'
+
+// ── Config ─────────────────────────────────────────────────────────────────────
+
+const ANALYSIS_CONFIG_KEY = 'spendly-analysis-config'
+
+interface AnalysisConfig {
+  emergencyAccountId: number | null
+  savingsGroupIds: number[]
+}
+
+function loadAnalysisConfig(): AnalysisConfig {
+  try {
+    const s = localStorage.getItem(ANALYSIS_CONFIG_KEY)
+    if (s) return { emergencyAccountId: null, savingsGroupIds: [], ...JSON.parse(s) }
+  } catch {}
+  return { emergencyAccountId: null, savingsGroupIds: [] }
+}
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -28,19 +45,23 @@ function sumIncome(movements: Movement[]) {
   return movements.filter(m => m.dinero > 0).reduce((s, m) => s + m.dinero, 0)
 }
 
-function sumExpenses(movements: Movement[]) {
-  return movements.filter(m => m.dinero < 0).reduce((s, m) => s + Math.abs(m.dinero), 0)
-}
-
-function monthKey(date: string) {
-  return date.slice(0, 7)
-}
-
 function monthsInRange(start: string, end: string): number {
   const s = new Date(start)
   const e = new Date(end)
-  const diff = (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1
-  return Math.max(1, diff)
+  return Math.max(1, (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1)
+}
+
+function buildRealExpenseMovements(
+  movements: Movement[],
+  typeGroupMap: Map<number, number>,
+  savingsGroupIdSet: Set<number>,
+): Movement[] {
+  return movements.filter(m => {
+    if (m.dinero >= 0) return false
+    if (!m.movement_type_id) return true
+    const gid = typeGroupMap.get(m.movement_type_id)
+    return gid == null || !savingsGroupIdSet.has(gid)
+  })
 }
 
 const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
@@ -65,9 +86,7 @@ function DateRangeInputs({ start, end, onChange }: {
 }
 
 function SectionCard({ title, icon: Icon, children }: {
-  title: string
-  icon: LucideIcon
-  children: React.ReactNode
+  title: string; icon: LucideIcon; children: React.ReactNode
 }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-5">
@@ -80,29 +99,129 @@ function SectionCard({ title, icon: Icon, children }: {
   )
 }
 
+// ── Config Panel ───────────────────────────────────────────────────────────────
+
+function ConfigPanel({ config, onChange, accounts, groups, types, fmt }: {
+  config: AnalysisConfig
+  onChange: (c: AnalysisConfig) => void
+  accounts: Account[]
+  groups: Group[]
+  types: MovementType[]
+  fmt: (v: number) => string
+}) {
+  const [open, setOpen] = useState(false)
+
+  const expenseGroups = useMemo(() => {
+    const usedGroupIds = new Set(types.map(t => t.income_expense_group_id))
+    return groups.filter(g => !g.is_total && usedGroupIds.has(g.id))
+  }, [groups, types])
+
+  function toggleGroup(id: number) {
+    const ids = config.savingsGroupIds.includes(id)
+      ? config.savingsGroupIds.filter(x => x !== id)
+      : [...config.savingsGroupIds, id]
+    onChange({ ...config, savingsGroupIds: ids })
+  }
+
+  const adjustments = config.savingsGroupIds.length + (config.emergencyAccountId != null ? 1 : 0)
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full flex items-center justify-between px-5 py-3 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
+          <span className="font-medium text-gray-600 dark:text-gray-300">Configuración del análisis</span>
+          {adjustments > 0 && (
+            <span className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded text-xs font-medium">
+              {adjustments} ajuste{adjustments !== 1 ? 's' : ''}
+            </span>
+          )}
+        </div>
+        {open
+          ? <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.5} />
+          : <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} />}
+      </button>
+
+      {open && (
+        <div className="px-5 pb-5 space-y-5 border-t border-gray-100 dark:border-gray-800 pt-4">
+          <div>
+            <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Cuenta fondo de emergencia</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
+              Su saldo se usa para calcular cuántos meses puedes aguantar sin ingresos
+            </p>
+            <select
+              value={config.emergencyAccountId ?? ''}
+              onChange={e => onChange({ ...config, emergencyAccountId: e.target.value ? Number(e.target.value) : null })}
+              className="text-xs px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 w-full max-w-sm"
+            >
+              <option value="">Suma de todas las cuentas ({fmt(accounts.reduce((s, a) => s + a.balance, 0))})</option>
+              {accounts.map(a => (
+                <option key={a.id} value={a.id}>{a.name} — {fmt(a.balance)}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Categorías de ahorro</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
+              Los movimientos de estas categorías no contarán como gastos en ningún cálculo
+            </p>
+            <div className="flex flex-wrap gap-2">
+              {expenseGroups.length === 0
+                ? <p className="text-xs text-gray-400">No hay categorías disponibles</p>
+                : expenseGroups.map(g => {
+                    const selected = config.savingsGroupIds.includes(g.id)
+                    return (
+                      <button
+                        key={g.id}
+                        onClick={() => toggleGroup(g.id)}
+                        className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs border transition-colors ${
+                          selected
+                            ? 'border-blue-400 dark:border-blue-600 bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300'
+                            : 'border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600'
+                        }`}
+                      >
+                        <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
+                        {g.name}
+                      </button>
+                    )
+                  })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── 1. Salud Financiera ────────────────────────────────────────────────────────
 
-function SaludFinanciera({ movements, income, expenses, savings, savingsRate, totalBalance, fmt }: {
-  movements: Movement[]; income: number; expenses: number; savings: number
-  savingsRate: number; totalBalance: number; fmt: (v: number) => string
+function SaludFinanciera({ realExpenseMovements, income, realExpenses, savings, savingsRate, emergencyBalance, avgMonthlyExpenses, months, fmt }: {
+  realExpenseMovements: Movement[]
+  income: number
+  realExpenses: number
+  savings: number
+  savingsRate: number
+  emergencyBalance: number
+  avgMonthlyExpenses: number
+  months: number
+  fmt: (v: number) => string
 }) {
-  const months = Math.max(1, new Set(movements.map(m => monthKey(m.date))).size)
-  const avgMonthlyExpenses = expenses / months
-  const avgMonthlyIncome   = income   / months
-  const avgMonthlySavings  = savings  / months
-  const emergencyMonths = avgMonthlyExpenses > 0 ? totalBalance / avgMonthlyExpenses : 0
-  const ratio = expenses > 0 ? income / expenses : 0
+  const emergencyMonths = avgMonthlyExpenses > 0 ? emergencyBalance / avgMonthlyExpenses : 0
+  const ratio = realExpenses > 0 ? income / realExpenses : 0
 
-  // Top spending category
   const topCat = useMemo(() => {
     const map = new Map<string, number>()
-    movements.filter(m => m.dinero < 0).forEach(m => {
+    realExpenseMovements.forEach(m => {
       const label = m.label || 'Sin categoría'
       map.set(label, (map.get(label) ?? 0) + Math.abs(m.dinero))
     })
     if (map.size === 0) return null
     return [...map.entries()].reduce((a, b) => b[1] > a[1] ? b : a)
-  }, [movements])
+  }, [realExpenseMovements])
 
   const metrics = [
     {
@@ -110,70 +229,69 @@ function SaludFinanciera({ movements, income, expenses, savings, savingsRate, to
       value: `${savingsRate.toFixed(1)}%`,
       sub: savingsRate >= 20 ? 'Excelente (obj. >20%)' : savingsRate >= 10 ? 'Buena (obj. >20%)' : savingsRate >= 0 ? 'Mejorable (obj. >20%)' : 'Gastos > Ingresos',
       color: savingsRate >= 20 ? 'text-green-500' : savingsRate >= 10 ? 'text-yellow-500' : 'text-red-500',
-      detail: `De cada 100€ ingresados, ahorras ${savingsRate.toFixed(0)}€`,
+      detail: income > 0 ? `De cada 100€ ingresados, ahorras ${savingsRate.toFixed(0)}€` : '',
     },
     {
       label: 'Fondo de emergencia',
       value: `${emergencyMonths.toFixed(1)} meses`,
       sub: emergencyMonths >= 6 ? 'Suficiente (obj. >6m)' : emergencyMonths >= 3 ? 'Mínimo (obj. >6m)' : 'Insuficiente (obj. >6m)',
       color: emergencyMonths >= 6 ? 'text-green-500' : emergencyMonths >= 3 ? 'text-yellow-500' : 'text-red-500',
-      detail: `${fmt(totalBalance)} patrimonio ÷ ${fmt(avgMonthlyExpenses)}/mes`,
+      detail: `${fmt(emergencyBalance)} ÷ ${fmt(avgMonthlyExpenses)}/mes`,
     },
     {
       label: 'Ratio ingreso/gasto',
       value: ratio.toFixed(2),
-      sub: ratio >= 1.2 ? 'Saludable (obj. >1.2)' : ratio >= 1 ? 'Ajustado (obj. >1.2)' : 'Deficitario',
+      sub: ratio >= 1.2 ? 'Saludable (obj. >1.2)' : ratio >= 1 ? 'Ajustado' : 'Deficitario',
       color: ratio >= 1.2 ? 'text-green-500' : ratio >= 1 ? 'text-yellow-500' : 'text-red-500',
-      detail: `Por cada €1 gastado, ingresas €${ratio.toFixed(2)}`,
+      detail: `Por €1 de gasto real, ingresas €${ratio.toFixed(2)}`,
     },
     {
-      label: 'Media mensual',
-      value: fmt(avgMonthlySavings),
+      label: 'Ahorro mensual',
+      value: fmt(savings / months),
       sub: `${months} ${months === 1 ? 'mes' : 'meses'} analizados`,
-      color: avgMonthlySavings >= 0 ? 'text-green-500' : 'text-red-500',
-      detail: `${fmt(avgMonthlyIncome)} ing. · ${fmt(avgMonthlyExpenses)} gasto`,
+      color: savings >= 0 ? 'text-green-500' : 'text-red-500',
+      detail: `${fmt(income / months)} ing. · ${fmt(avgMonthlyExpenses)} gastos`,
     },
     {
       label: 'Mayor categoría',
       value: topCat ? topCat[0] : '—',
-      sub: topCat ? fmt(topCat[1]) : 'Sin datos',
+      sub: topCat ? fmt(topCat[1]) : 'Sin datos de gastos',
       color: 'text-gray-700 dark:text-gray-200',
-      detail: topCat && expenses > 0 ? `${((topCat[1] / expenses) * 100).toFixed(0)}% del total de gastos` : '',
+      detail: topCat && realExpenses > 0 ? `${((topCat[1] / realExpenses) * 100).toFixed(0)}% del total de gastos` : '',
     },
     {
       label: 'Ahorro neto total',
       value: fmt(savings),
-      sub: savings >= 0 ? `+${fmt(savings - 0)} en el período` : 'Período deficitario',
+      sub: savings >= 0 ? 'Balance positivo' : 'Balance negativo',
       color: savings >= 0 ? 'text-green-500' : 'text-red-500',
-      detail: `${fmt(income)} ingresos — ${fmt(expenses)} gastos`,
+      detail: `${fmt(income)} ingresos — ${fmt(realExpenses)} gastos reales`,
     },
   ]
 
-  // Dynamic summary text
   const summary = useMemo(() => {
     if (income === 0) return 'No hay ingresos registrados en el período seleccionado.'
     const parts: string[] = []
     if (savingsRate >= 20) {
-      parts.push(`Estás ahorrando el ${savingsRate.toFixed(0)}% de tus ingresos, por encima del objetivo recomendado del 20%.`)
+      parts.push(`Estás ahorrando el ${savingsRate.toFixed(0)}% de tus ingresos, por encima del 20% recomendado.`)
     } else if (savingsRate >= 10) {
-      parts.push(`Tu tasa de ahorro del ${savingsRate.toFixed(0)}% es positiva pero está por debajo del objetivo recomendado del 20%.`)
+      parts.push(`Tu tasa de ahorro del ${savingsRate.toFixed(0)}% es positiva pero no llega al objetivo del 20%.`)
     } else if (savingsRate >= 0) {
-      parts.push(`Tu tasa de ahorro del ${savingsRate.toFixed(0)}% es muy baja. Revisa si hay gastos que puedas reducir.`)
+      parts.push(`Tu tasa de ahorro del ${savingsRate.toFixed(0)}% es baja. Revisa si puedes reducir alguna categoría de gasto.`)
     } else {
       parts.push(`Tus gastos superan tus ingresos en ${fmt(Math.abs(savings))}. Situación deficitaria que requiere atención.`)
     }
     if (emergencyMonths >= 6) {
-      parts.push(`El fondo de emergencia cubre ${emergencyMonths.toFixed(1)} meses de gastos — solidez financiera correcta.`)
+      parts.push(`El fondo de emergencia cubre ${emergencyMonths.toFixed(1)} meses de gastos — situación sólida.`)
     } else if (emergencyMonths >= 3) {
-      parts.push(`El fondo de emergencia cubre ${emergencyMonths.toFixed(1)} meses. Se recomienda llegar a al menos 6 meses.`)
+      parts.push(`El fondo de emergencia cubre ${emergencyMonths.toFixed(1)} meses; el objetivo recomendado son 6 meses.`)
     } else {
-      parts.push(`El fondo de emergencia solo cubre ${emergencyMonths.toFixed(1)} meses. Prioriza aumentarlo hasta los 6 meses mínimos recomendados.`)
+      parts.push(`El fondo de emergencia solo cubre ${emergencyMonths.toFixed(1)} meses. Prioriza construirlo hasta los 6 meses mínimos.`)
     }
     if (topCat) {
-      parts.push(`Tu mayor gasto es "${topCat[0]}" con ${fmt(topCat[1])} (${expenses > 0 ? ((topCat[1] / expenses) * 100).toFixed(0) : 0}% del total).`)
+      parts.push(`Tu mayor gasto es "${topCat[0]}" con ${fmt(topCat[1])} (${realExpenses > 0 ? ((topCat[1] / realExpenses) * 100).toFixed(0) : 0}% del total).`)
     }
     return parts.join(' ')
-  }, [income, savingsRate, savings, emergencyMonths, topCat, expenses, fmt])
+  }, [income, savingsRate, savings, emergencyMonths, topCat, realExpenses, fmt])
 
   return (
     <div className="space-y-4">
@@ -196,59 +314,77 @@ function SaludFinanciera({ movements, income, expenses, savings, savingsRate, to
 
 // ── 2. Patrones de Gasto por Mes ──────────────────────────────────────────────
 
-function PatronesDeGasto({ movements, fmt }: { movements: Movement[]; fmt: (v: number) => string }) {
-  const expenses = movements.filter(m => m.dinero < 0)
+function PatronesDeGasto({ realExpenseMovements, fmt }: {
+  realExpenseMovements: Movement[]
+  fmt: (v: number) => string
+}) {
+  const byCalendarMonth = useMemo(() => {
+    const monthData = new Map<number, { total: number; years: Set<number> }>()
+    for (let i = 1; i <= 12; i++) monthData.set(i, { total: 0, years: new Set() })
 
-  const byMonth = useMemo(() => {
-    const map = new Map<string, number>()
-    expenses.forEach(m => {
-      const key = monthKey(m.date)
-      map.set(key, (map.get(key) ?? 0) + Math.abs(m.dinero))
+    realExpenseMovements.forEach(m => {
+      const parts = m.date.split('-')
+      const year = Number(parts[0])
+      const mo = Number(parts[1])
+      const d = monthData.get(mo)!
+      d.total += Math.abs(m.dinero)
+      d.years.add(year)
     })
-    return [...map.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, total]) => {
-        const [y, mo] = key.split('-').map(Number)
-        const label = `${MONTHS_SHORT[mo - 1]} ${String(y).slice(2)}`
-        return { key, label, total }
-      })
-  }, [expenses])
 
-  if (byMonth.length === 0) {
+    return Array.from(monthData.entries()).map(([mo, { total, years }]) => ({
+      label: MONTHS_SHORT[mo - 1],
+      avg: years.size > 0 ? total / years.size : 0,
+      yearsCount: years.size,
+    }))
+  }, [realExpenseMovements])
+
+  const biggest = useMemo(() =>
+    [...realExpenseMovements]
+      .sort((a, b) => a.dinero - b.dinero)
+      .slice(0, 10),
+    [realExpenseMovements]
+  )
+
+  if (realExpenseMovements.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-8">Sin gastos en el período seleccionado</p>
   }
 
-  const avg = byMonth.reduce((s, m) => s + m.total, 0) / byMonth.length
-  const max = byMonth.reduce((a, b) => b.total > a.total ? b : a, byMonth[0])
-  const min = byMonth.reduce((a, b) => b.total < a.total ? b : a, byMonth[0])
-
   return (
-    <div className="space-y-4">
-      <ResponsiveContainer width="100%" height={220}>
-        <BarChart data={byMonth} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-          <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} width={36} />
-          <Tooltip formatter={(v) => fmt(v as number)} labelFormatter={l => `Gastos · ${l}`} />
-          <Bar dataKey="total" name="Gastos" fill="#60a5fa" radius={[3, 3, 0, 0]}
-            label={false} />
-        </BarChart>
-      </ResponsiveContainer>
-      <div className="grid grid-cols-3 gap-3 text-center text-xs">
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
-          <p className="text-gray-400 dark:text-gray-500 mb-0.5">Mes más alto</p>
-          <p className="font-semibold text-red-500">{max.label}</p>
-          <p className="text-gray-500 dark:text-gray-400 mt-0.5">{fmt(max.total)}</p>
-        </div>
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
-          <p className="text-gray-400 dark:text-gray-500 mb-0.5">Media mensual</p>
-          <p className="font-semibold text-blue-500">—</p>
-          <p className="text-gray-500 dark:text-gray-400 mt-0.5">{fmt(avg)}</p>
-        </div>
-        <div className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
-          <p className="text-gray-400 dark:text-gray-500 mb-0.5">Mes más bajo</p>
-          <p className="font-semibold text-green-500">{min.label}</p>
-          <p className="text-gray-500 dark:text-gray-400 mt-0.5">{fmt(min.total)}</p>
+    <div className="space-y-5">
+      <div>
+        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+          Media de gasto por mes del año, promediada entre todos los años del rango
+        </p>
+        <ResponsiveContainer width="100%" height={180}>
+          <BarChart data={byCalendarMonth} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+            <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} width={36} />
+            <Tooltip
+              formatter={(v) => fmt(v as number)}
+              labelFormatter={(l, payload) => {
+                const p = payload?.[0]?.payload as { yearsCount?: number } | undefined
+                return `${l}${p?.yearsCount && p.yearsCount > 1 ? ` (media ${p.yearsCount} años)` : ''}`
+              }}
+            />
+            <Bar dataKey="avg" name="Media gastos" fill="#60a5fa" radius={[3, 3, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      <div>
+        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
+          Movimientos más grandes del período
+        </p>
+        <div className="space-y-1.5">
+          {biggest.map(m => (
+            <div key={m.id} className="flex items-center gap-3 text-xs bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
+              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color || '#9ca3af' }} />
+              <span className="text-gray-700 dark:text-gray-300 flex-1 truncate">{m.name}</span>
+              <span className="text-gray-400 dark:text-gray-500 shrink-0">{m.date.slice(0, 7)}</span>
+              <span className="font-medium text-red-500 shrink-0">{fmt(Math.abs(m.dinero))}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -266,8 +402,12 @@ const BUCKETS: { id: RuleBucket; label: string; target: number; barColor: string
   { id: 'ahorro',      label: 'Ahorro/Inv.',  target: 20, barColor: 'bg-green-500',  textColor: 'text-green-600 dark:text-green-400' },
 ]
 
-function Regla502030({ movements, groups, types, income, fmt }: {
-  movements: Movement[]; groups: Group[]; types: MovementType[]; income: number; fmt: (v: number) => string
+function Regla502030({ realExpenseMovements, groups, types, income, fmt }: {
+  realExpenseMovements: Movement[]
+  groups: Group[]
+  types: MovementType[]
+  income: number
+  fmt: (v: number) => string
 }) {
   const [assignment, setAssignment] = useState<Record<number, RuleBucket>>(() => {
     try {
@@ -284,17 +424,15 @@ function Regla502030({ movements, groups, types, income, fmt }: {
 
   const byBucket = useMemo(() => {
     const map: Record<RuleBucket, number> = { necesidades: 0, deseos: 0, ahorro: 0, unassigned: 0 }
-    movements.filter(m => m.dinero < 0 && m.movement_type_id != null).forEach(m => {
+    realExpenseMovements.forEach(m => {
+      if (m.movement_type_id == null) { map.unassigned += Math.abs(m.dinero); return }
       const t = types.find(t => t.id === m.movement_type_id)
       if (!t) { map.unassigned += Math.abs(m.dinero); return }
       const bucket: RuleBucket = assignment[t.income_expense_group_id] ?? 'unassigned'
       map[bucket] += Math.abs(m.dinero)
     })
-    movements.filter(m => m.dinero < 0 && m.movement_type_id == null).forEach(m => {
-      map.unassigned += Math.abs(m.dinero)
-    })
     return map
-  }, [movements, types, assignment])
+  }, [realExpenseMovements, types, assignment])
 
   const expenseGroups = useMemo(() => {
     const usedGroupIds = new Set(types.map(t => t.income_expense_group_id))
@@ -400,14 +538,8 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
           <XAxis dataKey="label" tick={{ fontSize: 10 }} />
           <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} width={40} />
           <Tooltip formatter={(v) => fmt(v as number)} />
-          <Area
-            type="monotone"
-            dataKey="balance"
-            name="Patrimonio"
-            stroke={positive ? '#60a5fa' : '#f87171'}
-            fill="url(#projGrad)"
-            strokeWidth={2}
-          />
+          <Area type="monotone" dataKey="balance" name="Patrimonio"
+            stroke={positive ? '#60a5fa' : '#f87171'} fill="url(#projGrad)" strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>
       <div className="grid grid-cols-3 gap-3 text-center">
@@ -426,8 +558,10 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
 
 // ── 5. Prompt IA ──────────────────────────────────────────────────────────────
 
-function PromptIA({ allMovements, fmt }: {
+function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, fmt }: {
   allMovements: Movement[]
+  typeGroupMap: Map<number, number>
+  savingsGroupIdSet: Set<number>
   fmt: (v: number) => string
 }) {
   const now = new Date()
@@ -437,27 +571,31 @@ function PromptIA({ allMovements, fmt }: {
 
   const movements = useMemo(() => filterMovements(allMovements, start, end), [allMovements, start, end])
 
+  const realExpenseMovements = useMemo(
+    () => buildRealExpenseMovements(movements, typeGroupMap, savingsGroupIdSet),
+    [movements, typeGroupMap, savingsGroupIdSet]
+  )
+
   const income   = sumIncome(movements)
-  const expenses = sumExpenses(movements)
-  const savings  = income - expenses
+  const realExpenses = realExpenseMovements.reduce((s, m) => s + Math.abs(m.dinero), 0)
+  const savings  = income - realExpenses
   const savingsRate = income > 0 ? (savings / income) * 100 : 0
 
   const byCategory = useMemo(() => {
     const map = new Map<string, number>()
-    movements.filter(m => m.dinero < 0).forEach(m => {
+    realExpenseMovements.forEach(m => {
       const label = m.label || 'Sin categoría'
       map.set(label, (map.get(label) ?? 0) + Math.abs(m.dinero))
     })
     return [...map.entries()].sort((a, b) => b[1] - a[1])
-  }, [movements])
+  }, [realExpenseMovements])
 
   const topExpenses = useMemo(() =>
-    [...movements]
-      .filter(m => m.dinero < 0)
-      .sort((a, b) => a.dinero - b.dinero)
-      .slice(0, 10),
-    [movements]
+    [...realExpenseMovements].sort((a, b) => a.dinero - b.dinero).slice(0, 10),
+    [realExpenseMovements]
   )
+
+  const hasSavingsFilter = savingsGroupIdSet.size > 0
 
   const prompt = useMemo(() => {
     if (movements.length === 0) return 'Sin datos para el período seleccionado. Elige un rango con movimientos.'
@@ -465,28 +603,27 @@ function PromptIA({ allMovements, fmt }: {
     return [
       `Actúa como un asesor financiero personal experto. Analiza mis finanzas del ${start} al ${end} y dame un informe completo con recomendaciones accionables.`,
       '',
-      '## CONTEXTO IMPORTANTE SOBRE LOS DATOS',
+      '## CONTEXTO SOBRE LOS DATOS',
       '',
-      'Esta aplicación registra todas las salidas de dinero como "gastos", incluyendo transferencias a cuentas de ahorro o de inversión propias.',
-      'Esto significa que la "tasa de ahorro" calculada automáticamente puede estar artificialmente deprimida: si hago transferencias a mis propias cuentas de ahorro/inversión, esas aparecen como gasto aunque en realidad son ahorro.',
-      'Al analizar los datos, ten en cuenta que algunas categorías de "gasto" (especialmente las relacionadas con ahorro, inversión, fondos, o cuentas propias) son en realidad ahorro real.',
-      'Ajusta tu evaluación de la tasa de ahorro si detectas este patrón en las categorías.',
+      hasSavingsFilter
+        ? 'Los datos ya están filtrados: las transferencias a cuentas de ahorro/inversión están excluidas de los gastos y no aparecen en este análisis. Los importes de "gastos" son solo consumo real.'
+        : 'AVISO: Esta aplicación puede registrar transferencias a cuentas de ahorro propias como "gastos". Si ves categorías relacionadas con ahorro o inversión, esos importes son en realidad ahorro, no consumo. Ajusta tu análisis si detectas este patrón.',
       '',
       '## DATOS FINANCIEROS',
       '',
       '### Resumen del período',
       `- Ingresos totales: ${fmt(income)}`,
-      `- Salidas totales (gastos + transferencias a ahorro): ${fmt(expenses)}`,
-      `- Balance neto del período: ${fmt(savings)}`,
-      `- Tasa de ahorro aparente: ${savingsRate.toFixed(1)}% (puede ser superior si hay transferencias a ahorro)`,
+      `- Gastos reales (consumo): ${fmt(realExpenses)}`,
+      `- Ahorro neto: ${fmt(savings)}`,
+      `- Tasa de ahorro: ${savingsRate.toFixed(1)}%`,
       `- Total movimientos: ${movements.length}`,
       '',
-      '### Salidas por categoría (gastos y posibles ahorros)',
+      '### Gastos por categoría',
       ...byCategory.map(([cat, amount]) =>
         `- ${cat}: ${fmt(amount)}${income > 0 ? ` (${((amount / income) * 100).toFixed(1)}% sobre ingresos)` : ''}`
       ),
       '',
-      '### Top 10 salidas del período',
+      '### Top 10 gastos individuales',
       ...topExpenses.map((m, i) =>
         `${i + 1}. ${m.name} — ${fmt(Math.abs(m.dinero))} (${m.date})${m.label ? ` [${m.label}]` : ''}`
       ),
@@ -494,21 +631,14 @@ function PromptIA({ allMovements, fmt }: {
       '## ANÁLISIS SOLICITADO',
       '',
       'Por favor proporciona:',
-      '1. **Evaluación general** — distingue entre gastos reales y posibles transferencias a ahorro según las categorías',
-      '2. **Tasa de ahorro real estimada** — ajustando si identificas categorías que son en realidad ahorro',
+      '1. **Evaluación general** de mi situación financiera en este período',
+      '2. **Tasa de ahorro real** — si es adecuada y cómo mejorarla',
       '3. **Análisis de gastos** — categorías preocupantes y por qué',
       '4. **3 recomendaciones concretas** y fáciles de implementar',
       '5. **Alertas** — patrones o gastos que deberían preocuparme',
       '6. **Proyección** — si continúo así, ¿dónde estaré en 6 y 12 meses?',
     ].join('\n')
-  }, [movements, start, end, income, expenses, savings, savingsRate, byCategory, topExpenses, fmt])
-
-  function handleCopy() {
-    navigator.clipboard.writeText(prompt).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
-    })
-  }
+  }, [movements, realExpenseMovements, start, end, income, realExpenses, savings, savingsRate, byCategory, topExpenses, fmt, hasSavingsFilter])
 
   return (
     <div className="space-y-4">
@@ -525,18 +655,16 @@ function PromptIA({ allMovements, fmt }: {
           {prompt}
         </pre>
         <button
-          onClick={handleCopy}
+          onClick={() => navigator.clipboard.writeText(prompt).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })}
           className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm"
         >
-          {copied
-            ? <Check className="w-3.5 h-3.5 text-green-500" />
-            : <Copy className="w-3.5 h-3.5" />}
+          {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
           {copied ? 'Copiado' : 'Copiar'}
         </button>
       </div>
 
       <p className="text-xs text-gray-400 dark:text-gray-500">
-        Pega este prompt en ChatGPT, Claude u otro asistente de IA para obtener un análisis financiero personalizado.
+        Pega este prompt en ChatGPT, Claude u otro asistente de IA para obtener un análisis personalizado.
       </p>
     </div>
   )
@@ -550,36 +678,56 @@ export default function Analysis() {
 
   const [rangeStart, setRangeStart] = useState(localDateStr(new Date(now.getFullYear(), now.getMonth() - 2, 1)))
   const [rangeEnd,   setRangeEnd]   = useState(localDateStr(now))
+  const [analysisConfig, setAnalysisConfig] = useState<AnalysisConfig>(loadAnalysisConfig)
 
-  const { data: allMovements = [] } = useQuery({
-    queryKey: ['movements'],
-    queryFn: () => getMovements(),
-  })
-  const { data: groups = [] } = useQuery({
-    queryKey: ['groups'],
-    queryFn: getGroups,
-  })
-  const { data: types = [] } = useQuery({
-    queryKey: ['movement-types'],
-    queryFn: getMovementTypes,
-  })
-  const { data: accountsSummary } = useQuery({
-    queryKey: ['accounts-summary'],
-    queryFn: getAccountsSummary,
-  })
+  function updateConfig(c: AnalysisConfig) {
+    setAnalysisConfig(c)
+    localStorage.setItem(ANALYSIS_CONFIG_KEY, JSON.stringify(c))
+  }
+
+  const { data: allMovements = [] } = useQuery({ queryKey: ['movements'], queryFn: () => getMovements() })
+  const { data: groups = [] }       = useQuery({ queryKey: ['groups'],    queryFn: getGroups })
+  const { data: types = [] }        = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
+  const { data: accountsSummary }   = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
+
+  const savingsGroupIdSet = useMemo(
+    () => new Set(analysisConfig.savingsGroupIds),
+    [analysisConfig.savingsGroupIds]
+  )
+
+  const typeGroupMap = useMemo(() => {
+    const map = new Map<number, number>()
+    types.forEach(t => map.set(t.id, t.income_expense_group_id))
+    return map
+  }, [types])
 
   const movements = useMemo(
     () => filterMovements(allMovements, rangeStart, rangeEnd),
     [allMovements, rangeStart, rangeEnd]
   )
 
-  const income   = useMemo(() => sumIncome(movements),   [movements])
-  const expenses = useMemo(() => sumExpenses(movements), [movements])
-  const savings  = income - expenses
-  const savingsRate    = income > 0 ? (savings / income) * 100 : 0
-  const totalBalance   = accountsSummary?.total ?? 0
-  const months         = monthsInRange(rangeStart, rangeEnd)
-  const monthlySavings = savings / months
+  const realExpenseMovements = useMemo(
+    () => buildRealExpenseMovements(movements, typeGroupMap, savingsGroupIdSet),
+    [movements, typeGroupMap, savingsGroupIdSet]
+  )
+
+  const income       = useMemo(() => sumIncome(movements), [movements])
+  const realExpenses = useMemo(
+    () => realExpenseMovements.reduce((s, m) => s + Math.abs(m.dinero), 0),
+    [realExpenseMovements]
+  )
+  const savings      = income - realExpenses
+  const savingsRate  = income > 0 ? (savings / income) * 100 : 0
+  const totalBalance = accountsSummary?.total ?? 0
+  const months       = monthsInRange(rangeStart, rangeEnd)
+
+  const emergencyBalance = useMemo(() => {
+    if (analysisConfig.emergencyAccountId == null) return totalBalance
+    return accountsSummary?.accounts.find(a => a.id === analysisConfig.emergencyAccountId)?.balance ?? 0
+  }, [analysisConfig.emergencyAccountId, accountsSummary, totalBalance])
+
+  const avgMonthlyExpenses = realExpenses / months
+  const monthlySavings     = savings / months
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto">
@@ -597,24 +745,41 @@ export default function Analysis() {
         </div>
       </div>
 
+      <ConfigPanel
+        config={analysisConfig}
+        onChange={updateConfig}
+        accounts={accountsSummary?.accounts ?? []}
+        groups={groups}
+        types={types}
+        fmt={fmt}
+      />
+
       <SectionCard title="Salud Financiera" icon={Heart}>
         <SaludFinanciera
-          movements={movements}
+          realExpenseMovements={realExpenseMovements}
           income={income}
-          expenses={expenses}
+          realExpenses={realExpenses}
           savings={savings}
           savingsRate={savingsRate}
-          totalBalance={totalBalance}
+          emergencyBalance={emergencyBalance}
+          avgMonthlyExpenses={avgMonthlyExpenses}
+          months={months}
           fmt={fmt}
         />
       </SectionCard>
 
       <SectionCard title="Patrones de Gasto por Mes" icon={Activity}>
-        <PatronesDeGasto movements={movements} fmt={fmt} />
+        <PatronesDeGasto realExpenseMovements={realExpenseMovements} fmt={fmt} />
       </SectionCard>
 
       <SectionCard title="Regla 50/30/20" icon={Target}>
-        <Regla502030 movements={movements} groups={groups} types={types} income={income} fmt={fmt} />
+        <Regla502030
+          realExpenseMovements={realExpenseMovements}
+          groups={groups}
+          types={types}
+          income={income}
+          fmt={fmt}
+        />
       </SectionCard>
 
       <SectionCard title="Proyección de Patrimonio" icon={TrendingUp}>
@@ -622,7 +787,12 @@ export default function Analysis() {
       </SectionCard>
 
       <SectionCard title="Prompt IA" icon={Sparkles}>
-        <PromptIA allMovements={allMovements} fmt={fmt} />
+        <PromptIA
+          allMovements={allMovements}
+          typeGroupMap={typeGroupMap}
+          savingsGroupIdSet={savingsGroupIdSet}
+          fmt={fmt}
+        />
       </SectionCard>
     </div>
   )
