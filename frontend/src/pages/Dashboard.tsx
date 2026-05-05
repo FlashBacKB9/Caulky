@@ -1364,39 +1364,23 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
 }
 
 // ── Dashboard grid width ──────────────────────────────────────────────────────
-// On first page load the flex layout may not be computed when useLayoutEffect
-// fires (offsetWidth = 0). Poll via rAF until we get a real value, then hand
-// off to a ResizeObserver for any subsequent changes.
+// Start with window.innerWidth minus sidebar+padding as a safe initial estimate
+// (always > 0, so the grid renders immediately). A ResizeObserver then corrects
+// the exact value once the flex layout is computed.
 
 function useDashWidth() {
   const ref = useRef<HTMLDivElement>(null)
-  const [width, setWidth] = useState(0)
+  const [width, setWidth] = useState(() => Math.max(200, window.innerWidth - 224 - 48))
 
   useEffect(() => {
     const el = ref.current
     if (!el) return
-    let rafId: number
-    let active = true
-
-    const measure = () => {
-      if (!active) return
-      const w = el.offsetWidth
-      if (w > 0) {
-        setWidth(w)
-      } else {
-        rafId = requestAnimationFrame(measure)
-      }
-    }
-
-    measure()
-
     const ro = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect.width
       if (w != null && w > 0) setWidth(w)
     })
     ro.observe(el)
-
-    return () => { active = false; cancelAnimationFrame(rafId); ro.disconnect() }
+    return () => ro.disconnect()
   }, [])
 
   return { ref, width }
@@ -1786,7 +1770,6 @@ export default function Dashboard() {
       {/* Widget grid — ref div always rendered so useDashWidth measures correct width */}
       <div ref={dashContainerRef}>
       {config.widgets.length > 0 ? (
-        dashGridWidth > 0 ? (
           <GridLayout
             width={dashGridWidth}
             gridConfig={{ cols: 4, rowHeight: DASH_ROW_H, margin: [16, 16], containerPadding: [0, 0] }}
@@ -1834,7 +1817,6 @@ export default function Dashboard() {
               )
             })}
           </GridLayout>
-        ) : null /* width not yet measured — wait for ResizeObserver */
       ) : (
         !editMode && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
