@@ -6,7 +6,7 @@ import {
 } from 'recharts'
 import {
   Heart, Activity, Target, TrendingUp, Sparkles,
-  Copy, Check, Settings, ChevronDown, ChevronUp, type LucideIcon,
+  Copy, Check, Settings, ChevronDown, ChevronUp, EyeOff, Eye, type LucideIcon,
 } from 'lucide-react'
 import { getMovements, type Movement } from '../api/movements'
 import { getGroups, type Group } from '../api/groups'
@@ -21,14 +21,15 @@ const ANALYSIS_CONFIG_KEY = 'spendly-analysis-config'
 interface AnalysisConfig {
   emergencyAccountId: number | null
   savingsGroupIds: number[]
+  excludedMovementIds: number[]
 }
 
 function loadAnalysisConfig(): AnalysisConfig {
   try {
     const s = localStorage.getItem(ANALYSIS_CONFIG_KEY)
-    if (s) return { emergencyAccountId: null, savingsGroupIds: [], ...JSON.parse(s) }
+    if (s) return { emergencyAccountId: null, savingsGroupIds: [], excludedMovementIds: [], ...JSON.parse(s) }
   } catch {}
-  return { emergencyAccountId: null, savingsGroupIds: [] }
+  return { emergencyAccountId: null, savingsGroupIds: [], excludedMovementIds: [] }
 }
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
@@ -335,8 +336,11 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
 
 // ── 2. Patrones de Gasto por Mes ──────────────────────────────────────────────
 
-function PatronesDeGasto({ realExpenseMovements, fmt }: {
+function PatronesDeGasto({ realExpenseMovements, allExpenseMovements, excludedMovementIds, onToggleExclusion, fmt }: {
   realExpenseMovements: Movement[]
+  allExpenseMovements: Movement[]
+  excludedMovementIds: number[]
+  onToggleExclusion: (id: number) => void
   fmt: (v: number) => string
 }) {
   const byCalendarMonth = useMemo(() => {
@@ -359,14 +363,15 @@ function PatronesDeGasto({ realExpenseMovements, fmt }: {
     }))
   }, [realExpenseMovements])
 
+  // Show top 10 biggest from ALL expense movements (including excluded), so user can toggle them
   const biggest = useMemo(() =>
-    [...realExpenseMovements]
+    [...allExpenseMovements]
       .sort((a, b) => a.dinero - b.dinero)
       .slice(0, 10),
-    [realExpenseMovements]
+    [allExpenseMovements]
   )
 
-  if (realExpenseMovements.length === 0) {
+  if (allExpenseMovements.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-8">Sin gastos en el período seleccionado</p>
   }
 
@@ -398,15 +403,43 @@ function PatronesDeGasto({ realExpenseMovements, fmt }: {
           Movimientos más grandes del período
         </p>
         <div className="space-y-1.5">
-          {biggest.map(m => (
-            <div key={m.id} className="flex items-center gap-3 text-xs bg-gray-50 dark:bg-gray-800 rounded-lg px-3 py-2">
-              <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color || '#9ca3af' }} />
-              <span className="text-gray-700 dark:text-gray-300 flex-1 truncate">{m.name}</span>
-              <span className="text-gray-400 dark:text-gray-500 shrink-0">{m.date.slice(0, 7)}</span>
-              <span className="font-medium text-red-500 shrink-0">{fmt(Math.abs(m.dinero))}</span>
-            </div>
-          ))}
+          {biggest.map(m => {
+            const excluded = excludedMovementIds.includes(m.id)
+            return (
+              <div
+                key={m.id}
+                className={`flex items-center gap-3 text-xs rounded-lg px-3 py-2 transition-opacity ${
+                  excluded
+                    ? 'bg-gray-50/50 dark:bg-gray-800/30 opacity-50'
+                    : 'bg-gray-50 dark:bg-gray-800'
+                }`}
+              >
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color || '#9ca3af' }} />
+                <span className={`flex-1 truncate ${excluded ? 'line-through text-gray-400 dark:text-gray-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                  {m.name}
+                </span>
+                <span className="text-gray-400 dark:text-gray-500 shrink-0">{m.date.slice(0, 7)}</span>
+                <span className={`font-medium shrink-0 ${excluded ? 'text-gray-400 dark:text-gray-600' : 'text-red-500'}`}>
+                  {fmt(Math.abs(m.dinero))}
+                </span>
+                <button
+                  onClick={() => onToggleExclusion(m.id)}
+                  title={excluded ? 'Incluir en el análisis' : 'Excluir del análisis'}
+                  className="shrink-0 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                >
+                  {excluded
+                    ? <Eye className="w-3.5 h-3.5" strokeWidth={1.5} />
+                    : <EyeOff className="w-3.5 h-3.5" strokeWidth={1.5} />}
+                </button>
+              </div>
+            )
+          })}
         </div>
+        {excludedMovementIds.length > 0 && (
+          <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+            {excludedMovementIds.length} movimiento{excludedMovementIds.length !== 1 ? 's' : ''} excluido{excludedMovementIds.length !== 1 ? 's' : ''} del análisis
+          </p>
+        )}
       </div>
     </div>
   )
@@ -590,6 +623,27 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, fmt }: {
   const [end,   setEnd]   = useState(localDateStr(now))
   const [copied, setCopied] = useState(false)
 
+  function handleCopy(text: string) {
+    function fallback() {
+      const el = document.createElement('textarea')
+      el.value = text
+      el.style.cssText = 'position:fixed;opacity:0;pointer-events:none'
+      document.body.appendChild(el)
+      el.select()
+      document.execCommand('copy')
+      document.body.removeChild(el)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(() => {
+        setCopied(true); setTimeout(() => setCopied(false), 2000)
+      }).catch(fallback)
+    } else {
+      fallback()
+    }
+  }
+
   const movements = useMemo(() => filterMovements(allMovements, start, end), [allMovements, start, end])
 
   const realExpenseMovements = useMemo(
@@ -672,11 +726,11 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, fmt }: {
       </div>
 
       <div className="relative">
-        <pre className="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono max-h-80 overflow-y-auto leading-relaxed border border-gray-100 dark:border-gray-700">
+        <pre className="scrollbar-none bg-gray-50 dark:bg-gray-800 rounded-xl p-4 text-xs text-gray-700 dark:text-gray-300 whitespace-pre-wrap font-mono max-h-80 overflow-y-auto leading-relaxed border border-gray-100 dark:border-gray-700">
           {prompt}
         </pre>
         <button
-          onClick={() => navigator.clipboard.writeText(prompt).then(() => { setCopied(true); setTimeout(() => setCopied(false), 2000) })}
+          onClick={() => handleCopy(prompt)}
           className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
@@ -727,10 +781,27 @@ export default function Analysis() {
     [allMovements, rangeStart, rangeEnd]
   )
 
-  const realExpenseMovements = useMemo(
+  const excludedIdSet = useMemo(
+    () => new Set(analysisConfig.excludedMovementIds),
+    [analysisConfig.excludedMovementIds]
+  )
+
+  const allExpenseMovements = useMemo(
     () => buildRealExpenseMovements(movements, typeGroupMap, savingsGroupIdSet),
     [movements, typeGroupMap, savingsGroupIdSet]
   )
+
+  const realExpenseMovements = useMemo(
+    () => allExpenseMovements.filter(m => !excludedIdSet.has(m.id)),
+    [allExpenseMovements, excludedIdSet]
+  )
+
+  function toggleMovementExclusion(id: number) {
+    const ids = analysisConfig.excludedMovementIds.includes(id)
+      ? analysisConfig.excludedMovementIds.filter(x => x !== id)
+      : [...analysisConfig.excludedMovementIds, id]
+    updateConfig({ ...analysisConfig, excludedMovementIds: ids })
+  }
 
   const income       = useMemo(
     () => sumRealIncome(movements, typeGroupMap, savingsGroupIdSet),
@@ -798,7 +869,13 @@ export default function Analysis() {
       </SectionCard>
 
       <SectionCard title="Patrones de Gasto por Mes" icon={Activity}>
-        <PatronesDeGasto realExpenseMovements={realExpenseMovements} fmt={fmt} />
+        <PatronesDeGasto
+          realExpenseMovements={realExpenseMovements}
+          allExpenseMovements={allExpenseMovements}
+          excludedMovementIds={analysisConfig.excludedMovementIds}
+          onToggleExclusion={toggleMovementExclusion}
+          fmt={fmt}
+        />
       </SectionCard>
 
       <SectionCard title="Regla 50/30/20" icon={Target}>

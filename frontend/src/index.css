@@ -87,3 +87,11 @@ body {
 .dark .react-resizable-handle:hover::after {
   background-color: #60a5fa;
 }
+
+/* ── scrollbar-none utility ───────────────────────────────────────────────── */
+.scrollbar-none {
+  scrollbar-width: none;
+}
+.scrollbar-none::-webkit-scrollbar {
+  display: none;
+}
