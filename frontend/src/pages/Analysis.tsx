@@ -65,6 +65,18 @@ function sumRealIncome(
     .reduce((s, m) => s + m.dinero, 0)
 }
 
+// Sum of outflows to savings (savings group movements with negative dinero = transfers TO savings)
+function sumActualSavings(
+  movements: Movement[],
+  typeGroupMap: Map<number, number>,
+  savingsGroupIdSet: Set<number>,
+): number {
+  if (savingsGroupIdSet.size === 0) return 0
+  return movements
+    .filter(m => m.dinero < 0 && isSavingsMovement(m, typeGroupMap, savingsGroupIdSet))
+    .reduce((s, m) => s + Math.abs(m.dinero), 0)
+}
+
 function buildRealExpenseMovements(
   movements: Movement[],
   typeGroupMap: Map<number, number>,
@@ -118,12 +130,13 @@ function SectionCard({ title, icon: Icon, children }: {
 
 // ── Config Panel ───────────────────────────────────────────────────────────────
 
-function ConfigPanel({ config, onChange, accounts, groups, types, fmt }: {
+function ConfigPanel({ config, onChange, accounts, groups, types, allExpenseMovements, fmt }: {
   config: AnalysisConfig
   onChange: (c: AnalysisConfig) => void
   accounts: Account[]
   groups: Group[]
   types: MovementType[]
+  allExpenseMovements: Movement[]
   fmt: (v: number) => string
 }) {
   const [open, setOpen] = useState(false)
@@ -140,7 +153,19 @@ function ConfigPanel({ config, onChange, accounts, groups, types, fmt }: {
     onChange({ ...config, savingsGroupIds: ids })
   }
 
-  const adjustments = config.savingsGroupIds.length + (config.emergencyAccountId != null ? 1 : 0)
+  function toggleExclusion(id: number) {
+    const ids = config.excludedMovementIds.includes(id)
+      ? config.excludedMovementIds.filter(x => x !== id)
+      : [...config.excludedMovementIds, id]
+    onChange({ ...config, excludedMovementIds: ids })
+  }
+
+  const topMovements = useMemo(() =>
+    [...allExpenseMovements].sort((a, b) => a.dinero - b.dinero).slice(0, 10),
+    [allExpenseMovements]
+  )
+
+  const adjustments = config.savingsGroupIds.length + (config.emergencyAccountId != null ? 1 : 0) + config.excludedMovementIds.length
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
@@ -184,7 +209,7 @@ function ConfigPanel({ config, onChange, accounts, groups, types, fmt }: {
           <div>
             <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Categorías de ahorro</p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-              Los movimientos de estas categorías no contarán como gastos en ningún cálculo
+              Los movimientos de estas categorías cuentan como ahorro y no como gasto
             </p>
             <div className="flex flex-wrap gap-2">
               {expenseGroups.length === 0
@@ -208,6 +233,51 @@ function ConfigPanel({ config, onChange, accounts, groups, types, fmt }: {
                   })}
             </div>
           </div>
+
+          {topMovements.length > 0 && (
+            <div>
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Movimientos grandes a excluir</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
+                Los movimientos excluidos no se cuentan en ningún cálculo ni gráfico
+              </p>
+              <div className="space-y-1.5">
+                {topMovements.map(m => {
+                  const excluded = config.excludedMovementIds.includes(m.id)
+                  return (
+                    <div
+                      key={m.id}
+                      className={`flex items-center gap-3 text-xs rounded-lg px-3 py-2 transition-opacity ${
+                        excluded ? 'bg-gray-50/50 dark:bg-gray-800/30 opacity-50' : 'bg-gray-50 dark:bg-gray-800'
+                      }`}
+                    >
+                      <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color || '#9ca3af' }} />
+                      <span className={`flex-1 truncate ${excluded ? 'line-through text-gray-400 dark:text-gray-600' : 'text-gray-700 dark:text-gray-300'}`}>
+                        {m.name}
+                      </span>
+                      <span className="text-gray-400 dark:text-gray-500 shrink-0">{m.date.slice(0, 7)}</span>
+                      <span className={`font-medium shrink-0 ${excluded ? 'text-gray-400 dark:text-gray-600' : 'text-red-500'}`}>
+                        {fmt(Math.abs(m.dinero))}
+                      </span>
+                      <button
+                        onClick={() => toggleExclusion(m.id)}
+                        title={excluded ? 'Incluir en el análisis' : 'Excluir del análisis'}
+                        className="shrink-0 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                      >
+                        {excluded
+                          ? <Eye className="w-3.5 h-3.5" strokeWidth={1.5} />
+                          : <EyeOff className="w-3.5 h-3.5" strokeWidth={1.5} />}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+              {config.excludedMovementIds.length > 0 && (
+                <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
+                  {config.excludedMovementIds.length} movimiento{config.excludedMovementIds.length !== 1 ? 's' : ''} excluido{config.excludedMovementIds.length !== 1 ? 's' : ''} del análisis
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -216,16 +286,17 @@ function ConfigPanel({ config, onChange, accounts, groups, types, fmt }: {
 
 // ── 1. Salud Financiera ────────────────────────────────────────────────────────
 
-function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, realExpenses, savings, savingsRate, emergencyBalance, avgMonthlyExpenses, months, fmt }: {
+function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, realExpenses, actualSavings, savingsRate, emergencyBalance, avgMonthlyExpenses, months, typeNameMap, fmt }: {
   realExpenseMovements: Movement[]
   incomeMovementsCount: number
   income: number
   realExpenses: number
-  savings: number
+  actualSavings: number
   savingsRate: number
   emergencyBalance: number
   avgMonthlyExpenses: number
   months: number
+  typeNameMap: Map<number, string>
   fmt: (v: number) => string
 }) {
   const emergencyMonths = avgMonthlyExpenses > 0 ? emergencyBalance / avgMonthlyExpenses : 0
@@ -234,20 +305,22 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
   const topCat = useMemo(() => {
     const map = new Map<string, number>()
     realExpenseMovements.forEach(m => {
-      const label = m.label || 'Sin categoría'
-      map.set(label, (map.get(label) ?? 0) + Math.abs(m.dinero))
+      const typeName = m.movement_type_id
+        ? (typeNameMap.get(m.movement_type_id) ?? m.label ?? 'Sin categoría')
+        : (m.label ?? 'Sin categoría')
+      map.set(typeName, (map.get(typeName) ?? 0) + Math.abs(m.dinero))
     })
     if (map.size === 0) return null
     return [...map.entries()].reduce((a, b) => b[1] > a[1] ? b : a)
-  }, [realExpenseMovements])
+  }, [realExpenseMovements, typeNameMap])
 
   const metrics = [
     {
       label: 'Tasa de ahorro',
       value: `${savingsRate.toFixed(1)}%`,
-      sub: savingsRate >= 20 ? 'Excelente (obj. >20%)' : savingsRate >= 10 ? 'Buena (obj. >20%)' : savingsRate >= 0 ? 'Mejorable (obj. >20%)' : 'Gastos > Ingresos',
-      color: savingsRate >= 20 ? 'text-green-500' : savingsRate >= 10 ? 'text-yellow-500' : 'text-red-500',
-      detail: income > 0 ? `De cada 100€ ingresados, ahorras ${savingsRate.toFixed(0)}€` : '',
+      sub: savingsRate >= 20 ? 'Excelente (obj. >20%)' : savingsRate >= 10 ? 'Buena (obj. >20%)' : savingsRate >= 0 ? 'Mejorable (obj. >20%)' : 'Sin datos de ahorro',
+      color: savingsRate >= 20 ? 'text-green-500' : savingsRate >= 10 ? 'text-yellow-500' : savingsRate >= 0 ? 'text-orange-500' : 'text-gray-400',
+      detail: income > 0 ? `De cada 100€ ingresados, destinas ${savingsRate.toFixed(0)}€ al ahorro` : '',
     },
     {
       label: 'Fondo de emergencia',
@@ -265,24 +338,24 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
     },
     {
       label: 'Ahorro mensual',
-      value: fmt(savings / months),
+      value: fmt(actualSavings / months),
       sub: `${months} ${months === 1 ? 'mes' : 'meses'} analizados`,
-      color: savings >= 0 ? 'text-green-500' : 'text-red-500',
+      color: actualSavings >= 0 ? 'text-green-500' : 'text-red-500',
       detail: `${fmt(income / months)} ing. · ${fmt(avgMonthlyExpenses)} gastos`,
     },
     {
-      label: 'Mayor categoría',
+      label: 'Mayor tipo de gasto',
       value: topCat ? topCat[0] : '—',
       sub: topCat ? fmt(topCat[1]) : 'Sin datos de gastos',
       color: 'text-gray-700 dark:text-gray-200',
       detail: topCat && realExpenses > 0 ? `${((topCat[1] / realExpenses) * 100).toFixed(0)}% del total de gastos` : '',
     },
     {
-      label: 'Ahorro neto total',
-      value: fmt(savings),
-      sub: savings >= 0 ? 'Balance positivo' : 'Balance negativo',
-      color: savings >= 0 ? 'text-green-500' : 'text-red-500',
-      detail: `${fmt(income)} ingresos — ${fmt(realExpenses)} gastos reales`,
+      label: 'Ahorro total en período',
+      value: fmt(actualSavings),
+      sub: actualSavings >= 0 ? 'Ahorro acumulado' : 'Sin ahorro registrado',
+      color: actualSavings >= 0 ? 'text-green-500' : 'text-gray-400',
+      detail: income > 0 ? `${fmt(income)} ingresos · ${fmt(actualSavings)} ahorrados` : '',
     },
   ]
 
@@ -293,10 +366,10 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
       parts.push(`Estás ahorrando el ${savingsRate.toFixed(0)}% de tus ingresos, por encima del 20% recomendado.`)
     } else if (savingsRate >= 10) {
       parts.push(`Tu tasa de ahorro del ${savingsRate.toFixed(0)}% es positiva pero no llega al objetivo del 20%.`)
-    } else if (savingsRate >= 0) {
+    } else if (savingsRate > 0) {
       parts.push(`Tu tasa de ahorro del ${savingsRate.toFixed(0)}% es baja. Revisa si puedes reducir alguna categoría de gasto.`)
     } else {
-      parts.push(`Tus gastos superan tus ingresos en ${fmt(Math.abs(savings))}. Situación deficitaria que requiere atención.`)
+      parts.push('No hay movimientos de ahorro registrados en el período. Configura tus categorías de ahorro arriba.')
     }
     if (emergencyMonths >= 6) {
       parts.push(`El fondo de emergencia cubre ${emergencyMonths.toFixed(1)} meses de gastos — situación sólida.`)
@@ -306,10 +379,10 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
       parts.push(`El fondo de emergencia solo cubre ${emergencyMonths.toFixed(1)} meses. Prioriza construirlo hasta los 6 meses mínimos.`)
     }
     if (topCat) {
-      parts.push(`Tu mayor gasto es "${topCat[0]}" con ${fmt(topCat[1])} (${realExpenses > 0 ? ((topCat[1] / realExpenses) * 100).toFixed(0) : 0}% del total).`)
+      parts.push(`Tu mayor tipo de gasto es "${topCat[0]}" con ${fmt(topCat[1])} (${realExpenses > 0 ? ((topCat[1] / realExpenses) * 100).toFixed(0) : 0}% del total).`)
     }
     return parts.join(' ')
-  }, [income, savingsRate, savings, emergencyMonths, topCat, realExpenses, fmt])
+  }, [income, savingsRate, actualSavings, emergencyMonths, topCat, realExpenses, fmt])
 
   return (
     <div className="space-y-4">
@@ -319,7 +392,7 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
             <p className="text-xs text-gray-500 dark:text-gray-400 mb-1">{m.label}</p>
             <p className={`text-base font-bold truncate ${m.color}`}>{m.value}</p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 truncate">{m.sub}</p>
-            {m.detail && <p className="text-xs text-gray-400 dark:text-gray-600 mt-1 truncate">{m.detail}</p>}
+            {m.detail && <p className="text-xs text-gray-400 dark:text-gray-600 mt-1 leading-snug">{m.detail}</p>}
           </div>
         ))}
       </div>
@@ -336,11 +409,8 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
 
 // ── 2. Patrones de Gasto por Mes ──────────────────────────────────────────────
 
-function PatronesDeGasto({ realExpenseMovements, allExpenseMovements, excludedMovementIds, onToggleExclusion, fmt }: {
+function PatronesDeGasto({ realExpenseMovements, fmt }: {
   realExpenseMovements: Movement[]
-  allExpenseMovements: Movement[]
-  excludedMovementIds: number[]
-  onToggleExclusion: (id: number) => void
   fmt: (v: number) => string
 }) {
   const byCalendarMonth = useMemo(() => {
@@ -363,91 +433,37 @@ function PatronesDeGasto({ realExpenseMovements, allExpenseMovements, excludedMo
     }))
   }, [realExpenseMovements])
 
-  // Show top 10 biggest from ALL expense movements (including excluded), so user can toggle them
-  const biggest = useMemo(() =>
-    [...allExpenseMovements]
-      .sort((a, b) => a.dinero - b.dinero)
-      .slice(0, 10),
-    [allExpenseMovements]
-  )
-
-  if (allExpenseMovements.length === 0) {
+  if (realExpenseMovements.length === 0) {
     return <p className="text-sm text-gray-400 text-center py-8">Sin gastos en el período seleccionado</p>
   }
 
   return (
-    <div className="space-y-5">
-      <div>
-        <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-          Media de gasto por mes del año, promediada entre todos los años del rango
-        </p>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={byCalendarMonth} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
-            <XAxis dataKey="label" tick={{ fontSize: 10 }} />
-            <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} width={36} />
-            <Tooltip
-              formatter={(v) => fmt(v as number)}
-              labelFormatter={(l, payload) => {
-                const p = payload?.[0]?.payload as { yearsCount?: number } | undefined
-                return `${l}${p?.yearsCount && p.yearsCount > 1 ? ` (media ${p.yearsCount} años)` : ''}`
-              }}
-            />
-            <Bar dataKey="avg" name="Media gastos" fill="#60a5fa" radius={[3, 3, 0, 0]} />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      <div>
-        <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">
-          Movimientos más grandes del período
-        </p>
-        <div className="space-y-1.5">
-          {biggest.map(m => {
-            const excluded = excludedMovementIds.includes(m.id)
-            return (
-              <div
-                key={m.id}
-                className={`flex items-center gap-3 text-xs rounded-lg px-3 py-2 transition-opacity ${
-                  excluded
-                    ? 'bg-gray-50/50 dark:bg-gray-800/30 opacity-50'
-                    : 'bg-gray-50 dark:bg-gray-800'
-                }`}
-              >
-                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: m.color || '#9ca3af' }} />
-                <span className={`flex-1 truncate ${excluded ? 'line-through text-gray-400 dark:text-gray-600' : 'text-gray-700 dark:text-gray-300'}`}>
-                  {m.name}
-                </span>
-                <span className="text-gray-400 dark:text-gray-500 shrink-0">{m.date.slice(0, 7)}</span>
-                <span className={`font-medium shrink-0 ${excluded ? 'text-gray-400 dark:text-gray-600' : 'text-red-500'}`}>
-                  {fmt(Math.abs(m.dinero))}
-                </span>
-                <button
-                  onClick={() => onToggleExclusion(m.id)}
-                  title={excluded ? 'Incluir en el análisis' : 'Excluir del análisis'}
-                  className="shrink-0 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-                >
-                  {excluded
-                    ? <Eye className="w-3.5 h-3.5" strokeWidth={1.5} />
-                    : <EyeOff className="w-3.5 h-3.5" strokeWidth={1.5} />}
-                </button>
-              </div>
-            )
-          })}
-        </div>
-        {excludedMovementIds.length > 0 && (
-          <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-            {excludedMovementIds.length} movimiento{excludedMovementIds.length !== 1 ? 's' : ''} excluido{excludedMovementIds.length !== 1 ? 's' : ''} del análisis
-          </p>
-        )}
-      </div>
+    <div>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+        Media de gasto por mes del año, promediada entre todos los años del rango. Los movimientos excluidos en la configuración no se cuentan.
+      </p>
+      <ResponsiveContainer width="100%" height={180}>
+        <BarChart data={byCalendarMonth} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
+          <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+          <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} width={36} />
+          <Tooltip
+            formatter={(v) => fmt(v as number)}
+            labelFormatter={(l, payload) => {
+              const p = payload?.[0]?.payload as { yearsCount?: number } | undefined
+              return `${l}${p?.yearsCount && p.yearsCount > 1 ? ` (media ${p.yearsCount} años)` : ''}`
+            }}
+          />
+          <Bar dataKey="avg" name="Media gastos" fill="#60a5fa" radius={[3, 3, 0, 0]} />
+        </BarChart>
+      </ResponsiveContainer>
     </div>
   )
 }
 
 // ── 3. Regla 50/30/20 ─────────────────────────────────────────────────────────
 
-type RuleBucket = 'necesidades' | 'deseos' | 'ahorro' | 'unassigned'
+type RuleBucket = 'necesidades' | 'deseos' | 'ahorro' | 'ingreso' | 'unassigned'
 const RULE_KEY = 'spendly-5030-assignment'
 
 const BUCKETS: { id: RuleBucket; label: string; target: number; barColor: string; textColor: string }[] = [
@@ -477,7 +493,7 @@ function Regla502030({ realExpenseMovements, groups, types, income, fmt }: {
   }
 
   const byBucket = useMemo(() => {
-    const map: Record<RuleBucket, number> = { necesidades: 0, deseos: 0, ahorro: 0, unassigned: 0 }
+    const map: Record<RuleBucket, number> = { necesidades: 0, deseos: 0, ahorro: 0, ingreso: 0, unassigned: 0 }
     realExpenseMovements.forEach(m => {
       if (m.movement_type_id == null) { map.unassigned += Math.abs(m.dinero); return }
       const t = types.find(t => t.id === m.movement_type_id)
@@ -550,6 +566,7 @@ function Regla502030({ realExpenseMovements, groups, types, income, fmt }: {
                 >
                   <option value="unassigned">Sin asignar</option>
                   {BUCKETS.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
+                  <option value="ingreso">Ingreso</option>
                 </select>
               </div>
             ))}
@@ -612,10 +629,11 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
 
 // ── 5. Prompt IA ──────────────────────────────────────────────────────────────
 
-function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, fmt }: {
+function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, excludedMovementIds, fmt }: {
   allMovements: Movement[]
   typeGroupMap: Map<number, number>
   savingsGroupIdSet: Set<number>
+  excludedMovementIds: number[]
   fmt: (v: number) => string
 }) {
   const now = new Date()
@@ -646,15 +664,23 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, fmt }: {
 
   const movements = useMemo(() => filterMovements(allMovements, start, end), [allMovements, start, end])
 
+  const excludedIdSet = useMemo(() => new Set(excludedMovementIds), [excludedMovementIds])
+
   const realExpenseMovements = useMemo(
-    () => buildRealExpenseMovements(movements, typeGroupMap, savingsGroupIdSet),
-    [movements, typeGroupMap, savingsGroupIdSet]
+    () => buildRealExpenseMovements(movements, typeGroupMap, savingsGroupIdSet)
+           .filter(m => !excludedIdSet.has(m.id)),
+    [movements, typeGroupMap, savingsGroupIdSet, excludedIdSet]
   )
 
-  const income   = sumRealIncome(movements, typeGroupMap, savingsGroupIdSet)
-  const realExpenses = realExpenseMovements.reduce((s, m) => s + Math.abs(m.dinero), 0)
-  const savings  = income - realExpenses
-  const savingsRate = income > 0 ? (savings / income) * 100 : 0
+  const income        = useMemo(() => sumRealIncome(movements, typeGroupMap, savingsGroupIdSet), [movements, typeGroupMap, savingsGroupIdSet])
+  const actualSavings = useMemo(() => sumActualSavings(movements, typeGroupMap, savingsGroupIdSet), [movements, typeGroupMap, savingsGroupIdSet])
+  const realExpenses  = useMemo(() => realExpenseMovements.reduce((s, m) => s + Math.abs(m.dinero), 0), [realExpenseMovements])
+  const savingsRate   = income > 0 ? (actualSavings / income) * 100 : 0
+
+  const excludedInPeriod = useMemo(
+    () => allMovements.filter(m => excludedIdSet.has(m.id) && m.date >= start && m.date <= end),
+    [allMovements, excludedIdSet, start, end]
+  )
 
   const byCategory = useMemo(() => {
     const map = new Map<string, number>()
@@ -675,13 +701,22 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, fmt }: {
   const prompt = useMemo(() => {
     if (movements.length === 0) return 'Sin datos para el período seleccionado. Elige un rango con movimientos.'
 
+    const excludedSection = excludedInPeriod.length > 0 ? [
+      '',
+      '### Gastos excluidos manualmente del análisis',
+      '(Gastos puntuales que el usuario consideró no representativos)',
+      ...excludedInPeriod.map((m, i) =>
+        `${i + 1}. ${m.name} — ${fmt(Math.abs(m.dinero))} (${m.date})`
+      ),
+    ] : []
+
     return [
       `Actúa como un asesor financiero personal experto. Analiza mis finanzas del ${start} al ${end} y dame un informe completo con recomendaciones accionables.`,
       '',
       '## CONTEXTO SOBRE LOS DATOS',
       '',
       hasSavingsFilter
-        ? 'Los datos ya están filtrados: las transferencias a cuentas de ahorro/inversión están excluidas de los gastos y no aparecen en este análisis. Los importes de "gastos" son solo consumo real.'
+        ? 'Los datos ya están filtrados: las transferencias a cuentas de ahorro/inversión están excluidas de los gastos. La tasa de ahorro se calcula directamente sobre los movimientos de ahorro registrados.'
         : 'AVISO: Esta aplicación puede registrar transferencias a cuentas de ahorro propias como "gastos". Si ves categorías relacionadas con ahorro o inversión, esos importes son en realidad ahorro, no consumo. Ajusta tu análisis si detectas este patrón.',
       '',
       '## DATOS FINANCIEROS',
@@ -689,7 +724,7 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, fmt }: {
       '### Resumen del período',
       `- Ingresos totales: ${fmt(income)}`,
       `- Gastos reales (consumo): ${fmt(realExpenses)}`,
-      `- Ahorro neto: ${fmt(savings)}`,
+      `- Ahorro registrado: ${fmt(actualSavings)}`,
       `- Tasa de ahorro: ${savingsRate.toFixed(1)}%`,
       `- Total movimientos: ${movements.length}`,
       '',
@@ -702,6 +737,7 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, fmt }: {
       ...topExpenses.map((m, i) =>
         `${i + 1}. ${m.name} — ${fmt(Math.abs(m.dinero))} (${m.date})${m.label ? ` [${m.label}]` : ''}`
       ),
+      ...excludedSection,
       '',
       '## ANÁLISIS SOLICITADO',
       '',
@@ -713,7 +749,7 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, fmt }: {
       '5. **Alertas** — patrones o gastos que deberían preocuparme',
       '6. **Proyección** — si continúo así, ¿dónde estaré en 6 y 12 meses?',
     ].join('\n')
-  }, [movements, realExpenseMovements, start, end, income, realExpenses, savings, savingsRate, byCategory, topExpenses, fmt, hasSavingsFilter])
+  }, [movements, realExpenseMovements, start, end, income, realExpenses, actualSavings, savingsRate, byCategory, topExpenses, excludedInPeriod, fmt, hasSavingsFilter])
 
   return (
     <div className="space-y-4">
@@ -796,23 +832,25 @@ export default function Analysis() {
     [allExpenseMovements, excludedIdSet]
   )
 
-  function toggleMovementExclusion(id: number) {
-    const ids = analysisConfig.excludedMovementIds.includes(id)
-      ? analysisConfig.excludedMovementIds.filter(x => x !== id)
-      : [...analysisConfig.excludedMovementIds, id]
-    updateConfig({ ...analysisConfig, excludedMovementIds: ids })
-  }
+  const typeNameMap = useMemo(() => {
+    const map = new Map<number, string>()
+    types.forEach(t => map.set(t.id, t.name))
+    return map
+  }, [types])
 
-  const income       = useMemo(
+  const income = useMemo(
     () => sumRealIncome(movements, typeGroupMap, savingsGroupIdSet),
+    [movements, typeGroupMap, savingsGroupIdSet]
+  )
+  const actualSavings = useMemo(
+    () => sumActualSavings(movements, typeGroupMap, savingsGroupIdSet),
     [movements, typeGroupMap, savingsGroupIdSet]
   )
   const realExpenses = useMemo(
     () => realExpenseMovements.reduce((s, m) => s + Math.abs(m.dinero), 0),
     [realExpenseMovements]
   )
-  const savings      = income - realExpenses
-  const savingsRate  = income > 0 ? (savings / income) * 100 : 0
+  const savingsRate  = income > 0 ? (actualSavings / income) * 100 : 0
   const totalBalance = accountsSummary?.total ?? 0
   const months       = monthsInRange(rangeStart, rangeEnd)
 
@@ -826,7 +864,7 @@ export default function Analysis() {
     [movements, typeGroupMap, savingsGroupIdSet]
   )
   const avgMonthlyExpenses = realExpenses / months
-  const monthlySavings     = savings / months
+  const monthlySavings     = actualSavings / months
 
   return (
     <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto">
@@ -850,6 +888,7 @@ export default function Analysis() {
         accounts={accountsSummary?.accounts ?? []}
         groups={groups}
         types={types}
+        allExpenseMovements={allExpenseMovements}
         fmt={fmt}
       />
 
@@ -859,23 +898,18 @@ export default function Analysis() {
           incomeMovementsCount={incomeMovementsCount}
           income={income}
           realExpenses={realExpenses}
-          savings={savings}
+          actualSavings={actualSavings}
           savingsRate={savingsRate}
           emergencyBalance={emergencyBalance}
           avgMonthlyExpenses={avgMonthlyExpenses}
           months={months}
+          typeNameMap={typeNameMap}
           fmt={fmt}
         />
       </SectionCard>
 
       <SectionCard title="Patrones de Gasto por Mes" icon={Activity}>
-        <PatronesDeGasto
-          realExpenseMovements={realExpenseMovements}
-          allExpenseMovements={allExpenseMovements}
-          excludedMovementIds={analysisConfig.excludedMovementIds}
-          onToggleExclusion={toggleMovementExclusion}
-          fmt={fmt}
-        />
+        <PatronesDeGasto realExpenseMovements={realExpenseMovements} fmt={fmt} />
       </SectionCard>
 
       <SectionCard title="Regla 50/30/20" icon={Target}>
@@ -897,6 +931,7 @@ export default function Analysis() {
           allMovements={allMovements}
           typeGroupMap={typeGroupMap}
           savingsGroupIdSet={savingsGroupIdSet}
+          excludedMovementIds={analysisConfig.excludedMovementIds}
           fmt={fmt}
         />
       </SectionCard>
