@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { GridLayout, verticalCompactor, type LayoutItem } from 'react-grid-layout'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
@@ -1363,22 +1363,40 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
   )
 }
 
-// ── Dashboard grid width — measured synchronously before first paint ──────────
+// ── Dashboard grid width ──────────────────────────────────────────────────────
+// On first page load the flex layout may not be computed when useLayoutEffect
+// fires (offsetWidth = 0). Poll via rAF until we get a real value, then hand
+// off to a ResizeObserver for any subsequent changes.
 
 function useDashWidth() {
   const ref = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(0)
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     const el = ref.current
     if (!el) return
-    setWidth(el.offsetWidth)
+    let rafId: number
+    let active = true
+
+    const measure = () => {
+      if (!active) return
+      const w = el.offsetWidth
+      if (w > 0) {
+        setWidth(w)
+      } else {
+        rafId = requestAnimationFrame(measure)
+      }
+    }
+
+    measure()
+
     const ro = new ResizeObserver(entries => {
       const w = entries[0]?.contentRect.width
       if (w != null && w > 0) setWidth(w)
     })
     ro.observe(el)
-    return () => ro.disconnect()
+
+    return () => { active = false; cancelAnimationFrame(rafId); ro.disconnect() }
   }, [])
 
   return { ref, width }
