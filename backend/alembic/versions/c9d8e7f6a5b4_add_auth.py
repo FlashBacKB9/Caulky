@@ -8,7 +8,6 @@ Create Date: 2026-05-04
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects.postgresql import UUID
 
 revision: str = 'c9d8e7f6a5b4'
 down_revision: Union[str, Sequence[str], None] = 'b1c2d3e4f5a6'
@@ -20,7 +19,7 @@ def upgrade() -> None:
     # ── users ──────────────────────────────────────────────────────────────────
     op.create_table(
         'users',
-        sa.Column('id', UUID(as_uuid=True), primary_key=True),
+        sa.Column('id', sa.Uuid(), primary_key=True),
         sa.Column('email', sa.String(320), nullable=False),
         sa.Column('hashed_password', sa.String(1024), nullable=True),
         sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
@@ -33,8 +32,8 @@ def upgrade() -> None:
     # ── oauth_accounts ─────────────────────────────────────────────────────────
     op.create_table(
         'oauth_accounts',
-        sa.Column('id', UUID(as_uuid=True), primary_key=True),
-        sa.Column('user_id', UUID(as_uuid=True), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
+        sa.Column('id', sa.Uuid(), primary_key=True),
+        sa.Column('user_id', sa.Uuid(), sa.ForeignKey('users.id', ondelete='CASCADE'), nullable=False),
         sa.Column('oauth_name', sa.String(100), nullable=False),
         sa.Column('access_token', sa.String(1024), nullable=False),
         sa.Column('expires_at', sa.Integer(), nullable=True),
@@ -49,7 +48,7 @@ def upgrade() -> None:
     # ── user_id on data tables (nullable — existing rows are "unclaimed") ──────
     for table in ['income_expense_groups', 'movement_types', 'movements', 'accounts', 'investment_funds']:
         op.add_column(table, sa.Column(
-            'user_id', UUID(as_uuid=True),
+            'user_id', sa.Uuid(),
             sa.ForeignKey('users.id', ondelete='CASCADE'),
             nullable=True,
         ))
