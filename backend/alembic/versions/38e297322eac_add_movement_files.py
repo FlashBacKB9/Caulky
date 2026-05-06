@@ -27,7 +27,7 @@ def upgrade() -> None:
     sa.Column('filename', sa.String(length=255), nullable=False),
     sa.Column('original_name', sa.String(length=255), nullable=False),
     sa.Column('mime_type', sa.String(length=100), nullable=False),
-    sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=False),
+    sa.Column('created_at', sa.DateTime(), server_default=sa.text('(CURRENT_TIMESTAMP)'), nullable=False),
     sa.ForeignKeyConstraint(['movement_id'], ['movements.id'], ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('id')
     )

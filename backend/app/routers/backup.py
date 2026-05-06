@@ -8,6 +8,7 @@ from sqlalchemy import select, delete as sa_delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
 
+from app.config import settings
 from app.database import get_db
 from app.models.account import Account
 from app.models.income_expense_group import IncomeExpenseGroup
@@ -19,6 +20,8 @@ from app.auth.setup import current_active_user
 from app.models.user import User
 
 router = APIRouter(prefix="/backup", tags=["backup"])
+
+_is_sqlite = settings.DATABASE_URL.startswith("sqlite")
 
 
 def _clean(obj) -> dict[str, Any]:
@@ -168,7 +171,8 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
             db.add(InvestmentPurchase(**p))
         await db.flush()
 
-    await _fix_sequences(db)
+    if not _is_sqlite:
+        await _fix_sequences(db)
     await db.commit()
 
 
@@ -240,7 +244,9 @@ async def reset_system(db: AsyncSession = Depends(get_db), user: User = Depends(
     await db.execute(sa_delete(Account).where(Account.user_id == uid))
     await db.execute(sa_delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == uid))
     await db.flush()
-    await _fix_sequences(db)
+    if not _is_sqlite:
+        await _fix_sequences(db)
     await _seed_defaults(db, uid)
-    await _fix_sequences(db)
+    if not _is_sqlite:
+        await _fix_sequences(db)
     await db.commit()
