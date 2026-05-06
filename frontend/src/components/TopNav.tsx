@@ -5,6 +5,7 @@ import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 import { logout } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
+import { t } from '../utils/i18n'
 
 function InfoModal({ onClose }: { onClose: () => void }) {
   return (
@@ -13,7 +14,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-white">Acerca de Caulky</h2>
-            <span className="text-xs text-gray-400 dark:text-gray-500">v1.0</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">v1.2</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
@@ -73,7 +74,7 @@ export default function TopNav() {
 
           {/* Nav links — scrollable */}
           <nav className="flex items-center gap-0.5 overflow-x-auto scrollbar-none flex-1 min-w-0">
-            {visibleLinks.map(({ to, label, Icon }) => (
+            {visibleLinks.map(({ to, labelKey, label, Icon }) => (
               <NavLink
                 key={to}
                 to={to}
@@ -81,7 +82,7 @@ export default function TopNav() {
                 className={({ isActive }) => linkCls(isActive)}
               >
                 <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-                <span className="hidden xl:block whitespace-nowrap">{label}</span>
+                <span className="hidden xl:block whitespace-nowrap">{t(labelKey) || label}</span>
               </NavLink>
             ))}
           </nav>
