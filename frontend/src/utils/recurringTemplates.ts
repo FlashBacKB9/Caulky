@@ -19,7 +19,7 @@ export interface TemplateRecurrence {
 }
 
 export interface MovementTemplate {
-  id: string
+  id: number
   label: string
   name: string          // supports {mes}, {año}, {mesfecha}, {mesfechabanco}
   money: string
@@ -141,14 +141,15 @@ type CreateFn = (data: {
   movement_type_id?: number; paid: boolean; no_count: boolean; notes?: string
 }) => Promise<unknown>
 
-export async function runAutoRecurring(createFn: CreateFn): Promise<number> {
-  const templates = loadTemplates()
+export async function runAutoRecurring(
+  templates: MovementTemplate[],
+  createFn: CreateFn,
+  onTemplateUpdated: (id: number, recurrence: TemplateRecurrence) => Promise<void>
+): Promise<number> {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   let totalCreated = 0
-  const updated = templates.map(t => ({ ...t }))
 
-  for (let i = 0; i < updated.length; i++) {
-    const tpl = updated[i]
+  for (const tpl of templates) {
     if (!tpl.recurrence?.autoCreate || !tpl.recurrence.rule) continue
 
     const { rule, startDate, lastCreated } = tpl.recurrence
@@ -179,14 +180,13 @@ export async function runAutoRecurring(createFn: CreateFn): Promise<number> {
       } catch { /* skip */ }
     }
 
-    // Mark last created date
-    updated[i] = {
-      ...tpl,
-      recurrence: { ...tpl.recurrence, lastCreated: due[due.length - 1].toISOString().split('T')[0] },
+    const updatedRecurrence: TemplateRecurrence = {
+      ...tpl.recurrence,
+      lastCreated: due[due.length - 1].toISOString().split('T')[0],
     }
+    await onTemplateUpdated(tpl.id, updatedRecurrence)
   }
 
-  if (totalCreated > 0) saveTemplates(updated)
   return totalCreated
 }
 

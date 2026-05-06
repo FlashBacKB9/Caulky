@@ -7,20 +7,19 @@ export interface RestoreOptions {
   types: boolean
   movements: boolean
   investments: boolean
+  templates: boolean
   // localStorage
   dashboard: boolean
   charts: boolean
   budgets: boolean
-  templates: boolean
   appearance: boolean
   tablePrefs: boolean
 }
 
-const LS_MAP: Record<keyof Pick<RestoreOptions, 'dashboard' | 'charts' | 'budgets' | 'templates' | 'appearance' | 'tablePrefs'>, string[]> = {
+const LS_MAP: Record<keyof Pick<RestoreOptions, 'dashboard' | 'charts' | 'budgets' | 'appearance' | 'tablePrefs'>, string[]> = {
   dashboard:  ['spendly-dashboard-config'],
   charts:     ['spendly-custom-charts-v2', 'spendly-hidden-builtins', 'spendly-hidden-customs', 'spendly-builtin-cfg', 'spendly-builtin-order'],
   budgets:    ['spendly-budgets'],
-  templates:  ['movement-templates'],
   appearance: ['theme', 'spendly-currency', 'spendly-date-format', 'caulky-show-investments'],
   tablePrefs: ['movements-filter-favorites', 'movements-widths', 'movements-col-order', 'kanban-group-order', 'movements-day-order'],
 }
@@ -56,7 +55,7 @@ export async function importBackup(file: File, options: RestoreOptions): Promise
   const backup = JSON.parse(await file.text())
   if (!backup.version || !backup.db) throw new Error('Archivo de copia de seguridad inválido')
 
-  const hasDb = options.groups || options.accounts || options.types || options.movements || options.investments
+  const hasDb = options.groups || options.accounts || options.types || options.movements || options.investments || options.templates
   if (hasDb) {
     await api.post('/backup/restore', {
       version:              backup.version,
@@ -66,6 +65,7 @@ export async function importBackup(file: File, options: RestoreOptions): Promise
       restore_types:        options.types,
       restore_movements:    options.movements,
       restore_investments:  options.investments,
+      restore_templates:    options.templates,
     })
   }
 

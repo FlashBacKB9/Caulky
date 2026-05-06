@@ -16,6 +16,7 @@ from app.models.investment import InvestmentFund, InvestmentPurchase
 from app.models.movement import Movement
 from app.models.movement_file import MovementFile
 from app.models.movement_type import MovementType
+from app.models.template import MovementTemplate as TemplateModel
 from app.auth.setup import current_active_user
 from app.models.user import User
 
@@ -72,6 +73,7 @@ async def export_backup(db: AsyncSession = Depends(get_db), user: User = Depends
     accounts  = (await db.execute(select(Account).where(Account.user_id == uid).order_by(Account.id))).scalars().all()
     types     = (await db.execute(select(MovementType).where(MovementType.user_id == uid).order_by(MovementType.id))).scalars().all()
     movements = (await db.execute(select(Movement).where(Movement.user_id == uid).order_by(Movement.id))).scalars().all()
+    tpls      = (await db.execute(select(TemplateModel).where(TemplateModel.user_id == uid).order_by(TemplateModel.id))).scalars().all()
 
     mv_ids = [m.id for m in movements]
     inv_funds = (await db.execute(select(InvestmentFund).where(InvestmentFund.user_id == uid).order_by(InvestmentFund.id))).scalars().all()
@@ -91,6 +93,7 @@ async def export_backup(db: AsyncSession = Depends(get_db), user: User = Depends
             "movements":            [_clean(m) for m in movements],
             "investment_funds":     [_clean(f) for f in inv_funds],
             "investment_purchases": [_clean(p) for p in inv_purchases],
+            "templates":            [_clean(t) for t in tpls],
         },
     }
 
@@ -103,6 +106,7 @@ class RestorePayload(BaseModel):
     restore_types: bool = False
     restore_movements: bool = False
     restore_investments: bool = False
+    restore_templates: bool = False
 
 
 @router.post("/restore", status_code=204)
@@ -113,6 +117,7 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
     rt = payload.restore_types
     rm = payload.restore_movements
     ri = payload.restore_investments
+    rtp = payload.restore_templates
 
     # Delete user's data in FK order
     if ri or rm or rt or ra or rg:
@@ -169,6 +174,14 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
         await db.flush()
         for p in payload.db.get("investment_purchases", []):
             db.add(InvestmentPurchase(**p))
+        await db.flush()
+
+    if rtp:
+        await db.execute(sa_delete(TemplateModel).where(TemplateModel.user_id == uid))
+        await db.flush()
+        for t in payload.db.get("templates", []):
+            t = {k: v for k, v in t.items() if k != "user_id"}
+            db.add(TemplateModel(**t, user_id=uid))
         await db.flush()
 
     if not _is_sqlite:
@@ -243,6 +256,7 @@ async def reset_system(db: AsyncSession = Depends(get_db), user: User = Depends(
     await db.execute(sa_delete(MovementType).where(MovementType.user_id == uid))
     await db.execute(sa_delete(Account).where(Account.user_id == uid))
     await db.execute(sa_delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == uid))
+    await db.execute(sa_delete(TemplateModel).where(TemplateModel.user_id == uid))
     await db.flush()
     if not _is_sqlite:
         await _fix_sequences(db)

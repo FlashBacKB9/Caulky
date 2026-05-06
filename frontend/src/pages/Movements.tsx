@@ -6,6 +6,7 @@ import { getGroups } from '../api/groups'
 import MovementForm from '../components/MovementForm'
 import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePayload } from '../components/MovementDetailModal'
 import { runAutoRecurring } from '../utils/recurringTemplates'
+import { getTemplates, updateTemplate } from '../api/templates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
 import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
@@ -617,14 +618,25 @@ export default function Movements() {
   const qcOuter = useQueryClient()
 
   useEffect(() => {
-    runAutoRecurring(data => createMovement(data as Parameters<typeof createMovement>[0])).then(n => {
-      if (n > 0) {
-        qcOuter.invalidateQueries({ queryKey: ['movements'] })
-        qcOuter.invalidateQueries({ queryKey: ['dashboard'] })
-        qcOuter.invalidateQueries({ queryKey: ['annual'] })
-        qcOuter.invalidateQueries({ queryKey: ['accounts-summary'] })
-      }
+    let cancelled = false
+    getTemplates().then(templates => {
+      if (cancelled) return
+      return runAutoRecurring(
+        templates,
+        data => createMovement(data as Parameters<typeof createMovement>[0]),
+        async (id, updatedRecurrence) => {
+          const tpl = templates.find(t => t.id === id)
+          if (tpl) await updateTemplate(id, { ...tpl, recurrence: updatedRecurrence })
+        }
+      )
+    }).then(n => {
+      if (cancelled || !n) return
+      qcOuter.invalidateQueries({ queryKey: ['movements'] })
+      qcOuter.invalidateQueries({ queryKey: ['dashboard'] })
+      qcOuter.invalidateQueries({ queryKey: ['annual'] })
+      qcOuter.invalidateQueries({ queryKey: ['accounts-summary'] })
     })
+    return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [year, setYear] = useState<number | null>(currentYear)

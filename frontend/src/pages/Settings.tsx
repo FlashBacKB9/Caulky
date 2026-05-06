@@ -898,12 +898,12 @@ const DB_OPTS = [
   { key: 'types'       as const, label: 'Tipos de movimiento',    warn: true },
   { key: 'movements'   as const, label: 'Movimientos',            warn: true },
   { key: 'investments' as const, label: 'Inversiones',            warn: true },
+  { key: 'templates'   as const, label: 'Plantillas de movimientos', warn: false },
 ]
 const LS_OPTS = [
   { key: 'dashboard'  as const, label: 'Dashboard'                  },
   { key: 'charts'     as const, label: 'Gráficos personalizados'     },
   { key: 'budgets'    as const, label: 'Presupuestos'                },
-  { key: 'templates'  as const, label: 'Plantillas de movimientos'   },
   { key: 'appearance' as const, label: 'Apariencia (tema y moneda)'  },
   { key: 'tablePrefs' as const, label: 'Preferencias de la tabla'    },
 ]
