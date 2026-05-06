@@ -1213,7 +1213,8 @@ function SkinsSection() {
     setLoading(true); setError(null)
     try {
       const meta = await parseSkinFile(file)
-      const newSkin: Skin = { ...meta, id: crypto.randomUUID(), enabled: false }
+      const id = crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+      const newSkin: Skin = { ...meta, id, enabled: false }
       persist([...skins, newSkin])
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error al cargar el skin')
