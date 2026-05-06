@@ -8,6 +8,7 @@ import { getAccountsSummary } from '../api/accounts'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { loadTemplates, type MovementTemplate } from '../utils/recurringTemplates'
+import { t } from '../utils/i18n'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -17,9 +18,9 @@ const INCOME_CATEGORIES = new Set(['Ingreso'])
 
 const today = () => new Date().toISOString().slice(0, 10)
 
-const KIND_LABELS: Record<Kind, string> = {
-  gasto: 'Gasto', ingreso: 'Ingreso', devolucion: 'Devolución',
-}
+const KIND_LABELS = (): Record<Kind, string> => ({
+  gasto: t('movement.expense'), ingreso: t('movement.income'), devolucion: t('movement.refund'),
+})
 
 // ── Numpad ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,7 @@ function KindToggle({ kind, onChange }: { kind: Kind; onChange: (k: Kind) => voi
               : 'text-gray-500 dark:text-gray-400'
           }`}
         >
-          {KIND_LABELS[k]}
+          {KIND_LABELS()[k]}
         </button>
       ))}
     </div>
@@ -113,7 +114,7 @@ function TypePicker({ types, selectedId, onSelect, onClose }: {
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
-          <span className="text-sm font-semibold text-gray-800 dark:text-white">Tipo de movimiento</span>
+          <span className="text-sm font-semibold text-gray-800 dark:text-white">{t('movement.type')}</span>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
             <X className="w-4 h-4" />
           </button>
@@ -166,7 +167,7 @@ function TemplatePicker({ templates, onApply, onClose }: {
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
-          <span className="text-sm font-semibold text-gray-800 dark:text-white">Plantillas</span>
+          <span className="text-sm font-semibold text-gray-800 dark:text-white">{t('quickadd.templates')}</span>
           <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
             <X className="w-4 h-4" />
           </button>
@@ -174,7 +175,7 @@ function TemplatePicker({ templates, onApply, onClose }: {
         <div className="overflow-y-auto flex-1 p-2">
           {templates.length === 0 ? (
             <p className="text-sm text-gray-400 dark:text-gray-500 px-3 py-4 text-center">
-              No hay plantillas guardadas
+              {t('quickadd.noTemplates')}
             </p>
           ) : (
             templates.map(tpl => {
@@ -403,14 +404,14 @@ export default function QuickAdd() {
           {showMore && (
             <div className="px-5 pb-5 space-y-4 border-t border-gray-50 dark:border-gray-800">
               <div className="pt-3">
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Fecha</p>
+                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">{t('quickadd.date')}</p>
                 <input
                   type="date" value={date} onChange={e => setDate(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
                 />
               </div>
               <div>
-                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">Fecha banco</p>
+                <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-widest mb-2">{t('quickadd.bankDate')}</p>
                 <input
                   type="date" value={bankDate} onChange={e => setBankDate(e.target.value)}
                   className="w-full px-3 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 transition"
@@ -448,8 +449,8 @@ export default function QuickAdd() {
             <span className="flex items-center justify-center gap-2">
               <Check className="w-5 h-5" /> ¡Guardado!
             </span>
-          ) : mutation.isPending ? 'Guardando…' : (
-            `Guardar${canSave ? ` ${fmt(value, 2)}` : ''}`
+          ) : mutation.isPending ? t('quickadd.saving') : (
+            `${t('quickadd.save')}${canSave ? ` ${fmt(value, 2)}` : ''}`
           )}
         </button>
       </div>

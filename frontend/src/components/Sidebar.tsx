@@ -5,6 +5,7 @@ import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 import { logout } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
+import { t } from '../utils/i18n'
 
 function InfoModal({ onClose }: { onClose: () => void }) {
   return (
@@ -13,7 +14,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-white">Acerca de Caulky</h2>
-            <span className="text-xs text-gray-400 dark:text-gray-500">v1.0</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">v1.2</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
@@ -41,6 +42,11 @@ function InfoModal({ onClose }: { onClose: () => void }) {
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Precios actuales e históricos de fondos de inversión</p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5">query1.finance.yahoo.com</p>
               </div>
+              <div className="px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800">
+                <p className="font-medium text-gray-800 dark:text-gray-100">Google Fonts</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Tipografías para skins personalizados</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5">fonts.googleapis.com</p>
+              </div>
             </div>
           </div>
 
@@ -55,10 +61,10 @@ function InfoModal({ onClose }: { onClose: () => void }) {
                 { name: 'Tailwind CSS v4', desc: 'Estilos y diseño' },
                 { name: 'Lucide React', desc: 'Iconografía' },
                 { name: 'Axios', desc: 'Cliente HTTP' },
-              ].map(t => (
-                <div key={t.name} className="flex items-baseline gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800">
-                  <span className="font-medium text-gray-800 dark:text-gray-100 shrink-0">{t.name}</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">{t.desc}</span>
+              ].map(item => (
+                <div key={item.name} className="flex items-baseline gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800">
+                  <span className="font-medium text-gray-800 dark:text-gray-100 shrink-0">{item.name}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{item.desc}</span>
                 </div>
               ))}
             </div>
@@ -74,10 +80,26 @@ function InfoModal({ onClose }: { onClose: () => void }) {
                 { name: 'Alembic', desc: 'Migraciones de base de datos' },
                 { name: 'Pydantic v2', desc: 'Validación de datos y schemas' },
                 { name: 'httpx', desc: 'Cliente HTTP asíncrono (Yahoo Finance)' },
-              ].map(t => (
-                <div key={t.name} className="flex items-baseline gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800">
-                  <span className="font-medium text-gray-800 dark:text-gray-100 shrink-0">{t.name}</span>
-                  <span className="text-xs text-gray-400 dark:text-gray-500">{t.desc}</span>
+              ].map(item => (
+                <div key={item.name} className="flex items-baseline gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800">
+                  <span className="font-medium text-gray-800 dark:text-gray-100 shrink-0">{item.name}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{item.desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">Extensibilidad</p>
+            <div className="space-y-1.5">
+              {[
+                { name: 'Plugins', desc: 'Scripts .js para extender la app con widgets y lógica personalizada' },
+                { name: 'Skins', desc: 'Archivos .js para cambiar completamente el aspecto visual y el layout' },
+                { name: 'Idiomas', desc: 'Archivos .js para traducir la interfaz a cualquier idioma' },
+              ].map(item => (
+                <div key={item.name} className="flex items-baseline gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800">
+                  <span className="font-medium text-gray-800 dark:text-gray-100 shrink-0">{item.name}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{item.desc}</span>
                 </div>
               ))}
             </div>
@@ -127,7 +149,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
         </div>
 
         <nav className="px-3 pt-4 space-y-0.5">
-          {visibleLinks.map(({ to, label, Icon }) => (
+          {visibleLinks.map(({ to, labelKey, label, Icon }) => (
             <NavLink
               key={to}
               to={to}
@@ -136,7 +158,7 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
               onClick={onClose}
             >
               <Icon className="w-4 h-4" strokeWidth={1.5} />
-              {label}
+              {t(labelKey) || label}
             </NavLink>
           ))}
         </nav>
@@ -148,21 +170,21 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
             onClick={onClose}
           >
             <Settings className="w-4 h-4" strokeWidth={1.5} />
-            Configuración
+            {t('layout.settings')}
           </NavLink>
           <button
             onClick={() => setShowInfo(true)}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           >
             <Info className="w-4 h-4" strokeWidth={1.5} />
-            Acerca de
+            {t('layout.about')}
           </button>
           <button
             onClick={handleLogout}
             className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-400 dark:text-gray-500 hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-600 dark:hover:text-red-400 transition-colors"
           >
             <LogOut className="w-4 h-4" strokeWidth={1.5} />
-            Cerrar sesión
+            {t('layout.logout')}
           </button>
         </div>
       </aside>

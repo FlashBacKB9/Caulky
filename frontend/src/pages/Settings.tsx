@@ -21,6 +21,10 @@ import {
 import { usePlugins, type PluginScanResult } from '../hooks/usePlugins'
 import AppIcon, { ICON_KEYS } from '../components/AppIcon'
 import { loadSkins, saveSkins, applySkinCSS, parseSkinFile, type Skin } from '../utils/skins'
+import {
+  t, BUILT_IN_LANGS, getLanguage, setLanguage,
+  loadCustomLanguages, saveCustomLanguages, parseLanguageFile, type CustomLanguage,
+} from '../utils/i18n'
 
 // ── Account Card ──────────────────────────────────────────────────────────────
 
@@ -1177,6 +1181,107 @@ function PluginsSection() {
   )
 }
 
+// ── Language section ──────────────────────────────────────────────────────────
+
+function LanguageSection() {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [activeLang, setActiveLang] = useState(getLanguage)
+  const [customLangs, setCustomLangs] = useState<CustomLanguage[]>(loadCustomLanguages)
+  const [error, setError] = useState<string | null>(null)
+  const [loading, setLoading] = useState(false)
+
+  const persistCustom = (next: CustomLanguage[]) => {
+    setCustomLangs(next)
+    saveCustomLanguages(next)
+  }
+
+  const handleSelect = (id: string) => {
+    setActiveLang(id)
+    setLanguage(id)
+  }
+
+  const removeCustom = (id: string) => {
+    const wasActive = activeLang === id
+    persistCustom(customLangs.filter(l => l.id !== id))
+    if (wasActive) setLanguage('es')
+  }
+
+  const handleFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setLoading(true); setError(null)
+    try {
+      const meta = await parseLanguageFile(file)
+      const id = crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
+      persistCustom([...customLangs, { ...meta, id }])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Error al cargar el idioma')
+    } finally { setLoading(false) }
+  }
+
+  const btnCls = (active: boolean) =>
+    `flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+      active
+        ? 'bg-blue-500 border-blue-500 text-white'
+        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 bg-white dark:bg-gray-800'
+    }`
+
+  return (
+    <div className="space-y-3">
+      <div className="flex flex-wrap gap-1.5">
+        {BUILT_IN_LANGS.map(lang => (
+          <button key={lang.id} onClick={() => handleSelect(lang.id)} className={btnCls(activeLang === lang.id)}>
+            <span>{lang.flag}</span>
+            <span>{lang.name}</span>
+          </button>
+        ))}
+        {customLangs.map(lang => (
+          <div key={lang.id} className="flex items-center gap-0.5">
+            <button onClick={() => handleSelect(lang.id)} className={btnCls(activeLang === lang.id)}>
+              {lang.flag && <span>{lang.flag}</span>}
+              <span>{lang.name}</span>
+            </button>
+            <button onClick={() => removeCustom(lang.id)} className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 rounded transition-colors">
+              <Trash2 className="w-3 h-3" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {error && <p className="text-xs text-red-500 dark:text-red-400">{error}</p>}
+
+      <input ref={fileRef} type="file" accept=".js" onChange={handleFile} className="sr-only" />
+      <div className="flex gap-2">
+        <button
+          onClick={() => fileRef.current?.click()}
+          disabled={loading}
+          className="flex items-center gap-2 flex-1 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors disabled:opacity-40"
+        >
+          <Upload className="w-4 h-4" />
+          {loading ? t('common.loading') : t('settings.languageInstall')}
+        </button>
+        <a
+          href="/locales/example-translation.js"
+          download="example-translation.js"
+          className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors whitespace-nowrap"
+        >
+          <Download className="w-4 h-4" />
+          {t('settings.languageExample')}
+        </a>
+        <a
+          href="/locales/lang-dev-guide.md"
+          download="lang-dev-guide.md"
+          className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors whitespace-nowrap"
+        >
+          <Download className="w-4 h-4" />
+          {t('settings.languageGuide')}
+        </a>
+      </div>
+    </div>
+  )
+}
+
 // ── Skins section ─────────────────────────────────────────────────────────────
 
 function SkinsSection() {
@@ -1416,7 +1521,7 @@ export default function Settings() {
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Configuración</h1>
+      <h1 className="text-2xl font-bold text-gray-800 dark:text-white">{t('settings.title')}</h1>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
@@ -1430,39 +1535,39 @@ export default function Settings() {
               className="flex items-center justify-between w-full group"
             >
               <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-colors">
-                Configuración Original
+                {t('settings.originalConfig')}
               </h2>
               <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-all ${configOriginalOpen ? 'rotate-180' : ''}`} />
             </button>
             <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
-              Cuentas bancarias y tipos de movimiento. Configúralos una vez al empezar; no suelen necesitar cambios.
+              {t('settings.originalConfigDesc')}
             </p>
             {configOriginalOpen && (
               <div className="space-y-6">
-                <Section title="Cuentas">
+                <Section title={t('settings.accounts')}>
                   <AccountsSection accounts={data.accounts} fmt={fmt} />
                 </Section>
-                <Section title="Tipos de movimiento">
+                <Section title={t('settings.movementTypes')}>
                   <TypesSection />
                 </Section>
               </div>
             )}
           </div>
 
-          <Section title="Apariencia">
+          <Section title={t('settings.appearance')}>
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
               <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-gray-700 dark:text-gray-200">Tema</span>
+                <span className="text-sm text-gray-700 dark:text-gray-200">{t('settings.theme')}</span>
                 <button
                   onClick={toggle}
                   className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
                 >
                   {dark ? <Sun className="w-3.5 h-3.5" strokeWidth={1.5} /> : <Moon className="w-3.5 h-3.5" strokeWidth={1.5} />}
-                  {dark ? 'Modo claro' : 'Modo oscuro'}
+                  {dark ? t('settings.lightMode') : t('settings.darkMode')}
                 </button>
               </div>
               <div className="px-4 py-3">
-                <span className="text-sm text-gray-700 dark:text-gray-200">Moneda</span>
+                <span className="text-sm text-gray-700 dark:text-gray-200">{t('settings.currency')}</span>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {currencies.map(c => (
                     <button
@@ -1479,7 +1584,7 @@ export default function Settings() {
                 </div>
               </div>
               <div className="px-4 py-3">
-                <span className="text-sm text-gray-700 dark:text-gray-200">Formato de fecha</span>
+                <span className="text-sm text-gray-700 dark:text-gray-200">{t('settings.dateFormat')}</span>
                 <div className="flex flex-wrap gap-1.5 mt-2">
                   {DATE_FORMATS.map(f => (
                     <button
@@ -1496,7 +1601,7 @@ export default function Settings() {
                 </div>
               </div>
               <div className="flex items-center justify-between px-4 py-3">
-                <span className="text-sm text-gray-700 dark:text-gray-200">Tamaño de la interfaz</span>
+                <span className="text-sm text-gray-700 dark:text-gray-200">{t('settings.uiSize')}</span>
                 <div className="flex items-center gap-2">
                   <button onClick={zoomOut} disabled={zoom <= zoomMin}
                     className="w-7 h-7 rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-40 text-base font-medium flex items-center justify-center transition-colors">−</button>
@@ -1516,18 +1621,25 @@ export default function Settings() {
             </div>
           </Section>
 
-          <Section title="Skins">
+          <Section title={t('settings.language')}>
             <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
-              Cambia el aspecto completo de la app subiendo un archivo .js de skin.
+              {t('settings.languageDesc')}
+            </p>
+            <LanguageSection />
+          </Section>
+
+          <Section title={t('settings.skins')}>
+            <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
+              {t('settings.skinsDesc')}
             </p>
             <SkinsSection />
           </Section>
 
-          <Section title="Movimientos">
+          <Section title={t('settings.movements')}>
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
               <div className="flex items-start justify-between gap-4 px-4 py-3">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Movimientos compartidos</p>
+                  <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{t('settings.sharedMovements')}</p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 leading-relaxed">
                     Activa los campos de compartido al añadir un movimiento. Útil cuando pagas el total
                     pero solo deberías contar tu parte: la app resta el importe completo del balance pero
@@ -1555,9 +1667,9 @@ export default function Settings() {
         {/* ── Col 2: navegación ────────────────────────────────────── */}
         <div className="space-y-6">
 
-          <Section title="Navegación">
+          <Section title={t('settings.navigation')}>
             <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
-              Elige qué páginas aparecen en el menú lateral y en qué orden.
+              {t('settings.navigationDesc')}
             </p>
             <NavSection entries={navEntries} onChange={updateNav} />
           </Section>
@@ -1567,7 +1679,7 @@ export default function Settings() {
         {/* ── Col 3: dashboard + backup + plugins + peligro ────────── */}
         <div className="space-y-6">
 
-          <Section title="Dashboard">
+          <Section title={t('settings.dashboard')}>
             <button
               onClick={() => navigate('/?edit=1')}
               className="flex items-center gap-3 w-full px-4 py-3 bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left"
@@ -1576,24 +1688,24 @@ export default function Settings() {
                 <LayoutDashboard className="w-4 h-4 text-blue-500" strokeWidth={1.5} />
               </div>
               <div>
-                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Editar Dashboard</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Añadir, mover y redimensionar widgets</p>
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{t('settings.editDashboard')}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t('settings.editDashboardDesc')}</p>
               </div>
             </button>
           </Section>
 
-          <Section title="Copia de seguridad">
+          <Section title={t('settings.backup')}>
             <BackupSection />
           </Section>
 
-          <Section title="Plugins">
+          <Section title={t('settings.plugins')}>
             <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
-              Extiende la app subiendo archivos .js. Los plugins se guardan en tu navegador.
+              {t('settings.pluginsDesc')}
             </p>
             <PluginsSection />
           </Section>
 
-          <Section title="Zona de peligro">
+          <Section title={t('settings.danger')}>
             <ResetSection />
           </Section>
 

@@ -4,6 +4,7 @@ import { Wallet, Eye, EyeOff } from 'lucide-react'
 import { login, register, getMe, claimData } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
+import { t, BUILT_IN_LANGS, getLanguage, setLanguage } from '../utils/i18n'
 
 export default function LoginPage() {
   const { setUser } = useAuth()
@@ -16,6 +17,12 @@ export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [activeLang, setActiveLang] = useState(getLanguage())
+
+  function handleLangChange(id: string) {
+    setActiveLang(id)
+    setLanguage(id)
+  }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -35,10 +42,10 @@ export default function LoginPage() {
       navigate('/', { replace: true })
     } catch (err: any) {
       const detail = err?.response?.data?.detail
-      if (detail === 'LOGIN_BAD_CREDENTIALS') setError('Email o contraseña incorrectos')
-      else if (detail === 'REGISTER_USER_ALREADY_EXISTS') setError('Ya existe una cuenta con ese email')
-      else if (mode === 'register') setError('Error al crear la cuenta')
-      else setError('Error al iniciar sesión')
+      if (detail === 'LOGIN_BAD_CREDENTIALS') setError(t('auth.errorCredentials'))
+      else if (detail === 'REGISTER_USER_ALREADY_EXISTS') setError(t('auth.errorExists'))
+      else if (mode === 'register') setError(t('auth.errorRegister'))
+      else setError(t('auth.errorLogin'))
     } finally {
       setLoading(false)
     }
@@ -66,16 +73,38 @@ export default function LoginPage() {
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
               >
-                {m === 'login' ? 'Iniciar sesión' : 'Registrarse'}
+                {m === 'login' ? t('auth.login') : t('auth.register')}
               </button>
             ))}
           </div>
+
+          {mode === 'register' && (
+            <div className="mb-5">
+              <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{t('auth.chooseLanguage')}</p>
+              <div className="flex flex-wrap gap-1.5">
+                {BUILT_IN_LANGS.map(lang => (
+                  <button
+                    key={lang.id}
+                    onClick={() => handleLangChange(lang.id)}
+                    className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
+                      activeLang === lang.id
+                        ? 'bg-blue-500 border-blue-500 text-white'
+                        : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:border-gray-300 bg-white dark:bg-gray-800'
+                    }`}
+                  >
+                    <span>{lang.flag}</span>
+                    <span>{lang.name}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           <form onSubmit={handleSubmit} className="space-y-3">
             {mode === 'register' && (
               <input
                 type="text"
-                placeholder="Nombre (opcional)"
+                placeholder={t('auth.name')}
                 value={name}
                 onChange={e => setName(e.target.value)}
                 className={IN}
@@ -83,7 +112,7 @@ export default function LoginPage() {
             )}
             <input
               type="email"
-              placeholder="Email"
+              placeholder={t('auth.email')}
               required
               value={email}
               onChange={e => setEmail(e.target.value)}
@@ -92,7 +121,7 @@ export default function LoginPage() {
             <div className="relative">
               <input
                 type={showPwd ? 'text' : 'password'}
-                placeholder="Contraseña"
+                placeholder={t('auth.password')}
                 required
                 minLength={8}
                 value={password}
@@ -115,13 +144,13 @@ export default function LoginPage() {
               disabled={loading}
               className="w-full py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-semibold rounded-xl hover:bg-gray-700 dark:hover:bg-gray-100 transition disabled:opacity-50"
             >
-              {loading ? 'Cargando...' : mode === 'login' ? 'Entrar' : 'Crear cuenta'}
+              {loading ? t('auth.loading') : mode === 'login' ? t('auth.submitLogin') : t('auth.submitRegister')}
             </button>
           </form>
         </div>
 
         <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-4">
-          Cuenta local · los datos se guardan en tu servidor
+          {t('auth.footer')}
         </p>
       </div>
     </div>

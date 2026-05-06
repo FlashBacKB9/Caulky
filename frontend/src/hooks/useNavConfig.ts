@@ -7,21 +7,21 @@ import {
 
 export interface NavEntry { id: string; visible: boolean }
 
-export interface NavPageMeta { label: string; Icon: LucideIcon }
+export interface NavPageMeta { label: string; labelKey: string; Icon: LucideIcon }
 
 export const PAGE_META: Record<string, NavPageMeta> = {
-  '/':              { label: 'Dashboard',        Icon: Home },
-  '/movements':     { label: 'Movimientos',      Icon: List },
-  '/cuentas':       { label: 'Cuentas',          Icon: Landmark },
-  '/annual':        { label: 'Finanzas del Año', Icon: BarChart2 },
-  '/charts':        { label: 'Gráficos',         Icon: LineChart },
-  '/comparaciones': { label: 'Comparaciones',    Icon: GitCompare },
-  '/budgets':       { label: 'Presupuestos',      Icon: ChartCandlestick },
-  '/inversiones':   { label: 'Inversiones',      Icon: TrendingUp },
-  '/import':        { label: 'Importar Excel',   Icon: Upload },
-  '/proyeccion':    { label: 'Proyección',       Icon: Telescope },
-  '/analisis':      { label: 'Análisis',         Icon: Brain },
-  '/docs':          { label: 'Documentación',    Icon: BookOpen },
+  '/':              { label: 'Dashboard',        labelKey: 'nav.dashboard',   Icon: Home },
+  '/movements':     { label: 'Movimientos',      labelKey: 'nav.movements',   Icon: List },
+  '/cuentas':       { label: 'Cuentas',          labelKey: 'nav.accounts',    Icon: Landmark },
+  '/annual':        { label: 'Finanzas del Año', labelKey: 'nav.annual',      Icon: BarChart2 },
+  '/charts':        { label: 'Gráficos',         labelKey: 'nav.charts',      Icon: LineChart },
+  '/comparaciones': { label: 'Comparaciones',    labelKey: 'nav.comparisons', Icon: GitCompare },
+  '/budgets':       { label: 'Presupuestos',     labelKey: 'nav.budgets',     Icon: ChartCandlestick },
+  '/inversiones':   { label: 'Inversiones',      labelKey: 'nav.investments', Icon: TrendingUp },
+  '/import':        { label: 'Importar Excel',   labelKey: 'nav.import',      Icon: Upload },
+  '/proyeccion':    { label: 'Proyección',       labelKey: 'nav.projection',  Icon: Telescope },
+  '/analisis':      { label: 'Análisis',         labelKey: 'nav.analysis',    Icon: Brain },
+  '/docs':          { label: 'Documentación',    labelKey: 'nav.docs',        Icon: BookOpen },
 }
 
 const DEFAULT_IDS = Object.keys(PAGE_META)
