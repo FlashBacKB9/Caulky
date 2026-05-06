@@ -1296,8 +1296,34 @@ export default function Settings() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-        {/* ── Col 1: apariencia + movimientos + navegación ─────────── */}
+        {/* ── Col 1: config original + apariencia + movimientos ────── */}
         <div className="space-y-6">
+
+          {/* Configuración Original — desplegable */}
+          <div className="space-y-3">
+            <button
+              onClick={() => setConfigOriginalOpen(v => !v)}
+              className="flex items-center justify-between w-full group"
+            >
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-colors">
+                Configuración Original
+              </h2>
+              <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-all ${configOriginalOpen ? 'rotate-180' : ''}`} />
+            </button>
+            <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
+              Cuentas bancarias y tipos de movimiento. Configúralos una vez al empezar; no suelen necesitar cambios.
+            </p>
+            {configOriginalOpen && (
+              <div className="space-y-6">
+                <Section title="Cuentas">
+                  <AccountsSection accounts={data.accounts} fmt={fmt} />
+                </Section>
+                <Section title="Tipos de movimiento">
+                  <TypesSection />
+                </Section>
+              </div>
+            )}
+          </div>
 
           <Section title="Apariencia">
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
@@ -1393,6 +1419,11 @@ export default function Settings() {
             </div>
           </Section>
 
+        </div>
+
+        {/* ── Col 2: navegación ────────────────────────────────────── */}
+        <div className="space-y-6">
+
           <Section title="Navegación">
             <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
               Elige qué páginas aparecen en el menú lateral y en qué orden.
@@ -1402,7 +1433,7 @@ export default function Settings() {
 
         </div>
 
-        {/* ── Col 2: dashboard + backup + plugins + peligro ────────── */}
+        {/* ── Col 3: dashboard + backup + plugins + peligro ────────── */}
         <div className="space-y-6">
 
           <Section title="Dashboard">
@@ -1435,30 +1466,6 @@ export default function Settings() {
             <ResetSection />
           </Section>
 
-        </div>
-
-        {/* ── Col 3: configuración original (desplegable) ───────────── */}
-        <div className="space-y-3">
-          <button
-            onClick={() => setConfigOriginalOpen(v => !v)}
-            className="flex items-center justify-between w-full group"
-          >
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-colors">
-              Configuración Original
-            </h2>
-            <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-all ${configOriginalOpen ? 'rotate-180' : ''}`} />
-          </button>
-
-          {configOriginalOpen && (
-            <div className="space-y-6">
-              <Section title="Cuentas">
-                <AccountsSection accounts={data.accounts} fmt={fmt} />
-              </Section>
-              <Section title="Tipos de movimiento">
-                <TypesSection />
-              </Section>
-            </div>
-          )}
         </div>
 
       </div>
