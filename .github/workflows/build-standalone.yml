@@ -6,9 +6,13 @@ on:
       - "v*"           # trigger on version tags: v1.2, v1.3, etc.
   workflow_dispatch:   # manual trigger from GitHub UI (builds artifacts without release)
 
+permissions:
+  contents: write      # needed to create GitHub Releases
+
 jobs:
   build:
     strategy:
+      fail-fast: false  # don't cancel other platforms if one fails
       matrix:
         include:
           - os: windows-latest
@@ -30,7 +34,7 @@ jobs:
       # ── Build frontend ────────────────────────────────────────────────────
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
           cache: "npm"
           cache-dependency-path: frontend/package-lock.json
 
