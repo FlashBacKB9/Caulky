@@ -1280,6 +1280,7 @@ export default function Settings() {
   const { data, isLoading } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
   const navigate = useNavigate()
   const [navEntries, setNavEntries] = useState<NavEntry[]>(loadNavConfig)
+  const [configOriginalOpen, setConfigOriginalOpen] = useState(false)
 
   function updateNav(next: NavEntry[]) {
     setNavEntries(next)
@@ -1293,9 +1294,9 @@ export default function Settings() {
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
       <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Configuración</h1>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 
-        {/* ── Col izquierda: preferencias ──────────────────────────── */}
+        {/* ── Col 1: apariencia + movimientos + navegación ─────────── */}
         <div className="space-y-6">
 
           <Section title="Apariencia">
@@ -1399,6 +1400,11 @@ export default function Settings() {
             <NavSection entries={navEntries} onChange={updateNav} />
           </Section>
 
+        </div>
+
+        {/* ── Col 2: dashboard + backup + plugins + peligro ────────── */}
+        <div className="space-y-6">
+
           <Section title="Dashboard">
             <button
               onClick={() => navigate('/?edit=1')}
@@ -1431,17 +1437,28 @@ export default function Settings() {
 
         </div>
 
-        {/* ── Col derecha: configuración inicial ────────────────────── */}
-        <div className="space-y-6">
+        {/* ── Col 3: configuración original (desplegable) ───────────── */}
+        <div className="space-y-3">
+          <button
+            onClick={() => setConfigOriginalOpen(v => !v)}
+            className="flex items-center justify-between w-full group"
+          >
+            <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-colors">
+              Configuración Original
+            </h2>
+            <ChevronDown className={`w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-400 transition-all ${configOriginalOpen ? 'rotate-180' : ''}`} />
+          </button>
 
-          <Section title="Cuentas">
-            <AccountsSection accounts={data.accounts} fmt={fmt} />
-          </Section>
-
-          <Section title="Tipos de movimiento">
-            <TypesSection />
-          </Section>
-
+          {configOriginalOpen && (
+            <div className="space-y-6">
+              <Section title="Cuentas">
+                <AccountsSection accounts={data.accounts} fmt={fmt} />
+              </Section>
+              <Section title="Tipos de movimiento">
+                <TypesSection />
+              </Section>
+            </div>
+          )}
         </div>
 
       </div>
