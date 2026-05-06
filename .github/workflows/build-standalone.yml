@@ -54,10 +54,16 @@ jobs:
           cache-dependency-path: backend/requirements-standalone.txt
 
       - name: Install Python deps
-        run: pip install pyinstaller svglib reportlab Pillow -r backend/requirements-standalone.txt
+        run: pip install pyinstaller -r backend/requirements-standalone.txt
 
-      # ── Generate app icon from SVG ────────────────────────────────────────
+      # Linux executables don't embed icons — skip icon tools on Linux
+      - name: Install icon tools
+        if: matrix.label != 'linux'
+        run: pip install svglib reportlab Pillow
+
+      # ── Generate app icon from SVG (Windows + macOS only) ─────────────────
       - name: Generate icon
+        if: matrix.label != 'linux'
         shell: python
         run: |
           from svglib.svglib import svg2rlg
