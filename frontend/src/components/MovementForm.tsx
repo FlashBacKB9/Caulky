@@ -10,10 +10,11 @@ import {
   Pencil, Calendar, Check,
 } from 'lucide-react'
 import {
-  loadTemplates, saveTemplates, applyFormula, computeDates,
+  applyFormula, computeDates,
   WEEKDAY_NAMES, WEEK_ORD_NAMES, WEEK_ORD_VALUES, describeRule,
   type MovementTemplate, type RecurrenceRule, type TemplateRecurrence,
 } from '../utils/recurringTemplates'
+import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/templates'
 
 interface Props { onClose: () => void; initialDate?: string }
 
@@ -180,11 +181,11 @@ export default function MovementForm({ onClose, initialDate }: Props) {
 
   // ── Panel mode ───────────────────────────────────────────────────────────────
   const [panel, setPanel] = useState<PanelMode>('form')
-  const [editingId, setEditingId] = useState<string | null>(null)
-  const [recurrenceId, setRecurrenceId] = useState<string | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
+  const [recurrenceId, setRecurrenceId] = useState<number | null>(null)
 
   // ── Template state ───────────────────────────────────────────────────────────
-  const [templates, setTemplates] = useState<MovementTemplate[]>(loadTemplates)
+  const { data: templates = [] } = useQuery({ queryKey: ['templates'], queryFn: getTemplates })
   const emptyTpl = (): Omit<MovementTemplate, 'id'> => ({
     label: '', name: '', money: '', dateMode: 'today', bankDateMode: 'manual',
     movement_type_id: '', paid: true, no_count: false, notes: '',
@@ -307,35 +308,55 @@ export default function MovementForm({ onClose, initialDate }: Props) {
     setPanel('recurrence')
   }
 
+  const tplCreateMut = useMutation({
+    mutationFn: (draft: Omit<MovementTemplate, 'id'>) => createTemplate(draft),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }); setPanel('form'); setEditingId(null) },
+  })
+
+  const tplUpdateMut = useMutation({
+    mutationFn: ({ id, draft }: { id: number; draft: Omit<MovementTemplate, 'id'> }) =>
+      updateTemplate(id, draft),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }) },
+  })
+
+  const tplDeleteMut = useMutation({
+    mutationFn: (id: number) => deleteTemplate(id),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ['templates'] }) },
+  })
+
   const saveTemplate = () => {
     if (!tplDraft.label.trim()) return
-    let next: MovementTemplate[]
-    if (editingId) {
-      next = templates.map(t => t.id === editingId ? { ...t, ...tplDraft } : t)
+    if (editingId !== null) {
+      tplUpdateMut.mutate({ id: editingId, draft: tplDraft }, {
+        onSuccess: () => setPanel('form'),
+      })
     } else {
-      next = [...templates, { ...tplDraft, id: Date.now().toString() }]
+      tplCreateMut.mutate(tplDraft)
     }
-    setTemplates(next); saveTemplates(next)
-    setPanel('form'); setEditingId(null)
   }
 
-  const deleteTemplate = (id: string) => {
-    const next = templates.filter(t => t.id !== id)
-    setTemplates(next); saveTemplates(next)
+  const handleDeleteTemplate = (id: number) => {
+    tplDeleteMut.mutate(id)
     if (recurrenceId === id || editingId === id) setPanel('form')
   }
 
   const saveRecurrence = () => {
     const rec: TemplateRecurrence = { rule: recRule, startDate: recStart, autoCreate: recMode === 'auto' }
-    const next = templates.map(t => t.id === recurrenceId ? { ...t, recurrence: rec } : t)
-    setTemplates(next); saveTemplates(next)
-    setPanel('form')
+    const tpl = templates.find(t => t.id === recurrenceId)
+    if (!tpl) return
+    const { id, ...rest } = tpl
+    tplUpdateMut.mutate({ id, draft: { ...rest, recurrence: rec } }, {
+      onSuccess: () => setPanel('form'),
+    })
   }
 
   const clearRecurrence = () => {
-    const next = templates.map(t => t.id === recurrenceId ? { ...t, recurrence: undefined } : t)
-    setTemplates(next); saveTemplates(next)
-    setPanel('form')
+    const tpl = templates.find(t => t.id === recurrenceId)
+    if (!tpl) return
+    const { id, ...rest } = tpl
+    tplUpdateMut.mutate({ id, draft: { ...rest, recurrence: undefined } }, {
+      onSuccess: () => setPanel('form'),
+    })
   }
 
   const bulkCreate = () => {
@@ -893,7 +914,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                     className="p-1 text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors" title="Recurrencia">
                     <Calendar className="w-3 h-3" />
                   </button>
-                  <button type="button" onClick={e => { e.stopPropagation(); deleteTemplate(tpl.id) }}
+                  <button type="button" onClick={e => { e.stopPropagation(); handleDeleteTemplate(tpl.id) }}
                     className="p-1 text-gray-400 hover:text-red-500 dark:hover:text-red-400 transition-colors" title="Eliminar">
                     <X className="w-3 h-3" />
                   </button>

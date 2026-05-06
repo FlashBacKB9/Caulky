@@ -5,7 +5,17 @@
 #   pip install pyinstaller -r backend/requirements-standalone.txt
 #   pyinstaller caulky-standalone.spec
 
+import os
+import sys
 from PyInstaller.utils.hooks import collect_all, collect_submodules
+
+# Pick icon based on platform
+if sys.platform == 'win32' and os.path.exists('app-icon.ico'):
+    _icon = 'app-icon.ico'
+elif sys.platform == 'darwin' and os.path.exists('Caulky.icns'):
+    _icon = 'Caulky.icns'
+else:
+    _icon = None
 
 datas = [
     ("frontend/dist", "static"),       # React build
@@ -73,6 +83,7 @@ exe = EXE(
     upx=True,
     upx_exclude=[],
     runtime_tmpdir=None,
+    icon=_icon,
     console=True,       # Keep console so user can see the URL and Ctrl+C to quit
     disable_windowed_traceback=False,
     argv_emulation=False,

@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { getTemplates } from '../api/templates'
 import { useNavigate } from 'react-router-dom'
 import { Check, Delete, ChevronDown, X } from 'lucide-react'
 import { createMovement } from '../api/movements'
@@ -7,7 +8,7 @@ import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getAccountsSummary } from '../api/accounts'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDarkMode } from '../hooks/useDarkMode'
-import { loadTemplates, type MovementTemplate } from '../utils/recurringTemplates'
+import { type MovementTemplate } from '../utils/recurringTemplates'
 import { t } from '../utils/i18n'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -238,7 +239,7 @@ export default function QuickAdd() {
     isIncomeKind ? INCOME_CATEGORIES.has(t.category) : !INCOME_CATEGORIES.has(t.category)
   )
 
-  const allTemplates = loadTemplates()
+  const { data: allTemplates = [] } = useQuery({ queryKey: ['templates'], queryFn: getTemplates })
 
   // Reset type when switching to incompatible kind
   useEffect(() => {

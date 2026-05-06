@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin
+from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin, templates
 from app.auth.setup import fastapi_users, auth_backend
 from app.auth.schemas import UserRead, UserCreate, UserUpdate
 from app.config import settings
@@ -44,6 +44,7 @@ app.include_router(import_excel.router, prefix="/api")
 app.include_router(backup.router, prefix="/api")
 app.include_router(investments.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
+app.include_router(templates.router, prefix="/api")
 
 
 @app.get("/health")

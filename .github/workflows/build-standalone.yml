@@ -54,7 +54,47 @@ jobs:
           cache-dependency-path: backend/requirements-standalone.txt
 
       - name: Install Python deps
-        run: pip install pyinstaller -r backend/requirements-standalone.txt
+        run: pip install pyinstaller Pillow -r backend/requirements-standalone.txt
+
+      # ── Generate app icon with Pillow (Windows + macOS only) ──────────────
+      - name: Generate icon
+        if: matrix.label != 'linux'
+        shell: python
+        run: |
+          from PIL import Image, ImageDraw
+          import os, sys
+
+          def make_icon(size):
+              img = Image.new('RGBA', (size, size), (15, 23, 42, 255))
+              d = ImageDraw.Draw(img)
+              lw = max(1, size // 28)
+              white = (255, 255, 255, 255)
+              m = size // 6
+              r = size // 12
+              body_top = m + m // 3
+              d.rounded_rectangle([m, body_top, size - m, size - m], radius=r, outline=white, width=lw)
+              flap_y = body_top + (size - m - body_top) // 3
+              d.line([(m, flap_y), (size - m, flap_y)], fill=white, width=lw)
+              cx = size - m - size // 7
+              cy = body_top + (size - m - body_top) * 2 // 3
+              cr = size // 11
+              d.ellipse([cx - cr, cy - cr, cx + cr, cy + cr], outline=white, width=lw)
+              return img
+
+          if sys.platform == 'win32':
+              make_icon(256).save(
+                  'app-icon.ico', format='ICO',
+                  sizes=[(16,16),(32,32),(48,48),(64,64),(128,128),(256,256)]
+              )
+              print(f"Created app-icon.ico ({os.path.getsize('app-icon.ico')} bytes)")
+
+          elif sys.platform == 'darwin':
+              os.makedirs('Caulky.iconset', exist_ok=True)
+              for size in [16, 32, 64, 128, 256, 512]:
+                  make_icon(size).save(f'Caulky.iconset/icon_{size}x{size}.png')
+                  make_icon(size * 2).save(f'Caulky.iconset/icon_{size}x{size}@2x.png')
+              os.system('iconutil -c icns Caulky.iconset')
+              print(f"Created Caulky.icns ({os.path.getsize('Caulky.icns')} bytes)")
 
       # ── Build executable ──────────────────────────────────────────────────
       - name: Build with PyInstaller
