@@ -53,8 +53,12 @@ else:
 
 # ── Serve React SPA (catch-all, registered after all /api routes) ─────────────
 if STATIC_DIR.exists():
+    from fastapi import HTTPException as _HTTPException
+
     @app.get("/{full_path:path}", include_in_schema=False)
     async def serve_spa(full_path: str):
+        if full_path.startswith("api/") or full_path == "api":
+            raise _HTTPException(status_code=404)
         target = STATIC_DIR / full_path
         if target.is_file():
             return FileResponse(str(target))
