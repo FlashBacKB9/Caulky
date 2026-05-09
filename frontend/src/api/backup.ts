@@ -1,5 +1,6 @@
 import api from './client'
 import { syncPref } from '../utils/prefSync'
+import { setPreference } from './preferences'
 
 export interface RestoreOptions {
   // DB
@@ -74,17 +75,23 @@ export async function importBackup(file: File, options: RestoreOptions): Promise
     })
   }
 
-  // Fallback: restore from localStorage section for old backup files without db.preferences
+  // Fallback: restore from localStorage section for old backup files without db.preferences.
+  // We must write to the server synchronously before reloading, otherwise the reload triggers
+  // initPreferences() which fetches stale server prefs and overwrites what we just set.
   if (hasPrefs && backup.db.preferences == null) {
     const ls: Record<string, unknown> = backup.localStorage ?? {}
+    const serverWrites: Promise<void>[] = []
     for (const [optKey, keys] of Object.entries(LS_MAP) as [keyof typeof LS_MAP, string[]][]) {
       if (!options[optKey]) continue
       for (const key of keys) {
         if (ls[key] !== undefined) {
-          syncPref(key, typeof ls[key] === 'string' ? ls[key] as string : JSON.stringify(ls[key]))
+          const value = typeof ls[key] === 'string' ? ls[key] as string : JSON.stringify(ls[key])
+          syncPref(key, value)
+          serverWrites.push(setPreference(key, value).catch(() => {}))
         }
       }
     }
+    await Promise.all(serverWrites)
   }
 
   if (hasDb || hasPrefs) {
