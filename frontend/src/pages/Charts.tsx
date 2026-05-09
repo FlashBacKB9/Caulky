@@ -925,7 +925,7 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
               </button>
               {showYearPicker && (
                 <div className="absolute right-0 top-8 z-20 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-0.5 min-w-[90px]">
-                  {([['current_year',t('charts.currentYear')],['current_month',t('charts.currentMonth')]] as [string,string][]).map(([p,label])=>(
+                  {([['current_year',t('charts.currentYear')],['current_month',t('charts.currentMonth')]] as ['current_year'|'current_month', string][]).map(([p,label])=>(
                     <button key={p} onClick={()=>{ upd({ period:p, year:CUR_YEAR }); setShowYearPicker(false) }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-colors ${def.period===p?'bg-gray-800 dark:bg-white text-white dark:text-gray-900':'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
                       {label}
