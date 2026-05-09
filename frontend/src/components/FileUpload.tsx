@@ -1,7 +1,15 @@
 import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../api/client'
-import { Paperclip, Image as ImageIcon, FileText, BarChart2, X } from 'lucide-react'
+import { Paperclip, Image as ImageIcon, FileText, BarChart2, X, AlertTriangle } from 'lucide-react'
+
+const WARN_BYTES = 20 * 1024 * 1024 // 20 MB
+
+function fmt(bytes: number) {
+  return bytes >= 1024 * 1024
+    ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    : `${(bytes / 1024).toFixed(0)} KB`
+}
 
 interface FileRecord {
   id: number
@@ -26,6 +34,7 @@ function FileTypeIcon({ mime }: { mime: string }) {
 export default function FileUpload({ movementId, existingFiles }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
+  const [pendingLarge, setPendingLarge] = useState<File[] | null>(null)
   const qc = useQueryClient()
 
   const upload = useMutation({
@@ -43,11 +52,52 @@ export default function FileUpload({ movementId, existingFiles }: Props) {
   })
 
   const handle = (files: FileList | null) => {
-    if (files && files.length) upload.mutate(Array.from(files))
+    if (!files || !files.length) return
+    const arr = Array.from(files)
+    const large = arr.filter(f => f.size > WARN_BYTES)
+    if (large.length > 0) {
+      setPendingLarge(arr)
+    } else {
+      upload.mutate(arr)
+    }
   }
 
   return (
     <div className="space-y-2">
+      {pendingLarge && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-4 space-y-3">
+          <div className="flex items-start gap-2">
+            <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" strokeWidth={1.5} />
+            <div className="space-y-1">
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Archivo grande detectado</p>
+              <ul className="text-sm text-amber-700 dark:text-amber-400 space-y-0.5">
+                {pendingLarge.filter(f => f.size > WARN_BYTES).map(f => (
+                  <li key={f.name}>{f.name} — <strong>{fmt(f.size)}</strong></li>
+                ))}
+              </ul>
+              <p className="text-xs text-amber-600 dark:text-amber-500 pt-1">
+                El espacio de almacenamiento es limitado. Los archivos adjuntos deberían ser documentos ligeros:
+                fotos de tickets (1–5 MB), facturas PDF (1–3 MB) o capturas de pantalla.
+                No tiene sentido subir fotos de alta resolución sin comprimir, vídeos o archivos de Office con imágenes incrustadas.
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <button
+              onClick={() => { setPendingLarge(null); if (inputRef.current) inputRef.current.value = '' }}
+              className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
+            >
+              Cancelar
+            </button>
+            <button
+              onClick={() => { upload.mutate(pendingLarge); setPendingLarge(null) }}
+              className="text-sm px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              Subir de todas formas
+            </button>
+          </div>
+        </div>
+      )}
       {existingFiles.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {existingFiles.map(f => (

@@ -7,6 +7,7 @@ backend/__pycache__/
 backend/**/__pycache__/
 backend/**/*.pyc
 backend/.env
+backend/.secret_key
 backend/uploads/
 backend/uvicorn.log
 backend/uvicorn.err

@@ -57,26 +57,37 @@ export async function importBackup(file: File, options: RestoreOptions): Promise
   if (!backup.version || !backup.db) throw new Error('Archivo de copia de seguridad inválido')
 
   const hasDb = options.groups || options.accounts || options.types || options.movements || options.investments || options.templates
-  if (hasDb) {
+  const hasPrefs = options.dashboard || options.charts || options.budgets || options.appearance || options.tablePrefs
+  const hasServerPrefs = hasPrefs && backup.db.preferences != null
+
+  if (hasDb || hasServerPrefs) {
     await api.post('/backup/restore', {
-      version:              backup.version,
-      db:                   backup.db,
-      restore_groups:       options.groups,
-      restore_accounts:     options.accounts,
-      restore_types:        options.types,
-      restore_movements:    options.movements,
-      restore_investments:  options.investments,
-      restore_templates:    options.templates,
+      version:               backup.version,
+      db:                    backup.db,
+      restore_groups:        options.groups,
+      restore_accounts:      options.accounts,
+      restore_types:         options.types,
+      restore_movements:     options.movements,
+      restore_investments:   options.investments,
+      restore_templates:     options.templates,
+      restore_preferences:   hasServerPrefs,
     })
   }
 
-  const ls: Record<string, unknown> = backup.localStorage ?? {}
-  for (const [optKey, keys] of Object.entries(LS_MAP) as [keyof typeof LS_MAP, string[]][]) {
-    if (!options[optKey]) continue
-    for (const key of keys) {
-      if (ls[key] !== undefined) {
-        syncPref(key, typeof ls[key] === 'string' ? ls[key] as string : JSON.stringify(ls[key]))
+  // Fallback: restore from localStorage section for old backup files without db.preferences
+  if (hasPrefs && backup.db.preferences == null) {
+    const ls: Record<string, unknown> = backup.localStorage ?? {}
+    for (const [optKey, keys] of Object.entries(LS_MAP) as [keyof typeof LS_MAP, string[]][]) {
+      if (!options[optKey]) continue
+      for (const key of keys) {
+        if (ls[key] !== undefined) {
+          syncPref(key, typeof ls[key] === 'string' ? ls[key] as string : JSON.stringify(ls[key]))
+        }
       }
     }
+  }
+
+  if (hasDb || hasPrefs) {
+    window.location.reload()
   }
 }

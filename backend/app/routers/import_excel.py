@@ -75,7 +75,7 @@ async def parse_excel(file: UploadFile = File(...), user: User = Depends(current
             all_rows = [[_cell(c) for c in row] for row in raw]
     except Exception as e:
         temp_path.unlink(missing_ok=True)
-        raise HTTPException(status_code=400, detail=f"Error al leer el archivo: {e}")
+        raise HTTPException(status_code=400, detail="El archivo no se pudo leer. Comprueba que el formato sea correcto.")
 
     if not all_rows:
         temp_path.unlink(missing_ok=True)
@@ -165,6 +165,11 @@ def _parse_date(s: str) -> date_type:
 
 @router.post("/run")
 async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    try:
+        uuid.UUID(req.session_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="session_id inválido")
+
     temp_path = next(
         (TEMP_DIR / f"{req.session_id}{ext}" for ext in (".xlsx", ".csv")
          if (TEMP_DIR / f"{req.session_id}{ext}").exists()),
@@ -223,7 +228,7 @@ async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db), 
             wb.close()
             data_rows = [[_cell(c) for c in row] for row in raw[1:]]
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Error al releer el archivo: {e}")
+        raise HTTPException(status_code=400, detail="El archivo no se pudo releer. Vuelve a subir el archivo e inténtalo de nuevo.")
 
     imported = 0
     skipped = 0

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
@@ -11,7 +11,7 @@ router = APIRouter(prefix="/preferences", tags=["preferences"])
 
 
 class PrefValue(BaseModel):
-    value: str
+    value: str = Field(max_length=100_000)
 
 
 @router.get("")

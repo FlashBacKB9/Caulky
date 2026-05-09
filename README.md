@@ -73,6 +73,8 @@ The backend reads these from environment (or a `backend/.env` file in developmen
 |---|---|---|
 | `DATABASE_URL` | `postgresql+asyncpg://postgres:spendly@localhost:5432/spendly` | PostgreSQL connection string |
 | `CORS_ORIGINS` | `http://localhost:5173` | Comma-separated allowed origins (`*` in docker-compose) |
+| `SECRET_KEY` | *(auto-generated)* | JWT signing secret. Generated automatically on first start and persisted in `backend/.secret_key`. Override with a fixed value in production if needed. |
+| `COOKIE_SECURE` | `false` | Set to `true` when serving over HTTPS |
 
 ---
 
@@ -131,6 +133,20 @@ Caulky/
 │   └── vite.config.ts
 └── docker-compose.yml
 ```
+
+---
+
+## Security considerations
+
+Caulky is designed for **personal or small household use** on a trusted network. It does not implement certain hardening measures that a public-facing multi-tenant application would require:
+
+- **No rate limiting on login or registration.** An attacker with network access to the server could attempt to brute-force passwords or create accounts in bulk. If you expose Caulky to the internet, consider placing it behind a reverse proxy (e.g. Nginx or Caddy) with request limiting, or restrict access via VPN / firewall rules.
+- **Open registration.** Anyone who can reach the server can create an account. If you want to restrict access, either close the registration endpoint at the network level or add an invite-only mechanism.
+- **`COOKIE_SECURE` is `false` by default.** Set it to `true` in your `.env` if you serve the app over HTTPS (recommended for any internet-facing deployment).
+- **Plugin system executes arbitrary JavaScript.** Plugins are user-supplied code run directly in the app context via `new Function()`. The built-in scanner blocks obvious dangerous patterns, but regex-based filters can be bypassed. Only install plugins you have reviewed and trust. Do not share plugins between users — if a sharing mechanism were added in the future, it would need to run plugins inside a sandboxed `<iframe>` to be safe.
+- **Session tokens are not revoked on logout.** Caulky uses JWT cookies with a 30-day lifetime. Logging out clears the cookie from the browser but does not invalidate the token server-side. In practice the cookie is `httponly` (not accessible to JavaScript), so the risk is low for trusted-network use. For internet-facing deployments with untrusted users, consider implementing a token blacklist or reducing the token lifetime.
+
+For home or LAN use these limitations are generally acceptable. For any internet-exposed deployment, the mitigations above are strongly recommended.
 
 ---
 
