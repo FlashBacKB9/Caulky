@@ -191,7 +191,7 @@ function ConfigPanel({ config, onChange, accounts, groups, types, allExpenseMove
           <span className="font-medium text-gray-600 dark:text-gray-300">{t('analysis.config')}</span>
           {adjustments > 0 && (
             <span className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded text-xs font-medium">
-              {adjustments} ajuste{adjustments !== 1 ? 's' : ''}
+              {adjustments !== 1 ? t('analysis.adjustmentsPlural').replace('{n}', String(adjustments)) : t('analysis.adjustments').replace('{n}', String(adjustments))}
             </span>
           )}
         </div>

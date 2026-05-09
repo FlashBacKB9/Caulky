@@ -467,6 +467,34 @@ Botón directo "Editar Dashboard" para entrar en modo edición del layout.
 - Exportar backup: JSON con todos los datos (movimientos, tipos, grupos, cuentas, presupuestos, fondos)
 - Importar backup: restaura desde un fichero JSON ⚠️ Sobreescribe todos los datos actuales
 
+### Idiomas
+Permite instalar archivos de idioma personalizados que traducen toda la interfaz de la app.
+- Instalar idioma (.js): botón para subir un archivo .js con el formato de idioma
+- Toggle para activar cada idioma instalado
+- Botón de papelera para eliminarlo
+- "Ejemplo": descarga un archivo de idioma de ejemplo (inglés simplificado) listo para editar
+- "Guía IA": descarga la guía completa de creación de idiomas en formato .md
+
+**Formato de archivo de idioma (.js):**
+\`\`\`js
+export default {
+  name: 'Português',      // Nombre del idioma (obligatorio)
+  flag: '🇵🇹',           // Emoji de bandera (opcional)
+  author: 'Tu nombre',   // Autor (opcional)
+  version: '1.0',        // Versión (opcional)
+
+  // Traducciones: clave → valor traducido
+  'nav.dashboard':    'Dashboard',
+  'nav.movements':    'Movimentos',
+  'nav.accounts':     'Contas',
+  'common.save':      'Guardar',
+  'common.cancel':    'Cancelar',
+  // ... resto de claves
+}
+\`\`\`
+
+El archivo se instala como módulo ES. Solo necesitas incluir las claves que quieras sobreescribir; las que no estén se heredan del español. Cada vez que el usuario cambia de idioma, la app se recarga aplicando las traducciones del archivo.
+
 ### Plugins
 Permite instalar plugins JavaScript que modifican la interfaz de la app.
 - Instalar plugin (.js): botón para subir un archivo .js con el formato de plugin
@@ -753,582 +781,492 @@ export default function Documentation() {
           <Divider />
 
           {/* ── 1. Introducción ────────────────────────────────────────── */}
-          <H2 id="intro">Introducción</H2>
-          <P>
-            Caulky es una aplicación web de finanzas personales autoalojada con interfaz en español.
-            Backend: FastAPI + PostgreSQL. Frontend: React + TypeScript.
-          </P>
+          <H2 id="intro">{t('docs.intro.h2')}</H2>
+          <P>{t('docs.intro.p1')}</P>
           <UL>
-            <LI>Registrar y categorizar cualquier transacción (gastos, ingresos, transferencias, ahorros)</LI>
-            <LI>Ver las finanzas en distintos formatos: tabla, calendario, resumen anual, gráficos</LI>
-            <LI>Analizar la evolución de saldos por cuenta y comparar años</LI>
-            <LI>Gestionar presupuestos por categoría con historial de periodos</LI>
-            <LI>Crear plantillas de movimientos y programar recurrencias (diaria, semanal, mensual)</LI>
-            <LI>Hacer seguimiento de inversiones en fondos con precios de Yahoo Finance</LI>
-            <LI>Dividir gastos con otras personas</LI>
-            <LI>Importar datos desde hojas de cálculo Excel</LI>
-            <LI>Gestionar varias cuentas bancarias con saldos automáticos</LI>
-            <LI>Exportar e importar copias de seguridad completas en JSON</LI>
-            <LI>Personalizar la interfaz con plugins JavaScript</LI>
+            <LI>{t('docs.intro.li1')}</LI>
+            <LI>{t('docs.intro.li2')}</LI>
+            <LI>{t('docs.intro.li3')}</LI>
+            <LI>{t('docs.intro.li4')}</LI>
+            <LI>{t('docs.intro.li5')}</LI>
+            <LI>{t('docs.intro.li6')}</LI>
+            <LI>{t('docs.intro.li7')}</LI>
+            <LI>{t('docs.intro.li8')}</LI>
+            <LI>{t('docs.intro.li9')}</LI>
+            <LI>{t('docs.intro.li10')}</LI>
+            <LI>{t('docs.intro.li11')}</LI>
           </UL>
 
           <Divider />
 
           {/* ── 2. Conceptos clave ─────────────────────────────────────── */}
-          <H2 id="conceptos">Conceptos clave</H2>
+          <H2 id="conceptos">{t('docs.cpt.h2')}</H2>
 
-          <H3>Movimiento</H3>
-          <P>Una transacción de dinero. Es la entidad central de Caulky.</P>
+          <H3>{t('docs.cpt.movTitle')}</H3>
+          <P>{t('docs.cpt.movP')}</P>
           <FieldTable rows={[
-            ['Nombre',          'Descripción libre (ej. "Mercadona", "Nómina Mayo")'],
-            ['Importe',         'En euros. Positivo = ingreso, Negativo = gasto'],
-            ['Fecha',           'La fecha que tú registras'],
-            ['Fecha banco',     'Cuándo lo procesa el banco. Opcional. Afecta al calendario y a inversiones'],
-            ['Tipo',            'Categoría del movimiento (ej. "Supermercado", "Nómina")'],
-            ['Cuenta',          'Cuenta bancaria asociada'],
-            ['Pagado',          'Si el movimiento está confirmado. Solo los pagados computan en saldos e inversiones'],
-            ['No contar',       'Excluye el movimiento de estadísticas, gráficos, presupuestos e inversiones'],
-            ['Notas',           'Texto libre adicional'],
-            ['Adjuntos',        'Facturas, justificantes, imágenes'],
-            ['Compartido',      'Marca el gasto como dividido con otra persona'],
-            ['Compartido con',  'Nombre de la persona con quien se comparte'],
-            ['Dividido entre',  'Número de personas entre las que se divide (ej. 2 para la mitad)'],
-            ['Mi parte',        'Importe exacto que te corresponde (alternativa a "dividido entre")'],
+            [t('docs.cpt.fNombre'),        t('docs.cpt.fNombreD')],
+            [t('docs.cpt.fImporte'),       t('docs.cpt.fImporteD')],
+            [t('docs.cpt.fFecha'),         t('docs.cpt.fFechaD')],
+            [t('docs.cpt.fFechaBanco'),    t('docs.cpt.fFechaBancoD')],
+            [t('docs.cpt.fTipo'),          t('docs.cpt.fTipoD')],
+            [t('docs.cpt.fCuenta'),        t('docs.cpt.fCuentaD')],
+            [t('docs.cpt.fPagado'),        t('docs.cpt.fPagadoD')],
+            [t('docs.cpt.fNoContar'),      t('docs.cpt.fNoContarD')],
+            [t('docs.cpt.fNotas'),         t('docs.cpt.fNotasD')],
+            [t('docs.cpt.fAdjuntos'),      t('docs.cpt.fAdjuntosD')],
+            [t('docs.cpt.fCompartido'),    t('docs.cpt.fCompartidoD')],
+            [t('docs.cpt.fCompartidoCon'), t('docs.cpt.fCompartidoConD')],
+            [t('docs.cpt.fDividido'),      t('docs.cpt.fDivididoD')],
+            [t('docs.cpt.fMiParte'),       t('docs.cpt.fMiParteD')],
           ]} />
 
-          <H3>Tipos de movimiento</H3>
+          <H3>{t('docs.cpt.typesTitle')}</H3>
+          <P>{t('docs.cpt.typesP')}</P>
+
+          <H3>{t('docs.cpt.groupsTitle')}</H3>
+          <P>{t('docs.cpt.groupsP')}</P>
+
+          <H3>{t('docs.cpt.accountsTitle')}</H3>
+          <P>{t('docs.cpt.accountsP')}</P>
+
+          <H3>{t('docs.cpt.budgetsTitle')}</H3>
+          <P>{t('docs.cpt.budgetsP')}</P>
+
+          <H3>{t('docs.cpt.templatesTitle')}</H3>
           <P>
-            Categorías para clasificar movimientos (ej. "Supermercado", "Nómina", "Alquiler").
-            Cada tipo tiene nombre, color y pertenece a un <B>grupo</B>.
-            Opcionalmente tienen una <B>cuenta vinculada</B>: los movimientos de ese tipo afectan al saldo de esa cuenta.
+            {t('docs.cpt.templatesP').split('{mes}')[0]}<Code>{'{mes}'}</Code>
+            {t('docs.cpt.templatesP').split('{mes}')[1]?.split('{año}')[0]}<Code>{'{año}'}</Code>
+            {t('docs.cpt.templatesP').split('{año}')[1]?.split('{mesfecha}')[0]}<Code>{'{mesfecha}'}</Code>
+            {t('docs.cpt.templatesP').split('{mesfecha}')[1]?.split('{mesfechabanco}')[0]}<Code>{'{mesfechabanco}'}</Code>
+            {t('docs.cpt.templatesP').split('{mesfechabanco}')[1]}
           </P>
 
-          <H3>Grupos</H3>
-          <P>
-            Agrupaciones de tipos de movimiento (ej. "Alimentación", "Transporte", "Ingresos").
-            Se usan en Finanzas del Año, Comparaciones, Gráficos con desglose por grupo y vista Kanban.
-          </P>
-
-          <H3>Cuentas</H3>
-          <P>
-            Cuentas bancarias o bolsillos. Tienen nombre, color, icono y saldo inicial.
-            El saldo actual se calcula automáticamente: <B>Saldo inicial + suma de movimientos pagados</B> asociados.
-          </P>
-
-          <H3>Presupuestos</H3>
-          <P>
-            Límites de gasto configurables. Se vinculan a uno o varios tipos de movimiento y tienen un
-            periodo (mensual, semanal, anual o personalizado). Admiten <B>versiones de importe</B>: puedes
-            cambiar el límite en distintas fechas sin perder el historial.
-          </P>
-
-          <H3>Plantillas y recurrencias</H3>
-          <P>
-            Las plantillas son movimientos preconfigurados para crearlos en un clic.
-            Las recurrencias generan movimientos automáticamente según una regla periódica.
-            Variables dinámicas en el nombre: <Code>{'{mes}'}</Code>, <Code>{'{año}'}</Code>,{' '}
-            <Code>{'{mesfecha}'}</Code>, <Code>{'{mesfechabanco}'}</Code>.
-          </P>
-
-          <H3>Fondos de inversión</H3>
-          <P>
-            Fondos vinculados a un tipo de movimiento. Cada movimiento de ese tipo = una compra del fondo.
-            Con el ticker de Yahoo Finance (ej. <Code>IWDA.AS</Code>) se obtienen precios actuales e históricos.
-          </P>
+          <H3>{t('docs.cpt.fundsTitle')}</H3>
+          <P>{t('docs.cpt.fundsP')}</P>
 
           <Divider />
 
           {/* ── 3. Movimientos ─────────────────────────────────────────── */}
-          <H2 id="movimientos">Movimientos</H2>
-          <P>
-            Página principal de gestión de transacciones. Disponible en tres vistas:
-            <B> Tabla</B>, <B>Calendario</B> y <B>Kanban</B>.
-          </P>
+          <H2 id="movimientos">{t('docs.mov.h2')}</H2>
+          <P>{t('docs.mov.p1')}</P>
 
-          <H3>Añadir un movimiento</H3>
+          <H3>{t('docs.mov.addTitle')}</H3>
           <Steps>
-            <Step n={1}>Ir a <B>Movimientos</B> y clic en <B>"+ Nuevo"</B></Step>
-            <Step n={2}>Rellenar <B>Nombre</B> e <B>Importe</B> (negativo para gastos, positivo para ingresos)</Step>
-            <Step n={3}>Seleccionar <B>Fecha</B>, <B>Tipo</B> y <B>Cuenta</B> (opcionales pero recomendados)</Step>
-            <Step n={4}>Marcar <B>Pagado</B> si ya está confirmado. <B>No contar</B> para excluirlo de estadísticas</Step>
-            <Step n={5}>
-              Para gastos compartidos: activar el toggle <B>Compartido</B> → indicar con quién → elegir entre
-              "dividido entre N personas" o "mi parte es X€"
-            </Step>
-            <Step n={6}>Opcionalmente añadir <B>notas</B> y <B>archivos adjuntos</B></Step>
+            <Step n={1}>{t('docs.mov.s1')}</Step>
+            <Step n={2}>{t('docs.mov.s2')}</Step>
+            <Step n={3}>{t('docs.mov.s3')}</Step>
+            <Step n={4}>{t('docs.mov.s4')}</Step>
+            <Step n={5}>{t('docs.mov.s5')}</Step>
+            <Step n={6}>{t('docs.mov.s6')}</Step>
             <Step n={7}>
-              Botones en la parte inferior:
+              {t('docs.mov.s7')}
               <UL>
-                <LI><B>Cancelar</B>: cierra sin guardar</LI>
-                <LI><B>Crear varios</B>: crea el mismo movimiento en múltiples fechas según una regla</LI>
-                <LI><B>Guardar</B>: crea el movimiento único</LI>
+                <LI>{t('docs.mov.s7li1')}</LI>
+                <LI>{t('docs.mov.s7li2')}</LI>
+                <LI>{t('docs.mov.s7li3')}</LI>
               </UL>
             </Step>
           </Steps>
 
-          <H3>Crear varios movimientos de golpe</H3>
-          <P>El botón <B>"Crear varios"</B> crea múltiples copias del mismo movimiento distribuidas en el tiempo. Ideal para financiaciones a plazos, pagos escalonados, suscripciones con fecha de inicio conocida, etc.</P>
+          <H3>{t('docs.mov.bulkTitle')}</H3>
+          <P>{t('docs.mov.bulkP')}</P>
           <Steps>
-            <Step n={1}>Rellenar el formulario con nombre, importe, tipo, etc.</Step>
-            <Step n={2}>Clic en <B>"Crear varios"</B> (entre Cancelar y Guardar)</Step>
-            <Step n={3}>Elegir el <B>tipo de repetición</B>: Diario, Semanal, Mensual por día, Mensual por semana</Step>
-            <Step n={4}>Configurar la <B>fecha del primer movimiento</B></Step>
-            <Step n={5}>Indicar <B>cuántos movimientos</B> crear en total</Step>
-            <Step n={6}>Activar opcionalmente <B>"Numerar pagos en el nombre"</B> → añade "1/N", "2/N"… al nombre</Step>
-            <Step n={7}>La vista previa muestra los primeros movimientos con fechas y nombres resultantes</Step>
-            <Step n={8}>Clic en <B>"Crear N movimientos"</B></Step>
+            <Step n={1}>{t('docs.mov.bs1')}</Step>
+            <Step n={2}>{t('docs.mov.bs2')}</Step>
+            <Step n={3}>{t('docs.mov.bs3')}</Step>
+            <Step n={4}>{t('docs.mov.bs4')}</Step>
+            <Step n={5}>{t('docs.mov.bs5')}</Step>
+            <Step n={6}>{t('docs.mov.bs6')}</Step>
+            <Step n={7}>{t('docs.mov.bs7')}</Step>
+            <Step n={8}>{t('docs.mov.bs8')}</Step>
           </Steps>
-          <Example label="Financiación a plazos">
-            500€ en 5 pagos mensuales el día 15: Nombre "Financiación TV" · Importe -100 · Mensual (día) el 15 · Cantidad 5 · Numerar pagos activado
-            → crea "Financiación TV 1/5" el 15 enero, "Financiación TV 2/5" el 15 febrero, etc.
-          </Example>
-          <Tip>
-            <B>Diferencia con las recurrencias de plantillas</B>: "Crear varios" es un proceso puntual sin necesidad de guardar plantilla. Las plantillas con recurrencia son para gastos que se repiten de forma indefinida (alquiler, suscripciones, etc.).
-          </Tip>
+          <Example label={t('docs.mov.exFinLabel')}>{t('docs.mov.exFin')}</Example>
+          <Tip>{t('docs.mov.bulkTip')}</Tip>
 
-          <H3>Editar un movimiento</H3>
-          <P><B>Edición inline</B> — clic en cualquier celda de la tabla (excepto el nombre) para editar ese campo directamente. Un botón ✓ confirma el cambio.</P>
-          <P><B>Modal completo</B> — clic en el <B>nombre</B> del movimiento. Permite editar todos los campos, adjuntar archivos, duplicar o eliminar.</P>
-          <P><B>Menú contextual</B> — clic derecho en cualquier movimiento → opciones: Duplicar, Eliminar.</P>
+          <H3>{t('docs.mov.editTitle')}</H3>
+          <P>{t('docs.mov.editP1')}</P>
+          <P>{t('docs.mov.editP2')}</P>
+          <P>{t('docs.mov.editP3')}</P>
 
-          <H3>Edición masiva</H3>
-          <Steps title="Modificar un campo en varios movimientos a la vez">
-            <Step n={1}>Activar los <B>checkboxes</B> de las filas a editar. El checkbox del encabezado selecciona todos los visibles</Step>
-            <Step n={2}>En la barra de acciones → clic en <B>"Modificar campo"</B></Step>
-            <Step n={3}>Elegir el campo: Nombre, Importe, Tipo, Cuenta, Fecha, Fecha banco, Pagado, No contar, Notas</Step>
-            <Step n={4}>Introducir el nuevo valor y clic en <B>"Aplicar"</B></Step>
+          <H3>{t('docs.mov.massTitle')}</H3>
+          <Steps title={t('docs.mov.massStepTitle')}>
+            <Step n={1}>{t('docs.mov.ms1')}</Step>
+            <Step n={2}>{t('docs.mov.ms2')}</Step>
+            <Step n={3}>{t('docs.mov.ms3')}</Step>
+            <Step n={4}>{t('docs.mov.ms4')}</Step>
           </Steps>
-          <Example label="Caso de uso">
-            Marcar como pagados todos los movimientos de enero: filtrar por enero → checkbox encabezado → Modificar campo → Pagado → Sí → Aplicar.
-          </Example>
+          <Example label={t('docs.mov.massExLabel')}>{t('docs.mov.massEx')}</Example>
 
-          <H3>Vista Tabla</H3>
+          <H3>{t('docs.mov.tableTitle')}</H3>
           <UL>
-            <LI>Columnas configurables: mostrar/ocultar, reordenar arrastrando el encabezado, redimensionar arrastrando el borde</LI>
-            <LI>Ordenación: clic en el encabezado de columna</LI>
-            <LI>Filtros avanzados: rango de fechas, importe mín/máx, tipo(s), cuenta(s), pagado, no contar, búsqueda libre por texto</LI>
-            <LI><B>Filtros favoritos</B>: guardar combinaciones de filtros con nombre para reutilizarlos</LI>
+            <LI>{t('docs.mov.tli1')}</LI>
+            <LI>{t('docs.mov.tli2')}</LI>
+            <LI>{t('docs.mov.tli3')}</LI>
+            <LI>{t('docs.mov.tli4')}</LI>
           </UL>
 
-          <H3>Vista Calendario</H3>
+          <H3>{t('docs.mov.calTitle')}</H3>
           <UL>
-            <LI>Toggle <B>Fecha / Fecha banco</B>: elige qué campo determina en qué día aparece el movimiento</LI>
-            <LI><B>Drag & drop</B>: arrastra un movimiento a otro día para cambiar su fecha sin abrir el modal</LI>
-            <LI>Suma diaria visible en cada celda (verde = positivo, rojo = negativo)</LI>
+            <LI>{t('docs.mov.cli1')}</LI>
+            <LI>{t('docs.mov.cli2')}</LI>
+            <LI>{t('docs.mov.cli3')}</LI>
           </UL>
 
-          <H3>Vista Kanban</H3>
-          <P>Movimientos agrupados por tipo de movimiento con totales por grupo. Los grupos se pueden expandir y contraer. Útil para ver de un vistazo todos los movimientos de una categoría.</P>
+          <H3>{t('docs.mov.kanbanTitle')}</H3>
+          <P>{t('docs.mov.kanbanP')}</P>
 
           <Divider />
 
           {/* ── 4. Plantillas y recurrencias ───────────────────────────── */}
-          <H2 id="plantillas">Plantillas y recurrencias</H2>
+          <H2 id="plantillas">{t('docs.tpl.h2')}</H2>
 
-          <H3>Crear una plantilla</H3>
+          <H3>{t('docs.tpl.createTitle')}</H3>
           <Steps>
-            <Step n={1}>Movimientos → clic en <B>"+ Nuevo"</B> → clic en el icono de <B>plantillas</B> (arriba a la derecha del panel)</Step>
-            <Step n={2}>Clic en <B>"+ Nueva plantilla"</B></Step>
-            <Step n={3}>Rellenar la <B>etiqueta</B> (nombre corto para identificarla) y el resto de campos del movimiento</Step>
-            <Step n={4}>En el campo de nombre puedes usar <Code>{'{mes}'}</Code> para insertar el mes actual automáticamente. Ej: "Nómina {'{mes}'}" → "Nómina Mayo"</Step>
-            <Step n={5}>Elegir si <B>Fecha</B> y <B>Fecha banco</B> se rellenan solas como "hoy" o se dejan en blanco para rellenar manualmente</Step>
-            <Step n={6}>Guardar — aparecerá en la lista de plantillas para usarla en un clic</Step>
+            <Step n={1}>{t('docs.tpl.s1')}</Step>
+            <Step n={2}>{t('docs.tpl.s2')}</Step>
+            <Step n={3}>{t('docs.tpl.s3')}</Step>
+            <Step n={4}>{t('docs.tpl.s4')}</Step>
+            <Step n={5}>{t('docs.tpl.s5')}</Step>
+            <Step n={6}>{t('docs.tpl.s6')}</Step>
           </Steps>
 
-          <H3>Configurar una recurrencia</H3>
+          <H3>{t('docs.tpl.configTitle')}</H3>
           <Steps>
-            <Step n={1}>En la lista de plantillas, clic en el <B>icono de calendario</B> de la plantilla que quieres repetir</Step>
-            <Step n={2}>Elegir el <B>tipo de recurrencia</B>:
+            <Step n={1}>{t('docs.tpl.cs1')}</Step>
+            <Step n={2}>
+              {t('docs.tpl.cs2')}
               <UL>
-                <LI><B>Diaria</B>: cada N días</LI>
-                <LI><B>Semanal</B>: los días de la semana que elijas (puedes marcar varios)</LI>
-                <LI><B>Mensual por día</B>: el día X de cada N meses (ej. el día 5 de cada mes)</LI>
-                <LI><B>Mensual por semana</B>: el Nth día_de_semana del mes (ej. el primer lunes, el último viernes)</LI>
+                <LI>{t('docs.tpl.cs2li1')}</LI>
+                <LI>{t('docs.tpl.cs2li2')}</LI>
+                <LI>{t('docs.tpl.cs2li3')}</LI>
+                <LI>{t('docs.tpl.cs2li4')}</LI>
               </UL>
             </Step>
-            <Step n={3}>Establecer la <B>fecha de inicio</B> de la recurrencia</Step>
-            <Step n={4}>Elegir el <B>modo</B>:
+            <Step n={3}>{t('docs.tpl.cs3')}</Step>
+            <Step n={4}>
+              {t('docs.tpl.cs4')}
               <UL>
-                <LI><B>Auto-crear</B>: Caulky crea automáticamente los movimientos pendientes cada vez que abres la app</LI>
-                <LI><B>Creación masiva</B>: tú eliges cuántas ocurrencias crear ahora de golpe</LI>
+                <LI>{t('docs.tpl.cs4li1')}</LI>
+                <LI>{t('docs.tpl.cs4li2')}</LI>
               </UL>
             </Step>
-            <Step n={5}>Guardar</Step>
+            <Step n={5}>{t('docs.tpl.cs5')}</Step>
           </Steps>
 
-          <Example label="Todos los lunes">
-            Plantilla "Compra semanal" → icono calendario → tipo <B>Semanal</B> → marcar <B>Lunes</B> → modo <B>Auto-crear</B> → Guardar.
-          </Example>
-          <Example label="El día 5 de cada mes">
-            Plantilla "Alquiler" → tipo <B>Mensual (día)</B> → día <B>5</B>, cada <B>1</B> mes → Auto-crear → Guardar.
-          </Example>
-          <Example label="El primer viernes de cada mes">
-            Plantilla → tipo <B>Mensual (semana)</B> → "el <B>primer Viernes</B> de cada mes" → Auto-crear → Guardar.
-          </Example>
+          <Example label={t('docs.tpl.ex1Label')}>{t('docs.tpl.ex1')}</Example>
+          <Example label={t('docs.tpl.ex2Label')}>{t('docs.tpl.ex2')}</Example>
+          <Example label={t('docs.tpl.ex3Label')}>{t('docs.tpl.ex3')}</Example>
 
-          <Note>
-            Con <B>Auto-crear</B>, si llevas varios días sin abrir la app, al abrirla Caulky crea automáticamente todos los movimientos pendientes de golpe.
-          </Note>
+          <Note>{t('docs.tpl.note')}</Note>
 
           <Divider />
 
           {/* ── 5. Gráficos ────────────────────────────────────────────── */}
-          <H2 id="graficos">Gráficos</H2>
-          <P>Visualizaciones completamente configurables de los datos financieros.</P>
+          <H2 id="graficos">{t('docs.grf.h2')}</H2>
+          <P>{t('docs.grf.p1')}</P>
 
-          <H3>Crear un gráfico</H3>
+          <H3>{t('docs.grf.createTitle')}</H3>
           <Steps>
-            <Step n={1}>Ir a <B>Gráficos</B> → clic en <B>"+ Añadir gráfico"</B></Step>
-            <Step n={2}>Elegir el <B>tipo</B>: Columnas, Apilado, Líneas, Área, Donut o Mixto</Step>
-            <Step n={3}>Configurar el <B>Eje X</B>: Mes (un punto por mes), Año, o Ninguno (dato único acumulado)</Step>
-            <Step n={4}>Configurar el <B>Desglose</B>: Ninguno (una serie), Grupo, Tipo de movimiento, o Cuenta</Step>
-            <Step n={5}>Elegir el <B>Signo</B>: Todos los movimientos, Solo gastos (negativos), Solo ingresos (positivos)</Step>
-            <Step n={6}>Elegir la <B>Métrica</B>: suma de importes o número de movimientos</Step>
-            <Step n={7}>Opcionalmente aplicar <B>filtros avanzados</B> (por tipo, cuenta, rango de fechas…)</Step>
+            <Step n={1}>{t('docs.grf.s1')}</Step>
+            <Step n={2}>{t('docs.grf.s2')}</Step>
+            <Step n={3}>{t('docs.grf.s3')}</Step>
+            <Step n={4}>{t('docs.grf.s4')}</Step>
+            <Step n={5}>{t('docs.grf.s5')}</Step>
+            <Step n={6}>{t('docs.grf.s6')}</Step>
+            <Step n={7}>{t('docs.grf.s7')}</Step>
           </Steps>
 
-          <Example label="Gasto mensual en supermercado">
-            Tipo: Columnas · Eje X: Mes · Desglose: Ninguno · Signo: Solo gastos · Filtro: Tipo = "Supermercado"
-          </Example>
-          <Example label="Todos los gastos por categoría">
-            Tipo: Apilado · Eje X: Mes · Desglose: Grupo · Signo: Solo gastos
-          </Example>
-          <Example label="Evolución del saldo de cuentas">
-            Tipo: Líneas · Eje X: Mes · Desglose: Cuenta · Signo: Todos
-          </Example>
+          <Example label={t('docs.grf.ex1Label')}>{t('docs.grf.ex1')}</Example>
+          <Example label={t('docs.grf.ex2Label')}>{t('docs.grf.ex2')}</Example>
+          <Example label={t('docs.grf.ex3Label')}>{t('docs.grf.ex3')}</Example>
 
           <Divider />
 
           {/* ── 6. Cuentas ─────────────────────────────────────────────── */}
-          <H2 id="cuentas">Cuentas</H2>
-          <P>
-            Página de analítica de saldos. Muestra la evolución histórica de todas tus cuentas bancarias
-            con gráficos interactivos.
-          </P>
+          <H2 id="cuentas">{t('docs.act.h2')}</H2>
+          <P>{t('docs.act.p1')}</P>
 
-          <H3>Tarjetas de resumen</H3>
-          <P>En la cabecera aparecen las tarjetas de cada cuenta con su saldo actual, saldo inicial y variación total desde el inicio. También hay un indicador del saldo total combinado de todas las cuentas.</P>
+          <H3>{t('docs.act.summaryTitle')}</H3>
+          <P>{t('docs.act.summaryP')}</P>
 
-          <H3>Filtro de año</H3>
-          <P>Botones en la cabecera para filtrar los gráficos por un año concreto o ver <B>"Todo"</B> el historial disponible.</P>
+          <H3>{t('docs.act.yearTitle')}</H3>
+          <P>{t('docs.act.yearP')}</P>
 
-          <H3>Gráfico de evolución del saldo</H3>
+          <H3>{t('docs.act.evTitle')}</H3>
           <UL>
-            <LI>Muestra el saldo de cada cuenta mes a mes</LI>
-            <LI>Toggle <B>Líneas / Apilado</B>: líneas independientes por cuenta o área apilada con el total</LI>
+            <LI>{t('docs.act.evLi1')}</LI>
+            <LI>{t('docs.act.evLi2')}</LI>
           </UL>
 
-          <H3>Gráfico de variación mensual</H3>
-          <P>Barras que muestran cuánto ha cambiado el saldo de cada cuenta cada mes. Barras positivas = el saldo subió ese mes; negativas = bajó.</P>
+          <H3>{t('docs.act.monthTitle')}</H3>
+          <P>{t('docs.act.monthP')}</P>
 
-          <H3>Gráfico de distribución</H3>
-          <P>Donut que muestra el porcentaje del saldo total que corresponde a cada cuenta en el momento actual.</P>
+          <H3>{t('docs.act.distTitle')}</H3>
+          <P>{t('docs.act.distP')}</P>
 
-          <Tip>Para gestionar las cuentas (crear, editar, eliminar), ve a Configuración → Cuentas. La página Cuentas es solo para analítica; las operaciones CRUD están en Configuración.</Tip>
+          <Tip>{t('docs.act.tip')}</Tip>
 
           <Divider />
 
           {/* ── 7. Comparaciones ───────────────────────────────────────── */}
-          <H2 id="comparaciones">Comparaciones</H2>
-          <P>
-            Compara dos años entre sí para detectar patrones, mejoras o desviaciones en tus finanzas.
-          </P>
+          <H2 id="comparaciones">{t('docs.cmp.h2')}</H2>
+          <P>{t('docs.cmp.p1')}</P>
 
-          <H3>Controles principales</H3>
-          <P><B>Selección de años:</B> botones para elegir el Año A (azul) y el Año B (naranja). Solo aparecen los años que tienen datos.</P>
+          <H3>{t('docs.cmp.controlsTitle')}</H3>
+          <P>{t('docs.cmp.controlsP')}</P>
 
-          <H3>Tipos de gráfico</H3>
+          <H3>{t('docs.cmp.typesTitle')}</H3>
           <UL>
-            <LI><B>Gastos por categoría</B>: desglose mensual de gastos por grupo</LI>
-            <LI><B>Total de gastos</B>: total mensual de gastos (una línea por año)</LI>
-            <LI><B>Ingresos</B>: total mensual de ingresos</LI>
-            <LI><B>Balance neto</B>: ingresos − gastos cada mes</LI>
-            <LI><B>Distribución</B>: donut con el porcentaje de gasto por categoría</LI>
+            <LI>{t('docs.cmp.tLi1')}</LI>
+            <LI>{t('docs.cmp.tLi2')}</LI>
+            <LI>{t('docs.cmp.tLi3')}</LI>
+            <LI>{t('docs.cmp.tLi4')}</LI>
+            <LI>{t('docs.cmp.tLi5')}</LI>
           </UL>
 
-          <H3>Tipo de visualización</H3>
-          <P>Para todos los gráficos excepto Distribución: <B>Línea</B>, <B>Barra</B> o <B>Área</B>.</P>
+          <H3>{t('docs.cmp.vizTitle')}</H3>
+          <P>{t('docs.cmp.vizP')}</P>
 
-          <H3>Modo de vista</H3>
+          <H3>{t('docs.cmp.modeTitle')}</H3>
           <UL>
-            <LI><B>Lado a lado</B>: dos gráficos independientes con el mismo eje Y para comparar visualmente. Los ejes Y son iguales para que la comparación sea directa</LI>
-            <LI><B>Superpuesto</B>: los datos de ambos años en un mismo gráfico. El tooltip muestra los dos valores</LI>
+            <LI>{t('docs.cmp.mLi1')}</LI>
+            <LI>{t('docs.cmp.mLi2')}</LI>
           </UL>
 
-          <H3>Periodo</H3>
+          <H3>{t('docs.cmp.periodTitle')}</H3>
           <UL>
-            <LI><B>Año completo</B>: todos los meses del año (por defecto)</LI>
-            <LI><B>Mes concreto</B>: disponible para el tipo Distribución; muestra los datos de ese mes específico</LI>
+            <LI>{t('docs.cmp.pLi1')}</LI>
+            <LI>{t('docs.cmp.pLi2')}</LI>
           </UL>
 
-          <Example label="Ver si gasto más en alimentación este año que el anterior">
-            Tipo: Gastos por categoría · Modo: Lado a lado · Año A: 2024 · Año B: 2025
-          </Example>
-          <Example label="Comparar ingresos totales entre dos años">
-            Tipo: Ingresos · Modo: Superpuesto · Visualización: Área
-          </Example>
+          <Example label={t('docs.cmp.ex1Label')}>{t('docs.cmp.ex1')}</Example>
+          <Example label={t('docs.cmp.ex2Label')}>{t('docs.cmp.ex2')}</Example>
 
           <Divider />
 
           {/* ── 8. Finanzas del Año ────────────────────────────────────── */}
-          <H2 id="annual">Finanzas del Año</H2>
-          <P>
-            Tabla resumen anual con desglose mensual por categoría. Solo lectura.
-          </P>
+          <H2 id="annual">{t('docs.ann.h2')}</H2>
+          <P>{t('docs.ann.p1')}</P>
           <UL>
-            <LI>Filas: grupos y tipos de movimiento</LI>
-            <LI>Columnas: 12 meses + total anual + media mensual</LI>
-            <LI>Los valores cero aparecen como "—" para facilitar la lectura</LI>
-            <LI>Selector de año en la parte superior</LI>
+            <LI>{t('docs.ann.li1')}</LI>
+            <LI>{t('docs.ann.li2')}</LI>
+            <LI>{t('docs.ann.li3')}</LI>
+            <LI>{t('docs.ann.li4')}</LI>
           </UL>
-          <Tip>Ideal para ver de un vistazo cuánto has gastado en cada categoría mes a mes y detectar variaciones o meses atípicos.</Tip>
+          <Tip>{t('docs.ann.tip')}</Tip>
 
           <Divider />
 
           {/* ── 9. Dashboard ───────────────────────────────────────────── */}
-          <H2 id="dashboard">Dashboard</H2>
-          <P>Página de inicio personalizable con widgets de estadísticas, gráficos y presupuestos.</P>
+          <H2 id="dashboard">{t('docs.dsh.h2')}</H2>
+          <P>{t('docs.dsh.p1')}</P>
 
-          <H3>Selector de mes/año</H3>
-          <P>El pill junto al título muestra el mes y año. <B>Clic en él</B> para abrir el selector y navegar a cualquier mes pasado. Los widgets mensuales (ingresos del mes, gastos del mes, balance neto, presupuestos) reflejan el periodo seleccionado. El pill se vuelve <B>azul</B> cuando no estás viendo el mes actual.</P>
+          <H3>{t('docs.dsh.selectorTitle')}</H3>
+          <P>{t('docs.dsh.selectorP')}</P>
 
-          <H3>Editar el Dashboard</H3>
-          <P>Accede desde el botón "Editar" del propio Dashboard o desde Configuración → Editar Dashboard. En modo edición:</P>
+          <H3>{t('docs.dsh.editTitle')}</H3>
+          <P>{t('docs.dsh.editP')}</P>
           <UL>
-            <LI>Arrastrar widgets para reordenarlos</LI>
-            <LI>Handles de resize en los bordes para cambiar el tamaño</LI>
-            <LI>Botones <B>"+ Estadística"</B>, <B>"+ Gráfico"</B>, <B>"+ Presupuesto"</B> para añadir widgets</LI>
-            <LI>"Restablecer" devuelve el layout por defecto</LI>
-            <LI>"Guardar" confirma los cambios y sale del modo edición</LI>
+            <LI>{t('docs.dsh.eLi1')}</LI>
+            <LI>{t('docs.dsh.eLi2')}</LI>
+            <LI>{t('docs.dsh.eLi3')}</LI>
+            <LI>{t('docs.dsh.eLi4')}</LI>
+            <LI>{t('docs.dsh.eLi5')}</LI>
           </UL>
 
-          <H3>Widgets de Estadística</H3>
-          <P>Al pulsar <B>"+ Estadística"</B> se muestran tres secciones:</P>
+          <H3>{t('docs.dsh.statsTitle')}</H3>
+          <P>{t('docs.dsh.statsP')}</P>
           <UL>
-            <LI><B>Métricas:</B> Ingresos del año/mes · Gastos del año/mes · Balance neto del año/mes (verde si positivo, rojo si negativo)</LI>
-            <LI><B>Cuentas:</B> un widget por cada cuenta bancaria configurada, que muestra su saldo actual</LI>
-            <LI><B>Paneles especiales:</B> "Cuenta de uso" (cuenta principal) · "Panel de ahorro" (cíclico entre cuentas de ahorro)</LI>
+            <LI>{t('docs.dsh.sLi1')}</LI>
+            <LI>{t('docs.dsh.sLi2')}</LI>
+            <LI>{t('docs.dsh.sLi3')}</LI>
           </UL>
-          <Tip>Puedes añadir varios widgets de cuenta a la vez. Por ejemplo: "Cuenta corriente", "Cuenta ahorro" y "Efectivo" en la misma fila del dashboard.</Tip>
+          <Tip>{t('docs.dsh.statsTip')}</Tip>
 
-          <H3>Widgets de Presupuesto</H3>
+          <H3>{t('docs.dsh.budgetsTitle')}</H3>
           <UL>
-            <LI>Presupuestos individuales: barra de progreso con importe gastado vs límite</LI>
-            <LI><B>Todos los presupuestos:</B> tarjeta combinada que muestra todos los presupuestos activos en una sola vista</LI>
+            <LI>{t('docs.dsh.bLi1')}</LI>
+            <LI>{t('docs.dsh.bLi2')}</LI>
           </UL>
 
           <Divider />
 
           {/* ── 10. Inversiones ────────────────────────────────────────── */}
-          <H2 id="inversiones">Inversiones</H2>
-          <Note>
-            La sección Inversiones está oculta por defecto. Actívala en <B>Configuración → Navegación</B> (toggle de Inversiones) o en <B>Configuración → Apariencia</B> (toggle "Mostrar inversiones").
-          </Note>
-          <Note>
-            Para que un movimiento aparezca en Inversiones debe estar <B>Pagado</B>, no tener <B>No contar</B> activo, y si tiene fecha banco no puede ser futura.
-          </Note>
+          <H2 id="inversiones">{t('docs.inv.h2')}</H2>
+          <Note>{t('docs.inv.note1')}</Note>
+          <Note>{t('docs.inv.note2')}</Note>
 
-          <H3>Configurar un fondo nuevo</H3>
+          <H3>{t('docs.inv.newTitle')}</H3>
           <Steps>
-            <Step n={1}>En <B>Configuración</B>, crear un <B>tipo de movimiento</B> para las compras del fondo (ej. "Compra MSCI World"), asignarlo a un grupo</Step>
-            <Step n={2}>Ir a <B>Inversiones</B> en el menú lateral</Step>
-            <Step n={3}>Clic en <B>"+ Nuevo fondo"</B></Step>
-            <Step n={4}>Rellenar nombre, <B>ticker de Yahoo Finance</B> (ej. <Code>IWDA.AS</Code>, <Code>0P0000XMVJ.F</Code>) y vincular al tipo del paso 1</Step>
-            <Step n={5}>Cada aportación = crear un movimiento con ese tipo (importe negativo, marcado como Pagado)</Step>
-            <Step n={6}>En la lista de compras del fondo → clic en <B>"Obtener"</B> para buscar el precio histórico en Yahoo Finance</Step>
-            <Step n={7}>Actualizar el precio actual con el <B>icono de refresco</B> del fondo</Step>
+            <Step n={1}>{t('docs.inv.s1')}</Step>
+            <Step n={2}>{t('docs.inv.s2')}</Step>
+            <Step n={3}>{t('docs.inv.s3')}</Step>
+            <Step n={4}>{t('docs.inv.s4')}</Step>
+            <Step n={5}>{t('docs.inv.s5')}</Step>
+            <Step n={6}>{t('docs.inv.s6')}</Step>
+            <Step n={7}>{t('docs.inv.s7')}</Step>
           </Steps>
 
-          <H3>Columnas de la lista de compras</H3>
+          <H3>{t('docs.inv.colsTitle')}</H3>
           <UL>
-            <LI><B>Fecha</B>: fecha banco del movimiento (o fecha normal si no tiene)</LI>
-            <LI><B>Importe</B>: euros invertidos en esa compra</LI>
-            <LI><B>Precio/part.</B>: precio por participación en la fecha de compra</LI>
-            <LI><B>Participaciones</B>: importe ÷ precio de compra</LI>
-            <LI><B>Valor actual</B>: importe × (precio actual ÷ precio de compra)</LI>
-            <LI><B>Rentabilidad</B>: (precio actual − precio compra) ÷ precio compra × 100%</LI>
+            <LI>{t('docs.inv.cLi1')}</LI>
+            <LI>{t('docs.inv.cLi2')}</LI>
+            <LI>{t('docs.inv.cLi3')}</LI>
+            <LI>{t('docs.inv.cLi4')}</LI>
+            <LI>{t('docs.inv.cLi5')}</LI>
+            <LI>{t('docs.inv.cLi6')}</LI>
           </UL>
-          <P>Clic en una fila → abre el modal de detalle del movimiento. Clic en el valor actual del fondo → sobreescribirlo manualmente si lo necesitas.</P>
+          <P>{t('docs.inv.colsP')}</P>
 
           <Divider />
 
           {/* ── 11. Presupuestos ───────────────────────────────────────── */}
-          <H2 id="presupuestos">Presupuestos</H2>
+          <H2 id="presupuestos">{t('docs.bgt.h2')}</H2>
 
-          <H3>Crear un presupuesto</H3>
+          <H3>{t('docs.bgt.createTitle')}</H3>
           <Steps>
-            <Step n={1}>Ir a <B>Presupuestos</B> → clic en <B>"+ Nuevo presupuesto"</B></Step>
-            <Step n={2}>Poner un <B>nombre</B> descriptivo (ej. "Alimentación mensual")</Step>
-            <Step n={3}>Vincular uno o varios <B>tipos de movimiento</B> al presupuesto</Step>
-            <Step n={4}>Elegir el <B>periodo</B>: Mensual, Semanal, Anual o Personalizado (rango de fechas fijo)</Step>
-            <Step n={5}>Establecer el <B>importe límite</B> de gasto para ese periodo</Step>
-            <Step n={6}>Opcionalmente indicar la <B>fecha de inicio de seguimiento</B> (para ignorar periodos anteriores)</Step>
+            <Step n={1}>{t('docs.bgt.s1')}</Step>
+            <Step n={2}>{t('docs.bgt.s2')}</Step>
+            <Step n={3}>{t('docs.bgt.s3')}</Step>
+            <Step n={4}>{t('docs.bgt.s4')}</Step>
+            <Step n={5}>{t('docs.bgt.s5')}</Step>
+            <Step n={6}>{t('docs.bgt.s6')}</Step>
           </Steps>
 
-          <H3>Cambiar el importe sin perder el historial</H3>
+          <H3>{t('docs.bgt.changeTitle')}</H3>
           <Steps>
-            <Step n={1}>Abrir el presupuesto → clic en <B>"Nueva versión"</B></Step>
-            <Step n={2}>Indicar el nuevo importe y la <B>fecha desde la que aplica</B></Step>
-            <Step n={3}>Guardar — los periodos anteriores mantienen el importe anterior</Step>
+            <Step n={1}>{t('docs.bgt.cs1')}</Step>
+            <Step n={2}>{t('docs.bgt.cs2')}</Step>
+            <Step n={3}>{t('docs.bgt.cs3')}</Step>
           </Steps>
 
-          <H3>Visualización</H3>
+          <H3>{t('docs.bgt.vizTitle')}</H3>
           <UL>
-            <LI>Barra de progreso del periodo actual (gasto real vs límite)</LI>
-            <LI>Histórico de periodos pasados</LI>
-            <LI>Gráfico de líneas con la evolución temporal</LI>
+            <LI>{t('docs.bgt.vLi1')}</LI>
+            <LI>{t('docs.bgt.vLi2')}</LI>
+            <LI>{t('docs.bgt.vLi3')}</LI>
           </UL>
 
           <Divider />
 
           {/* ── 12. Importar Excel ─────────────────────────────────────── */}
-          <H2 id="importar">Importar Excel</H2>
-          <P>Asistente de 4 pasos para importar movimientos desde un fichero .xlsx.</P>
+          <H2 id="importar">{t('docs.imp.h2')}</H2>
+          <P>{t('docs.imp.p1')}</P>
           <Steps>
-            <Step n={1}><B>Archivo</B>: subir el fichero Excel (arrastrar al área o clic para seleccionar)</Step>
-            <Step n={2}><B>Columnas</B>: mapear cada columna del Excel al campo de Caulky correspondiente (Fecha, Nombre, Importe, Fecha banco, Tipo, Notas). Vista previa del resultado</Step>
-            <Step n={3}><B>Tipos</B>: si el Excel tiene categorías en texto, mapearlas a tipos de movimiento de Caulky</Step>
-            <Step n={4}><B>Importar</B>: previsualización completa → simulación previa → importación definitiva</Step>
+            <Step n={1}>{t('docs.imp.s1')}</Step>
+            <Step n={2}>{t('docs.imp.s2')}</Step>
+            <Step n={3}>{t('docs.imp.s3')}</Step>
+            <Step n={4}>{t('docs.imp.s4')}</Step>
           </Steps>
 
           <Divider />
 
           {/* ── 13. Configuración ──────────────────────────────────────── */}
-          <H2 id="config">Configuración</H2>
+          <H2 id="config">{t('docs.cfg.h2')}</H2>
 
-          <H3>Apariencia</H3>
+          <H3>{t('docs.cfg.appearTitle')}</H3>
           <UL>
-            <LI><B>Tema</B>: toggle Modo oscuro / Modo claro</LI>
-            <LI><B>Moneda</B>: símbolo junto a los importes (€, $, £, ¥, CHF…)</LI>
-            <LI><B>Formato de fecha</B>: DD/MM/AAAA, MM/DD/AAAA o AAAA-MM-DD</LI>
-            <LI><B>Tamaño de la interfaz</B>: ajuste de zoom de la UI en porcentaje con botones −/+ (útil para pantallas muy grandes o pequeñas)</LI>
+            <LI>{t('docs.cfg.aLi1')}</LI>
+            <LI>{t('docs.cfg.aLi2')}</LI>
+            <LI>{t('docs.cfg.aLi3')}</LI>
+            <LI>{t('docs.cfg.aLi4')}</LI>
           </UL>
 
-          <H3>Navegación</H3>
-          <P>Controla qué páginas aparecen en el menú lateral y en qué orden.</P>
+          <H3>{t('docs.cfg.navTitle')}</H3>
+          <P>{t('docs.cfg.navP')}</P>
           <UL>
-            <LI>Toggle para mostrar u ocultar cada página</LI>
-            <LI>Flechas ▲▼ para reordenar las páginas en el menú</LI>
+            <LI>{t('docs.cfg.nLi1')}</LI>
+            <LI>{t('docs.cfg.nLi2')}</LI>
           </UL>
 
-          <H3>Dashboard</H3>
-          <P>Botón directo <B>"Editar Dashboard"</B> para entrar en modo edición del layout sin necesidad de ir al Dashboard primero.</P>
+          <H3>{t('docs.cfg.dashTitle')}</H3>
+          <P>{t('docs.cfg.dashP')}</P>
 
-          <H3>Crear tipos de movimiento y grupos</H3>
+          <H3>{t('docs.cfg.typesTitle')}</H3>
           <Steps>
-            <Step n={1}>Ir a <B>Configuración</B> → sección <B>"Tipos de movimiento y Grupos"</B></Step>
-            <Step n={2}>Para crear un <B>grupo</B>: clic en <B>"+ Nuevo grupo"</B> → nombre → guardar</Step>
-            <Step n={3}>Para crear un <B>tipo</B>: clic en <B>"+ Nuevo tipo"</B> → nombre, color, grupo al que pertenece</Step>
-            <Step n={4}>Opcionalmente: asignar una <B>cuenta vinculada</B> → los movimientos de ese tipo afectarán al saldo de esa cuenta</Step>
+            <Step n={1}>{t('docs.cfg.ts1')}</Step>
+            <Step n={2}>{t('docs.cfg.ts2')}</Step>
+            <Step n={3}>{t('docs.cfg.ts3')}</Step>
+            <Step n={4}>{t('docs.cfg.ts4')}</Step>
           </Steps>
 
-          <H3>Crear una cuenta bancaria</H3>
+          <H3>{t('docs.cfg.acctTitle')}</H3>
           <Steps>
-            <Step n={1}>Configuración → sección <B>"Cuentas"</B> → clic en <B>"+ Nueva cuenta"</B></Step>
-            <Step n={2}>Rellenar nombre, color, icono y <B>saldo inicial</B> (el saldo que tenía cuando empezaste a usar Caulky)</Step>
-            <Step n={3}>Guardar — el saldo actual se calculará automáticamente con cada movimiento</Step>
+            <Step n={1}>{t('docs.cfg.as1')}</Step>
+            <Step n={2}>{t('docs.cfg.as2')}</Step>
+            <Step n={3}>{t('docs.cfg.as3')}</Step>
           </Steps>
-          <Note>Al eliminar una cuenta con movimientos asociados: puedes elegir entre <B>borrar los movimientos</B> o <B>convertirlos en gastos sin cuenta</B>.</Note>
+          <Note>{t('docs.cfg.acctNote')}</Note>
 
-          <H3>Copia de seguridad</H3>
+          <H3>{t('docs.cfg.backupTitle')}</H3>
           <UL>
-            <LI><B>Exportar backup</B>: descarga un fichero JSON con todos los datos (movimientos, tipos, grupos, cuentas, presupuestos, fondos)</LI>
-            <LI><B>Importar backup</B>: restaura desde un JSON de backup. ⚠️ Sobreescribe todos los datos actuales</LI>
+            <LI>{t('docs.cfg.bLi1')}</LI>
+            <LI>{t('docs.cfg.bLi2')}</LI>
           </UL>
 
-          <H3>Zona de peligro — Restablecer sistema</H3>
-          <P>Borra todos los datos y deja la app como nueva. Requiere escribir <Code>DELETE</Code> para confirmar. Esta acción es irreversible.</P>
+          <H3>{t('docs.cfg.dangerTitle')}</H3>
+          <P>{t('docs.cfg.dangerP')}</P>
 
           <Divider />
 
           {/* ── 14. Plugins ────────────────────────────────────────────── */}
-          <H2 id="plugins">Plugins</H2>
-          <P>
-            Los plugins son archivos <B>.js</B> que modifican o amplían la interfaz de Caulky.
-            Se instalan desde <B>Configuración → Plugins</B> y se ejecutan automáticamente en cada carga de página.
-          </P>
+          <H2 id="plugins">{t('docs.plg.h2')}</H2>
+          <P>{t('docs.plg.p1')}</P>
 
-          <H3>Instalar un plugin</H3>
+          <H3>{t('docs.plg.installTitle')}</H3>
           <Steps>
-            <Step n={1}>Ir a <B>Configuración</B> → sección <B>"Plugins"</B></Step>
-            <Step n={2}>Clic en <B>"Instalar plugin (.js)"</B> y seleccionar el archivo</Step>
-            <Step n={3}>El plugin aparece en la lista. Está activado por defecto</Step>
+            <Step n={1}>{t('docs.plg.is1')}</Step>
+            <Step n={2}>{t('docs.plg.is2')}</Step>
+            <Step n={3}>{t('docs.plg.is3')}</Step>
           </Steps>
 
-          <H3>Gestionar plugins instalados</H3>
+          <H3>{t('docs.plg.manageTitle')}</H3>
           <UL>
-            <LI>Toggle azul: activa o desactiva el plugin sin desinstalarlo</LI>
-            <LI>Botón de papelera: elimina el plugin permanentemente</LI>
-            <LI>Cada plugin muestra nombre, descripción y versión</LI>
+            <LI>{t('docs.plg.mLi1')}</LI>
+            <LI>{t('docs.plg.mLi2')}</LI>
+            <LI>{t('docs.plg.mLi3')}</LI>
           </UL>
 
-          <H3>Recursos incluidos</H3>
+          <H3>{t('docs.plg.resourcesTitle')}</H3>
           <UL>
-            <LI><B>"Ejemplo"</B>: descarga un plugin de muestra que cambia la fuente de texto de la app</LI>
-            <LI><B>"Guía IA"</B>: descarga el manual completo de desarrollo de plugins en formato .md, diseñado para dárselo a una IA que te ayude a crear tu propio plugin</LI>
+            <LI>{t('docs.plg.rLi1')}</LI>
+            <LI>{t('docs.plg.rLi2')}</LI>
           </UL>
 
-          <Tip>
-            Para crear tu propio plugin, descarga la "Guía IA" desde Configuración → Plugins y adjúntala a una conversación con ChatGPT o Claude. Dile qué quieres que haga el plugin y la IA te generará el código listo para instalar.
-          </Tip>
+          <Tip>{t('docs.plg.tip')}</Tip>
 
           <Divider />
 
           {/* ── 15. Atajos y trucos ────────────────────────────────────── */}
-          <H2 id="trucos">Atajos y trucos</H2>
+          <H2 id="trucos">{t('docs.trk.h2')}</H2>
           <UL>
-            <LI><B>Clic derecho</B> en cualquier movimiento → menú rápido: Duplicar, Eliminar</LI>
-            <LI><B>Arrastrar</B> en el calendario → cambia la fecha del movimiento sin abrir el modal</LI>
-            <LI><B>Clic en el nombre</B> en la tabla → modal de detalle completo con todos los campos</LI>
-            <LI>Selección múltiple + <B>"Modificar campo"</B> → edición masiva de cualquier campo</LI>
-            <LI><B>"No contar"</B>: excluye de estadísticas, gráficos, presupuestos e inversiones. Ideal para gastos futuros inciertos o traspasos entre tus propias cuentas</LI>
-            <LI>Movimientos con <B>fecha banco futura</B> no computan en inversiones hasta que esa fecha llegue</LI>
-            <LI>Con <B>Auto-crear</B>, si llevas días sin abrir la app, al abrirla se crean todos los movimientos recurrentes pendientes de golpe</LI>
-            <LI>Las preferencias de columnas (orden, ancho, visibilidad) y los <B>filtros favoritos</B> persisten entre sesiones</LI>
-            <LI>El <B>zoom de la UI</B> se ajusta en Configuración → Apariencia → Tamaño de la interfaz</LI>
-            <LI>El menú lateral se personaliza en <B>Configuración → Navegación</B>: ocultar páginas no utilizadas y reordenar</LI>
+            <LI>{t('docs.trk.li1')}</LI>
+            <LI>{t('docs.trk.li2')}</LI>
+            <LI>{t('docs.trk.li3')}</LI>
+            <LI>{t('docs.trk.li4')}</LI>
+            <LI>{t('docs.trk.li5')}</LI>
+            <LI>{t('docs.trk.li6')}</LI>
+            <LI>{t('docs.trk.li7')}</LI>
+            <LI>{t('docs.trk.li8')}</LI>
+            <LI>{t('docs.trk.li9')}</LI>
+            <LI>{t('docs.trk.li10')}</LI>
           </UL>
 
-          <H3>Preguntas frecuentes</H3>
-          <QA q="¿Cómo creo un movimiento recurrente todos los lunes?">
-            Crea una plantilla → icono calendario → tipo Semanal → marca Lunes → fecha de inicio → Auto-crear → Guardar.
-          </QA>
-          <QA q="¿Cómo añado un nuevo tipo de gasto?">
-            Configuración → Tipos de movimiento y Grupos → "+ Nuevo tipo" → nombre, color, grupo.
-          </QA>
-          <QA q="¿El saldo de la cuenta es automático?">
-            Sí. Saldo actual = Saldo inicial + suma de todos los movimientos pagados asociados a esa cuenta.
-          </QA>
-          <QA q="¿Cómo comparo cuánto gasté este año vs el año pasado?">
-            Ir a Comparaciones → seleccionar Año A y Año B → tipo "Total de gastos" o "Gastos por categoría".
-          </QA>
-          <QA q="¿Cómo veo la evolución del saldo de mis cuentas?">
-            Ir a Cuentas. El gráfico de evolución muestra el saldo mes a mes de todas las cuentas. Usa el filtro de año o "Todo" para ver el historial completo.
-          </QA>
-          <QA q="¿Puedo cambiar el límite de un presupuesto sin perder el historial?">
-            Sí. Abre el presupuesto → "Nueva versión" → nuevo importe y fecha efectiva. El historial anterior no cambia.
-          </QA>
-          <QA q="¿Cómo marco varios movimientos como pagados de golpe?">
-            Vista Tabla → seleccionar con checkboxes → Modificar campo → Pagado → Sí → Aplicar.
-          </QA>
-          <QA q="¿Qué significa 'No contar'?">
-            El movimiento queda fuera de estadísticas, gráficos, presupuestos e inversiones. Solo aparece en la tabla. Úsalo para gastos futuros que pueden ocurrir o no, o para traspasos entre tus propias cuentas.
-          </QA>
-          <QA q="¿Cómo divido un gasto con otra persona?">
-            Al crear o editar el movimiento, activa el toggle "Compartido". Indica con quién, y elige entre dividir entre N personas o poner tu parte exacta en euros.
-          </QA>
-          <QA q="¿Cómo oculto la sección Inversiones del menú?">
-            Configuración → Navegación → toggle de Inversiones para desactivarla.
-          </QA>
-          <QA q="¿Cómo instalo un plugin?">
-            Configuración → Plugins → "Instalar plugin (.js)" → seleccionar el archivo .js.
-          </QA>
-          <QA q="¿Cómo obtengo el precio histórico de una compra de fondo?">
-            Inversiones → expandir el fondo → fila de la compra → botón "Obtener".
-          </QA>
-          <QA q="¿Cómo exporto todos mis datos?">
-            Configuración → Copia de seguridad → Exportar backup.
-          </QA>
+          <H3>{t('docs.faq.h3')}</H3>
+          <QA q={t('docs.faq.q1')}>{t('docs.faq.a1')}</QA>
+          <QA q={t('docs.faq.q2')}>{t('docs.faq.a2')}</QA>
+          <QA q={t('docs.faq.q3')}>{t('docs.faq.a3')}</QA>
+          <QA q={t('docs.faq.q4')}>{t('docs.faq.a4')}</QA>
+          <QA q={t('docs.faq.q5')}>{t('docs.faq.a5')}</QA>
+          <QA q={t('docs.faq.q6')}>{t('docs.faq.a6')}</QA>
+          <QA q={t('docs.faq.q7')}>{t('docs.faq.a7')}</QA>
+          <QA q={t('docs.faq.q8')}>{t('docs.faq.a8')}</QA>
+          <QA q={t('docs.faq.q9')}>{t('docs.faq.a9')}</QA>
+          <QA q={t('docs.faq.q10')}>{t('docs.faq.a10')}</QA>
+          <QA q={t('docs.faq.q11')}>{t('docs.faq.a11')}</QA>
+          <QA q={t('docs.faq.q12')}>{t('docs.faq.a12')}</QA>
+          <QA q={t('docs.faq.q13')}>{t('docs.faq.a13')}</QA>
 
           <div className="pb-12" />
         </div>
