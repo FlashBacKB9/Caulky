@@ -11,15 +11,15 @@ export interface CurrencyOption {
 }
 
 export const CURRENCIES: CurrencyOption[] = [
-  { code: 'EUR', symbol: '€',   label: 'Euro' },
-  { code: 'USD', symbol: '$',   label: 'Dólar (USD)' },
-  { code: 'GBP', symbol: '£',   label: 'Libra esterlina' },
-  { code: 'CHF', symbol: 'Fr.', label: 'Franco suizo' },
-  { code: 'JPY', symbol: '¥',   label: 'Yen japonés' },
-  { code: 'MXN', symbol: 'MX$', label: 'Peso mexicano' },
-  { code: 'ARS', symbol: 'AR$', label: 'Peso argentino' },
-  { code: 'COP', symbol: 'CO$', label: 'Peso colombiano' },
-  { code: 'BRL', symbol: 'R$',  label: 'Real brasileño' },
+  { code: 'EUR', symbol: '€', label: 'Euro' },
+  { code: 'USD', symbol: '$',      label: 'Dólar (USD)' },
+  { code: 'GBP', symbol: '£', label: 'Libra esterlina' },
+  { code: 'CHF', symbol: 'Fr.',    label: 'Franco suizo' },
+  { code: 'JPY', symbol: '¥', label: 'Yen japonés' },
+  { code: 'MXN', symbol: 'MX$',   label: 'Peso mexicano' },
+  { code: 'ARS', symbol: 'AR$',   label: 'Peso argentino' },
+  { code: 'COP', symbol: 'CO$',   label: 'Peso colombiano' },
+  { code: 'BRL', symbol: 'R$',    label: 'Real brasileño' },
 ]
 
 function getCurrent(): string {
@@ -42,7 +42,8 @@ export function useCurrency() {
 
   const fmt = useCallback(
     (v: number, maxDecimals = 2) =>
-      v.toLocaleString('es-ES', { style: 'currency', currency, maximumFractionDigits: maxDecimals }),
+      v.toLocaleString('es-ES', { style: 'currency', currency, maximumFractionDigits: maxDecimals })
+        .replace(/[   ]/g, ' '),
     [currency]
   )
 
