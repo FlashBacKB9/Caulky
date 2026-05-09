@@ -7,12 +7,13 @@ import {
 } from 'recharts'
 import { getAnnualStats } from '../api/stats'
 import { useCurrency } from '../hooks/useCurrency'
+import { t, getMonthNames } from '../utils/i18n'
 import { Columns2, Layers, BarChart2, Activity, TrendingUp } from 'lucide-react'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MONTHS    = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-const MONTHS_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
+const MONTHS    = getMonthNames('short')
+const MONTHS_ES = getMonthNames('long')
 const EXP_SKIP  = new Set(['Ingreso','Total','Ahorro','Gastos Anuales','Inversión'])
 const BAL_SKIP  = new Set(['Total','Ahorro','Gastos Anuales','Inversión'])
 const CUR_YEAR  = new Date().getFullYear()
@@ -29,11 +30,11 @@ type ViewMode    = 'side' | 'overlay'
 type DisplayType = 'line' | 'bar' | 'area'
 
 const CHART_OPTIONS: { id: ChartKind; label: string }[] = [
-  { id: 'expenses-group', label: 'Gastos por categoría' },
-  { id: 'expenses-total', label: 'Total de gastos'      },
-  { id: 'income',         label: 'Ingresos'             },
-  { id: 'net',            label: 'Balance neto'         },
-  { id: 'distribution',   label: 'Distribución'         },
+  { id: 'expenses-group', label: t('comp.chartExpensesGroup') },
+  { id: 'expenses-total', label: t('comp.chartExpensesTotal') },
+  { id: 'income',         label: t('comp.chartIncome')        },
+  { id: 'net',            label: t('comp.chartNet')           },
+  { id: 'distribution',   label: t('comp.chartDistribution')  },
 ]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -68,7 +69,7 @@ function CT({ active, payload, label, fmt }: {
 }
 
 function Empty() {
-  return <div className="flex items-center justify-center h-48 text-sm text-gray-300 dark:text-gray-600">Sin datos</div>
+  return <div className="flex items-center justify-center h-48 text-sm text-gray-300 dark:text-gray-600">{t('dashboard.noData')}</div>
 }
 
 // ── Shared axis props ─────────────────────────────────────────────────────────
@@ -458,7 +459,7 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
         <table className="w-full text-xs">
           <thead>
             <tr className="bg-gray-50 dark:bg-gray-800/60 border-b border-gray-100 dark:border-gray-800">
-              <th className={`${TH} text-left min-w-[140px] sticky left-0 z-10 bg-gray-50 dark:bg-gray-800/60`}>Categoría</th>
+              <th className={`${TH} text-left min-w-[140px] sticky left-0 z-10 bg-gray-50 dark:bg-gray-800/60`}>{t('comp.colCategory')}</th>
               {years.map(y => <th key={y} className={TH}>{y}</th>)}
             </tr>
           </thead>
@@ -486,7 +487,7 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
 
             {/* Gasto Total */}
             <tr className="bg-blue-50/60 dark:bg-blue-900/10 border-t border-blue-100 dark:border-blue-900/20">
-              <td className={`${LBL} bg-blue-50/60 dark:bg-blue-900/10 text-blue-700 dark:text-blue-400 font-semibold`}>Gasto Total</td>
+              <td className={`${LBL} bg-blue-50/60 dark:bg-blue-900/10 text-blue-700 dark:text-blue-400 font-semibold`}>{t('comp.totalExpense')}</td>
               {yearData.map(d => {
                 const total = expGroups(d).reduce((s, g) => s + Math.abs(g.total), 0)
                 return (
@@ -499,7 +500,7 @@ function SummaryTable({ yearData }: { yearData: AnnualData[] }) {
 
             {/* Total Neto */}
             <tr className="bg-gray-50/80 dark:bg-gray-800/40 border-t border-gray-100 dark:border-gray-700">
-              <td className={`${LBL} bg-gray-50/80 dark:bg-gray-800/40 text-gray-700 dark:text-gray-200 font-semibold`}>Total Neto</td>
+              <td className={`${LBL} bg-gray-50/80 dark:bg-gray-800/40 text-gray-700 dark:text-gray-200 font-semibold`}>{t('comp.totalNet')}</td>
               {yearData.map(d => {
                 const income   = d.groups.find(g => g.name === 'Ingreso')?.total ?? 0
                 const expenses = expGroups(d).reduce((s, g) => s + g.total, 0)
@@ -696,7 +697,7 @@ export default function Comparaciones() {
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-5">
-      <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Comparaciones</h1>
+      <h1 className="text-2xl font-bold text-gray-800 dark:text-white">{t('comp.title')}</h1>
 
       {/* Controls */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm px-4 py-3 flex flex-wrap items-center gap-3">
@@ -718,13 +719,13 @@ export default function Comparaciones() {
           <>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
               <button onClick={() => setDisplayType('line')} className={tabCls(displayType === 'line')}>
-                <Activity className="w-3.5 h-3.5"/> Líneas
+                <Activity className="w-3.5 h-3.5"/> {t('comp.displayLines')}
               </button>
               <button onClick={() => setDisplayType('bar')} className={tabCls(displayType === 'bar')}>
-                <BarChart2 className="w-3.5 h-3.5"/> Columnas
+                <BarChart2 className="w-3.5 h-3.5"/> {t('comp.displayColumns')}
               </button>
               <button onClick={() => setDisplayType('area')} className={tabCls(displayType === 'area')}>
-                <TrendingUp className="w-3.5 h-3.5"/> Área
+                <TrendingUp className="w-3.5 h-3.5"/> {t('comp.displayArea')}
               </button>
             </div>
             {sep}
@@ -753,8 +754,8 @@ export default function Comparaciones() {
         {kind === 'distribution' && (
           <>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-              <button onClick={() => setPeriod('year')}  className={tabCls(period === 'year')}>Año completo</button>
-              <button onClick={() => setPeriod('month')} className={tabCls(period === 'month')}>Mes</button>
+              <button onClick={() => setPeriod('year')}  className={tabCls(period === 'year')}>{t('comp.fullYear')}</button>
+              <button onClick={() => setPeriod('month')} className={tabCls(period === 'month')}>{t('comp.month')}</button>
             </div>
             {period === 'month' && (
               <select value={month} onChange={e => setMonth(+e.target.value)}
@@ -769,10 +770,10 @@ export default function Comparaciones() {
         {/* Mode toggle */}
         <div className={`flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1 ${!canOverlay ? 'opacity-40 pointer-events-none' : ''}`}>
           <button onClick={() => setMode('side')} className={tabCls(effectiveMode === 'side')}>
-            <Columns2 className="w-3.5 h-3.5"/> Lado a lado
+            <Columns2 className="w-3.5 h-3.5"/> {t('comp.viewSide')}
           </button>
           <button onClick={() => setMode('overlay')} className={tabCls(effectiveMode === 'overlay')}>
-            <Layers className="w-3.5 h-3.5"/> Superponer
+            <Layers className="w-3.5 h-3.5"/> {t('comp.viewOverlay')}
           </button>
         </div>
       </div>
@@ -781,10 +782,10 @@ export default function Comparaciones() {
       {effectiveMode === 'side' ? (
         <div className="flex gap-4">
           <YearCard year={yearA} colorDot={dotA} subtitle={distMonthIdx !== undefined ? MONTHS_ES[distMonthIdx].replace(/^\w/, c => c.toUpperCase()) : undefined}>
-            {dA ? renderSide(dA) : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">Cargando…</div>}
+            {dA ? renderSide(dA) : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">{t('comp.loading')}</div>}
           </YearCard>
           <YearCard year={yearB} colorDot={dotB} subtitle={distMonthIdx !== undefined ? MONTHS_ES[distMonthIdx].replace(/^\w/, c => c.toUpperCase()) : undefined}>
-            {dB ? renderSide(dB) : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">Cargando…</div>}
+            {dB ? renderSide(dB) : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">{t('comp.loading')}</div>}
           </YearCard>
         </div>
       ) : (
@@ -804,13 +805,13 @@ export default function Comparaciones() {
               </div>
             ))}
           </div>
-          {dA && dB ? renderOverlay() : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">Cargando…</div>}
+          {dA && dB ? renderOverlay() : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">{t('comp.loading')}</div>}
         </div>
       )}
 
       {/* Multi-year section */}
       {sortedYearData.length >= 1 && (<>
-        <h2 className="text-lg font-bold text-gray-800 dark:text-white pt-2">Evolución anual</h2>
+        <h2 className="text-lg font-bold text-gray-800 dark:text-white pt-2">{t('comp.annualEvolution')}</h2>
 
         <SummaryTable yearData={sortedYearData}/>
 

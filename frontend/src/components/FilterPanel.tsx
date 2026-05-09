@@ -3,6 +3,7 @@ import { X, Plus, ChevronDown } from 'lucide-react'
 import type { MovementType } from '../api/movementTypes'
 import type { Group } from '../api/groups'
 import type { Movement } from '../api/movements'
+import { t } from '../utils/i18n'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -119,27 +120,27 @@ export function applyAdvancedFilter(
 // ── Config ────────────────────────────────────────────────────────────────────
 
 const FIELDS: { value: FilterField; label: string }[] = [
-  { value: 'name',      label: 'Nombre' },
-  { value: 'notes',     label: 'Notas' },
-  { value: 'amount',    label: 'Importe' },
-  { value: 'date',      label: 'Fecha' },
-  { value: 'bank_date', label: 'Fecha banco' },
-  { value: 'group',     label: 'Tipo' },
-  { value: 'type',      label: 'Subtipo' },
-  { value: 'paid',      label: 'Pagado' },
-  { value: 'no_count',  label: 'No contar' },
+  { value: 'name',      label: t('filter.fieldName') },
+  { value: 'notes',     label: t('filter.fieldNotes') },
+  { value: 'amount',    label: t('filter.fieldAmount') },
+  { value: 'date',      label: t('filter.fieldDate') },
+  { value: 'bank_date', label: t('filter.fieldBankDate') },
+  { value: 'group',     label: t('filter.fieldGroup') },
+  { value: 'type',      label: t('filter.fieldType') },
+  { value: 'paid',      label: t('filter.fieldPaid') },
+  { value: 'no_count',  label: t('filter.fieldNoCount') },
 ]
 
 const OPS: Record<FilterField, { value: FilterOp; label: string }[]> = {
-  name:      [{ value: 'contains', label: 'contiene' }, { value: 'not_contains', label: 'no contiene' }, { value: 'eq', label: 'es igual a' }],
-  notes:     [{ value: 'contains', label: 'contiene' }, { value: 'not_contains', label: 'no contiene' }, { value: 'empty', label: 'está vacío' }, { value: 'set', label: 'tiene valor' }],
-  amount:    [{ value: 'gt', label: 'mayor que' }, { value: 'gte', label: 'mayor o igual' }, { value: 'lt', label: 'menor que' }, { value: 'lte', label: 'menor o igual' }, { value: 'eq', label: 'igual a' }, { value: 'neq', label: 'distinto de' }],
-  date:      [{ value: 'gte', label: 'desde' }, { value: 'lte', label: 'hasta' }, { value: 'eq', label: 'exactamente' }, { value: 'empty', label: 'vacío' }, { value: 'set', label: 'con valor' }],
-  bank_date: [{ value: 'gte', label: 'desde' }, { value: 'lte', label: 'hasta' }, { value: 'eq', label: 'exactamente' }, { value: 'empty', label: 'vacío' }, { value: 'set', label: 'con valor' }],
-  group:     [{ value: 'in', label: 'es uno de' }, { value: 'not_in', label: 'no es ninguno de' }, { value: 'empty', label: 'sin tipo' }, { value: 'set', label: 'con tipo' }],
-  type:      [{ value: 'in', label: 'es uno de' }, { value: 'not_in', label: 'no es ninguno de' }, { value: 'empty', label: 'sin subtipo' }, { value: 'set', label: 'con subtipo' }],
-  paid:      [{ value: 'eq', label: 'es' }, { value: 'neq', label: 'no es' }],
-  no_count:  [{ value: 'eq', label: 'es' }, { value: 'neq', label: 'no es' }],
+  name:      [{ value: 'contains', label: t('filter.opContains') }, { value: 'not_contains', label: t('filter.opNotContains') }, { value: 'eq', label: t('filter.opEquals') }],
+  notes:     [{ value: 'contains', label: t('filter.opContains') }, { value: 'not_contains', label: t('filter.opNotContains') }, { value: 'empty', label: t('filter.opIsBlank') }, { value: 'set', label: t('filter.opHasValue') }],
+  amount:    [{ value: 'gt', label: t('filter.opGt') }, { value: 'gte', label: t('filter.opGte') }, { value: 'lt', label: t('filter.opLt') }, { value: 'lte', label: t('filter.opLte') }, { value: 'eq', label: t('filter.opEq') }, { value: 'neq', label: t('filter.opNeq') }],
+  date:      [{ value: 'gte', label: t('filter.opFrom') }, { value: 'lte', label: t('filter.opTo') }, { value: 'eq', label: t('filter.opExactly') }, { value: 'empty', label: t('filter.opEmpty') }, { value: 'set', label: t('filter.opWithValue') }],
+  bank_date: [{ value: 'gte', label: t('filter.opFrom') }, { value: 'lte', label: t('filter.opTo') }, { value: 'eq', label: t('filter.opExactly') }, { value: 'empty', label: t('filter.opEmpty') }, { value: 'set', label: t('filter.opWithValue') }],
+  group:     [{ value: 'in', label: t('filter.opIsOneOf') }, { value: 'not_in', label: t('filter.opIsNoneOf') }, { value: 'empty', label: t('filter.opNoType') }, { value: 'set', label: t('filter.opWithType') }],
+  type:      [{ value: 'in', label: t('filter.opIsOneOf') }, { value: 'not_in', label: t('filter.opIsNoneOf') }, { value: 'empty', label: t('filter.opNoSubtype') }, { value: 'set', label: t('filter.opWithSubtype') }],
+  paid:      [{ value: 'eq', label: t('filter.opIs') }, { value: 'neq', label: t('filter.opIsNot') }],
+  no_count:  [{ value: 'eq', label: t('filter.opIs') }, { value: 'neq', label: t('filter.opIsNot') }],
 }
 
 const DEFAULT_OP: Record<FilterField, FilterOp> = {
@@ -178,7 +179,7 @@ function GroupMultiSelect({ groups, selected, onChange }: {
     <div className="relative" ref={ref}>
       <button type="button" onClick={() => setOpen(v => !v)} className={SEL + ' flex items-center gap-2 min-w-[160px]'}>
         <span className="flex-1 text-left">
-          {selected.length === 0 ? 'Seleccionar...' : `${selected.length} tipo${selected.length > 1 ? 's' : ''}`}
+          {selected.length === 0 ? t('filter.selectPlaceholder') : `${selected.length} ${t('filter.groupUnit')}`}
         </span>
         <ChevronDown className="w-3 h-3 shrink-0 text-gray-400" />
       </button>
@@ -220,7 +221,7 @@ function TypeMultiSelect({ types, selected, onChange }: {
     <div className="relative" ref={ref}>
       <button type="button" onClick={() => setOpen(v => !v)} className={SEL + ' flex items-center gap-2 min-w-[160px]'}>
         <span className="flex-1 text-left">
-          {selected.length === 0 ? 'Seleccionar...' : `${selected.length} subtipo${selected.length > 1 ? 's' : ''}`}
+          {selected.length === 0 ? t('filter.selectPlaceholder') : `${selected.length} ${t('filter.typeUnit')}`}
         </span>
         <ChevronDown className="w-3 h-3 shrink-0 text-gray-400" />
       </button>
@@ -262,7 +263,7 @@ function ConditionRow({ cond, types, groups, onChange, onRemove }: {
     switch (cond.field) {
       case 'name':
       case 'notes':
-        return <input type="text" value={cond.value} onChange={e => onChange({ ...cond, value: e.target.value })} className={SEL + ' flex-1 min-w-[120px]'} placeholder="valor..." />
+        return <input type="text" value={cond.value} onChange={e => onChange({ ...cond, value: e.target.value })} className={SEL + ' flex-1 min-w-[120px]'} placeholder={t('filter.valuePlaceholder')} />
       case 'amount':
         return <input type="number" step="0.01" value={cond.value} onChange={e => onChange({ ...cond, value: e.target.value })} className={SEL + ' w-28'} placeholder="0.00" />
       case 'date':
@@ -276,8 +277,8 @@ function ConditionRow({ cond, types, groups, onChange, onRemove }: {
       case 'no_count':
         return (
           <select value={cond.value || 'true'} onChange={e => onChange({ ...cond, value: e.target.value })} className={SEL}>
-            <option value="true">Sí</option>
-            <option value="false">No</option>
+            <option value="true">{t('common.yes')}</option>
+            <option value="false">{t('common.no')}</option>
           </select>
         )
     }
@@ -292,7 +293,7 @@ function ConditionRow({ cond, types, groups, onChange, onRemove }: {
         {ops.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       {valueInput()}
-      {active && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" title="Filtro activo" />}
+      {active && <span className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" title={t('filter.activeFilter')} />}
       <button onClick={onRemove} className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 transition-colors shrink-0">
         <X className="w-3.5 h-3.5" />
       </button>
@@ -319,7 +320,7 @@ export default function FilterPanel({ filter, onChange, types, groups }: Props) 
 
       {filter.conditions.length > 1 && (
         <div className="flex items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
-          <span>Combinar condiciones con</span>
+          <span>{t('filter.combineWith')}</span>
           {(['and', 'or'] as const).map(c => (
             <button key={c} onClick={() => onChange({ ...filter, combinator: c })}
               className={`px-2.5 py-0.5 rounded-md text-xs font-bold uppercase transition-colors ${
@@ -356,11 +357,11 @@ export default function FilterPanel({ filter, onChange, types, groups }: Props) 
           className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors"
         >
           <Plus className="w-3.5 h-3.5" strokeWidth={2} />
-          Añadir condición
+          {t('filter.addCondition')}
         </button>
         {filter.conditions.length > 0 && (
           <button onClick={() => onChange(EMPTY_FILTER)} className="text-sm text-gray-400 hover:text-red-500 transition-colors">
-            Limpiar todo
+            {t('filter.clearAll')}
           </button>
         )}
       </div>

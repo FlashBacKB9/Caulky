@@ -1072,7 +1072,7 @@ function PluginsSection() {
       const result = await addPlugin(file)
       if (result.blocked.length > 0 || result.warnings.length > 0) setScan(result)
     } catch {
-      setGeneralError('No se pudo cargar el plugin')
+      setGeneralError(t('settings.pluginsLoadError'))
     }
   }, [addPlugin])
 
@@ -1083,7 +1083,7 @@ function PluginsSection() {
     <div className="space-y-2">
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
         {plugins.length === 0 && (
-          <p className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500">No hay plugins instalados.</p>
+          <p className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500">{t('settings.pluginsNone')}</p>
         )}
         {plugins.map(p => (
           <div key={p.id} className="flex items-center gap-3 px-4 py-3">
@@ -1095,7 +1095,7 @@ function PluginsSection() {
                 <p className="text-sm font-medium text-gray-700 dark:text-gray-200 truncate">{p.name}</p>
                 {p.autoDisabled && (
                   <span className="shrink-0 px-1.5 py-0.5 text-[10px] font-medium rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400">
-                    Auto-desactivado
+                    {t('settings.pluginsAutoDisabled')}
                   </span>
                 )}
               </div>
@@ -1106,7 +1106,7 @@ function PluginsSection() {
             <span className="text-xs text-gray-300 dark:text-gray-600 shrink-0">v{p.version}</span>
             <button
               onClick={() => togglePlugin(p.id)}
-              title={p.autoDisabled ? 'Reactivar plugin' : undefined}
+              title={p.autoDisabled ? t('settings.pluginsReactivate') : undefined}
               className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors focus:outline-none shrink-0 ${
                 p.enabled ? 'bg-blue-500' : 'bg-gray-200 dark:bg-gray-700'
               }`}
@@ -1124,7 +1124,7 @@ function PluginsSection() {
 
       {blocked.length > 0 && (
         <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 px-4 py-3 space-y-1">
-          <p className="text-xs font-semibold text-red-600 dark:text-red-400">Plugin bloqueado — no se ha instalado:</p>
+          <p className="text-xs font-semibold text-red-600 dark:text-red-400">{t('settings.pluginsBlocked')}</p>
           {blocked.map((msg, i) => (
             <p key={i} className="text-xs text-red-500 dark:text-red-400 flex gap-1.5"><span>•</span>{msg}</p>
           ))}
@@ -1133,7 +1133,7 @@ function PluginsSection() {
 
       {warnings.length > 0 && blocked.length === 0 && (
         <div className="rounded-xl border border-amber-200 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/20 px-4 py-3 space-y-1">
-          <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">Plugin instalado con advertencias:</p>
+          <p className="text-xs font-semibold text-amber-700 dark:text-amber-400">{t('settings.pluginsWarnings')}</p>
           {warnings.map((msg, i) => (
             <p key={i} className="text-xs text-amber-600 dark:text-amber-400 flex gap-1.5"><span>•</span>{msg}</p>
           ))}
@@ -1149,7 +1149,7 @@ function PluginsSection() {
           className="flex items-center gap-2 flex-1 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors"
         >
           <Upload className="w-4 h-4" />
-          Instalar plugin (.js)
+          {t('settings.pluginsInstall')}
         </button>
         <a
           href="/plugins/fuente-personalizada.js"
@@ -1157,7 +1157,7 @@ function PluginsSection() {
           className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors whitespace-nowrap"
         >
           <Download className="w-4 h-4" />
-          Ejemplo
+          {t('settings.languageExample')}
         </a>
         <a
           href="/plugins/plugin-dev-guide.md"
@@ -1165,17 +1165,17 @@ function PluginsSection() {
           className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors whitespace-nowrap"
         >
           <Download className="w-4 h-4" />
-          Guía IA
+          {t('settings.languageGuide')}
         </a>
       </div>
 
       {plugins.length > 0 && (
         <button
-          onClick={() => { if (confirm('¿Eliminar todos los plugins? Esta acción no se puede deshacer.')) removeAll() }}
+          onClick={() => { if (confirm(t('settings.pluginsDeleteAllConfirm'))) removeAll() }}
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
         >
           <Trash2 className="w-3 h-3" />
-          Eliminar todos los plugins
+          {t('settings.pluginsDeleteAll')}
         </button>
       )}
     </div>
@@ -1323,17 +1323,17 @@ function SkinsSection() {
       const newSkin: Skin = { ...meta, id, enabled: false }
       persist([...skins, newSkin])
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al cargar el skin')
+      setError(err instanceof Error ? err.message : t('settings.skinsLoadError'))
     } finally { setLoading(false) }
   }
 
-  const LAYOUT_LABEL: Record<string, string> = { topnav: 'Menú superior', sidebar: 'Menú lateral' }
+  const LAYOUT_LABEL: Record<string, string> = { topnav: t('settings.skinsTopNav'), sidebar: t('settings.skinsSidebar') }
 
   return (
     <div className="space-y-2">
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
         {skins.length === 0 && (
-          <p className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500">No hay skins instalados.</p>
+          <p className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500">{t('settings.skinsNone')}</p>
         )}
         {skins.map(skin => (
           <div key={skin.id} className="flex items-center gap-3 px-4 py-3">
@@ -1353,7 +1353,7 @@ function SkinsSection() {
                 <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{skin.description}</p>
               )}
               {skin.author && (
-                <p className="text-xs text-gray-300 dark:text-gray-600">por {skin.author}</p>
+                <p className="text-xs text-gray-300 dark:text-gray-600">{t('settings.skinsBy')} {skin.author}</p>
               )}
             </div>
             <button
@@ -1383,7 +1383,7 @@ function SkinsSection() {
           className="flex items-center gap-2 flex-1 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors disabled:opacity-40"
         >
           <Upload className="w-4 h-4" />
-          {loading ? 'Cargando...' : 'Instalar skin (.js)'}
+          {loading ? t('common.loading') : t('settings.skinsInstall')}
         </button>
         <a
           href="/skins/cute-pastel.js"
@@ -1391,7 +1391,7 @@ function SkinsSection() {
           className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors whitespace-nowrap"
         >
           <Download className="w-4 h-4" />
-          Ejemplo
+          {t('settings.languageExample')}
         </a>
         <a
           href="/skins/skin-dev-guide.md"
@@ -1399,7 +1399,7 @@ function SkinsSection() {
           className="flex items-center gap-2 px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors whitespace-nowrap"
         >
           <Download className="w-4 h-4" />
-          Guía IA
+          {t('settings.languageGuide')}
         </a>
       </div>
     </div>
@@ -1423,7 +1423,7 @@ function ResetSection() {
       await resetSystem()
       window.location.reload()
     } catch {
-      setError('Error al restablecer el sistema')
+      setError(t('settings.resetError'))
       setResetting(false)
     }
   }
@@ -1443,7 +1443,7 @@ function ResetSection() {
                 <div className="w-8 h-8 rounded-lg bg-red-50 dark:bg-red-900/30 flex items-center justify-center shrink-0">
                   <Trash2 className="w-4 h-4 text-red-500" strokeWidth={1.5} />
                 </div>
-                <h2 className="text-sm font-semibold text-gray-800 dark:text-white">Restablecer sistema</h2>
+                <h2 className="text-sm font-semibold text-gray-800 dark:text-white">{t('settings.resetTitle')}</h2>
               </div>
               <button onClick={closeModal} disabled={resetting} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600 disabled:opacity-40">
                 <X className="w-4 h-4" />
@@ -1451,8 +1451,8 @@ function ResetSection() {
             </div>
             <div className="px-5 py-4 space-y-4">
               <div className="bg-red-50 dark:bg-red-900/20 rounded-xl px-3 py-2.5 text-xs text-red-700 dark:text-red-400 space-y-1">
-                <p className="font-semibold">Esta acción es irreversible.</p>
-                <p>Se borrarán todos los movimientos, categorías, cuentas, inversiones y toda la configuración. La aplicación quedará como recién instalada.</p>
+                <p className="font-semibold">{t('settings.resetIrreversible')}</p>
+                <p>{t('settings.resetDesc')}</p>
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs text-gray-500 dark:text-gray-400">
@@ -1473,11 +1473,11 @@ function ResetSection() {
             <div className="px-5 pb-5 flex justify-end gap-2">
               <button onClick={closeModal} disabled={resetting}
                 className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 disabled:opacity-40">
-                Cancelar
+                {t('common.cancel')}
               </button>
               <button onClick={handleReset} disabled={!confirmed || resetting}
                 className="px-3 py-1.5 text-xs font-medium rounded-lg bg-red-500 hover:bg-red-600 text-white disabled:opacity-40 transition-colors">
-                {resetting ? 'Borrando...' : 'Restablecer todo'}
+                {resetting ? t('settings.resetBtnDoing') : t('settings.resetBtnAll')}
               </button>
             </div>
           </div>
@@ -1487,13 +1487,13 @@ function ResetSection() {
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-red-100 dark:border-red-900/30 divide-y divide-gray-50 dark:divide-gray-800">
         <div className="flex items-center justify-between px-4 py-3">
           <div>
-            <p className="text-sm text-red-600 dark:text-red-400">Restablecer sistema</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Borra todos los datos y deja la app como nueva</p>
+            <p className="text-sm text-red-600 dark:text-red-400">{t('settings.resetTitle')}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t('settings.resetSystemDesc')}</p>
           </div>
           <button onClick={() => setShowModal(true)}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-900/20 text-sm text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
             <Trash2 className="w-3.5 h-3.5" />
-            Restablecer
+            {t('settings.resetBtn')}
           </button>
         </div>
       </div>
@@ -1517,7 +1517,7 @@ export default function Settings() {
     saveNavConfig(next)
   }
 
-  if (isLoading) return <div className="p-8 text-gray-500">Cargando...</div>
+  if (isLoading) return <div className="p-8 text-gray-500">{t('common.loading')}</div>
   if (!data) return null
 
   return (

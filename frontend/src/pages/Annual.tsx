@@ -5,8 +5,10 @@ import { getAnnualStats } from '../api/stats'
 import { getMovements } from '../api/movements'
 import { ChevronDown, ChevronRight, GripVertical, Eye, EyeOff, Download } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
+import { t, getMonthNames } from '../utils/i18n'
 
 const MONTHS = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
+const MONTHS_DISPLAY = getMonthNames('short')
 
 interface MType { id: number; name: string; monthly: Record<string,number>; total: number; media: number }
 interface Group { id: number; name: string; color: string; monthly: Record<string,number>; total: number; media: number; movement_types: MType[] }
@@ -142,7 +144,7 @@ export default function Annual() {
   // ── Export ─────────────────────────────────────────────────────────────────────
 
   function exportCSV() {
-    const rows: string[][] = [['Categoría / Tipo', ...MONTHS.map(m => m.slice(0, 3)), 'Media', 'Total']]
+    const rows: string[][] = [[t('annual.colCategory'), ...MONTHS_DISPLAY, t('annual.colAvg'), t('annual.colTotal')]]
     for (const g of sortedGroups) {
       if (showGroups)
         rows.push([g.name, ...MONTHS.map(m => String(g.monthly[m] ?? 0)), String(Math.round(g.media)), String(g.total)])
@@ -157,7 +159,7 @@ export default function Annual() {
     URL.revokeObjectURL(url)
   }
 
-  if (isLoading) return <div className="p-8 text-gray-500">Cargando...</div>
+  if (isLoading) return <div className="p-8 text-gray-500">{t('common.loading')}</div>
   if (!data) return null
 
   const btnCls = 'flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors'
@@ -167,7 +169,7 @@ export default function Annual() {
     <div className="p-3 md:p-6">
       <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-          Finanzas
+          {t('annual.title')}
           <div ref={yearPickerRef} className="relative">
             <button
               onClick={() => setShowYearPicker(v => !v)}
@@ -194,15 +196,15 @@ export default function Annual() {
         <div className="flex items-center gap-2 flex-wrap">
           <button onClick={toggleAll} className={btnCls}>
             {allCollapsed ? <ChevronDown className="w-3.5 h-3.5"/> : <ChevronRight className="w-3.5 h-3.5"/>}
-            {allCollapsed ? 'Desplegar todos' : 'Plegar todos'}
+            {allCollapsed ? t('annual.expandAll') : t('annual.collapseAll')}
           </button>
           <button onClick={toggleShowGroups} className={btnCls}>
             {showGroups ? <EyeOff className="w-3.5 h-3.5"/> : <Eye className="w-3.5 h-3.5"/>}
-            {showGroups ? 'Ocultar tipos' : 'Mostrar tipos'}
+            {showGroups ? t('annual.hideTypes') : t('annual.showTypes')}
           </button>
           <button onClick={exportCSV} className={btnCls}>
             <Download className="w-3.5 h-3.5"/>
-            Exportar CSV
+            {t('annual.exportCSV')}
           </button>
         </div>
       </div>
@@ -213,10 +215,10 @@ export default function Annual() {
             <tr>
               <th className="w-6 px-0"></th>
               <th className="w-1 px-0"></th>
-              <th className="px-4 py-3 text-left min-w-[180px]">Categoría / Tipo</th>
-              {MONTHS.map(m => <th key={m} className="px-3 py-3 text-right capitalize">{m.slice(0,3)}</th>)}
-              <th className="px-3 py-3 text-right">Media</th>
-              <th className="px-3 py-3 text-right">Total</th>
+              <th className="px-4 py-3 text-left min-w-[180px]">{t('annual.colCategory')}</th>
+              {MONTHS.map((m, idx) => <th key={m} className="px-3 py-3 text-right capitalize">{MONTHS_DISPLAY[idx]}</th>)}
+              <th className="px-3 py-3 text-right">{t('annual.colAvg')}</th>
+              <th className="px-3 py-3 text-right">{t('annual.colTotal')}</th>
             </tr>
           </thead>
           <tbody className="bg-white dark:bg-gray-950">

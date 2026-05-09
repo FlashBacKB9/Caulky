@@ -13,11 +13,12 @@ import {
 import { getMovements } from '../api/movements'
 import { getAccountsSummary } from '../api/accounts'
 import { useCurrency } from '../hooks/useCurrency'
+import { t, getMonthNames } from '../utils/i18n'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-const MONTH_NAMES  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const MONTHS_SHORT = getMonthNames('short')
+const MONTH_NAMES  = getMonthNames('long')
 
 const AI_EXPENSE_GROWTH = 3
 const AI_INCOME_GROWTH  = 2
@@ -895,7 +896,7 @@ export default function Projection() {
           <TrendingUp className="w-5 h-5 text-blue-500" strokeWidth={1.5} />
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-white">Proyección a futuro</h1>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-white">{t('projection.title')}</h1>
           <p className="text-xs text-gray-400 dark:text-gray-500">Simula la evolución de tu dinero a largo plazo</p>
         </div>
       </div>

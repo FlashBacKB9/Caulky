@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { t, getMonthNames } from '../utils/i18n'
 import { syncPref } from '../utils/prefSync'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Edit2, Trash2, X, ChevronLeft, History, ChartCandlestick, Table2, TrendingUp } from 'lucide-react'
@@ -37,9 +38,9 @@ function addDays(d: string, n: number) {
   const dt = new Date(d); dt.setDate(dt.getDate() + n); return dt.toISOString().slice(0, 10)
 }
 
-const MONTHS = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const MONTHS = getMonthNames('short')
 const PERIOD_LABELS: Record<BudgetPeriodType, string> = {
-  monthly: 'Mensual', weekly: 'Semanal', annual: 'Anual', custom: 'Personalizado',
+  monthly: t('budgets.periodMonthly'), weekly: t('budgets.periodWeekly'), annual: t('budgets.periodAnnual'), custom: t('budgets.periodCustom'),
 }
 
 function getCurrentPeriod(period: BudgetPeriodType, customFrom?: string, customTo?: string): { start: string; end: string } {
@@ -254,7 +255,7 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
       <div className="w-full max-w-lg bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-100 dark:border-gray-800 flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800 shrink-0">
           <h2 className="text-sm font-semibold text-gray-800 dark:text-white">
-            {initial ? 'Editar presupuesto' : 'Nuevo presupuesto'}
+            {initial ? t('budgets.editTitle') : t('budgets.newTitle')}
           </h2>
           <button onClick={onCancel} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
             <X className="w-4 h-4"/>
@@ -264,16 +265,16 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
         <div className="p-5 space-y-4 overflow-y-auto flex-1">
           {/* Name */}
           <div>
-            <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">Nombre</label>
+            <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">{t('common.name')}</label>
             <input value={name} onChange={e => setName(e.target.value)} placeholder="Ej: Ocio mensual" className={inputCls}/>
           </div>
 
           {/* Amount */}
           <div>
             <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">
-              Límite (€)
+              {t('budgets.amountLabel')}
               {amountChanged && (
-                <span className="ml-2 normal-case font-normal text-blue-400"> — se creará nueva versión desde hoy</span>
+                <span className="ml-2 normal-case font-normal text-blue-400"> — {t('budgets.newVersion')}</span>
               )}
             </label>
             <input type="number" min="0" step="any" value={amount} onChange={e => setAmount(e.target.value)} placeholder="150" className={inputCls}/>
@@ -281,7 +282,7 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
 
           {/* Period */}
           <div>
-            <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">Periodo</label>
+            <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">{t('budgets.periodLabel')}</label>
             <div className="flex gap-1.5 flex-wrap">
               {(['monthly','weekly','annual','custom'] as BudgetPeriodType[]).map(p => (
                 <button key={p} onClick={() => setPeriod(p)}
@@ -302,19 +303,19 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
           {/* Tracking start */}
           <div>
             <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">
-              Inicio del seguimiento <span className="normal-case font-normal">(vacío = desde siempre)</span>
+              {t('budgets.trackingStart')} <span className="normal-case font-normal">({t('budgets.trackingHint')})</span>
             </label>
             <input type="date" value={trackingStart} onChange={e => setTrackingStart(e.target.value)}
               className="px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-700 dark:text-gray-300 focus:outline-none w-auto"/>
             {trackingStart && (
-              <button onClick={() => setTrackingStart('')} className="ml-2 text-[11px] text-gray-400 hover:text-gray-600 transition-colors">Borrar</button>
+              <button onClick={() => setTrackingStart('')} className="ml-2 text-[11px] text-gray-400 hover:text-gray-600 transition-colors">{t('budgets.clear')}</button>
             )}
           </div>
 
           {/* Type selector */}
           <div>
             <label className="block text-[11px] font-medium text-gray-400 uppercase tracking-wide mb-1.5">
-              Subcategorías <span className="normal-case font-normal">({selectedIds.size} seleccionadas)</span>
+              {t('budgets.subcategories')} <span className="normal-case font-normal">({selectedIds.size} seleccionadas)</span>
             </label>
             <div className="border border-gray-100 dark:border-gray-800 rounded-xl p-3 space-y-3 max-h-52 overflow-y-auto">
               {Object.entries(typesByGroup).map(([gid, gTypes]) => {
@@ -341,11 +342,11 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
         <div className="flex gap-2 px-5 py-4 border-t border-gray-100 dark:border-gray-800 shrink-0">
           <button onClick={onCancel}
             className="flex-1 px-4 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-            Cancelar
+            {t('common.cancel')}
           </button>
           <button onClick={handleSave} disabled={!isValid}
             className="flex-1 px-4 py-2 rounded-xl bg-gray-800 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-            Guardar
+            {t('common.save')}
           </button>
         </div>
       </div>
@@ -422,11 +423,11 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
       {/* Subheader */}
       <div className="flex items-center gap-4 px-6 py-3 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
         <button onClick={onClose} className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors shrink-0">
-          <ChevronLeft className="w-4 h-4"/> Volver
+          <ChevronLeft className="w-4 h-4"/> {t('common.back')}
         </button>
         <h2 className="flex-1 text-sm font-semibold text-gray-800 dark:text-white text-center truncate">{budget.name}</h2>
         <button onClick={onEdit} className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors shrink-0">
-          <Edit2 className="w-3.5 h-3.5"/> Editar
+          <Edit2 className="w-3.5 h-3.5"/> {t('common.edit')}
         </button>
       </div>
 
@@ -436,7 +437,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5">
           <div className="flex items-center justify-between mb-3">
             <div>
-              <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">{PERIOD_LABELS[budget.period]} actual</p>
+              <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">{PERIOD_LABELS[budget.period]} {t('budgets.currentPeriod')}</p>
               <p className="text-lg font-bold text-gray-800 dark:text-white mt-0.5">{budget.name}</p>
             </div>
             <span className={`text-2xl font-bold tabular-nums ${currentColors.text}`}>{currentPct}%</span>
@@ -445,8 +446,8 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
             <div className={`h-full rounded-full transition-all ${currentColors.bar}`} style={{ width: `${Math.min(currentPct, 100)}%` }}/>
           </div>
           <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-            <span>Gastado: <span className="font-semibold text-gray-700 dark:text-gray-200">{fmt(currentSpent)}</span></span>
-            <span>Límite: <span className="font-semibold text-gray-700 dark:text-gray-200">{fmt(currentAmount)}</span></span>
+            <span>{t('budgets.spent')} <span className="font-semibold text-gray-700 dark:text-gray-200">{fmt(currentSpent)}</span></span>
+            <span>{t('budgets.limit')} <span className="font-semibold text-gray-700 dark:text-gray-200">{fmt(currentAmount)}</span></span>
           </div>
           <p className="text-[11px] text-gray-400 mt-2 truncate">{typeNames}</p>
         </div>
@@ -487,7 +488,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
           <input type="date" value={viewFrom} onChange={e => setViewFrom(e.target.value)}
             className="px-2 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-xs text-gray-700 dark:text-gray-300 focus:outline-none"/>
           {viewFrom && (
-            <button onClick={() => setViewFrom('')} className="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">Borrar</button>
+            <button onClick={() => setViewFrom('')} className="text-[11px] text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">{t('budgets.clear')}</button>
           )}
         </div>
 
@@ -495,7 +496,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
         {view === 'chart' && (
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
             {chartData.length === 0 ? (
-              <p className="text-center text-sm text-gray-400 py-8">Sin datos</p>
+              <p className="text-center text-sm text-gray-400 py-8">{t('charts.noData')}</p>
             ) : (
               <ResponsiveContainer width="100%" height={280}>
                 <LineChart data={chartData} margin={{ left: 0, right: 8 }}>
@@ -518,9 +519,9 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
-                  <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">Periodo</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">Límite</th>
-                  <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">Gastado</th>
+                  <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">{t('budgets.periodLabel')}</th>
+                  <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">{t('budgets.limit')}</th>
+                  <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">{t('budgets.spent')}</th>
                   <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">%</th>
                   <th className="px-4 py-3 w-24"></th>
                 </tr>
@@ -597,7 +598,7 @@ export default function Budgets() {
       <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0">
         <div className="flex items-center gap-2.5">
           <ChartCandlestick className="w-4 h-4 text-gray-400" strokeWidth={1.5}/>
-          <h1 className="text-base font-bold text-gray-800 dark:text-white">Presupuestos</h1>
+          <h1 className="text-base font-bold text-gray-800 dark:text-white">{t('budgets.title')}</h1>
         </div>
         <button
           onClick={() => { setEditingBudget(null); setShowForm(true) }}

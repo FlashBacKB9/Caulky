@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { t, getMonthNames } from '../utils/i18n'
 import { syncPref } from '../utils/prefSync'
 import { useQuery } from '@tanstack/react-query'
 import { GridLayout, useContainerWidth, verticalCompactor, type LayoutItem } from 'react-grid-layout'
@@ -26,7 +27,7 @@ import {
 const ROW_H = 150
 const CARD_HEADER_H = 60  // approx card header + padding height in px
 
-const MONTHS   = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const MONTHS   = getMonthNames('short')
 const GRID     = '#e5e7eb'
 const CUR_YEAR  = new Date().getFullYear()
 const CUR_MONTH = String(new Date().getMonth() + 1).padStart(2, '0')
@@ -56,12 +57,12 @@ const ComboIcon = () => (
     <polyline points="2.25,6 6.75,3.5 11.25,5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
   </svg>
 )
-const M_BARS:    ModeOption = { id:'bars',    icon:<BarChart2  className="w-3.5 h-3.5"/>, label:'Columnas' }
-const M_STACKED: ModeOption = { id:'stacked', icon:<Layers     className="w-3.5 h-3.5"/>, label:'Apilado'  }
-const M_LINES:   ModeOption = { id:'lines',   icon:<Activity   className="w-3.5 h-3.5"/>, label:'Líneas'   }
-const M_AREA:    ModeOption = { id:'area',    icon:<TrendingUp className="w-3.5 h-3.5"/>, label:'Área'     }
-const M_DONUT:   ModeOption = { id:'donut',   icon:<PieIcon    className="w-3.5 h-3.5"/>, label:'Donut'    }
-const M_COMBO:   ModeOption = { id:'combo',   icon:<ComboIcon/>,                           label:'Mixto'    }
+const M_BARS:    ModeOption = { id:'bars',    icon:<BarChart2  className="w-3.5 h-3.5"/>, label:t('charts.modeColumns') }
+const M_STACKED: ModeOption = { id:'stacked', icon:<Layers     className="w-3.5 h-3.5"/>, label:t('charts.modeStacked') }
+const M_LINES:   ModeOption = { id:'lines',   icon:<Activity   className="w-3.5 h-3.5"/>, label:t('charts.modeLines')   }
+const M_AREA:    ModeOption = { id:'area',    icon:<TrendingUp className="w-3.5 h-3.5"/>, label:t('charts.modeArea')    }
+const M_DONUT:   ModeOption = { id:'donut',   icon:<PieIcon    className="w-3.5 h-3.5"/>, label:t('charts.modeDonut')   }
+const M_COMBO:   ModeOption = { id:'combo',   icon:<ComboIcon/>,                           label:t('charts.modeCombo')   }
 
 // ── Custom chart types ────────────────────────────────────────────────────────
 
@@ -94,7 +95,7 @@ interface ComputedSeries {
 function genId() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 function newCustomChart(): CustomChartDef {
   return {
-    id: genId(), title: 'Mi gráfico', colSpan: 2, year: CUR_YEAR,
+    id: genId(), title: t('charts.newTitle'), colSpan: 2, year: CUR_YEAR,
     filter: EMPTY_FILTER, sign: 'expense', xAxis: 'month', splitBy: 'none',
     metric: 'sum', defaultDisplay: 'bar', defaultColor: '#3b82f6', overrides: [],
     dataSource: 'movements',
@@ -123,7 +124,7 @@ function CT({ active, payload, label, fmt }: {
   )
 }
 function Empty({ h = 200 }: { h?: number }) {
-  return <div className="flex items-center justify-center text-gray-300 dark:text-gray-600 text-sm" style={{ height: h }}>Sin datos</div>
+  return <div className="flex items-center justify-center text-gray-300 dark:text-gray-600 text-sm" style={{ height: h }}>{t('charts.noData')}</div>
 }
 
 // ── Month helpers ─────────────────────────────────────────────────────────────
@@ -159,7 +160,7 @@ function computeChartData(
     return mv.account_id ? String(mv.account_id) : null
   }
   function baseInfo(key: string): { label: string; color: string } {
-    if (key === '__total__') return { label: def.sign === 'expense' ? 'Gastos' : def.sign === 'income' ? 'Ingresos' : 'Total', color: def.defaultColor }
+    if (key === '__total__') return { label: def.sign === 'expense' ? t('charts.expense') : def.sign === 'income' ? t('charts.income') : 'Total', color: def.defaultColor }
     if (def.splitBy === 'group')   return { label: groupById[+key]?.name ?? '?',   color: groupById[+key]?.color   ?? '#6b7280' }
     if (def.splitBy === 'type')    return { label: typeById[+key]?.name   ?? '?',   color: typeById[+key]?.color    ?? '#6b7280' }
     return                                { label: accountById[+key]?.name ?? '?',  color: accountById[+key]?.color ?? '#6b7280' }
@@ -521,10 +522,10 @@ function MonthlyBarChart({ filtered, year, mode }: ChartProps) {
     return series.map(({ key, label }) => ({ month:label, ...m[key] }))
   }, [filtered, year])
   const tt = (p: unknown) => <CT {...(p as Parameters<typeof CT>[0])} fmt={fmt}/>
-  if (mode==='lines') return (<ResponsiveContainer width="100%" height={220}><LineChart data={data}><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Legend wrapperStyle={{ fontSize:11, paddingTop:6 }}/><Line type="monotone" dataKey="income" name="Ingresos" stroke="#22c55e" strokeWidth={2} dot={false}/><Line type="monotone" dataKey="expense" name="Gastos" stroke="#ef4444" strokeWidth={2} dot={false}/></LineChart></ResponsiveContainer>)
-  if (mode==='combo') return (<ResponsiveContainer width="100%" height={220}><ComposedChart data={data} barCategoryGap="35%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Legend wrapperStyle={{ fontSize:11, paddingTop:6 }}/><Bar dataKey="expense" name="Gastos" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40}/><Line type="monotone" dataKey="income" name="Ingresos" stroke="#22c55e" strokeWidth={2.5} dot={false} activeDot={{ r:4 }}/></ComposedChart></ResponsiveContainer>)
+  if (mode==='lines') return (<ResponsiveContainer width="100%" height={220}><LineChart data={data}><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Legend wrapperStyle={{ fontSize:11, paddingTop:6 }}/><Line type="monotone" dataKey="income" name={t('charts.income')} stroke="#22c55e" strokeWidth={2} dot={false}/><Line type="monotone" dataKey="expense" name={t('charts.expense')} stroke="#ef4444" strokeWidth={2} dot={false}/></LineChart></ResponsiveContainer>)
+  if (mode==='combo') return (<ResponsiveContainer width="100%" height={220}><ComposedChart data={data} barCategoryGap="35%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Legend wrapperStyle={{ fontSize:11, paddingTop:6 }}/><Bar dataKey="expense" name={t('charts.expense')} fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40}/><Line type="monotone" dataKey="income" name={t('charts.income')} stroke="#22c55e" strokeWidth={2.5} dot={false} activeDot={{ r:4 }}/></ComposedChart></ResponsiveContainer>)
   const isStacked = mode==='stacked'
-  return (<ResponsiveContainer width="100%" height={220}><BarChart data={data} barGap={4} barCategoryGap="30%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Legend wrapperStyle={{ fontSize:11, paddingTop:6 }}/><Bar dataKey="income" name="Ingresos" fill="#22c55e" radius={isStacked?[0,0,0,0]:[4,4,0,0]} maxBarSize={40} stackId={isStacked?'a':undefined}/><Bar dataKey="expense" name="Gastos" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40} stackId={isStacked?'a':undefined}/></BarChart></ResponsiveContainer>)
+  return (<ResponsiveContainer width="100%" height={220}><BarChart data={data} barGap={4} barCategoryGap="30%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Legend wrapperStyle={{ fontSize:11, paddingTop:6 }}/><Bar dataKey="income" name={t('charts.income')} fill="#22c55e" radius={isStacked?[0,0,0,0]:[4,4,0,0]} maxBarSize={40} stackId={isStacked?'a':undefined}/><Bar dataKey="expense" name={t('charts.expense')} fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40} stackId={isStacked?'a':undefined}/></BarChart></ResponsiveContainer>)
 }
 
 function NetMonthlyChart({ filtered, year }: ChartProps) {
@@ -536,7 +537,7 @@ function NetMonthlyChart({ filtered, year }: ChartProps) {
     return series.map(({ key, label }) => ({ month:label, net:m[key] }))
   }, [filtered, year])
   const tt = (p: unknown) => <CT {...(p as Parameters<typeof CT>[0])} fmt={fmt}/>
-  return (<ResponsiveContainer width="100%" height={220}><BarChart data={data} barCategoryGap="35%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><ReferenceLine y={0} stroke="#9ca3af" strokeWidth={1}/><Bar dataKey="net" name="Neto" radius={[4,4,0,0]} maxBarSize={40}>{data.map((d,i)=><Cell key={i} fill={d.net>=0?'#22c55e':'#ef4444'}/>)}</Bar></BarChart></ResponsiveContainer>)
+  return (<ResponsiveContainer width="100%" height={220}><BarChart data={data} barCategoryGap="35%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><ReferenceLine y={0} stroke="#9ca3af" strokeWidth={1}/><Bar dataKey="net" name={t('charts.net')} radius={[4,4,0,0]} maxBarSize={40}>{data.map((d,i)=><Cell key={i} fill={d.net>=0?'#22c55e':'#ef4444'}/>)}</Bar></BarChart></ResponsiveContainer>)
 }
 
 function CumulativeChart({ filtered, year, mode }: ChartProps) {
@@ -907,8 +908,8 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
   }
 
   const modeOptions = def.xAxis==='none'
-    ? [['bar','Columnas',BarChart2],['donut','Donut',PieIcon]] as const
-    : [['bar','Columnas',BarChart2],['line','Líneas',Activity],['area','Área',TrendingUp]] as const
+    ? [['bar',t('charts.modeColumns'),BarChart2],['donut',t('charts.modeDonut'),PieIcon]] as const
+    : [['bar',t('charts.modeColumns'),BarChart2],['line',t('charts.modeLines'),Activity],['area',t('charts.modeArea'),TrendingUp]] as const
 
   return (
     <div className="relative h-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
@@ -963,7 +964,7 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
                   </button>
                 ))
               ) : (<>
-                {([['bar','Columnas',BarChart2],['line','Líneas',Activity],['area','Área',TrendingUp]] as const).map(([id,,Icon])=>(
+                {([['bar',t('charts.modeColumns'),BarChart2],['line',t('charts.modeLines'),Activity],['area',t('charts.modeArea'),TrendingUp]] as const).map(([id,,Icon])=>(
                   <button key={id} onClick={()=>upd({ displayMode: id })}
                     className={`p-1 rounded-md transition-colors ${def.displayMode===id?'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 shadow-sm':'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
                     <Icon className="w-3 h-3"/>
@@ -1332,9 +1333,9 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                     ? [{ id:'bar',   icon:<BarChart2 className="w-3.5 h-3.5"/>, label:'Barras' },
                        { id:'donut', icon:<PieIcon   className="w-3.5 h-3.5"/>, label:'Donut'  },
                        { id:'pie',   icon:<PieIcon   className="w-3.5 h-3.5"/>, label:'Tarta'  }]
-                    : [{ id:'bar',   icon:<BarChart2  className="w-3.5 h-3.5"/>, label:'Columnas' },
-                       { id:'line',  icon:<Activity   className="w-3.5 h-3.5"/>, label:'Líneas'   },
-                       { id:'area',  icon:<TrendingUp className="w-3.5 h-3.5"/>, label:'Área'     }]
+                    : [{ id:'bar',   icon:<BarChart2  className="w-3.5 h-3.5"/>, label:t('charts.modeColumns') },
+                       { id:'line',  icon:<Activity   className="w-3.5 h-3.5"/>, label:t('charts.modeLines')   },
+                       { id:'area',  icon:<TrendingUp className="w-3.5 h-3.5"/>, label:t('charts.modeArea')    }]
                   ).map(m=>(
                     <button key={m.id} onClick={()=>upd({ defaultDisplay:m.id as CustomChartDef['defaultDisplay'] })}
                       className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg border text-xs transition-colors ${def.defaultDisplay===m.id?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'}`}
@@ -1392,7 +1393,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                   <div className="space-y-3">
                     <div className="flex items-center gap-1">
                       <span className="text-[11px] text-gray-400 shrink-0 mr-0.5">Todos:</span>
-                      {([['bar',<BarChart2 className="w-3.5 h-3.5"/>,'Columnas'],['line',<Activity className="w-3.5 h-3.5"/>,'Líneas'],['area',<TrendingUp className="w-3.5 h-3.5"/>,'Área'],['hidden',<X className="w-3.5 h-3.5"/>,'Ocultar']] as const).map(([d,icon,label])=>(
+                      {([['bar',<BarChart2 className="w-3.5 h-3.5"/>,t('charts.modeColumns')],['line',<Activity className="w-3.5 h-3.5"/>,t('charts.modeLines')],['area',<TrendingUp className="w-3.5 h-3.5"/>,t('charts.modeArea')],['hidden',<X className="w-3.5 h-3.5"/>,'Ocultar']] as const).map(([d,icon,label])=>(
                         <button key={d} onClick={()=>setAllAccDisplay(d)} title={label}
                           className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                         >{icon}</button>
@@ -1417,7 +1418,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                           <span className="flex-1 text-xs text-gray-600 dark:text-gray-400 truncate min-w-0">{s.label}</span>
                           <div className="flex items-center gap-0.5 shrink-0">
                             {(['bar','line','area'] as const).map(d=>(
-                              <button key={d} onClick={()=>setAccOverride(s.key,{ display:d })} title={d==='bar'?'Columnas':d==='line'?'Líneas':'Área'}
+                              <button key={d} onClick={()=>setAccOverride(s.key,{ display:d })} title={d==='bar'?t('charts.modeColumns'):d==='line'?t('charts.modeLines'):t('charts.modeArea')}
                                 className={`p-1.5 rounded transition-colors ${s.display===d?'bg-gray-800 dark:bg-white text-white dark:text-gray-900':'text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400'}`}
                               >{dispIcons[d]}</button>
                             ))}
@@ -1448,7 +1449,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                     {/* Change all row */}
                     <div className="flex items-center gap-1">
                       <span className="text-[11px] text-gray-400 shrink-0 mr-0.5">Todos:</span>
-                      {([['bar',<BarChart2 className="w-3.5 h-3.5"/>,'Columnas'],['line',<Activity className="w-3.5 h-3.5"/>,'Líneas'],['area',<TrendingUp className="w-3.5 h-3.5"/>,'Área'],['hidden',<X className="w-3.5 h-3.5"/>,'Ocultar']] as const).map(([d,icon,label])=>(
+                      {([['bar',<BarChart2 className="w-3.5 h-3.5"/>,t('charts.modeColumns')],['line',<Activity className="w-3.5 h-3.5"/>,t('charts.modeLines')],['area',<TrendingUp className="w-3.5 h-3.5"/>,t('charts.modeArea')],['hidden',<X className="w-3.5 h-3.5"/>,'Ocultar']] as const).map(([d,icon,label])=>(
                         <button key={d} onClick={()=>setAllDisplay(d)} title={label}
                           className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                         >{icon}</button>
@@ -1478,7 +1479,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                           <span className="flex-1 text-xs text-gray-600 dark:text-gray-400 truncate min-w-0">{s.label}</span>
                           <div className="flex items-center gap-0.5 shrink-0">
                             {(['bar','line','area'] as const).map(d=>(
-                              <button key={d} onClick={()=>setSeriesOverride(s.key,{ display:d })} title={d==='bar'?'Columnas':d==='line'?'Líneas':'Área'}
+                              <button key={d} onClick={()=>setSeriesOverride(s.key,{ display:d })} title={d==='bar'?t('charts.modeColumns'):d==='line'?t('charts.modeLines'):t('charts.modeArea')}
                                 className={`p-1.5 rounded transition-colors ${s.display===d?'bg-gray-800 dark:bg-white text-white dark:text-gray-900':'text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400'}`}
                               >{dispIcons[d]}</button>
                             ))}
@@ -1654,7 +1655,7 @@ export default function Charts() {
     <div className="p-3 md:p-6 space-y-4">
       <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Gráficos</h1>
+          <h1 className="text-2xl font-bold text-gray-800 dark:text-white">{t('charts.title')}</h1>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">Filtros y vista independientes por gráfico</p>
         </div>
         <div className="flex items-center gap-2">

@@ -14,8 +14,9 @@ import {
   PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, CartesianGrid, Legend, ReferenceLine,
 } from 'recharts'
+import { t, getMonthNames } from '../utils/i18n'
 
-const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const MONTHS_SHORT = getMonthNames('short')
 
 function buildAccountHistory(
   acc: Account,
@@ -160,7 +161,7 @@ export default function AccountsPage() {
   if (loadingAccounts || loadingMovements) {
     return (
       <div className="p-6 flex items-center justify-center h-96">
-        <span className="text-sm text-gray-400 dark:text-gray-500">Cargando...</span>
+        <span className="text-sm text-gray-400 dark:text-gray-500">{t('common.loading')}</span>
       </div>
     )
   }
@@ -168,7 +169,7 @@ export default function AccountsPage() {
   if (accounts.length === 0) {
     return (
       <div className="p-6 flex items-center justify-center h-96">
-        <span className="text-sm text-gray-400 dark:text-gray-500">No hay cuentas configuradas.</span>
+        <span className="text-sm text-gray-400 dark:text-gray-500">{t('accounts.noAccounts')}</span>
       </div>
     )
   }
@@ -183,7 +184,7 @@ export default function AccountsPage() {
 
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">Cuentas</h1>
+        <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t('accounts.title')}</h1>
         <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
           <button
             onClick={() => setSelectedYear(null)}
@@ -193,7 +194,7 @@ export default function AccountsPage() {
                 : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
             }`}
           >
-            Todo
+            {t('accounts.all')}
           </button>
           {availableYears.map(y => (
             <button
@@ -214,14 +215,14 @@ export default function AccountsPage() {
       {/* ── Total card ─────────────────────────────────────────────── */}
       <div className={`${PANEL} p-5 flex items-center gap-6`}>
         <div className="flex-1">
-          <p className={`${TITLE} mb-2`}>Patrimonio total</p>
+          <p className={`${TITLE} mb-2`}>{t('accounts.totalWealth')}</p>
           <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">
             {fmt(totalBalance)}
           </p>
         </div>
         <div className={`flex items-center gap-1.5 text-sm font-semibold ${totalChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
           {totalChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-          <span>{totalChange >= 0 ? '+' : ''}{fmt(totalChange)} desde inicio</span>
+          <span>{totalChange >= 0 ? '+' : ''}{fmt(totalChange)} {t('accounts.fromStart')}</span>
         </div>
       </div>
 
@@ -253,7 +254,7 @@ export default function AccountsPage() {
       {/* ── Evolution chart ────────────────────────────────────────── */}
       <div className={`${PANEL} p-5`}>
         <div className="flex items-center justify-between mb-4">
-          <h2 className={TITLE}>Evolución del balance</h2>
+          <h2 className={TITLE}>{t('accounts.balanceEvolution')}</h2>
           <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
             {(['lines', 'stacked'] as const).map(mode => (
               <button
@@ -265,7 +266,7 @@ export default function AccountsPage() {
                     : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                 }`}
               >
-                {mode === 'lines' ? 'Líneas' : 'Apilado'}
+                {mode === 'lines' ? t('accounts.lines') : t('accounts.stacked')}
               </button>
             ))}
           </div>
@@ -328,7 +329,7 @@ export default function AccountsPage() {
 
         {/* Monthly change */}
         <div className={`${PANEL} p-5 lg:col-span-2`}>
-          <h2 className={`${TITLE} mb-4`}>Cambio mensual</h2>
+          <h2 className={`${TITLE} mb-4`}>{t('accounts.monthlyChg')}</h2>
           <ResponsiveContainer width="100%" height={240}>
             <BarChart data={monthlyChangeData} margin={{ top: 4, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false} />
@@ -355,7 +356,7 @@ export default function AccountsPage() {
 
         {/* Distribution */}
         <div className={`${PANEL} p-5`}>
-          <h2 className={`${TITLE} mb-4`}>Distribución actual</h2>
+          <h2 className={`${TITLE} mb-4`}>{t('accounts.distribution')}</h2>
           <ResponsiveContainer width="100%" height={160}>
             <PieChart>
               <Pie

@@ -15,6 +15,7 @@ import { getGroups, type Group } from '../api/groups'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getAccountsSummary, type Account } from '../api/accounts'
 import { useCurrency } from '../hooks/useCurrency'
+import { t, getMonthNames } from '../utils/i18n'
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 
@@ -96,7 +97,7 @@ function monthsInRange(start: string, end: string): number {
   return Math.max(1, (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth()) + 1)
 }
 
-const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+const MONTHS_SHORT = getMonthNames('short')
 
 const TOOLTIP_STYLE: React.CSSProperties = {
   backgroundColor: '#1f2937',
@@ -187,7 +188,7 @@ function ConfigPanel({ config, onChange, accounts, groups, types, allExpenseMove
       >
         <div className="flex items-center gap-2">
           <Settings className="w-3.5 h-3.5" strokeWidth={1.5} />
-          <span className="font-medium text-gray-600 dark:text-gray-300">Configuración del análisis</span>
+          <span className="font-medium text-gray-600 dark:text-gray-300">{t('analysis.config')}</span>
           {adjustments > 0 && (
             <span className="bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 px-1.5 py-0.5 rounded text-xs font-medium">
               {adjustments} ajuste{adjustments !== 1 ? 's' : ''}
@@ -202,16 +203,16 @@ function ConfigPanel({ config, onChange, accounts, groups, types, allExpenseMove
       {open && (
         <div className="px-5 pb-5 space-y-5 border-t border-gray-100 dark:border-gray-800 pt-4">
           <div>
-            <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Cuenta fondo de emergencia</p>
+            <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{t('analysis.emergencyFund')}</p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-              Su saldo se usa para calcular cuántos meses puedes aguantar sin ingresos
+              {t('analysis.emergencyFundDesc')}
             </p>
             <select
               value={config.emergencyAccountId ?? ''}
               onChange={e => onChange({ ...config, emergencyAccountId: e.target.value ? Number(e.target.value) : null })}
               className="text-xs px-2 py-1.5 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 w-full max-w-sm"
             >
-              <option value="">Suma de todas las cuentas ({fmt(accounts.reduce((s, a) => s + a.balance, 0))})</option>
+              <option value="">{t('analysis.allAccounts')} ({fmt(accounts.reduce((s, a) => s + a.balance, 0))})</option>
               {accounts.map(a => (
                 <option key={a.id} value={a.id}>{a.name} — {fmt(a.balance)}</option>
               ))}
@@ -219,13 +220,13 @@ function ConfigPanel({ config, onChange, accounts, groups, types, allExpenseMove
           </div>
 
           <div>
-            <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Categorías de ahorro</p>
+            <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{t('analysis.savingsCategories')}</p>
             <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-              Los movimientos de estas categorías cuentan como ahorro y no como gasto
+              {t('analysis.savingsCategoriesDesc')}
             </p>
             <div className="flex flex-wrap gap-2">
               {expenseGroups.length === 0
-                ? <p className="text-xs text-gray-400">No hay categorías disponibles</p>
+                ? <p className="text-xs text-gray-400">{t('analysis.noCategories')}</p>
                 : expenseGroups.map(g => {
                     const selected = config.savingsGroupIds.includes(g.id)
                     return (
@@ -248,9 +249,9 @@ function ConfigPanel({ config, onChange, accounts, groups, types, allExpenseMove
 
           {topMovements.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">Movimientos grandes a excluir</p>
+              <p className="text-xs font-medium text-gray-600 dark:text-gray-300 mb-1">{t('analysis.bigExpenses')}</p>
               <p className="text-xs text-gray-400 dark:text-gray-500 mb-2">
-                Los movimientos excluidos no se cuentan en ningún cálculo ni gráfico
+                {t('analysis.bigExpensesDesc')}
               </p>
               <div className="space-y-1.5">
                 {topMovements.map(m => {
@@ -272,7 +273,7 @@ function ConfigPanel({ config, onChange, accounts, groups, types, allExpenseMove
                       </span>
                       <button
                         onClick={() => toggleExclusion(m.id)}
-                        title={excluded ? 'Incluir en el análisis' : 'Excluir del análisis'}
+                        title={excluded ? t('analysis.include') : t('analysis.exclude')}
                         className="shrink-0 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
                       >
                         {excluded
@@ -285,7 +286,7 @@ function ConfigPanel({ config, onChange, accounts, groups, types, allExpenseMove
               </div>
               {config.excludedMovementIds.length > 0 && (
                 <p className="text-xs text-yellow-600 dark:text-yellow-400 mt-2">
-                  {config.excludedMovementIds.length} movimiento{config.excludedMovementIds.length !== 1 ? 's' : ''} excluido{config.excludedMovementIds.length !== 1 ? 's' : ''} del análisis
+                  {`${config.excludedMovementIds.length} ${t('analysis.excluded')}`}
                 </p>
               )}
             </div>
@@ -928,7 +929,7 @@ export default function Analysis() {
     <div className="p-4 md:p-6 space-y-4 max-w-4xl mx-auto">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold text-gray-800 dark:text-white">Análisis Financiero</h1>
+          <h1 className="text-xl font-bold text-gray-800 dark:text-white">{t('analysis.title')}</h1>
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Métricas y patrones de tus finanzas</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">

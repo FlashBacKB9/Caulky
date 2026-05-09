@@ -5,6 +5,7 @@ import { type MovementType } from '../api/movementTypes'
 import FileUpload from './FileUpload'
 import { X, Trash2, Copy } from 'lucide-react'
 import { useSharedMovements } from '../hooks/useSharedMovements'
+import { t } from '../utils/i18n'
 
 export interface DraftRow {
   id: number
@@ -121,7 +122,7 @@ export default function MovementDetailModal({ movement, types, onClose }: {
   })
 
   const handleDelete = () => {
-    if (!confirm('¿Eliminar este movimiento? Esta acción no se puede deshacer.')) return
+    if (!confirm(t('detail.deleteConfirm'))) return
     deleteMut.mutate()
   }
 
@@ -134,7 +135,7 @@ export default function MovementDetailModal({ movement, types, onClose }: {
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md" onMouseDown={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-white">Detalle del movimiento</h2>
+          <h2 className="text-base font-semibold text-gray-800 dark:text-white">{t('detail.title')}</h2>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
           </button>
@@ -144,18 +145,18 @@ export default function MovementDetailModal({ movement, types, onClose }: {
         <div className="px-5 py-4 space-y-3">
           {/* Name */}
           <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Nombre</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('common.name')}</label>
             <input className={IN} value={draft.name} onChange={e => setField('name', e.target.value)} />
           </div>
 
           {/* Importe + Fecha */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Importe</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('form.amountLabel')}</label>
               <input type="number" step="0.01" className={IN} value={draft.money} onChange={e => setField('money', e.target.value)} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Fecha</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('common.date')}</label>
               <input type="date" className={IN} value={draft.date} onChange={e => setField('date', e.target.value)} />
             </div>
           </div>
@@ -163,11 +164,11 @@ export default function MovementDetailModal({ movement, types, onClose }: {
           {/* Tipo + Fecha banco */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Tipo</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('common.type')}</label>
               <div className="relative">
                 {selType && <span className="absolute left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full z-10 pointer-events-none" style={{ backgroundColor: selType.color }} />}
                 <select className={IN + (selType ? ' pl-8' : '')} value={draft.movement_type_id} onChange={e => setField('movement_type_id', e.target.value)}>
-                  <option value="">Sin tipo</option>
+                  <option value="">{t('detail.noType')}</option>
                   {Object.entries(byCategory).map(([cat, items]) => (
                     <optgroup key={cat} label={cat}>
                       {items.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -178,13 +179,13 @@ export default function MovementDetailModal({ movement, types, onClose }: {
               {linkedAcc && (
                 <div className="mt-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 rounded-lg text-xs text-blue-600 dark:text-blue-400">
                   {parseFloat(draft.money) < 0
-                    ? <><span className="font-semibold">{linkedAcc.name}</span> → De uso</>
-                    : <>De uso → <span className="font-semibold">{linkedAcc.name}</span></>}
+                    ? <><span className="font-semibold">{linkedAcc.name}</span> → {t('detail.linkedAccount')}</>
+                    : <>{t('detail.linkedAccount')} → <span className="font-semibold">{linkedAcc.name}</span></>}
                 </div>
               )}
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Fecha banco</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('movement.bankDate')}</label>
               <input type="date" className={IN} value={draft.bank_date} onChange={e => setField('bank_date', e.target.value)} />
             </div>
           </div>
@@ -192,16 +193,16 @@ export default function MovementDetailModal({ movement, types, onClose }: {
           {/* Pagado / No contar / Compartido */}
           <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Pagado</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{t('form.paid')}</label>
               <Toggle value={draft.paid} onChange={v => setField('paid', v)} color="#22c55e" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">No contar</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{t('form.noCount')}</label>
               <Toggle value={draft.no_count} onChange={v => setField('no_count', v)} color="#f59e0b" />
             </div>
             {sharedEnabled && (
               <div>
-                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Compartido</label>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{t('form.shared')}</label>
                 <Toggle
                   value={draft.is_shared}
                   onChange={v => setDraft(d => ({ ...d, is_shared: v, ...(v ? {} : { shared_between: '2', my_share: '' }) }))}
@@ -214,17 +215,17 @@ export default function MovementDetailModal({ movement, types, onClose }: {
           {/* Shared detail */}
           {sharedEnabled && draft.is_shared && (
             <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 space-y-2">
-              <p className="text-xs text-blue-600 dark:text-blue-400">El importe total resta del balance. Solo tu parte cuenta en las estadísticas.</p>
+              <p className="text-xs text-blue-600 dark:text-blue-400">{t('detail.sharedInfo')}</p>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">Nº personas</label>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('detail.numPeople')}</label>
                   <input type="number" min={2} max={99} className={IN + ' text-sm'}
                     value={draft.shared_between}
                     onChange={e => setDraft(d => ({ ...d, shared_between: e.target.value, my_share: '' }))}
                     placeholder="2" />
                 </div>
                 <div>
-                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">O mi importe</label>
+                  <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">{t('detail.myShare')}</label>
                   <input type="number" step="0.01" min={0} className={IN + ' text-sm'}
                     value={draft.my_share}
                     onChange={e => setDraft(d => ({ ...d, my_share: e.target.value, shared_between: e.target.value ? '' : d.shared_between }))}
@@ -246,13 +247,13 @@ export default function MovementDetailModal({ movement, types, onClose }: {
 
           {/* Notas */}
           <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Notas</label>
-            <textarea rows={2} className={IN + ' resize-none'} value={draft.notes} onChange={e => setField('notes', e.target.value)} placeholder="Sin notas..." />
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('common.notes')}</label>
+            <textarea rows={2} className={IN + ' resize-none'} value={draft.notes} onChange={e => setField('notes', e.target.value)} placeholder={t('detail.noNotes')} />
           </div>
 
           {/* Adjuntos */}
           <div>
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Adjuntos</label>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('form.attachments')}</label>
             <FileUpload movementId={movement.id} existingFiles={movement.files} />
           </div>
         </div>
@@ -262,20 +263,20 @@ export default function MovementDetailModal({ movement, types, onClose }: {
           <button onClick={handleDelete} disabled={deleteMut.isPending}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors disabled:opacity-50">
             <Trash2 className="w-3.5 h-3.5" />
-            Eliminar
+            {t('common.delete')}
           </button>
           <div className="flex items-center gap-2">
             <button onClick={() => duplicateMut.mutate()} disabled={duplicateMut.isPending}
               className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors disabled:opacity-50">
               <Copy className="w-3.5 h-3.5" />
-              Duplicar
+              {t('detail.duplicate')}
             </button>
             <button onClick={onClose} className="px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
-              Cancelar
+              {t('common.cancel')}
             </button>
             <button onClick={() => updateMut.mutate(draftPayload(draft, movement))} disabled={updateMut.isPending}
               className="px-4 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors disabled:opacity-50">
-              {updateMut.isPending ? 'Guardando...' : 'Guardar'}
+              {updateMut.isPending ? t('form.saving') : t('common.save')}
             </button>
           </div>
         </div>

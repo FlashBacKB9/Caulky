@@ -5,6 +5,7 @@ import { Upload, ChevronRight, ChevronLeft, Check, AlertCircle, FileSpreadsheet,
 import { parseExcel, runImport, type ParseResult, type TypeMapping, type TypeAction, type DryRunResult, type RunResult } from '../api/importExcel'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getGroups, type Group } from '../api/groups'
+import { t } from '../utils/i18n'
 
 // ── API helpers ──────────────────────────────────────────────────────────────
 
@@ -15,7 +16,7 @@ const PREVIEW_ROWS = 5
 // ── Step indicator ───────────────────────────────────────────────────────────
 
 function Steps({ current, hasTypes }: { current: number; hasTypes: boolean }) {
-  const steps = ['Archivo', 'Columnas', ...(hasTypes ? ['Tipos'] : []), 'Importar']
+  const steps = [t('import.stepFile'), t('import.stepColumns'), ...(hasTypes ? [t('import.stepTypes')] : []), t('import.stepImport')]
   return (
     <div className="flex items-center gap-2 mb-8">
       {steps.map((label, i) => {
@@ -86,14 +87,14 @@ function StepUpload({ onParsed }: { onParsed: (r: ParseResult) => void }) {
         {loading ? (
           <div className="space-y-3">
             <div className="w-12 h-12 border-2 border-gray-300 border-t-gray-800 rounded-full animate-spin mx-auto" />
-            <p className="text-sm text-gray-500">Procesando archivo...</p>
+            <p className="text-sm text-gray-500">{t('import.processing')}</p>
           </div>
         ) : (
           <div className="space-y-3">
             <FileSpreadsheet className="w-12 h-12 mx-auto text-gray-300 dark:text-gray-600" strokeWidth={1} />
             <div>
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Arrastra tu Excel aquí</p>
-              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">o haz clic para seleccionar · .xlsx · .csv</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('import.dropHere')}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{t('import.dropHint')}</p>
             </div>
           </div>
         )}
@@ -112,16 +113,16 @@ function StepUpload({ onParsed }: { onParsed: (r: ParseResult) => void }) {
 // ── Step 2: Map columns ──────────────────────────────────────────────────────
 
 const FIELDS: { key: keyof ColMap; label: string; required: boolean; tooltip?: string }[] = [
-  { key: 'name',          label: 'Nombre',              required: true  },
-  { key: 'money',         label: 'Importe',             required: true  },
-  { key: 'type',          label: 'Tipo de movimiento',  required: false },
-  { key: 'date',          label: 'Fecha',               required: true  },
-  { key: 'bankDate',      label: 'Fecha banco',         required: false },
-  { key: 'notes',         label: 'Notas',               required: false },
-  { key: 'shared',        label: 'Compartido',          required: false },
-  { key: 'sharedBetween', label: 'Nº personas',         required: false,
+  { key: 'name',          label: t('import.fieldName'),          required: true  },
+  { key: 'money',         label: t('import.fieldMoney'),         required: true  },
+  { key: 'type',          label: t('import.fieldType'),          required: false },
+  { key: 'date',          label: t('import.fieldDate'),          required: true  },
+  { key: 'bankDate',      label: t('import.fieldBankDate'),      required: false },
+  { key: 'notes',         label: t('import.fieldNotes'),         required: false },
+  { key: 'shared',        label: t('import.fieldShared'),        required: false },
+  { key: 'sharedBetween', label: t('import.fieldSharedBetween'), required: false,
     tooltip: 'Número de personas entre las que se divide el gasto. Si está vacío y Compartido es verdadero, se divide entre 2.' },
-  { key: 'myShare',       label: 'Mi importe',          required: false,
+  { key: 'myShare',       label: t('import.fieldMyShare'),       required: false,
     tooltip: 'Importe del gasto que te corresponde a ti para las estadísticas.' },
 ]
 
@@ -146,14 +147,14 @@ function StepColumns({
       {/* Field mapping */}
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-50 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">Asigna cada campo a una columna del Excel</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">{t('import.mapTitle')}</p>
         </div>
         <div className="divide-y divide-gray-50 dark:divide-gray-800">
           {FIELDS.map(field => (
             <div key={field.key} className="flex items-center px-5 py-3 gap-4">
               <div className="w-44 shrink-0 flex items-center gap-1">
                 <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{field.label}</span>
-                {field.required && <span className="text-red-400 text-xs">*</span>}
+                {field.required && <span className="text-red-400 text-xs" title={t('import.required')}>*</span>}
                 {field.tooltip && (
                   <span
                     title={field.tooltip}
@@ -544,7 +545,7 @@ export default function Import() {
   return (
     <div className="p-3 md:p-6 max-w-3xl">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">Importar Excel</h1>
+        <h1 className="text-2xl font-bold text-gray-800 dark:text-white">{t('import.title')}</h1>
         <p className="text-sm text-gray-400 mt-1">Importa movimientos desde un archivo .xlsx</p>
       </div>
 

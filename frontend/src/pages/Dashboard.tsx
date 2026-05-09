@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 import AppIcon from '../components/AppIcon'
 import { useCurrency } from '../hooks/useCurrency'
+import { t, getMonthNames } from '../utils/i18n'
 import {
   useDashboardConfig, DEFAULT_DASHBOARD_CONFIG, type DashboardWidget,
 } from '../hooks/useDashboardConfig'
@@ -32,8 +33,8 @@ import {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MONTHS_FULL  = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre']
-const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const MONTHS_FULL  = getMonthNames('long')
+const MONTHS_SHORT = getMonthNames('short')
 const EXCLUDE_GROUPS  = new Set(['Ingreso','Total','Ahorro','Gastos Anuales','Inversión'])
 const BALANCE_EXCLUDE = new Set(['Total','Ahorro','Gastos Anuales','Inversión'])
 const GRID_CLR = '#e5e7eb'
@@ -168,14 +169,14 @@ function ExpensesLineChart({ groups, year, height = 300 }: { groups: Group[]; ye
   }
 
   if (!expGroups.length) return (
-    <div className="flex items-center justify-center h-48 text-gray-300 dark:text-gray-600 text-sm">Sin datos de gastos</div>
+    <div className="flex items-center justify-center h-48 text-gray-300 dark:text-gray-600 text-sm">{t('dashboard.noDataExpenses')}</div>
   )
   return (
     <div>
       {zoomRange && (
         <div className="flex justify-end mb-2">
           <button onClick={() => setZoomRange(null)} className="text-xs text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1">
-            Restablecer zoom
+            {t('dashboard.resetZoom')}
           </button>
         </div>
       )}
@@ -220,7 +221,7 @@ function ExpensesPieChart({ groups, height = 200 }: { groups: Group[]; height?: 
     .map(g => ({ name: g.name, value: Math.abs(g.total), color: g.color }))
     .filter(s => s.value > 0).sort((a, b) => b.value - a.value)
 
-  if (!slices.length) return <div className="flex items-center justify-center h-full text-gray-300 dark:text-gray-600 text-sm">Sin datos</div>
+  if (!slices.length) return <div className="flex items-center justify-center h-full text-gray-300 dark:text-gray-600 text-sm">{t('dashboard.noData')}</div>
   const active = activeIdx !== null ? slices[activeIdx] : null
 
   return (
@@ -672,7 +673,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
     let acc = 0
     const data = [...filtered].filter(m => !m.no_count).sort((a, b) => a.date.localeCompare(b.date))
       .map(mv => { acc += mv.dinero; return { label: mv.date.slice(5), balance: Math.round(acc * 100) / 100 } })
-    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>Sin datos</div>
+    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
     return (
       <ResponsiveContainer width="100%" height={height}>
         <AreaChart data={data}>
@@ -691,7 +692,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
     const s: Record<number, number> = {}
     for (const mv of filtered) { if (mv.dinero >= 0) continue; const gid = typeToGroup[mv.movement_type_id ?? -1]; if (gid) s[gid] = (s[gid] ?? 0) + Math.abs(mv.dinero) }
     const data = Object.entries(s).map(([gid, v]) => ({ name: groupById[+gid]?.name ?? '?', value: v, color: groupById[+gid]?.color ?? '#6b7280' })).sort((a, b) => b.value - a.value)
-    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>Sin datos</div>
+    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
     return (
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
@@ -709,7 +710,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
     const s: Record<number, number> = {}
     for (const mv of filtered) { if (mv.dinero <= 0) continue; const gid = typeToGroup[mv.movement_type_id ?? -1]; if (gid) s[gid] = (s[gid] ?? 0) + mv.dinero }
     const data = Object.entries(s).map(([gid, v]) => ({ name: groupById[+gid]?.name ?? '?', value: v, color: groupById[+gid]?.color ?? '#22c55e' })).sort((a, b) => b.value - a.value)
-    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>Sin datos</div>
+    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
     return (
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
@@ -727,7 +728,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
     const s: Record<number, { name: string; value: number; color: string }> = {}
     for (const mv of filtered) { if (mv.dinero >= 0 || !mv.movement_type_id) continue; const tid = mv.movement_type_id; if (!s[tid]) { const t = typeById[tid]; s[tid] = { name: t?.name ?? '?', value: 0, color: t?.color ?? '#6b7280' } }; s[tid].value += Math.abs(mv.dinero) }
     const data = Object.values(s).sort((a, b) => b.value - a.value).slice(0, 10)
-    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>Sin datos</div>
+    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
     return (
       <ResponsiveContainer width="100%" height={Math.max(height, data.length * 30 + 20)}>
         <BarChart data={data} layout="vertical" margin={{ left: 0, right: 8 }}>
@@ -772,7 +773,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
     for (const { key } of series) { byM[key] = {}; for (const id of top5ids) byM[key][id] = 0 }
     for (const mv of filtered) { if (mv.dinero >= 0) continue; const gid = typeToGroup[mv.movement_type_id ?? -1]; if (!top5ids.includes(gid)) continue; const k = mvMonthKeyD(mv, year); if (byM[k]) byM[k][gid] = (byM[k][gid] ?? 0) + Math.abs(mv.dinero) }
     const data = series.map(({ key, label }) => ({ month: label, ...Object.fromEntries(top5ids.map(id => [id, byM[key]?.[id] ?? 0])) }))
-    if (!top5.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>Sin datos</div>
+    if (!top5.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
     return (
       <ResponsiveContainer width="100%" height={height}>
         <LineChart data={data}>
@@ -794,7 +795,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
     for (const mv of filtered) { if (mv.dinero >= 0 || !mv.movement_type_id) continue; const gid = typeToGroup[mv.movement_type_id]; if (!gid) continue; const k = `t${mv.movement_type_id}`; if (!byGroup[gid]) byGroup[gid] = {}; byGroup[gid][k] = (byGroup[gid][k] ?? 0) + Math.abs(mv.dinero) }
     const data = Object.entries(byGroup).map(([gid, vals]) => ({ group: groupById[+gid]?.name ?? '?', ...vals }))
     const subtypes = Object.entries(typeInfo).map(([id, info]) => ({ key: `t${id}`, ...info }))
-    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>Sin datos</div>
+    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
     return (
       <ResponsiveContainer width="100%" height={height}>
         <BarChart data={data} barCategoryGap="25%">
@@ -840,7 +841,7 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
     const data = accounts
       .map(a => ({ name: a.name, value: a.balance, color: a.color }))
       .filter(d => d.value !== 0).sort((a, b) => b.value - a.value)
-    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>Sin datos</div>
+    if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
     const innerR = def.defaultDisplay === 'donut' ? 55 : 0
     return (
       <ResponsiveContainer width="100%" height={height}>
@@ -878,7 +879,7 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
 
   if (def.xAxis === 'none') {
     const d = chartData as { name: string; value: number; color: string }[]
-    if (!d.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>Sin datos</div>
+    if (!d.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
     if (def.defaultDisplay === 'donut' || def.defaultDisplay === 'pie') {
       return (
         <ResponsiveContainer width="100%" height={height}>
@@ -906,7 +907,7 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
     )
   }
 
-  if (!visible.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>Sin datos</div>
+  if (!visible.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
   const dm = def.displayMode ?? null
   return (
     <ResponsiveContainer width="100%" height={height}>
@@ -949,9 +950,9 @@ function PeriodToggle({ period, onChange }: { period: 'month' | 'year'; onChange
 // ── Chart options ─────────────────────────────────────────────────────────────
 
 const BUILTIN_CHART_DEFS: { id: string; label: string; desc: string; Icon: LucideIcon; defaultColSpan: number }[] = [
-  { id: 'chart-expenses-line',      label: 'Gastos por categoría',          desc: 'Líneas por grupo a lo largo del año',           Icon: BarChart2,  defaultColSpan: 4 },
-  { id: 'chart-expenses-pie',       label: 'Distribución de gastos',        desc: 'Donut con el total anual por grupo',             Icon: PieIcon,    defaultColSpan: 2 },
-  { id: 'chart-balance',            label: 'Evolución del balance',         desc: 'Área con la evolución mensual del saldo',        Icon: TrendingUp, defaultColSpan: 2 },
+  { id: 'chart-expenses-line',      label: t('dashboard.chartExpensesLine'),   desc: 'Líneas por grupo a lo largo del año',           Icon: BarChart2,  defaultColSpan: 4 },
+  { id: 'chart-expenses-pie',       label: t('dashboard.chartExpensesPie'),    desc: 'Donut con el total anual por grupo',             Icon: PieIcon,    defaultColSpan: 2 },
+  { id: 'chart-balance',            label: t('dashboard.chartBalance'),        desc: 'Área con la evolución mensual del saldo',        Icon: TrendingUp, defaultColSpan: 2 },
   { id: 'charts-monthly',      label: 'Ingresos y gastos por mes',      desc: 'Barras de ingresos y gastos mensuales',         Icon: BarChart2,  defaultColSpan: 4 },
   { id: 'charts-net',          label: 'Balance neto por mes',           desc: 'Balance neto por cada mes',                    Icon: TrendingUp, defaultColSpan: 2 },
   { id: 'charts-cumulative',   label: 'Balance acumulado',              desc: 'Balance acumulado de todos los movimientos',    Icon: TrendingUp, defaultColSpan: 2 },
@@ -964,23 +965,23 @@ const BUILTIN_CHART_DEFS: { id: string; label: string; desc: string; Icon: Lucid
 ]
 
 const METRIC_STAT_OPTIONS = [
-  { id: 'stat-income',          label: 'Ingresos del año',     desc: 'Total de ingresos en el año actual',   Icon: ArrowUpRight,   color: '#22c55e' },
-  { id: 'stat-income-monthly',  label: 'Ingresos del mes',     desc: 'Ingresos en el mes en curso',          Icon: ArrowUpRight,   color: '#22c55e' },
-  { id: 'stat-expense',         label: 'Gastos del año',       desc: 'Total de gastos en el año actual',     Icon: ArrowDownRight, color: '#ef4444' },
-  { id: 'stat-expense-monthly', label: 'Gastos del mes',       desc: 'Gastos en el mes en curso',            Icon: ArrowDownRight, color: '#ef4444' },
-  { id: 'stat-net-annual',      label: 'Balance neto del año', desc: 'Ingresos menos gastos del año actual', Icon: TrendingUp,     color: '#8b5cf6' },
-  { id: 'stat-net-monthly',     label: 'Balance neto del mes', desc: 'Ingresos menos gastos del mes actual', Icon: TrendingUp,     color: '#8b5cf6' },
+  { id: 'stat-income',          label: t('dashboard.widgetIncome'),        desc: 'Total de ingresos en el año actual',   Icon: ArrowUpRight,   color: '#22c55e' },
+  { id: 'stat-income-monthly',  label: t('dashboard.widgetIncomeMonthly'), desc: 'Ingresos en el mes en curso',          Icon: ArrowUpRight,   color: '#22c55e' },
+  { id: 'stat-expense',         label: t('dashboard.widgetExpense'),        desc: 'Total de gastos en el año actual',     Icon: ArrowDownRight, color: '#ef4444' },
+  { id: 'stat-expense-monthly', label: t('dashboard.widgetExpenseMonthly'), desc: 'Gastos en el mes en curso',            Icon: ArrowDownRight, color: '#ef4444' },
+  { id: 'stat-net-annual',      label: t('dashboard.widgetNetAnnual'),     desc: 'Ingresos menos gastos del año actual', Icon: TrendingUp,     color: '#8b5cf6' },
+  { id: 'stat-net-monthly',     label: t('dashboard.widgetNetMonthly'),    desc: 'Ingresos menos gastos del mes actual', Icon: TrendingUp,     color: '#8b5cf6' },
 ]
 
 const SPECIAL_STAT_OPTIONS = [
-  { id: 'stat-uso',           label: 'Cuenta de uso',     desc: 'Saldo de la cuenta principal',            Icon: CreditCard,      color: '#3b82f6' },
-  { id: 'stat-accounts',      label: 'Panel de ahorro',   desc: 'Cuentas de ahorro con selector cíclico',  Icon: ChartCandlestick, color: '#f59e0b' },
-  { id: 'stat-total-balance', label: 'Patrimonio total',  desc: 'Suma del saldo de todas las cuentas',     Icon: Landmark,        color: '#8b5cf6' },
+  { id: 'stat-uso',           label: t('dashboard.widgetUso'),          desc: 'Saldo de la cuenta principal',            Icon: CreditCard,      color: '#3b82f6' },
+  { id: 'stat-accounts',      label: 'Panel de ahorro',                 desc: 'Cuentas de ahorro con selector cíclico',  Icon: ChartCandlestick, color: '#f59e0b' },
+  { id: 'stat-total-balance', label: t('dashboard.widgetTotalBalance'), desc: 'Suma del saldo de todas las cuentas',     Icon: Landmark,        color: '#8b5cf6' },
 ]
 
 const BALANCE_HISTORY_OPTIONS = [
-  { id: 'stat-balance-history',  label: 'Histórico de balance',        desc: 'Balance histórico de todas las cuentas en un gráfico', Icon: TrendingUp, color: '#6366f1', defaultColSpan: 4 },
-  { id: 'stat-balance-combined', label: 'Balance total histórico',     desc: 'Suma de todas las cuentas en una sola línea',          Icon: TrendingUp, color: '#3b82f6', defaultColSpan: 2 },
+  { id: 'stat-balance-history',  label: t('dashboard.chartBalanceHistory'),  desc: 'Balance histórico de todas las cuentas en un gráfico', Icon: TrendingUp, color: '#6366f1', defaultColSpan: 4 },
+  { id: 'stat-balance-combined', label: t('dashboard.chartBalanceCombined'), desc: 'Suma de todas las cuentas en una sola línea',          Icon: TrendingUp, color: '#3b82f6', defaultColSpan: 2 },
   { id: 'stat-balance-cycle',    label: 'Balance cuenta a cuenta',     desc: 'Una cuenta a la vez, con flechas para cambiar',        Icon: TrendingUp, color: '#f59e0b', defaultColSpan: 2 },
 ]
 
@@ -1209,10 +1210,10 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
                 <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
                   <Plus className="w-4 h-4 text-blue-500" />
                 </div>
-                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Crear nuevo gráfico</span>
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{t('dashboard.createChart')}</span>
               </button>
               {availChartOptions.length === 0 ? (
-                <p className="text-sm text-gray-400 dark:text-gray-500 px-1 py-2">Todos los gráficos ya están en el dashboard</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500 px-1 py-2">{t('dashboard.allChartsUsed')}</p>
               ) : (
                 <div className="grid grid-cols-2 gap-1">
                   {availChartOptions.map(o => (
@@ -1230,12 +1231,12 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
           {/* Stat options */}
           {mode === 'stat' && (
             availMetrics.length === 0 && availAccounts.length === 0 && availSpecial.length === 0 && availBalanceHist.length === 0 ? (
-              <p className="text-sm text-gray-400 dark:text-gray-500 px-1 py-2">Todos los paneles de estadística ya están en el dashboard</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500 px-1 py-2">{t('dashboard.allStatsUsed')}</p>
             ) : (
               <>
                 {availMetrics.length > 0 && (
                   <>
-                    <ModalSection label="Métricas" first />
+                    <ModalSection label={t('dashboard.metrics')} first />
                     <div className="grid grid-cols-2 gap-1">
                       {availMetrics.map(o => (
                         <ModalItem key={o.id}
@@ -1249,12 +1250,12 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
                 )}
                 {availAccounts.length > 0 && (
                   <>
-                    <ModalSection label="Cuentas" first={availMetrics.length === 0} />
+                    <ModalSection label={t('dashboard.accounts')} first={availMetrics.length === 0} />
                     <div className="grid grid-cols-2 gap-1">
                       {availAccounts.map(a => (
                         <ModalItem key={a.id}
                           iconBg={a.color + '20'} iconColor={a.color} Icon={CreditCard}
-                          label={a.name} desc="Saldo de la cuenta"
+                          label={a.name} desc={t('dashboard.accountBalance')}
                           onClick={() => { onAdd({ id: `stat-account-${a.id}`, colSpan: 1 }); onClose() }}
                         />
                       ))}
@@ -1263,7 +1264,7 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
                 )}
                 {availSpecial.length > 0 && (
                   <>
-                    <ModalSection label="Paneles especiales" first={availMetrics.length === 0 && availAccounts.length === 0} />
+                    <ModalSection label={t('dashboard.specialPanels')} first={availMetrics.length === 0 && availAccounts.length === 0} />
                     <div className="grid grid-cols-2 gap-1">
                       {availSpecial.map(o => (
                         <ModalItem key={o.id}
@@ -1277,7 +1278,7 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
                 )}
                 {availBalanceHist.length > 0 && (
                   <>
-                    <ModalSection label="Histórico" first={availMetrics.length === 0 && availAccounts.length === 0 && availSpecial.length === 0} />
+                    <ModalSection label={t('dashboard.historical')} first={availMetrics.length === 0 && availAccounts.length === 0 && availSpecial.length === 0} />
                     <div className="grid grid-cols-2 gap-1">
                       {availBalanceHist.map(o => (
                         <ModalItem key={o.id}
@@ -1302,12 +1303,12 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
                 <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
                   <Plus className="w-4 h-4 text-blue-500" />
                 </div>
-                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">Crear nuevo presupuesto</span>
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">{t('dashboard.createBudget')}</span>
               </button>
               {budgets.length > 0 && !existingIds.has('budget-all') && (
                 <ModalItem
                   iconBg="#10b98120" iconColor="#10b981" Icon={BarChart2}
-                  label="Todos los presupuestos" desc="Tarjeta combinada con todos en una"
+                  label={t('dashboard.allBudgets')} desc={t('dashboard.allBudgetsDesc')}
                   onClick={() => { onAdd({ id: 'budget-all', colSpan: 4 }); onClose() }}
                 />
               )}
@@ -1515,7 +1516,7 @@ export default function Dashboard() {
 
   const existingIds = useMemo(() => new Set(config.widgets.map(w => w.id)), [config.widgets])
 
-  if (isLoading) return <div className="p-8 text-gray-500">Cargando...</div>
+  if (isLoading) return <div className="p-8 text-gray-500">{t('common.loading')}</div>
   if (!data) return null
 
   const savingsAccounts = accountsData?.accounts.filter(a => !a.is_main) ?? []
@@ -1528,20 +1529,20 @@ export default function Dashboard() {
   // Render widget content
   function renderContent(w: DashboardWidget, chartH: number) {
     // ── Stat panels ──
-    if (w.id === 'stat-uso')      return <StaticPanel title="De uso"   value={data!.uso_balance}      color="#3b82f6" Icon={CreditCard}     />
-    if (w.id === 'stat-income')   return <StaticPanel title="Ingresos del año"  value={data!.annual.income}    color="#22c55e" Icon={ArrowUpRight}   />
-    if (w.id === 'stat-expense')  return <StaticPanel title="Gastos del año"    value={data!.annual.expenses}  color="#ef4444" Icon={ArrowDownRight} />
+    if (w.id === 'stat-uso')      return <StaticPanel title={t('dashboard.widgetUso')}   value={data!.uso_balance}      color="#3b82f6" Icon={CreditCard}     />
+    if (w.id === 'stat-income')   return <StaticPanel title={t('dashboard.widgetIncome')}  value={data!.annual.income}    color="#22c55e" Icon={ArrowUpRight}   />
+    if (w.id === 'stat-expense')  return <StaticPanel title={t('dashboard.widgetExpense')}    value={data!.annual.expenses}  color="#ef4444" Icon={ArrowDownRight} />
     if (w.id === 'stat-accounts')      return <CyclingPanel accounts={savingsAccounts} />
-    if (w.id === 'stat-total-balance') return <StaticPanel title="Patrimonio total" value={accountsData?.total ?? 0} color="#8b5cf6" Icon={Landmark} />
-    if (w.id === 'stat-income-monthly')  return <StaticPanel title="Ingresos del mes"     value={data!.monthly.income}                         color="#22c55e" Icon={ArrowUpRight}   />
-    if (w.id === 'stat-expense-monthly') return <StaticPanel title="Gastos del mes"       value={data!.monthly.expenses}                       color="#ef4444" Icon={ArrowDownRight} />
+    if (w.id === 'stat-total-balance') return <StaticPanel title={t('dashboard.widgetTotalBalance')} value={accountsData?.total ?? 0} color="#8b5cf6" Icon={Landmark} />
+    if (w.id === 'stat-income-monthly')  return <StaticPanel title={t('dashboard.widgetIncomeMonthly')}     value={data!.monthly.income}                         color="#22c55e" Icon={ArrowUpRight}   />
+    if (w.id === 'stat-expense-monthly') return <StaticPanel title={t('dashboard.widgetExpenseMonthly')}       value={data!.monthly.expenses}                       color="#ef4444" Icon={ArrowDownRight} />
     if (w.id === 'stat-net-annual') {
       const v = data!.annual.income - data!.annual.expenses
-      return <StaticPanel title="Balance neto del año" value={v} color={v >= 0 ? '#22c55e' : '#ef4444'} Icon={TrendingUp} />
+      return <StaticPanel title={t('dashboard.widgetNetAnnual')} value={v} color={v >= 0 ? '#22c55e' : '#ef4444'} Icon={TrendingUp} />
     }
     if (w.id === 'stat-net-monthly') {
       const v = data!.monthly.income - data!.monthly.expenses
-      return <StaticPanel title="Balance neto del mes" value={v} color={v >= 0 ? '#22c55e' : '#ef4444'} Icon={TrendingUp} />
+      return <StaticPanel title={t('dashboard.widgetNetMonthly')} value={v} color={v >= 0 ? '#22c55e' : '#ef4444'} Icon={TrendingUp} />
     }
     if (w.id.startsWith('stat-account-')) {
       const accId = parseInt(w.id.replace('stat-account-', ''))
@@ -1552,31 +1553,31 @@ export default function Dashboard() {
     // ── Dashboard-native charts ──
     if (w.id === 'chart-expenses-line') return (
       <div className={PANEL}>
-        <h2 className={`${TITLE} mb-5`}>Gastos por categoría — {year}</h2>
+        <h2 className={`${TITLE} mb-5`}>{t('dashboard.chartExpensesLine')} — {year}</h2>
         <ExpensesLineChart groups={annualData?.groups ?? []} year={year} height={chartH} />
       </div>
     )
     if (w.id === 'chart-expenses-pie') return (
       <div className={PANEL}>
-        <h2 className={`${TITLE} mb-4`}>Distribución de gastos — {year}</h2>
+        <h2 className={`${TITLE} mb-4`}>{t('dashboard.chartExpensesPie')} — {year}</h2>
         <ExpensesPieChart groups={annualData?.groups ?? []} height={chartH} />
       </div>
     )
     if (w.id === 'chart-balance') return (
       <div className={PANEL}>
-        <h2 className={`${TITLE} mb-4`}>Evolución del balance — {year}</h2>
+        <h2 className={`${TITLE} mb-4`}>{t('dashboard.chartBalance')} — {year}</h2>
         <BalanceEvolutionChart groups={annualData?.groups ?? []} year={year} initialTotal={initialTotal} height={chartH} />
       </div>
     )
     if (w.id === 'stat-balance-history') return (
       <div className={PANEL}>
-        <h2 className={`${TITLE} mb-4`}>Histórico de balance por cuenta</h2>
+        <h2 className={`${TITLE} mb-4`}>{t('dashboard.chartBalanceHistory')}</h2>
         <AccountBalanceHistoryChart accounts={allAccounts} movements={movements} movementTypes={movementTypes} height={chartH} />
       </div>
     )
     if (w.id === 'stat-balance-combined') return (
       <div className={PANEL}>
-        <h2 className={`${TITLE} mb-4`}>Balance total histórico</h2>
+        <h2 className={`${TITLE} mb-4`}>{t('dashboard.chartBalanceCombined')}</h2>
         <CombinedBalanceHistoryChart accounts={allAccounts} movements={movements} movementTypes={movementTypes} height={chartH} />
       </div>
     )

@@ -12,6 +12,7 @@ import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } f
 import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
+import { t, getDayNames, getMonthNames } from '../utils/i18n'
 
 interface FilterFavorite { id: string; name: string; filter: AdvancedFilter }
 
@@ -26,14 +27,14 @@ function saveFavorites(favs: FilterFavorite[]) {
 // ── Column definitions ───────────────────────────────────────────────────────
 
 const COLS = [
-  { key: 'date',      label: 'Fecha',       defaultWidth: 106, align: 'left'   },
-  { key: 'name',      label: 'Nombre',      defaultWidth: 220, align: 'left'   },
-  { key: 'type',      label: 'Tipo',        defaultWidth: 150, align: 'left'   },
-  { key: 'amount',    label: 'Importe',     defaultWidth: 110, align: 'right'  },
-  { key: 'paid',      label: 'Pagado',      defaultWidth: 72,  align: 'center' },
-  { key: 'bank_date', label: 'Fecha banco', defaultWidth: 106, align: 'left'   },
-  { key: 'notes',     label: 'Notas',       defaultWidth: 180, align: 'left'   },
-  { key: 'no_count',  label: 'No contar',   defaultWidth: 84,  align: 'center' },
+  { key: 'date',      label: t('movements.colDate'),     defaultWidth: 106, align: 'left'   },
+  { key: 'name',      label: t('movements.colName'),     defaultWidth: 220, align: 'left'   },
+  { key: 'type',      label: t('movements.colType'),     defaultWidth: 150, align: 'left'   },
+  { key: 'amount',    label: t('movements.colAmount'),   defaultWidth: 110, align: 'right'  },
+  { key: 'paid',      label: t('movements.colPaid'),     defaultWidth: 72,  align: 'center' },
+  { key: 'bank_date', label: t('movements.colBankDate'), defaultWidth: 106, align: 'left'   },
+  { key: 'notes',     label: t('movements.colNotes'),    defaultWidth: 180, align: 'left'   },
+  { key: 'no_count',  label: t('movements.colNoCount'),  defaultWidth: 84,  align: 'center' },
 ] as const
 
 type ColKey = typeof COLS[number]['key']
@@ -41,16 +42,16 @@ type ColKey = typeof COLS[number]['key']
 const DEFAULT_VISIBLE = new Set<ColKey>(['date', 'name', 'type', 'amount', 'paid'])
 
 const EXPORT_FIELDS = [
-  { key: 'date',      label: 'Fecha' },
-  { key: 'bank_date', label: 'Fecha banco' },
-  { key: 'name',      label: 'Nombre' },
-  { key: 'type',      label: 'Tipo' },
-  { key: 'group',     label: 'Grupo' },
-  { key: 'money',     label: 'Importe' },
-  { key: 'paid',      label: 'Pagado' },
-  { key: 'no_count',  label: 'No contar' },
-  { key: 'notes',     label: 'Notas' },
-  { key: 'account',   label: 'Cuenta' },
+  { key: 'date',      label: t('movements.colDate') },
+  { key: 'bank_date', label: t('movements.colBankDate') },
+  { key: 'name',      label: t('movements.colName') },
+  { key: 'type',      label: t('movements.colType') },
+  { key: 'group',     label: t('movements.exportGroup') },
+  { key: 'money',     label: t('movements.colAmount') },
+  { key: 'paid',      label: t('movements.colPaid') },
+  { key: 'no_count',  label: t('movements.colNoCount') },
+  { key: 'notes',     label: t('movements.colNotes') },
+  { key: 'account',   label: t('movements.exportAccount') },
 ] as const
 
 function loadSet<T extends string>(key: string, fallback: Set<T>): Set<T> {
@@ -85,10 +86,9 @@ const INPUT = 'w-full bg-white dark:bg-gray-800 border border-gray-200 dark:bord
 
 // ── Shared constants ──────────────────────────────────────────────────────────
 
-const DAYS_SHORT = ['lun', 'mar', 'mié', 'jue', 'vie', 'sáb', 'dom']
-const MONTHS_ES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-  'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
-const MONTHS_SHORT_CAL = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+const DAYS_SHORT = getDayNames('narrow')
+const MONTHS_ES = getMonthNames('long')
+const MONTHS_SHORT_CAL = getMonthNames('short')
 
 // ── Context menu ──────────────────────────────────────────────────────────────
 
@@ -127,7 +127,7 @@ function MovementContextMenu({ menu, onDuplicate, onDelete, onClose }: {
         className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
       >
         <Copy className="w-3.5 h-3.5 text-gray-400" />
-        Duplicar
+        {t('movements.duplicate')}
       </button>
       <div className="my-1 h-px bg-gray-100 dark:bg-gray-800" />
       <button
@@ -135,7 +135,7 @@ function MovementContextMenu({ menu, onDuplicate, onDelete, onClose }: {
         className="flex items-center gap-2.5 w-full px-3 py-2 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
       >
         <Trash2 className="w-3.5 h-3.5" />
-        Eliminar
+        {t('common.delete')}
       </button>
     </div>
   )
@@ -240,7 +240,7 @@ function CalendarView({ movements, types, selectedYear }: {
         <MovementContextMenu
           menu={ctxMenu}
           onDuplicate={mv => calDupMut.mutate(mv)}
-          onDelete={mv => { if (confirm(`¿Eliminar "${mv.name}"?`)) calDelMut.mutate(mv) }}
+          onDelete={mv => { if (confirm(t('movements.deleteConfirm').replace('{name}', mv.name))) calDelMut.mutate(mv) }}
           onClose={() => setCtxMenu(null)}
         />
       )}
@@ -252,8 +252,8 @@ function CalendarView({ movements, types, selectedYear }: {
           <div className="flex items-center gap-3">
             <span className="text-sm font-semibold text-gray-800 dark:text-white">{MONTHS_ES[calMonth]} {calYear}</span>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-              <button className={btnCls(dateField === 'date')} onClick={() => setDateField('date')}>Fecha</button>
-              <button className={btnCls(dateField === 'bank_date')} onClick={() => setDateField('bank_date')}>Fecha banco</button>
+              <button className={btnCls(dateField === 'date')} onClick={() => setDateField('date')}>{t('movements.dateField')}</button>
+              <button className={btnCls(dateField === 'bank_date')} onClick={() => setDateField('bank_date')}>{t('movements.bankDateField')}</button>
             </div>
           </div>
           <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
@@ -293,7 +293,7 @@ function CalendarView({ movements, types, selectedYear }: {
                     : cell.current ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'
                 }`}>{cell.day}</div>
                 {(expandedDays.has(cell.dateStr) ? mvs : mvs.slice(0, MAX)).map(mv => {
-                  const t = typeMap[mv.movement_type_id ?? 0]
+                  const typ = typeMap[mv.movement_type_id ?? 0]
                   return (
                     <div key={mv.id}
                       draggable
@@ -306,9 +306,9 @@ function CalendarView({ movements, types, selectedYear }: {
                       <span className={`text-[11px] font-mono ${mv.dinero >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
                         {fmtCal(mv.dinero)}
                       </span>
-                      {t && (
-                        <span className="block text-[10px] px-1 rounded mt-0.5 w-full" style={{ backgroundColor: t.color + '22', color: t.color }}>
-                          {t.name}
+                      {typ && (
+                        <span className="block text-[10px] px-1 rounded mt-0.5 w-full" style={{ backgroundColor: typ.color + '22', color: typ.color }}>
+                          {typ.name}
                         </span>
                       )}
                     </div>
@@ -318,13 +318,13 @@ function CalendarView({ movements, types, selectedYear }: {
                   <button
                     onClick={e => { e.stopPropagation(); setExpandedDays(prev => { const n = new Set(prev); n.add(cell.dateStr); return n }) }}
                     className="text-[10px] text-blue-500 dark:text-blue-400 pl-0.5 hover:underline leading-tight block"
-                  >+{extra} más</button>
+                  >+{extra} {t('movements.more')}</button>
                 )}
                 {expandedDays.has(cell.dateStr) && (
                   <button
                     onClick={e => { e.stopPropagation(); setExpandedDays(prev => { const n = new Set(prev); n.delete(cell.dateStr); return n }) }}
                     className="text-[10px] text-blue-500 dark:text-blue-400 pl-0.5 hover:underline leading-tight block"
-                  >− colapsar</button>
+                  >− {t('movements.collapse')}</button>
                 )}
               </div>
             )
@@ -399,8 +399,8 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
     for (const mv of movements) {
       const key = mv.movement_type_id != null ? String(mv.movement_type_id) : '__none__'
       if (!cols[key]) {
-        const t = mv.movement_type_id != null ? typeMap[mv.movement_type_id] : null
-        cols[key] = { typeId: mv.movement_type_id ?? null, name: t?.name ?? 'Sin tipo', color: t?.color ?? '#6b7280', movements: [] }
+        const typ = mv.movement_type_id != null ? typeMap[mv.movement_type_id] : null
+        cols[key] = { typeId: mv.movement_type_id ?? null, name: typ?.name ?? t('movements.noType'), color: typ?.color ?? '#6b7280', movements: [] }
       }
       cols[key].movements.push(mv)
     }
@@ -469,7 +469,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
         <MovementContextMenu
           menu={ctxMenu}
           onDuplicate={mv => kanbanDupMut.mutate(mv)}
-          onDelete={mv => { if (confirm(`¿Eliminar "${mv.name}"?`)) kanbanDelMut.mutate(mv) }}
+          onDelete={mv => { if (confirm(t('movements.deleteConfirm').replace('{name}', mv.name))) kanbanDelMut.mutate(mv) }}
           onClose={() => setCtxMenu(null)}
         />
       )}
@@ -483,7 +483,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
           {availableYears.map(y => <option key={y} value={y}>{y}</option>)}
         </select>
         <div className="flex items-center gap-1 flex-wrap">
-          <button className={pillCls(kanbanMonth === null)} onClick={() => setKanbanMonth(null)}>Todo el año</button>
+          <button className={pillCls(kanbanMonth === null)} onClick={() => setKanbanMonth(null)}>{t('movements.fullYear')}</button>
           {MONTHS_SHORT_CAL.map((m, i) => availableMonths.has(i) && (
             <button key={i} className={pillCls(kanbanMonth === i)} onClick={() => setKanbanMonth(i)}>{m}</button>
           ))}
@@ -493,7 +493,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
       {/* ── Año completo: acordeón 3 niveles ── */}
       {kanbanMonth === null && (
         tree.length === 0
-          ? <div className="text-center text-gray-400 py-16">Sin movimientos</div>
+          ? <div className="text-center text-gray-400 py-16">{t('movements.noMovements')}</div>
           : (
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(22rem, 1fr))' }}>
               {sortedTree.map(group => {
@@ -521,7 +521,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
                       <div className="flex items-center gap-2">
                         <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${groupOpen ? 'rotate-90' : ''}`} />
                         <span className="font-semibold text-gray-800 dark:text-gray-100">{group.name}</span>
-                        <span className="text-xs text-gray-400">{group.types.length} tipos</span>
+                        <span className="text-xs text-gray-400">{group.types.length} {t('movements.nTypes')}</span>
                       </div>
                       <span className={`text-sm font-mono font-semibold ${amtCls(group.total)}`}>{fmtCal(group.total)}</span>
                     </button>
@@ -542,7 +542,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
                                   <ChevronRight className={`w-3.5 h-3.5 text-gray-400 transition-transform ${typeOpen ? 'rotate-90' : ''}`} />
                                   <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: type.color }} />
                                   <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{type.name}</span>
-                                  <span className="text-xs text-gray-400">{type.movements.length} mov.</span>
+                                  <span className="text-xs text-gray-400">{type.movements.length} {t('movements.nMov')}</span>
                                 </div>
                                 <span className={`text-sm font-mono font-semibold ${amtCls(typeTotal)}`}>{fmtCal(typeTotal)}</span>
                               </button>
@@ -575,7 +575,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
       {/* ── Mes concreto: grid plano por tipo ── */}
       {kanbanMonth !== null && (
         columns.length === 0
-          ? <div className="text-center text-gray-400 py-16">Sin movimientos</div>
+          ? <div className="text-center text-gray-400 py-16">{t('movements.noMovements')}</div>
           : (
             <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(22rem, 1fr))' }}>
               {columns.map(col => {
@@ -585,7 +585,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
                     <div className="flex items-center justify-between px-4 py-2.5" style={{ borderLeft: `4px solid ${col.color}` }}>
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="text-sm font-semibold text-gray-800 dark:text-gray-100 truncate">{col.name}</span>
-                        <span className="text-xs text-gray-400 shrink-0">{col.movements.length} mov.</span>
+                        <span className="text-xs text-gray-400 shrink-0">{col.movements.length} {t('movements.nMov')}</span>
                       </div>
                       <span className={`text-sm font-mono font-semibold shrink-0 ml-3 ${amtCls(total)}`}>{fmtCal(total)}</span>
                     </div>
@@ -721,8 +721,8 @@ export default function Movements() {
         case 'type':      return typeMap[mv.movement_type_id ?? 0]?.name ?? ''
         case 'group':     return mv.label ?? ''
         case 'money':     return String(mv.dinero)
-        case 'paid':      return mv.paid ? 'Sí' : 'No'
-        case 'no_count':  return mv.no_count ? 'Sí' : 'No'
+        case 'paid':      return mv.paid ? t('common.yes') : t('common.no')
+        case 'no_count':  return mv.no_count ? t('common.yes') : t('common.no')
         case 'notes':     return mv.notes ?? ''
         case 'account':   return mv.account_id ? (accountMap[mv.account_id] ?? '') : ''
         default:          return ''
@@ -737,7 +737,7 @@ export default function Movements() {
   }
 
   const bulkDelete = async () => {
-    if (!confirm(`¿Eliminar ${selected.size} movimiento${selected.size > 1 ? 's' : ''}? Esta acción no se puede deshacer.`)) return
+    if (!confirm(t('movements.bulkDeleteConfirm').replace('{n}', String(selected.size)))) return
     setIsBulkPending(true)
     try {
       await Promise.all([...selected].map(id => deleteMovement(id)))
@@ -797,35 +797,35 @@ export default function Movements() {
       case 'account_id':
         return (
           <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className={BSEL}>
-            <option value="">— elegir —</option>
-            <option value="0">Sin cuenta</option>
+            <option value="">{t('movements.choose')}</option>
+            <option value="0">{t('movements.bulkNoAccount')}</option>
             {accounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         )
       case 'movement_type_id':
         return (
           <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className={BSEL}>
-            <option value="">— elegir —</option>
-            <option value="0">Sin categoría</option>
-            {types.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            <option value="">{t('movements.choose')}</option>
+            <option value="0">{t('movements.bulkNoCategory')}</option>
+            {types.map(tp => <option key={tp.id} value={tp.id}>{tp.name}</option>)}
           </select>
         )
       case 'paid': case 'no_count':
         return (
           <select value={bulkValue} onChange={e => setBulkValue(e.target.value)} className={BSEL}>
-            <option value="">— elegir —</option>
-            <option value="true">Sí</option>
-            <option value="false">No</option>
+            <option value="">{t('movements.choose')}</option>
+            <option value="true">{t('common.yes')}</option>
+            <option value="false">{t('common.no')}</option>
           </select>
         )
       case 'date': case 'bank_date':
         return <input type="date" value={bulkValue} onChange={e => setBulkValue(e.target.value)} className={BSEL} />
       case 'name':
-        return <input type="text" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Nuevo nombre..." className={BSEL + ' min-w-[160px]'} />
+        return <input type="text" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder={t('movements.bulkNewName')} className={BSEL + ' min-w-[160px]'} />
       case 'notes':
-        return <input type="text" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Nuevo valor..." className={BSEL + ' min-w-[160px]'} />
+        return <input type="text" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder={t('movements.bulkNewValue')} className={BSEL + ' min-w-[160px]'} />
       case 'money':
-        return <input type="number" step="0.01" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Importe..." className={BSEL + ' w-28'} />
+        return <input type="number" step="0.01" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder={t('movements.bulkAmountPh')} className={BSEL + ' w-28'} />
       default: return null
     }
   }
@@ -1064,7 +1064,7 @@ export default function Movements() {
         <MovementContextMenu
           menu={ctxMenu}
           onDuplicate={mv => { createMovement(duplicatePayload(mv)).then(() => { qc.invalidateQueries({ queryKey: ['movements'] }); qc.invalidateQueries({ queryKey: ['dashboard'] }) }) }}
-          onDelete={mv => { if (confirm(`¿Eliminar "${mv.name}"?`)) deleteMut.mutate(mv.id) }}
+          onDelete={mv => { if (confirm(t('movements.deleteConfirm').replace('{name}', mv.name))) deleteMut.mutate(mv.id) }}
           onClose={() => setCtxMenu(null)}
         />
       )}
@@ -1072,24 +1072,24 @@ export default function Movements() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-            <button onClick={() => setViewMode('table')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`} title="Vista tabla">
+            <button onClick={() => setViewMode('table')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`} title={t('movements.tableTitle')}>
               <Table2 className="w-4 h-4" />
             </button>
-            <button onClick={() => setViewMode('calendar')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`} title="Vista calendario">
+            <button onClick={() => setViewMode('calendar')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`} title={t('movements.calendarTitle')}>
               <CalendarDays className="w-4 h-4" />
             </button>
-            <button onClick={() => setViewMode('kanban')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`} title="Vista kanban">
+            <button onClick={() => setViewMode('kanban')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`} title={t('movements.kanbanTitle')}>
               <LayoutGrid className="w-4 h-4" />
             </button>
           </div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
-            Movimientos
+            {t('movements.title')}
             <div ref={yearPickerRef} className="relative">
               <button
                 onClick={() => setShowYearPicker(v => !v)}
                 className="flex items-center gap-1 text-2xl font-bold text-gray-800 dark:text-white hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
               >
-                {year ?? 'Todos'}
+                {year ?? t('movements.all')}
                 <ChevronDown className="w-5 h-5 mt-0.5 text-gray-400" />
               </button>
               {showYearPicker && (
@@ -1104,7 +1104,7 @@ export default function Movements() {
                           : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
                       }`}
                     >
-                      {y ?? 'Todos'}
+                      {y ?? t('movements.all')}
                     </button>
                   ))}
                 </div>
@@ -1134,13 +1134,13 @@ export default function Movements() {
               value={quickSearch}
               onChange={e => setQuickSearch(e.target.value)}
               onKeyDown={e => { if (e.key === 'Escape') { setShowSearch(false); setQuickSearch('') } }}
-              placeholder="Buscar por nombre..."
+              placeholder={t('movements.searchPh')}
               className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 rounded-lg px-3 py-1.5 text-sm w-44 focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
             />
           )}
           <button
             onClick={() => { const next = !showSearch; setShowSearch(next); if (!next) setQuickSearch('') }}
-            title="Buscar por nombre"
+            title={t('movements.searchTitle')}
             className={`p-1.5 rounded-lg border transition-colors ${
               showSearch || quickSearch
                 ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 border-transparent'
@@ -1158,7 +1158,7 @@ export default function Movements() {
                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}>
             <Filter className="w-3.5 h-3.5" strokeWidth={1.5} />
-            Filtros
+            {t('movements.filtersBtn')}
             {activeFilterCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">{activeFilterCount}</span>
             )}
@@ -1166,7 +1166,7 @@ export default function Movements() {
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 px-4 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors">
             <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
-            Nuevo
+            {t('movements.newBtn')}
           </button>
         </div>
       </div>
@@ -1203,20 +1203,20 @@ export default function Movements() {
                 value={savingName}
                 onChange={e => setSavingName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') commitSave(); if (e.key === 'Escape') { setShowSaveInput(false); setSavingName('') } }}
-                placeholder="Nombre del filtro favorito..."
+                placeholder={t('movements.filterNamePh')}
                 className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 placeholder-gray-400 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
               />
               <button onClick={commitSave} disabled={!savingName.trim()} className="px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 disabled:opacity-40 transition-colors">
-                Guardar
+                {t('common.save')}
               </button>
               <button onClick={() => { setShowSaveInput(false); setSavingName('') }} className="px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700">
-                Cancelar
+                {t('common.cancel')}
               </button>
             </>
           ) : (
             <button onClick={() => setShowSaveInput(true)} className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 transition-colors">
               <Bookmark className="w-3.5 h-3.5" strokeWidth={1.5} />
-              Guardar como favorito
+              {t('movements.saveFilter')}
             </button>
           )}
         </div>
@@ -1225,7 +1225,7 @@ export default function Movements() {
       {selected.size > 0 && (
         <div className="flex items-center gap-2.5 flex-wrap px-4 py-2.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-xl text-sm">
           <span className="font-semibold text-blue-700 dark:text-blue-300 shrink-0">
-            {selected.size} seleccionado{selected.size > 1 ? 's' : ''}
+            {selected.size} {t('movements.nSelected')}
           </span>
 
           <div className="w-px h-4 bg-blue-200 dark:bg-blue-700 shrink-0" />
@@ -1233,27 +1233,27 @@ export default function Movements() {
           <button onClick={bulkDelete} disabled={isBulkPending}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-800 transition-colors disabled:opacity-50">
             <Trash2 className="w-3.5 h-3.5" />
-            Eliminar
+            {t('common.delete')}
           </button>
           <button onClick={bulkDuplicate} disabled={isBulkPending}
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700 border border-blue-200 dark:border-blue-800 transition-colors disabled:opacity-50">
             <Copy className="w-3.5 h-3.5" />
-            Duplicar
+            {t('movements.duplicate')}
           </button>
 
           <div className="relative" ref={exportPickerRef}>
             <button onClick={() => setShowExportPicker(v => !v)}
               className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg border transition-colors ${showExportPicker ? 'bg-gray-100 dark:bg-gray-700 border-blue-300 dark:border-blue-700 text-gray-700 dark:text-gray-200' : 'bg-white dark:bg-gray-800 border-blue-200 dark:border-blue-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>
               <Download className="w-3.5 h-3.5" />
-              Exportar
+              {t('movements.exportBtn')}
             </button>
             {showExportPicker && (
               <div className="absolute left-0 top-full mt-1 z-30 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-3 min-w-[190px]">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Campos</span>
+                  <span className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t('movements.exportFields')}</span>
                   <div className="flex gap-2 text-xs">
-                    <button onClick={() => setExportFields(new Set(EXPORT_FIELDS.map(f => f.key)))} className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-300">Todos</button>
-                    <button onClick={() => setExportFields(new Set())} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">Ninguno</button>
+                    <button onClick={() => setExportFields(new Set(EXPORT_FIELDS.map(f => f.key)))} className="text-blue-500 hover:text-blue-700 dark:hover:text-blue-300">{t('movements.exportAll')}</button>
+                    <button onClick={() => setExportFields(new Set())} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">{t('movements.exportNone')}</button>
                   </div>
                 </div>
                 {EXPORT_FIELDS.map(f => (
@@ -1267,7 +1267,7 @@ export default function Movements() {
                 <div className="mt-2 pt-2 border-t border-gray-100 dark:border-gray-800">
                   <button onClick={exportCSV} disabled={exportFields.size === 0}
                     className="w-full px-3 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors disabled:opacity-40">
-                    Descargar CSV
+                    {t('movements.downloadCSV')}
                   </button>
                 </div>
               </div>
@@ -1277,16 +1277,16 @@ export default function Movements() {
           <div className="w-px h-4 bg-blue-200 dark:bg-blue-700 shrink-0" />
 
           <select value={bulkField} onChange={e => { const f = e.target.value; setBulkField(f); setBulkValue(f === 'paid' || f === 'no_count' ? 'true' : '') }} className={BSEL}>
-            <option value="">Modificar campo...</option>
-            <option value="name">Nombre</option>
-            <option value="money">Importe</option>
-            <option value="account_id">Cuenta</option>
-            <option value="movement_type_id">Tipo</option>
-            <option value="paid">Pagado</option>
-            <option value="no_count">No contar</option>
-            <option value="date">Fecha</option>
-            <option value="bank_date">Fecha banco</option>
-            <option value="notes">Notas</option>
+            <option value="">{t('movements.bulkModifyField')}</option>
+            <option value="name">{t('movements.colName')}</option>
+            <option value="money">{t('movements.colAmount')}</option>
+            <option value="account_id">{t('common.account')}</option>
+            <option value="movement_type_id">{t('common.type')}</option>
+            <option value="paid">{t('movements.colPaid')}</option>
+            <option value="no_count">{t('movements.colNoCount')}</option>
+            <option value="date">{t('movements.dateField')}</option>
+            <option value="bank_date">{t('movements.bankDateField')}</option>
+            <option value="notes">{t('movements.colNotes')}</option>
           </select>
 
           {bulkField && bulkValueInput()}
@@ -1294,14 +1294,14 @@ export default function Movements() {
           {bulkField && bulkValue !== '' && (
             <button onClick={bulkApply} disabled={isBulkPending}
               className="px-3 py-1 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
-              {isBulkPending ? 'Aplicando...' : 'Aplicar'}
+              {isBulkPending ? t('movements.bulkApplying') : t('movements.bulkApply')}
             </button>
           )}
 
           <div className="flex-1" />
 
           <button onClick={clearBulk} className="text-blue-500 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-200 transition-colors">
-            Quitar selección
+            {t('movements.bulkClear')}
           </button>
         </div>
       )}
@@ -1314,7 +1314,7 @@ export default function Movements() {
         <KanbanView allTypes={types} />
       )}
 
-      {viewMode === 'table' && (isLoading ? <p className="text-gray-400">Cargando...</p> : (
+      {viewMode === 'table' && (isLoading ? <p className="text-gray-400">{t('common.loading')}</p> : (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-x-auto">
           <table className="text-sm" style={{ tableLayout: 'fixed', width: '100%', minWidth: visibleList.reduce((s, c) => s + colWidths[c.key], 0) + 4 + 20 + 36 + 64 + (showBalance ? 110 : 0) }}>
             <colgroup>
@@ -1403,7 +1403,7 @@ export default function Movements() {
                 </th>
                 {showBalance && (
                   <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    Saldo de uso
+                    {t('movements.colBalance')}
                   </th>
                 )}
               </tr>
@@ -1496,8 +1496,8 @@ export default function Movements() {
                             <td key="type" className={cellCls} style={st} onClick={e => enterEdit(e, mv)}>
                               {isEditing
                                 ? <select value={d!.movement_type_id} className={INPUT + ' text-xs'} onChange={e => setField('movement_type_id', e.target.value)} onClick={e => e.stopPropagation()}>
-                                    <option value="">Sin categoría</option>
-                                    {types.map(t => <option key={t.id} value={t.id}>{t.category} / {t.name}</option>)}
+                                    <option value="">{t('movements.bulkNoCategory')}</option>
+                                    {types.map(tp => <option key={tp.id} value={tp.id}>{tp.category} / {tp.name}</option>)}
                                   </select>
                                 : typeInfo
                                   ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: color + '22', color }}>{typeInfo.name}</span>
@@ -1537,16 +1537,16 @@ export default function Movements() {
                         {isEditing ? (
                           <span className="flex items-center justify-end gap-1">
                             <button onClick={() => saveRow(mv)} disabled={updateMut.isPending}
-                              className="p-1 rounded text-green-600 hover:bg-green-50 dark:hover:bg-green-950 transition-colors" title="Guardar">
+                              className="p-1 rounded text-green-600 hover:bg-green-50 dark:hover:bg-green-950 transition-colors" title={t('common.save')}>
                               <Check className="w-3.5 h-3.5" strokeWidth={2.5} />
                             </button>
                             <button onClick={() => setDraft(null)}
-                              className="p-1 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Cancelar">
+                              className="p-1 rounded text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title={t('common.cancel')}>
                               <X className="w-3.5 h-3.5" />
                             </button>
                           </span>
                         ) : (
-                          <button onClick={() => { if (confirm(`¿Eliminar "${mv.name}"?`)) deleteMut.mutate(mv.id) }}
+                          <button onClick={() => { if (confirm(t('movements.deleteConfirm').replace('{name}', mv.name))) deleteMut.mutate(mv.id) }}
                             className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all p-1">
                             <X className="w-3.5 h-3.5" />
                           </button>
@@ -1575,9 +1575,9 @@ export default function Movements() {
           {filteredMovements.length === 0 && (
             <div className="text-center py-16 text-gray-400">
               <Inbox className="w-12 h-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" strokeWidth={1} />
-              <p>No hay movimientos</p>
+              <p>{t('movements.noMovementsMsg')}</p>
               <button onClick={() => setShowForm(true)} className="mt-3 text-sm text-gray-500 underline hover:text-gray-700">
-                Añadir el primero
+                {t('movements.addFirst')}
               </button>
             </div>
           )}

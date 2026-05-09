@@ -1,4 +1,5 @@
 import { useState, useRef } from 'react'
+import { t } from '../utils/i18n'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   getFunds, getSummary, createFund, updateFund, deleteFund, fetchFundPrice,
@@ -57,28 +58,28 @@ function FundForm({ movementTypes, initial, onSave, onCancel, isSaving }: {
       </div>
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Subtipo de movimiento</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{t('invest.subtype')}</label>
           <select value={v.movement_type_id} onChange={e => setV(p => ({ ...p, movement_type_id: e.target.value ? Number(e.target.value) : '' }))}
             className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-lg px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
-            <option value="">Sin vincular</option>
+            <option value="">{t('invest.noLink')}</option>
             {movementTypes.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
           </select>
         </div>
         <div>
-          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">Ticker Yahoo Finance</label>
+          <label className="text-xs text-gray-500 dark:text-gray-400 mb-1 block">{t('invest.ticker')}</label>
           <input value={v.ticker} onChange={e => setV(p => ({ ...p, ticker: e.target.value.toUpperCase() }))}
             placeholder="ej. IWDA.AS — opcional"
             className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
         </div>
       </div>
       <input value={v.notes} onChange={e => setV(p => ({ ...p, notes: e.target.value }))}
-        placeholder="Notas — opcional"
+        placeholder={t('invest.notesOpt')}
         className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
       <div className="flex justify-end gap-2">
-        <button onClick={onCancel} className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">Cancelar</button>
+        <button onClick={onCancel} className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">{t('common.cancel')}</button>
         <button onClick={() => v.name.trim() && onSave(v)} disabled={isSaving || !v.name.trim()}
           className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 transition-colors">
-          {isSaving ? '...' : 'Guardar'}
+          {isSaving ? '...' : t('common.save')}
         </button>
       </div>
     </div>
@@ -165,7 +166,7 @@ function PurchaseRow({ p, fund, fmt, onOpen }: { p: InvestmentPurchase; fund: In
                 <button onClick={() => { setFetchError(null); mutFetch.mutate() }} disabled={mutFetch.isPending}
                   className="text-blue-400 hover:text-blue-600 flex items-center gap-1 ml-auto disabled:opacity-40">
                   <RefreshCw className={`w-3 h-3 ${mutFetch.isPending ? 'animate-spin' : ''}`} />
-                  obtener
+                  {t('invest.getPrice')}
                 </button>
                 {fetchError && <span className="text-red-400 text-xs max-w-28 text-right leading-tight">{fetchError}</span>}
               </div>
@@ -197,7 +198,7 @@ function PurchaseRow({ p, fund, fmt, onOpen }: { p: InvestmentPurchase; fund: In
             className="p-1 text-gray-300 hover:text-gray-500 rounded"><Pencil className="w-3 h-3" /></button>
           {(p.price_at_purchase != null || p.units != null) && (
             <button onClick={() => mutClear.mutate()} disabled={mutClear.isPending}
-              title="Borrar precio/participaciones"
+              title={t('invest.clearPrice')}
               className="p-1 text-gray-300 hover:text-red-400 rounded"><X className="w-3 h-3" /></button>
           )}
         </div>
@@ -274,11 +275,11 @@ function FundCard({ fund, movementTypes }: { fund: InvestmentFund; movementTypes
 
             <div className="flex items-center gap-4 shrink-0">
               <div className="text-right hidden sm:block">
-                <p className="text-xs text-gray-400 dark:text-gray-500">Invertido</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">{t('invest.invested')}</p>
                 <p className="text-sm font-mono font-medium text-gray-700 dark:text-gray-200">{fmt(fund.total_invested)}</p>
               </div>
               <div className="text-right hidden sm:block">
-                <p className="text-xs text-gray-400 dark:text-gray-500">Valor actual</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500">{t('invest.currentValue')}</p>
                 {editingValue ? (
                   <div className="flex items-center gap-1">
                     <input type="number" step="0.01" value={valueInput} onChange={e => setValueInput(e.target.value)} autoFocus
@@ -301,7 +302,7 @@ function FundCard({ fund, movementTypes }: { fund: InvestmentFund; movementTypes
 
             <div className="flex items-center gap-0.5 shrink-0 ml-1">
               {fund.ticker && (
-                <button onClick={() => mutFetchPrice.mutate()} title="Actualizar precio" disabled={mutFetchPrice.isPending}
+                <button onClick={() => mutFetchPrice.mutate()} title={t('invest.updatePrice')} disabled={mutFetchPrice.isPending}
                   className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-blue-400 rounded transition-colors disabled:opacity-40">
                   <RefreshCw className={`w-3.5 h-3.5 ${mutFetchPrice.isPending ? 'animate-spin' : ''}`} />
                 </button>
@@ -327,7 +328,7 @@ function FundCard({ fund, movementTypes }: { fund: InvestmentFund; movementTypes
 
           {/* Price row */}
           <div className="px-4 pb-2.5 flex items-center gap-3">
-            <span className="text-xs text-gray-400 dark:text-gray-500">Precio actual:</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">{t('invest.currentPrice')}</span>
             {editingPrice ? (
               <div className="flex items-center gap-1">
                 <input type="number" step="0.0001" value={priceInput} onChange={e => setPriceInput(e.target.value)} autoFocus
@@ -340,12 +341,12 @@ function FundCard({ fund, movementTypes }: { fund: InvestmentFund; movementTypes
                 className="text-xs font-mono text-gray-600 dark:text-gray-300 hover:text-blue-500 transition-colors">
                 {fund.current_price != null
                   ? `${fund.current_price.toFixed(4)} €/participación`
-                  : <span className="text-gray-300 dark:text-gray-600">sin precio — click para añadir</span>}
+                  : <span className="text-gray-300 dark:text-gray-600">{t('invest.noPrice')}</span>}
               </button>
             )}
             {fund.total_units != null && (
               <span className="text-xs text-gray-400 dark:text-gray-500 ml-2">
-                {fund.total_units.toFixed(4)} participaciones
+                {fund.total_units.toFixed(4)} {t('invest.units')}
               </span>
             )}
           </div>
@@ -411,7 +412,7 @@ export default function Investments() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['investment-funds'] }); setAddingFund(false) },
   })
 
-  if (isLoading) return <div className="p-8 text-gray-500">Cargando...</div>
+  if (isLoading) return <div className="p-8 text-gray-500">{t('common.loading')}</div>
 
   const hasValue = summary?.total_current_value != null
 
@@ -427,10 +428,10 @@ export default function Investments() {
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
-            { label: 'Total invertido',  value: fmt(summary.total_invested),                                                                                                color: 'text-gray-700 dark:text-gray-200' },
-            { label: 'Valor actual',     value: hasValue ? fmt(summary.total_current_value!) : '—',                                                                        color: 'text-gray-700 dark:text-gray-200' },
-            { label: 'Ganancia €',       value: hasValue ? `${summary.gain_eur! >= 0 ? '+' : ''}${fmt(summary.gain_eur!)}` : '—',                                         color: !hasValue ? 'text-gray-400' : summary.gain_eur! >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' },
-            { label: 'Rentabilidad',     value: hasValue && summary.gain_pct != null ? `${summary.gain_pct >= 0 ? '+' : ''}${summary.gain_pct.toFixed(2)}%` : '—',        color: !hasValue ? 'text-gray-400' : (summary.gain_pct ?? 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' },
+            { label: t('invest.invested'),     value: fmt(summary.total_invested),                                                                                                color: 'text-gray-700 dark:text-gray-200' },
+            { label: t('invest.currentValue'), value: hasValue ? fmt(summary.total_current_value!) : '—',                                                                        color: 'text-gray-700 dark:text-gray-200' },
+            { label: 'Ganancia €',             value: hasValue ? `${summary.gain_eur! >= 0 ? '+' : ''}${fmt(summary.gain_eur!)}` : '—',                                         color: !hasValue ? 'text-gray-400' : summary.gain_eur! >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' },
+            { label: 'Rentabilidad',           value: hasValue && summary.gain_pct != null ? `${summary.gain_pct >= 0 ? '+' : ''}${summary.gain_pct.toFixed(2)}%` : '—',        color: !hasValue ? 'text-gray-400' : (summary.gain_pct ?? 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' },
           ].map(c => (
             <div key={c.label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
               <p className="text-xs text-gray-400 dark:text-gray-500">{c.label}</p>
