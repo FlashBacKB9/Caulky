@@ -1,12 +1,15 @@
 import datetime
 import decimal
+import logging
 import uuid
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select, delete as sa_delete, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel
+
+log = logging.getLogger(__name__)
 
 from app.config import settings
 from app.database import get_db
@@ -60,6 +63,7 @@ async def _fix_sequences(db: AsyncSession) -> None:
         ("movements", "id"),
         ("investment_funds", "id"),
         ("investment_purchases", "id"),
+        ("movement_templates", "id"),
     ]:
         await db.execute(text(
             f"SELECT setval(pg_get_serial_sequence('{table}', '{col}'), "
@@ -114,7 +118,7 @@ class RestorePayload(BaseModel):
 
 
 @router.post("/restore", status_code=204)
-async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):  # noqa: C901
     uid = user.id
     rg = payload.restore_groups
     ra = payload.restore_accounts
@@ -123,76 +127,83 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
     ri = payload.restore_investments
     rtp = payload.restore_templates
 
-    # Delete user's data in FK order
-    if ri or rm or rt or ra or rg:
-        mv_ids_res = await db.execute(select(Movement.id).where(Movement.user_id == uid))
-        mv_ids = [r[0] for r in mv_ids_res.all()]
-        if mv_ids:
-            await db.execute(sa_delete(InvestmentPurchase).where(InvestmentPurchase.movement_id.in_(mv_ids)))
-    if ri:
-        await db.execute(sa_delete(InvestmentFund).where(InvestmentFund.user_id == uid))
-    if rm or rt or ra or rg:
-        mv_ids_res2 = await db.execute(select(Movement.id).where(Movement.user_id == uid))
-        mv_ids2 = [r[0] for r in mv_ids_res2.all()]
-        if mv_ids2:
-            await db.execute(sa_delete(MovementFile).where(MovementFile.movement_id.in_(mv_ids2)))
-        await db.execute(sa_delete(Movement).where(Movement.user_id == uid))
-    if rt or ra or rg:
-        await db.execute(sa_delete(MovementType).where(MovementType.user_id == uid))
-    if ra or rg:
-        await db.execute(sa_delete(Account).where(Account.user_id == uid))
-    if rg:
-        await db.execute(sa_delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == uid))
-    await db.flush()
-
-    if rg:
-        for g in payload.db.get("groups", []):
-            db.add(IncomeExpenseGroup(**{k: v for k, v in g.items() if k != "user_id"}, user_id=uid))
+    try:
+        # Delete user's data in FK order
+        if ri or rm or rt or ra or rg:
+            mv_ids_res = await db.execute(select(Movement.id).where(Movement.user_id == uid))
+            mv_ids = [r[0] for r in mv_ids_res.all()]
+            if mv_ids:
+                await db.execute(sa_delete(InvestmentPurchase).where(InvestmentPurchase.movement_id.in_(mv_ids)))
+        if ri:
+            await db.execute(sa_delete(InvestmentFund).where(InvestmentFund.user_id == uid))
+        if rm or rt or ra or rg:
+            mv_ids_res2 = await db.execute(select(Movement.id).where(Movement.user_id == uid))
+            mv_ids2 = [r[0] for r in mv_ids_res2.all()]
+            if mv_ids2:
+                await db.execute(sa_delete(MovementFile).where(MovementFile.movement_id.in_(mv_ids2)))
+            await db.execute(sa_delete(Movement).where(Movement.user_id == uid))
+        if rt or ra or rg:
+            await db.execute(sa_delete(MovementType).where(MovementType.user_id == uid))
+        if ra or rg:
+            await db.execute(sa_delete(Account).where(Account.user_id == uid))
+        if rg:
+            await db.execute(sa_delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == uid))
         await db.flush()
 
-    if ra:
-        for a in payload.db.get("accounts", []):
-            db.add(Account(**{k: v for k, v in a.items() if k != "user_id"}, user_id=uid))
-        await db.flush()
+        if rg:
+            for g in payload.db.get("groups", []):
+                db.add(IncomeExpenseGroup(**{k: v for k, v in g.items() if k != "user_id"}, user_id=uid))
+            await db.flush()
 
-    if rt:
-        for t in payload.db.get("types", []):
-            db.add(MovementType(**{k: v for k, v in t.items() if k != "user_id"}, user_id=uid))
-        await db.flush()
+        if ra:
+            for a in payload.db.get("accounts", []):
+                db.add(Account(**{k: v for k, v in a.items() if k != "user_id"}, user_id=uid))
+            await db.flush()
 
-    if rm:
-        for m in payload.db.get("movements", []):
-            m = {k: v for k, v in m.items() if k != "user_id"}
-            m["date"]      = _parse_date(m.get("date"))
-            m["bank_date"] = _parse_date(m.get("bank_date"))
-            db.add(Movement(**m, user_id=uid))
-        await db.flush()
+        if rt:
+            for t in payload.db.get("types", []):
+                db.add(MovementType(**{k: v for k, v in t.items() if k != "user_id"}, user_id=uid))
+            await db.flush()
 
-    if ri:
-        for f in payload.db.get("investment_funds", []):
-            db.add(InvestmentFund(**{k: v for k, v in f.items() if k != "user_id"}, user_id=uid))
-        await db.flush()
-        for p in payload.db.get("investment_purchases", []):
-            db.add(InvestmentPurchase(**p))
-        await db.flush()
+        if rm:
+            _mv_skip = {"user_id", "files"}
+            for m in payload.db.get("movements", []):
+                m = {k: v for k, v in m.items() if k not in _mv_skip}
+                m["date"]      = _parse_date(m.get("date"))
+                m["bank_date"] = _parse_date(m.get("bank_date"))
+                db.add(Movement(**m, user_id=uid))
+            await db.flush()
 
-    if rtp:
-        await db.execute(sa_delete(TemplateModel).where(TemplateModel.user_id == uid))
-        await db.flush()
-        for t in payload.db.get("templates", []):
-            db.add(TemplateModel(**{k: v for k, v in t.items() if k != "user_id"}, user_id=uid))
-        await db.flush()
+        if ri:
+            for f in payload.db.get("investment_funds", []):
+                db.add(InvestmentFund(**{k: v for k, v in f.items() if k != "user_id"}, user_id=uid))
+            await db.flush()
+            for p in payload.db.get("investment_purchases", []):
+                db.add(InvestmentPurchase(**p))
+            await db.flush()
 
-    if payload.restore_preferences:
-        await db.execute(sa_delete(UserPreference).where(UserPreference.user_id == uid))
-        await db.flush()
-        for key, value in (payload.db.get("preferences") or {}).items():
-            db.add(UserPreference(user_id=uid, key=key, value=value))
-        await db.flush()
+        if rtp:
+            await db.execute(sa_delete(TemplateModel).where(TemplateModel.user_id == uid))
+            await db.flush()
+            for t in payload.db.get("templates", []):
+                db.add(TemplateModel(**{k: v for k, v in t.items() if k != "user_id"}, user_id=uid))
+            await db.flush()
 
-    if not _is_sqlite:
-        await _fix_sequences(db)
-    await db.commit()
+        if payload.restore_preferences:
+            await db.execute(sa_delete(UserPreference).where(UserPreference.user_id == uid))
+            await db.flush()
+            for key, value in (payload.db.get("preferences") or {}).items():
+                db.add(UserPreference(user_id=uid, key=key, value=value))
+            await db.flush()
+
+        if not _is_sqlite:
+            await _fix_sequences(db)
+        await db.commit()
+
+    except Exception as exc:
+        await db.rollback()
+        log.exception("Restore failed")
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
 async def _seed_defaults(db: AsyncSession, user_id: uuid.UUID) -> None:

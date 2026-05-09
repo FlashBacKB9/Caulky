@@ -947,8 +947,9 @@ function BackupSection() {
       setSuccess(true)
       qc.invalidateQueries()
       setTimeout(() => setSuccess(false), 4000)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Error al importar')
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setError(detail ?? (e instanceof Error ? e.message : 'Error al importar'))
     } finally { setImporting(false) }
   }
 
