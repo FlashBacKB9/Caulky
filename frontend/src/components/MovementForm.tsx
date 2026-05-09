@@ -484,7 +484,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                 <div>
                   <label className={LBL}>{t('common.name')} *</label>
                   <input type="text" value={form.name} onChange={e => set('name', e.target.value)}
-                    placeholder="Ej: Supermercado Mercadona" className={INP} autoFocus />
+                    placeholder={t('movement.namePh')} className={INP} autoFocus />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -647,12 +647,12 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                 <div>
                   <label className={LBL}>{t('form.templateNameLabel')} *</label>
                   <input autoFocus value={tplDraft.label} onChange={e => setTpl('label', e.target.value)}
-                    placeholder="Ej: Ahorro mensual" className={INP} />
+                    placeholder={t('movement.savingsPh')} className={INP} />
                 </div>
                 <div>
                   <label className={LBL}>{t('form.movementNameLabel')}</label>
                   <input value={tplDraft.name} onChange={e => setTpl('name', e.target.value)}
-                    placeholder="Ej: Ahorro {mes}" className={INP} />
+                    placeholder={t('movement.savingsPhMonth')} className={INP} />
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
                     <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{'{mes}'}</code> mes actual ·{' '}
                     <code className="bg-gray-100 dark:bg-gray-800 px-1 rounded">{'{año}'}</code> año actual ·{' '}
@@ -790,7 +790,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                 {multiBulkDone !== null && (
                   <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                     <Check className="w-4 h-4" />
-                    {multiBulkDone} movimiento{multiBulkDone !== 1 ? 's' : ''} creado{multiBulkDone !== 1 ? 's' : ''}
+                    {multiBulkDone !== 1 ? t('movement.createdPlural').replace('{n}', String(multiBulkDone)) : t('movement.created').replace('{n}', String(multiBulkDone))}
                   </div>
                 )}
 
@@ -883,7 +883,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                       {recBulkDone !== null && (
                         <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
                           <Check className="w-4 h-4" />
-                          {recBulkDone} movimiento{recBulkDone !== 1 ? 's' : ''} creado{recBulkDone !== 1 ? 's' : ''}
+                          {recBulkDone !== 1 ? t('movement.createdPlural').replace('{n}', String(recBulkDone)) : t('movement.created').replace('{n}', String(recBulkDone))}
                         </div>
                       )}
                     </div>

@@ -468,7 +468,7 @@ function PatronesDeGasto({ realExpenseMovements, fmt }: {
             contentStyle={TOOLTIP_STYLE}
             cursor={TOOLTIP_CURSOR}
           />
-          <Bar dataKey="avg" name="Media gastos" fill="#60a5fa" radius={[3, 3, 0, 0]} />
+          <Bar dataKey="avg" name={t('analysis.seriesAvgExpenses')} fill="#60a5fa" radius={[3, 3, 0, 0]} />
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -591,7 +591,7 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
             )
           })}
           <p className="text-xs text-gray-400 dark:text-gray-500 pt-1 border-t border-gray-100 dark:border-gray-800">
-            Total: {fmt(total)}
+            {t('analysis.tooltipTotal')} {fmt(total)}
           </p>
         </div>
       </div>
@@ -667,7 +667,7 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
           <XAxis dataKey="label" tick={{ fontSize: 10 }} />
           <YAxis tick={{ fontSize: 10 }} tickFormatter={v => `${(v / 1000).toFixed(0)}k`} width={40} />
           <Tooltip formatter={(v) => fmt(v as number)} contentStyle={TOOLTIP_STYLE} cursor={TOOLTIP_CURSOR} />
-          <Area type="monotone" dataKey="balance" name="Patrimonio"
+          <Area type="monotone" dataKey="balance" name={t('analysis.seriesPatrimony')}
             stroke={positive ? '#60a5fa' : '#f87171'} fill="url(#projGrad)" strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>

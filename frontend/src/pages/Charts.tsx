@@ -971,7 +971,7 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
                   </button>
                 ))}
                 {permVisible.some(s => s.display !== permVisible[0]?.display) && (
-                  <button onClick={()=>upd({ displayMode: null })} title="Mixto"
+                  <button onClick={()=>upd({ displayMode: null })} title={t('charts.mixedMode')}
                     className={`p-1 rounded-md transition-colors ${!def.displayMode?'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 shadow-sm':'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}>
                     <ComboIcon/>
                   </button>
@@ -979,7 +979,7 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
               </>)}
             </div>
           )}
-          <button onClick={onEdit} title="Editar gráfico" className="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+          <button onClick={onEdit} title={t('charts.editChart')} className="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
             <Settings2 className="w-3.5 h-3.5" strokeWidth={1.5}/>
           </button>
           {confirmingDelete ? (
@@ -987,12 +987,12 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
               {onHide && (
                 <button onClick={()=>{ onHide(); setConfirmingDelete(false) }}
                   className="px-2 py-1 text-xs rounded-lg bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors whitespace-nowrap">
-                  Solo ocultar
+                  {t('charts.onlyHide')}
                 </button>
               )}
               <button onClick={()=>{ onDelete(); setConfirmingDelete(false) }}
                 className="px-2 py-1 text-xs rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors whitespace-nowrap">
-                Eliminar
+                {t('common.delete')}
               </button>
               <button onClick={()=>setConfirmingDelete(false)} className="p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-gray-500 transition-colors">
                 <X className="w-3 h-3" strokeWidth={1.5}/>
@@ -1194,14 +1194,14 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
       {/* Header */}
       <div className="flex items-center gap-4 px-6 py-3.5 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0">
         <button onClick={onCancel} className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors shrink-0">
-          <X className="w-4 h-4"/> Cancelar
+          <X className="w-4 h-4"/> {t('common.cancel')}
         </button>
         <input
-          value={def.title} onChange={e=>upd({ title:e.target.value })} placeholder="Título del gráfico"
+          value={def.title} onChange={e=>upd({ title:e.target.value })} placeholder={t('charts.titlePh')}
           className="flex-1 min-w-0 text-base font-semibold text-gray-800 dark:text-white bg-transparent text-center focus:outline-none placeholder:text-gray-300"
         />
         <button onClick={onSave} className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-gray-800 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors shrink-0">
-          Guardar
+          {t('common.save')}
         </button>
       </div>
 
@@ -1213,9 +1213,9 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
         <div ref={sidebarRef} className="flex-1 overflow-y-auto p-5 space-y-5 [&::-webkit-scrollbar]:hidden" style={{ scrollbarWidth: 'none' }} onScroll={checkSidebar}>
 
           <div className="space-y-1.5">
-            <span className={labelCls}>Fuente de datos</span>
+            <span className={labelCls}>{t('charts.dataSource')}</span>
             <div className="flex gap-1.5">
-              {([['movements','Movimientos'],['accounts','Cuentas']] as const).map(([src,label])=>(
+              {([['movements', t('charts.dataMovements')], ['accounts', t('charts.dataAccounts')]] as ['movements'|'accounts', string][]).map(([src,label])=>(
                 <button key={src} onClick={()=>upd({ dataSource:src, overrides:[], xAxis:src==='accounts'?'none':def.xAxis, defaultDisplay:src==='accounts'?'donut':def.defaultDisplay, splitBy:src==='accounts'?'none':def.splitBy })}
                   className={`flex-1 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors ${(def.dataSource??'movements')===src?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-300'}`}>
                   {label}
@@ -1224,19 +1224,19 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
             </div>
             {!isAccounts && (<>
               <select value={def.sign} onChange={e=>upd({ sign:e.target.value as SignType })} className={`w-full ${selectCls}`}>
-                <option value="expense">Solo gastos</option>
-                <option value="income">Solo ingresos</option>
-                <option value="all">Todos</option>
+                <option value="expense">{t('charts.signExpense')}</option>
+                <option value="income">{t('charts.signIncome')}</option>
+                <option value="all">{t('charts.signAll')}</option>
               </select>
               <select value={def.metric} onChange={e=>upd({ metric:e.target.value as MetricType })} className={`w-full ${selectCls}`}>
-                <option value="sum">Suma (€)</option>
-                <option value="count">Nº movimientos</option>
+                <option value="sum">{t('charts.metricSum')}</option>
+                <option value="count">{t('charts.metricCount')}</option>
               </select>
             </>)}
           </div>
 
           <div className="space-y-1.5">
-            <span className={labelCls}>Vista</span>
+            <span className={labelCls}>{t('charts.viewLabel')}</span>
             <select value={def.xAxis} onChange={e=>{
               const xAxis=e.target.value as XAxisType
               upd({ xAxis, overrides:[],
@@ -1245,22 +1245,22 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                 ...(xAxis==='none'&&(def.defaultDisplay==='line'||def.defaultDisplay==='area')?{ defaultDisplay:'bar' as const }:{}),
               })
             }} className={`w-full ${selectCls}`}>
-              <option value="month">Eje: mes</option>
-              <option value="year">Eje: año</option>
-              <option value="none">Sin eje temporal</option>
+              <option value="month">{t('charts.axisMonth')}</option>
+              <option value="year">{t('charts.axisYear')}</option>
+              <option value="none">{t('charts.axisNone')}</option>
             </select>
             {!isAccounts && (
               <select value={def.splitBy} onChange={e=>upd({ splitBy:e.target.value as SplitByType, overrides:[] })} className={`w-full ${selectCls}`}>
-                <option value="none">Sin desglose</option>
-                <option value="group">Por categoría</option>
-                <option value="type">Por subtipo</option>
+                <option value="none">{t('charts.splitNone')}</option>
+                <option value="group">{t('charts.splitCategory')}</option>
+                <option value="type">{t('charts.splitSubtype')}</option>
               </select>
             )}
             {def.xAxis!=='none' && (
               <>
                 {!isAccounts && (
                   <div className="flex items-center gap-2 pt-1">
-                    <label className="text-[11px] text-gray-400 shrink-0">Máx. eje Y</label>
+                    <label className="text-[11px] text-gray-400 shrink-0">{t('charts.yMax')}</label>
                     <input
                       type="number" min="0" placeholder="Auto"
                       value={def.yMax ?? ''} onChange={e=>upd({ yMax: e.target.value==='' ? undefined : +e.target.value })}
@@ -1269,11 +1269,11 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                   </div>
                 )}
                 <div className="flex items-center gap-2 pt-1">
-                  <label className="text-[11px] text-gray-400 shrink-0">Líneas</label>
+                  <label className="text-[11px] text-gray-400 shrink-0">{t('charts.lineTypeLabel')}</label>
                   {(['monotone','linear'] as const).map(lt=>(
                     <button key={lt} onClick={()=>upd({ lineType:lt })}
                       className={`px-2.5 py-1 rounded-lg border text-[11px] font-medium transition-colors ${(def.lineType??'monotone')===lt?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                      {lt==='monotone'?'Curvas':'Rectas'}
+                      {lt==='monotone' ? t('charts.lineCurves') : t('charts.lineStraight')}
                     </button>
                   ))}
                 </div>
@@ -1282,7 +1282,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
             {!isAccounts && (
               <label className="flex items-center gap-2 text-[11px] text-gray-500 cursor-pointer pt-1">
                 <input type="checkbox" checked={def.showModeButtons??false} onChange={e=>upd({ showModeButtons:e.target.checked })} className="w-3.5 h-3.5 rounded accent-blue-500"/>
-                Selector de tipo en tarjeta
+                {t('charts.showModeBtn')}
               </label>
             )}
           </div>
@@ -1456,11 +1456,11 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                       ))}
                       <span className="w-px h-4 bg-gray-200 dark:bg-gray-700 mx-1 shrink-0"/>
                       <button onClick={()=>{ const allStacked=series.every(s=>s.stacked); upd({ overrides: series.map(s => ({ ...(def.overrides.find(o=>o.key===s.key) ?? { key:s.key, color:s.color, label:s.label, display:s.display }), stacked:!allStacked })) }) }}
-                        title={series.every(s=>s.stacked)?'Desapilar todo':'Apilar todo'} className={`p-1.5 rounded-lg border transition-colors ${series.every(s=>s.stacked)?'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-500':'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
+                        title={series.every(s=>s.stacked) ? t('charts.unstackAll') : t('charts.stackAll')} className={`p-1.5 rounded-lg border transition-colors ${series.every(s=>s.stacked)?'border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-500':'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}>
                         <Layers className="w-3.5 h-3.5"/>
                       </button>
                       <button onClick={()=>upd({ overrides: series.map(s => ({ ...(def.overrides.find(o=>o.key===s.key) ?? { key:s.key, color:s.color, label:s.label, display:s.display }), cumulative:!series.every(x=>x.cumulative) })) })}
-                        title="Acumulativo todo" className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                        title={t('charts.cumulativeAll')} className="p-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                         <Sigma className="w-3.5 h-3.5"/>
                       </button>
                     </div>

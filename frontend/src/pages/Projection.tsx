@@ -12,12 +12,12 @@ import {
 import { getMovements } from '../api/movements'
 import { getAccountsSummary } from '../api/accounts'
 import { useCurrency } from '../hooks/useCurrency'
-import { t } from '../utils/i18n'
+import { t, getMonthNames } from '../utils/i18n'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-const MONTH_NAMES  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
+const MONTHS_SHORT = getMonthNames('short')
+const MONTH_NAMES  = getMonthNames('long')
 
 const AI_EXPENSE_GROWTH = 3
 const AI_INCOME_GROWTH  = 2
@@ -288,7 +288,7 @@ function ExpenseRow({ exp, onChange, onDelete }: {
     <div className="p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 space-y-2">
       <div className="flex gap-2 items-center">
         <input className={INP} style={{ flex: '1 1 0', minWidth: 0 }}
-          placeholder="Nombre del gasto" value={exp.name}
+          placeholder={t('projection.expensePh')} value={exp.name}
           onChange={e => set({ name: e.target.value })} />
         <input type="number" min={0} step={0.01}
           className={`${INP_SM} w-24 text-right shrink-0`} placeholder="0"
@@ -301,13 +301,13 @@ function ExpenseRow({ exp, onChange, onDelete }: {
       <div className="flex flex-wrap items-center gap-2">
         <select className={INP_SM} value={exp.frequency}
           onChange={e => set({ frequency: e.target.value as FreqType })}>
-          <option value="monthly">Mensual</option>
+          <option value="monthly">{t('projection.freqMonthly')}</option>
           <option value="every-n">{t('projection.everyNMonths')}</option>
-          <option value="annual">Anual</option>
+          <option value="annual">{t('projection.annual')}</option>
         </select>
         {exp.frequency === 'every-n' && (
           <>
-            <span className="text-xs text-gray-400">Cada</span>
+            <span className="text-xs text-gray-400">{t('recurrence.every')}</span>
             <input type="number" min={1} max={60} className={`${INP_SM} w-14`}
               value={exp.everyN} onChange={e => set({ everyN: parseInt(e.target.value) || 1 })} />
             <span className="text-xs text-gray-400">{t('projection.monthsFrom')}</span>
@@ -346,7 +346,7 @@ function ExpensesDrawer({ phase, onChange, label, onCopyFrom, canCopy, onClose }
       <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm bg-white dark:bg-gray-900 shadow-2xl flex flex-col">
         <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 dark:border-gray-800 shrink-0">
           <div>
-            <p className="text-sm font-semibold text-gray-800 dark:text-white">Gastos — {label}</p>
+            <p className="text-sm font-semibold text-gray-800 dark:text-white">{t('projection.expensesSection').replace('{label}', label)}</p>
             <p className="text-xs text-gray-400 dark:text-gray-500">{phase.expenses.length} gasto{phase.expenses.length !== 1 ? 's' : ''}</p>
           </div>
           <div className="flex items-center gap-2">

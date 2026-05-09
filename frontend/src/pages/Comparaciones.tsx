@@ -220,7 +220,7 @@ function SideNetChart({ data }: { data: AnnualData }) {
         <XAxis dataKey="month" {...xProps}/>
         <YAxis {...yProps(fmtK)} domain={[min - pad, max + pad]}/>
         <Tooltip content={p => <CT {...(p as unknown as Parameters<typeof CT>[0])} fmt={fmt}/>}/>
-        <Area type="monotone" dataKey="Balance" stroke="#3b82f6" strokeWidth={2}
+        <Area type="monotone" dataKey="Balance" name={t('comparison.balance')} stroke="#3b82f6" strokeWidth={2}
           fill={`url(#netGrad${data.year})`} dot={false} activeDot={{ r: 3, strokeWidth: 0 }} isAnimationActive={false}/>
       </AreaChart>
     </ResponsiveContainer>
@@ -592,7 +592,7 @@ function EvolutionStackedChart({ yearData }: { yearData: AnnualData[] }) {
           <Bar key={name} dataKey={name} fill={colorMap[name]} stackId="exp"
             maxBarSize={60} hide={hidden.has(name)} isAnimationActive={false}/>
         ))}
-        <Line dataKey="Ingreso" name="Ingreso" stroke="#22c55e" strokeWidth={2.5} type="linear"
+        <Line dataKey="Ingreso" name={t('comparison.income')} stroke="#22c55e" strokeWidth={2.5} type="linear"
           dot={{ r: 4, fill: '#22c55e', strokeWidth: 0 }}
           activeDot={{ r: 5, strokeWidth: 0 }} hide={hidden.has('Ingreso')} isAnimationActive={false}/>
       </ComposedChart>

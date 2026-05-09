@@ -566,7 +566,7 @@ function computeChartData(
     return mv.account_id ? String(mv.account_id) : null
   }
   function baseInfo(key: string): { label: string; color: string } {
-    if (key === '__total__') return { label: def.sign === 'expense' ? 'Gastos' : def.sign === 'income' ? 'Ingresos' : 'Total', color: def.defaultColor }
+    if (key === '__total__') return { label: def.sign === 'expense' ? t('charts.expense') : def.sign === 'income' ? t('charts.income') : t('common.total'), color: def.defaultColor }
     if (def.splitBy === 'group') return { label: groupById[+key]?.name ?? '?', color: groupById[+key]?.color ?? '#6b7280' }
     if (def.splitBy === 'type')  return { label: typeById[+key]?.name ?? '?', color: typeById[+key]?.color ?? '#6b7280' }
     return                             { label: accountById[+key]?.name ?? '?', color: accountById[+key]?.color ?? '#6b7280' }
@@ -642,8 +642,8 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
           <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={52}/>
           <Tooltip content={<ChartTooltip />}/>
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }}/>
-          <Bar dataKey="income" name="Ingresos" fill="#22c55e" radius={[4,4,0,0]} maxBarSize={40}/>
-          <Bar dataKey="expense" name="Gastos" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40}/>
+          <Bar dataKey="income" name={t('charts.income')} fill="#22c55e" radius={[4,4,0,0]} maxBarSize={40}/>
+          <Bar dataKey="expense" name={t('charts.expense')} fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40}/>
         </BarChart>
       </ResponsiveContainer>
     )
@@ -661,7 +661,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
           <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false}/>
           <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={52}/>
           <Tooltip content={<ChartTooltip />}/>
-          <Bar dataKey="net" name="Neto" radius={[4,4,0,0]} maxBarSize={40}>
+          <Bar dataKey="net" name={t('charts.net')} radius={[4,4,0,0]} maxBarSize={40}>
             {data.map((d, i) => <Cell key={i} fill={d.net >= 0 ? '#22c55e' : '#ef4444'}/>)}
           </Bar>
         </BarChart>
@@ -735,7 +735,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
           <XAxis type="number" tickFormatter={fmtK} tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false}/>
           <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={110}/>
           <Tooltip content={<ChartTooltip />}/>
-          <Bar dataKey="value" name="Gasto" radius={[0,4,4,0]} maxBarSize={22}>
+          <Bar dataKey="value" name={t('charts.expense')} radius={[0,4,4,0]} maxBarSize={22}>
             {data.map((d, i) => <Cell key={i} fill={d.color}/>)}
           </Bar>
         </BarChart>
@@ -757,8 +757,8 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
           <YAxis tickFormatter={fmtK} tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} width={52}/>
           <Tooltip content={<ChartTooltip />}/>
           <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }}/>
-          <Bar dataKey="ahorro" name="Ahorro" fill="#8b5cf6" radius={[4,4,0,0]} maxBarSize={40}/>
-          <Bar dataKey="gasto" name="Gastos" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40}/>
+          <Bar dataKey="ahorro" name={t('charts.savings')} fill="#8b5cf6" radius={[4,4,0,0]} maxBarSize={40}/>
+          <Bar dataKey="gasto" name={t('charts.expense')} fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40}/>
         </BarChart>
       </ResponsiveContainer>
     )
@@ -810,7 +810,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
     )
   }
 
-  return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>Gráfico desconocido</div>
+  return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.unknownChart')}</div>
 }
 
 // ── DashboardCustomChart ──────────────────────────────────────────────────────
@@ -940,7 +940,7 @@ function PeriodToggle({ period, onChange }: { period: 'month' | 'year'; onChange
         <button key={p} onClick={() => onChange(p)}
           className={`px-2 py-0.5 text-[11px] rounded-md font-medium transition-colors ${period === p ? 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 shadow-sm' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}
         >
-          {p === 'year' ? 'Año' : 'Mes'}
+          {p === 'year' ? t('common.year') : t('common.month')}
         </button>
       ))}
     </div>
@@ -949,20 +949,22 @@ function PeriodToggle({ period, onChange }: { period: 'month' | 'year'; onChange
 
 // ── Chart options ─────────────────────────────────────────────────────────────
 
-const BUILTIN_CHART_DEFS: { id: string; label: string; desc: string; Icon: LucideIcon; defaultColSpan: number }[] = [
-  { id: 'chart-expenses-line',      label: t('dashboard.chartExpensesLine'),   desc: 'Líneas por grupo a lo largo del año',           Icon: BarChart2,  defaultColSpan: 4 },
-  { id: 'chart-expenses-pie',       label: t('dashboard.chartExpensesPie'),    desc: 'Donut con el total anual por grupo',             Icon: PieIcon,    defaultColSpan: 2 },
-  { id: 'chart-balance',            label: t('dashboard.chartBalance'),        desc: 'Área con la evolución mensual del saldo',        Icon: TrendingUp, defaultColSpan: 2 },
-  { id: 'charts-monthly',      label: 'Ingresos y gastos por mes',      desc: 'Barras de ingresos y gastos mensuales',         Icon: BarChart2,  defaultColSpan: 4 },
-  { id: 'charts-net',          label: 'Balance neto por mes',           desc: 'Balance neto por cada mes',                    Icon: TrendingUp, defaultColSpan: 2 },
-  { id: 'charts-cumulative',   label: 'Balance acumulado',              desc: 'Balance acumulado de todos los movimientos',    Icon: TrendingUp, defaultColSpan: 2 },
-  { id: 'charts-expdnt',       label: 'Gastos por categoría (donut)',   desc: 'Distribución de gastos por grupo',              Icon: PieIcon,    defaultColSpan: 2 },
-  { id: 'charts-incdnt',       label: 'Ingresos por categoría (donut)', desc: 'Distribución de ingresos por grupo',            Icon: PieIcon,    defaultColSpan: 2 },
-  { id: 'charts-top',          label: 'Top subtipos de gasto',          desc: 'Los mayores subtipos de gasto',                 Icon: BarChart2,  defaultColSpan: 2 },
-  { id: 'charts-savings',      label: 'Ahorro vs gasto mensual',        desc: 'Comparativa mensual de ahorro vs gasto',        Icon: BarChart2,  defaultColSpan: 2 },
-  { id: 'charts-trend',        label: 'Tendencia por categoría',        desc: 'Evolución mensual de las top 5 categorías',     Icon: TrendingUp, defaultColSpan: 4 },
-  { id: 'charts-subtypes',     label: 'Subtipos por categoría',         desc: 'Desglose de subtipos por grupo',                Icon: BarChart2,  defaultColSpan: 4 },
-]
+function getBuiltinChartDefs(): { id: string; label: string; desc: string; Icon: LucideIcon; defaultColSpan: number }[] {
+  return [
+    { id: 'chart-expenses-line',      label: t('dashboard.chartExpensesLine'),   desc: 'Líneas por grupo a lo largo del año',           Icon: BarChart2,  defaultColSpan: 4 },
+    { id: 'chart-expenses-pie',       label: t('dashboard.chartExpensesPie'),    desc: 'Donut con el total anual por grupo',             Icon: PieIcon,    defaultColSpan: 2 },
+    { id: 'chart-balance',            label: t('dashboard.chartBalance'),        desc: 'Área con la evolución mensual del saldo',        Icon: TrendingUp, defaultColSpan: 2 },
+    { id: 'charts-monthly',      label: t('charts.titleMonthly'),      desc: 'Barras de ingresos y gastos mensuales',         Icon: BarChart2,  defaultColSpan: 4 },
+    { id: 'charts-net',          label: t('charts.titleNet'),           desc: 'Balance neto por cada mes',                    Icon: TrendingUp, defaultColSpan: 2 },
+    { id: 'charts-cumulative',   label: t('charts.titleCumulative'),   desc: 'Balance acumulado de todos los movimientos',    Icon: TrendingUp, defaultColSpan: 2 },
+    { id: 'charts-expdnt',       label: t('charts.titleExpDnt'),       desc: 'Distribución de gastos por grupo',              Icon: PieIcon,    defaultColSpan: 2 },
+    { id: 'charts-incdnt',       label: t('charts.titleIncDnt'),       desc: 'Distribución de ingresos por grupo',            Icon: PieIcon,    defaultColSpan: 2 },
+    { id: 'charts-top',          label: t('charts.titleTop'),          desc: 'Los mayores subtipos de gasto',                 Icon: BarChart2,  defaultColSpan: 2 },
+    { id: 'charts-savings',      label: t('charts.titleSavings'),      desc: 'Comparativa mensual de ahorro vs gasto',        Icon: BarChart2,  defaultColSpan: 2 },
+    { id: 'charts-trend',        label: t('charts.titleTrend'),        desc: 'Evolución mensual de las top 5 categorías',     Icon: TrendingUp, defaultColSpan: 4 },
+    { id: 'charts-subtypes',     label: t('charts.titleSubtypes'),     desc: 'Desglose de subtipos por grupo',                Icon: BarChart2,  defaultColSpan: 4 },
+  ]
+}
 
 const METRIC_STAT_OPTIONS = [
   { id: 'stat-income',          label: t('dashboard.widgetIncome'),        desc: 'Total de ingresos en el año actual',   Icon: ArrowUpRight,   color: '#22c55e' },
@@ -975,7 +977,7 @@ const METRIC_STAT_OPTIONS = [
 
 const SPECIAL_STAT_OPTIONS = [
   { id: 'stat-uso',           label: t('dashboard.widgetUso'),          desc: 'Saldo de la cuenta principal',            Icon: CreditCard,      color: '#3b82f6' },
-  { id: 'stat-accounts',      label: 'Panel de ahorro',                 desc: 'Cuentas de ahorro con selector cíclico',  Icon: ChartCandlestick, color: '#f59e0b' },
+  { id: 'stat-accounts',      label: t('dashboard.savingsPanel'),       desc: 'Cuentas de ahorro con selector cíclico',  Icon: ChartCandlestick, color: '#f59e0b' },
   { id: 'stat-total-balance', label: t('dashboard.widgetTotalBalance'), desc: 'Suma del saldo de todas las cuentas',     Icon: Landmark,        color: '#8b5cf6' },
 ]
 
@@ -1018,27 +1020,27 @@ function NewBudgetForm({ types, onSave, onCancel }: {
 
   return (
     <div className="space-y-3 px-1 pb-1">
-      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 pt-1 uppercase tracking-widest">Nuevo presupuesto</p>
-      <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder="Nombre" autoFocus
+      <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 pt-1 uppercase tracking-widest">{t('budgets.newTitle')}</p>
+      <input type="text" value={name} onChange={e => setName(e.target.value)} placeholder={t('common.name')} autoFocus
         className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
       />
       <div className="flex gap-2">
         <select value={period} onChange={e => setPeriod(e.target.value as StoredBudget['period'])}
           className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none"
         >
-          <option value="monthly">Mensual</option>
-          <option value="weekly">Semanal</option>
-          <option value="annual">Anual</option>
+          <option value="monthly">{t('budgets.periodMonthly')}</option>
+          <option value="weekly">{t('budgets.periodWeekly')}</option>
+          <option value="annual">{t('budgets.periodAnnual')}</option>
         </select>
         <div className="relative flex-1">
-          <input type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder="Límite"
+          <input type="number" min="0" step="0.01" value={amount} onChange={e => setAmount(e.target.value)} placeholder={t('dashboard.budgetLimit')}
             className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 pr-6 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
           />
           <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">€</span>
         </div>
       </div>
       <div>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">Categorías</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">{t('dashboard.categories')}</p>
         <div className="space-y-0.5 max-h-44 overflow-y-auto border border-gray-100 dark:border-gray-800 rounded-lg p-1">
           {typesByGroup.map(([group, gTypes]) => (
             <div key={group}>
@@ -1058,12 +1060,12 @@ function NewBudgetForm({ types, onSave, onCancel }: {
       </div>
       <div className="flex gap-2">
         <button onClick={onCancel} className="flex-1 px-3 py-2 text-sm text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors">
-          Cancelar
+          {t('common.cancel')}
         </button>
         <button onClick={handleSave} disabled={!name.trim() || !amount || selIds.size === 0}
           className="flex-1 px-3 py-2 text-sm font-medium rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 transition-colors"
         >
-          Crear
+          {t('common.create')}
         </button>
       </div>
     </div>
@@ -1124,7 +1126,7 @@ function MonthPicker({ year, month, onChange, onClose }: {
           <button type="button"
             onClick={() => { onChange(todayYear, todayMonth); onClose() }}
             className="w-full mt-2 py-1.5 text-xs text-blue-500 hover:text-blue-600 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors border-t border-gray-100 dark:border-gray-800 pt-2">
-            Mes actual
+            {t('charts.currentMonth')}
           </button>
         )}
       </div>
@@ -1177,8 +1179,8 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
     const hiddenBuiltins = new Set<string>(JSON.parse(localStorage.getItem('spendly-hidden-builtins') ?? '[]'))
     const hiddenCustoms  = new Set<string>(JSON.parse(localStorage.getItem('spendly-hidden-customs') ?? '[]'))
     return [
-      ...BUILTIN_CHART_DEFS.filter(c => !hiddenBuiltins.has(c.id)),
-      ...custom.filter(c => !hiddenCustoms.has(c.id)).map(c => ({ id: c.id, label: c.title, desc: 'Gráfico personalizado', Icon: BarChart2, defaultColSpan: c.colSpan ?? 2 })),
+      ...getBuiltinChartDefs().filter(c => !hiddenBuiltins.has(c.id)),
+      ...custom.filter(c => !hiddenCustoms.has(c.id)).map(c => ({ id: c.id, label: c.title, desc: t('dashboard.customChartDesc'), Icon: BarChart2, defaultColSpan: c.colSpan ?? 2 })),
     ]
   }, [])
 
@@ -1188,7 +1190,7 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
   const availBalanceHist   = BALANCE_HISTORY_OPTIONS.filter(o => !existingIds.has(o.id))
   const availAccounts      = accounts.filter(a => !existingIds.has(`stat-account-${a.id}`))
   const availBudgets       = budgets.filter(b => !existingIds.has(b.id))
-  const title = mode === 'chart' ? 'Añadir gráfico' : mode === 'stat' ? 'Añadir estadística' : 'Añadir presupuesto'
+  const title = mode === 'chart' ? t('dashboard.modalAddChart') : mode === 'stat' ? t('dashboard.modalAddStat') : t('dashboard.modalAddBudget')
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -1314,7 +1316,7 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
               )}
               {availBudgets.length > 0 && (
                 <>
-                  <ModalSection label="Presupuestos" first={!budgets.length || existingIds.has('budget-all')} />
+                  <ModalSection label={t('budgets.title')} first={!budgets.length || existingIds.has('budget-all')} />
                   <div className="grid grid-cols-2 gap-1">
                     {availBudgets.map(b => (
                       <ModalItem key={b.id}
@@ -1590,7 +1592,7 @@ export default function Dashboard() {
     // ── Charts.tsx built-in charts ──
     if (w.id.startsWith('charts-')) {
       const currentPeriod = w.period ?? 'year'
-      const label = BUILTIN_CHART_DEFS.find(d => d.id === w.id)?.label ?? w.id
+      const label = getBuiltinChartDefs().find(d => d.id === w.id)?.label ?? w.id
       return (
         <div className={PANEL}>
           <div className="flex items-center justify-between mb-4">
@@ -1647,12 +1649,12 @@ export default function Dashboard() {
       })
       if (allPeriods.length === 0) return (
         <div className={`${PANEL} flex items-center justify-center text-gray-300 dark:text-gray-600 text-sm`}>
-          No hay presupuestos configurados
+          {t('dashboard.noBudgets')}
         </div>
       )
       return (
         <div className={PANEL}>
-          <h2 className={`${TITLE} mb-4`}>Presupuestos</h2>
+          <h2 className={`${TITLE} mb-4`}>{t('budgets.title')}</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {allPeriods.map(({ b, start, end, limit, spent, pct, colors }) => (
               <div key={b.id} className="space-y-1.5">
@@ -1662,7 +1664,7 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-center justify-between text-xs">
                   <span className="font-mono tabular-nums text-gray-600 dark:text-gray-300">{fmt(spent)}</span>
-                  <span className="text-gray-400 dark:text-gray-500">de {fmt(limit)}</span>
+                  <span className="text-gray-400 dark:text-gray-500">{t('dashboard.budgetOf').replace('{limit}', fmt(limit))}</span>
                 </div>
                 <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5">
                   <div className={`h-1.5 rounded-full transition-all ${colors.bar}`} style={{ width: `${pct}%` }} />
@@ -1679,12 +1681,12 @@ export default function Dashboard() {
     const budget = budgets.find(b => b.id === w.id)
     if (!budget) return (
       <div className={`${PANEL} flex flex-col items-center justify-center gap-2`}>
-        <span className="text-sm text-gray-300 dark:text-gray-600">Presupuesto no encontrado</span>
+        <span className="text-sm text-gray-300 dark:text-gray-600">{t('dashboard.budgetNotFound')}</span>
         <button
           onClick={() => removeWidget(w.id)}
           className="text-xs text-red-400 hover:text-red-500 underline underline-offset-2 transition-colors"
         >
-          Eliminar widget
+          {t('dashboard.removeWidget')}
         </button>
       </div>
     )
@@ -1747,17 +1749,17 @@ export default function Dashboard() {
             <button onClick={() => setAddMode('stat')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-colors"
             >
-              <Plus className="w-3.5 h-3.5" /> Estadística
+              <Plus className="w-3.5 h-3.5" /> {t('dashboard.addStat')}
             </button>
             <button onClick={() => setAddMode('chart')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-colors"
             >
-              <Plus className="w-3.5 h-3.5" /> Gráfico
+              <Plus className="w-3.5 h-3.5" /> {t('dashboard.addChart')}
             </button>
             <button onClick={() => { setBudgets(readBudgets()); setAddMode('budget') }}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-dashed border-gray-300 dark:border-gray-600 text-sm text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-500 dark:hover:border-blue-500 dark:hover:text-blue-400 transition-colors"
             >
-              <Plus className="w-3.5 h-3.5" /> Presupuesto
+              <Plus className="w-3.5 h-3.5" /> {t('dashboard.addBudget')}
             </button>
             <button onClick={() => {
               save(DEFAULT_DASHBOARD_CONFIG)
@@ -1768,12 +1770,12 @@ export default function Dashboard() {
             }}
               className="px-3 py-1.5 rounded-xl text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-700 transition-colors"
             >
-              Restablecer
+              {t('dashboard.resetLayout')}
             </button>
             <button onClick={exitEdit}
               className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors shadow-sm"
             >
-              Guardar
+              {t('common.save')}
             </button>
           </div>
         ) : null}
@@ -1782,7 +1784,7 @@ export default function Dashboard() {
       {/* Edit mode hint */}
       {editMode && (
         <p className="text-xs text-gray-400 dark:text-gray-500 -mt-3">
-          Arrastra los widgets desde el icono de grip · Arrastra los bordes inferior/derecho para cambiar el tamaño
+          {t('dashboard.dragHint')}
         </p>
       )}
 
@@ -1813,14 +1815,14 @@ export default function Dashboard() {
                         </button>
                         {confirmDeleteId === w.id ? (
                           <div className="absolute top-2 right-4 z-20 flex items-center gap-1 bg-white/95 dark:bg-gray-800/95 rounded-lg shadow border border-red-200 dark:border-red-700 px-2 py-1">
-                            <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">¿Eliminar?</span>
+                            <span className="text-xs text-gray-500 dark:text-gray-400 mr-1">{t('dashboard.confirmDelete')}</span>
                             <button onClick={() => { removeWidget(w.id); setConfirmDeleteId(null) }}
                               className="text-xs font-medium text-red-500 hover:text-red-600 px-1.5 py-0.5 rounded hover:bg-red-50 dark:hover:bg-red-900/30 transition-colors">
-                              Sí
+                              {t('common.yes')}
                             </button>
                             <button onClick={() => setConfirmDeleteId(null)}
                               className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 px-1.5 py-0.5 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
-                              No
+                              {t('common.no')}
                             </button>
                           </div>
                         ) : (
@@ -1841,8 +1843,8 @@ export default function Dashboard() {
       ) : (
         !editMode && (
           <div className="flex flex-col items-center justify-center py-20 text-center">
-            <p className="text-gray-300 dark:text-gray-600 text-sm mb-3">El dashboard está vacío</p>
-            <p className="text-xs text-gray-400 dark:text-gray-500">Ve a Configuración → Editar Dashboard para añadir widgets</p>
+            <p className="text-gray-300 dark:text-gray-600 text-sm mb-3">{t('dashboard.emptyDash')}</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">{t('dashboard.emptyHint')}</p>
           </div>
         )
       )}
@@ -1851,7 +1853,7 @@ export default function Dashboard() {
       {/* Backend budget groups (only in view mode) */}
       {!editMode && data.budget_groups.length > 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-5 space-y-4">
-          <h2 className={TITLE}>Presupuestos — {data.month}</h2>
+          <h2 className={TITLE}>{t('dashboard.budgetGroup').replace('{month}', data.month)}</h2>
           <div className="grid grid-cols-2 gap-4">
             {data.budget_groups.map((g: { name: string; color: string; budget: number; current_month: number; percent: number }) => (
               <div key={g.name}>

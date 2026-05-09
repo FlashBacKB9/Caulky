@@ -457,7 +457,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
           <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
             <div className="flex items-center gap-2 mb-3">
               <History className="w-3.5 h-3.5 text-gray-400" strokeWidth={1.5}/>
-              <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">Historial de límites</p>
+              <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">{t('budgets.limitHistory')}</p>
             </div>
             <div className="space-y-1.5">
               {[...budget.versions].reverse().map((v, i) => (
@@ -505,8 +505,8 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
                   <YAxis tickFormatter={fmtK} tick={{ fontSize: 11 }} axisLine={false} tickLine={false} width={60}/>
                   <Tooltip content={tooltipFmt as never}/>
                   <Legend wrapperStyle={{ fontSize: 11, paddingTop: 8 }}/>
-                  <Line dataKey="limite" name="Límite" stroke="#ef4444" strokeWidth={2} strokeDasharray="6 4" dot={false} activeDot={{ r: 4 }}/>
-                  <Line dataKey="gasto"  name="Gasto"  stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }}/>
+                  <Line dataKey="limite" name={t('budgets.seriesLimit')} stroke="#ef4444" strokeWidth={2} strokeDasharray="6 4" dot={false} activeDot={{ r: 4 }}/>
+                  <Line dataKey="gasto"  name={t('budgets.seriesSpent')}  stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }}/>
                 </LineChart>
               </ResponsiveContainer>
             )}
@@ -528,7 +528,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
               </thead>
               <tbody>
                 {rows.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">Sin datos para el periodo seleccionado</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">{t('budgets.noData')}</td></tr>
                 )}
                 {rows.map(row => {
                   const colors = pctColors(row.pct)
@@ -581,7 +581,7 @@ export default function Budgets() {
   }
 
   function handleDelete(id: string) {
-    if (!confirm('¿Eliminar este presupuesto?')) return
+    if (!confirm(t('budgets.confirmDelete'))) return
     saveBudgets(budgets.filter(b => b.id !== id))
     if (detailId === id) setDetailId(null)
   }
@@ -603,7 +603,7 @@ export default function Budgets() {
         <button
           onClick={() => { setEditingBudget(null); setShowForm(true) }}
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-800 dark:bg-white text-white dark:text-gray-900 text-xs font-medium hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors">
-          <Plus className="w-3.5 h-3.5"/> Nuevo
+          <Plus className="w-3.5 h-3.5"/> {t('budgets.new')}
         </button>
       </div>
 
@@ -620,11 +620,11 @@ export default function Budgets() {
           {budgets.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-400">
               <ChartCandlestick className="w-10 h-10" strokeWidth={1}/>
-              <p className="text-sm">Aún no hay presupuestos</p>
+              <p className="text-sm">{t('budgets.empty')}</p>
               <button
                 onClick={() => { setEditingBudget(null); setShowForm(true) }}
                 className="text-sm text-blue-500 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
-                Crea tu primer presupuesto
+                {t('budgets.createFirst')}
               </button>
             </div>
           ) : (

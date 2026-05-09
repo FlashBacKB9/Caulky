@@ -181,7 +181,7 @@ function StepColumns({
       {preview.length > 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
           <div className="px-5 py-3 border-b border-gray-50 dark:border-gray-800 bg-gray-50 dark:bg-gray-800">
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">Previsualización ({parsed.total} filas)</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">{t('import.preview').replace('{n}', String(parsed.total))}</p>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -212,11 +212,11 @@ function StepColumns({
 
       <div className="flex justify-between">
         <button onClick={onBack} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
-          <ChevronLeft className="w-4 h-4" /> Atrás
+          <ChevronLeft className="w-4 h-4" /> {t('import.back')}
         </button>
         <button onClick={onNext} disabled={!valid}
           className="flex items-center gap-1.5 px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-xl hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-          Siguiente <ChevronRight className="w-4 h-4" />
+          {t('import.next')} <ChevronRight className="w-4 h-4" />
         </button>
       </div>
     </div>
@@ -254,10 +254,10 @@ function StepTypes({
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-50 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-            {uniqueTypes.length} tipos encontrados en el archivo
+            {t('import.typesFound').replace('{n}', String(uniqueTypes.length))}
           </p>
           {pendingCount === 0 && (
-            <span className="text-xs text-green-600 dark:text-green-400 font-medium">Todo resuelto</span>
+            <span className="text-xs text-green-600 dark:text-green-400 font-medium">{t('import.allResolved')}</span>
           )}
         </div>
 
@@ -272,9 +272,9 @@ function StepTypes({
                   {/* Name + count */}
                   <div className="flex-1 min-w-0">
                     <span className="text-sm font-medium text-gray-800 dark:text-gray-100">{name}</span>
-                    <span className="ml-2 text-xs text-gray-400">{count} movimiento{count !== 1 ? 's' : ''}</span>
+                    <span className="ml-2 text-xs text-gray-400">{count !== 1 ? t('import.typeCountPlural').replace('{n}', String(count)) : t('import.typeCount').replace('{n}', String(count))}</span>
                     {isAuto && mapping.action === 'auto' && (
-                      <span className="ml-2 text-xs text-green-600 dark:text-green-400 font-medium">· coincidencia automática</span>
+                      <span className="ml-2 text-xs text-green-600 dark:text-green-400 font-medium">· {t('import.autoMatch')}</span>
                     )}
                   </div>
 
@@ -287,10 +287,10 @@ function StepTypes({
                     }}
                     className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
                   >
-                    {isAuto && <option value="auto">Usar coincidencia</option>}
-                    <option value="skip">Ignorar</option>
-                    <option value="existing">Mapear a existente</option>
-                    <option value="create">Crear nuevo</option>
+                    {isAuto && <option value="auto">{t('import.typeActionAuto')}</option>}
+                    <option value="skip">{t('import.typeActionSkip')}</option>
+                    <option value="existing">{t('import.typeActionExisting')}</option>
+                    <option value="create">{t('import.typeActionCreate')}</option>
                   </select>
                 </div>
 
@@ -302,7 +302,7 @@ function StepTypes({
                       onChange={e => set(name, { action: 'existing', type_id: Number(e.target.value) || undefined })}
                       className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
                     >
-                      <option value="">— Selecciona tipo existente —</option>
+                      <option value="">{t('import.selectTypeExisting')}</option>
                       {types.map(t => (
                         <option key={t.id} value={t.id}>{t.category} / {t.name}</option>
                       ))}
@@ -317,7 +317,7 @@ function StepTypes({
                       onChange={e => set(name, { action: 'create', group_id: Number(e.target.value) || undefined })}
                       className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-gray-300 dark:focus:ring-gray-600"
                     >
-                      <option value="">— Selecciona grupo —</option>
+                      <option value="">{t('import.selectGroup')}</option>
                       {groups.map(g => (
                         <option key={g.id} value={g.id}>{g.name}</option>
                       ))}
@@ -332,11 +332,11 @@ function StepTypes({
 
       <div className="flex justify-between">
         <button onClick={onBack} className="flex items-center gap-1.5 px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">
-          <ChevronLeft className="w-4 h-4" /> Atrás
+          <ChevronLeft className="w-4 h-4" /> {t('import.back')}
         </button>
         <button onClick={onNext}
           className="flex items-center gap-1.5 px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-xl hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors">
-          Siguiente <ChevronRight className="w-4 h-4" />
+          {t('import.next')} <ChevronRight className="w-4 h-4" />
         </button>
       </div>
     </div>
@@ -399,12 +399,12 @@ function StepImport({
       <div className="space-y-6">
         <div className={`rounded-2xl border p-6 text-center ${result.errors.length === 0 ? 'bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800' : 'bg-yellow-50 dark:bg-yellow-950 border-yellow-200 dark:border-yellow-800'}`}>
           <Check className={`w-10 h-10 mx-auto mb-3 ${result.errors.length === 0 ? 'text-green-500' : 'text-yellow-500'}`} />
-          <p className="text-xl font-bold text-gray-800 dark:text-white">{result.imported} movimientos importados</p>
+          <p className="text-xl font-bold text-gray-800 dark:text-white">{t('import.movementsImported').replace('{n}', String(result.imported))}</p>
           {result.skipped > 0 && (
-            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{result.skipped} duplicados omitidos</p>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{t('import.skippedDupes').replace('{n}', String(result.skipped))}</p>
           )}
           {result.errors.length > 0 && (
-            <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">{result.errors.length} filas con error</p>
+            <p className="text-sm text-yellow-600 dark:text-yellow-400 mt-1">{t('import.errorsCount').replace('{n}', String(result.errors.length))}</p>
           )}
         </div>
         {result.errors.length > 0 && (
@@ -413,7 +413,7 @@ function StepImport({
           </div>
         )}
         <button onClick={onDone} className="w-full px-5 py-2.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-xl hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors">
-          Ir a Movimientos
+          {t('import.goToMovements')}
         </button>
       </div>
     )
@@ -423,7 +423,7 @@ function StepImport({
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3">
         <div className="w-10 h-10 border-2 border-gray-200 border-t-gray-800 rounded-full animate-spin" />
-        <p className="text-sm text-gray-400">Analizando el archivo...</p>
+        <p className="text-sm text-gray-400">{t('import.analyzing')}</p>
       </div>
     )
   }
@@ -437,9 +437,9 @@ function StepImport({
       <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-50 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 flex items-center justify-between">
           <p className="text-xs font-semibold uppercase tracking-widest text-gray-500 dark:text-gray-400">
-            Movimientos a importar
+            {t('import.toImport')}
           </p>
-          <span className="text-xs font-semibold text-green-600 dark:text-green-400">{ok.length} filas</span>
+          <span className="text-xs font-semibold text-green-600 dark:text-green-400">{ok.length} {t('import.rows')}</span>
         </div>
         <div className="max-h-72 overflow-y-auto divide-y divide-gray-50 dark:divide-gray-800">
           {ok.map((row, i) => (
@@ -458,8 +458,8 @@ function StepImport({
       {errors.length > 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-red-100 dark:border-red-900 overflow-hidden">
           <div className="px-5 py-3 border-b border-red-50 dark:border-red-900 bg-red-50 dark:bg-red-950/40 flex items-center justify-between">
-            <p className="text-xs font-semibold uppercase tracking-widest text-red-500">Filas con error</p>
-            <span className="text-xs font-semibold text-red-500">{errors.length} filas</span>
+            <p className="text-xs font-semibold uppercase tracking-widest text-red-500">{t('import.errorRows')}</p>
+            <span className="text-xs font-semibold text-red-500">{errors.length} {t('import.rows')}</span>
           </div>
           <div className="max-h-40 overflow-y-auto divide-y divide-red-50 dark:divide-red-900/30">
             {errors.map((e, i) => (
@@ -476,18 +476,18 @@ function StepImport({
       <div className="flex items-center gap-3 flex-wrap">
         <button onClick={onCancel} disabled={importing}
           className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-700 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors disabled:opacity-40">
-          Cancelar
+          {t('common.cancel')}
         </button>
         <div className="flex-1" />
         <button onClick={() => doImport(true)} disabled={importing || ok.length === 0}
           className="flex items-center gap-1.5 px-5 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 transition-colors">
           {importing ? <div className="w-3.5 h-3.5 border-2 border-gray-400/30 border-t-gray-600 rounded-full animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-          Importar sin duplicados
+          {t('import.importNoDupes')}
         </button>
         <button onClick={() => doImport(false)} disabled={importing || ok.length === 0}
           className="flex items-center gap-1.5 px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-xl hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 transition-colors">
           {importing ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
-          Importar todo
+          {t('import.importAll')}
         </button>
       </div>
     </div>

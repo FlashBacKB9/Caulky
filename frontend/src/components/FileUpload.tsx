@@ -2,6 +2,7 @@ import { useRef, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../api/client'
 import { Paperclip, Image as ImageIcon, FileText, BarChart2, X, AlertTriangle } from 'lucide-react'
+import { t } from '../utils/i18n'
 
 const WARN_BYTES = 20 * 1024 * 1024 // 20 MB
 
@@ -69,16 +70,14 @@ export default function FileUpload({ movementId, existingFiles }: Props) {
           <div className="flex items-start gap-2">
             <AlertTriangle className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" strokeWidth={1.5} />
             <div className="space-y-1">
-              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">Archivo grande detectado</p>
+              <p className="text-sm font-medium text-amber-800 dark:text-amber-300">{t('fileupload.largeFile')}</p>
               <ul className="text-sm text-amber-700 dark:text-amber-400 space-y-0.5">
                 {pendingLarge.filter(f => f.size > WARN_BYTES).map(f => (
                   <li key={f.name}>{f.name} — <strong>{fmt(f.size)}</strong></li>
                 ))}
               </ul>
               <p className="text-xs text-amber-600 dark:text-amber-500 pt-1">
-                El espacio de almacenamiento es limitado. Los archivos adjuntos deberían ser documentos ligeros:
-                fotos de tickets (1–5 MB), facturas PDF (1–3 MB) o capturas de pantalla.
-                No tiene sentido subir fotos de alta resolución sin comprimir, vídeos o archivos de Office con imágenes incrustadas.
+                {t('fileupload.largeDesc')}
               </p>
             </div>
           </div>
@@ -87,13 +86,13 @@ export default function FileUpload({ movementId, existingFiles }: Props) {
               onClick={() => { setPendingLarge(null); if (inputRef.current) inputRef.current.value = '' }}
               className="text-sm px-3 py-1.5 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
             >
-              Cancelar
+              {t('common.cancel')}
             </button>
             <button
               onClick={() => { upload.mutate(pendingLarge); setPendingLarge(null) }}
               className="text-sm px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white"
             >
-              Subir de todas formas
+              {t('fileupload.uploadAnyway')}
             </button>
           </div>
         </div>
