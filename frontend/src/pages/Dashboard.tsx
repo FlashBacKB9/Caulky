@@ -69,7 +69,7 @@ function StaticPanel({ title, value, color, Icon }: {
       <div className="px-5 pt-3 pb-2 border-b border-gray-50 dark:border-gray-800">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">{title}</h2>
       </div>
-      <div className="flex-1 px-5 py-3">
+      <div className="flex-1 flex items-center px-5">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: color + '20' }}>
             <Icon className="w-5 h-5" style={{ color }} strokeWidth={1.5} />
@@ -101,7 +101,7 @@ function CyclingPanel({ accounts }: { accounts: Account[] }) {
           ))}
         </div>
       </div>
-      <div className="flex-1 px-5 py-5">
+      <div className="flex-1 flex items-center px-5">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: current.color + '20' }}>
             <AppIcon name={current.icon} className="w-5 h-5" style={{ color: current.color }} strokeWidth={1.5} />
