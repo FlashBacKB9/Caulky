@@ -36,7 +36,7 @@ const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct
 const EXCLUDE_GROUPS  = new Set(['Ingreso','Total','Ahorro','Gastos Anuales','Inversión'])
 const BALANCE_EXCLUDE = new Set(['Total','Ahorro','Gastos Anuales','Inversión'])
 const GRID_CLR = '#e5e7eb'
-const DASH_ROW_H = 96
+const DASH_ROW_H = 120
 const DASH_HEADER_H = 60
 const DASH_LAYOUT_KEY = 'spendly-dashboard-layout-v1'
 
@@ -49,7 +49,7 @@ function buildDashLayout(widgets: DashboardWidget[], customIds: Set<string>): re
     const ww = w.colSpan
     const hh = isDashChart(w.id, customIds)
       ? Math.max(2, Math.ceil(((w.height ?? 300) + DASH_HEADER_H) / DASH_ROW_H))
-      : 2
+      : 1
     if (x + ww > 4) { x = 0; y += rowH; rowH = 0 }
     const item = { i: w.id, x, y, w: ww, h: hh }
     x += ww; rowH = Math.max(rowH, hh)
@@ -65,10 +65,10 @@ function StaticPanel({ title, value, color, Icon }: {
   const { fmt } = useCurrency()
   return (
     <div className="h-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden flex flex-col">
-      <div className="px-5 pt-4 pb-3 border-b border-gray-50 dark:border-gray-800">
+      <div className="px-5 pt-3 pb-2 border-b border-gray-50 dark:border-gray-800">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">{title}</h2>
       </div>
-      <div className="flex-1 px-5 py-5">
+      <div className="flex-1 px-5 py-3">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: color + '20' }}>
             <Icon className="w-5 h-5" style={{ color }} strokeWidth={1.5} />
@@ -1435,7 +1435,11 @@ export default function Dashboard() {
         // Strip any stale static/isDraggable/isResizable flags
         const filtered = parsed
           .filter(item => currentIds.has(item.i))
-          .map(({ i, x, y, w, h }) => ({ i, x, y, w, h }))
+          .map(({ i, x, y, w, h }) => ({
+            i, x, y, w,
+            // Migrate old default stat height (h=2) down to h=1
+            h: (!isDashChart(i, customIds) && h === 2) ? 1 : h,
+          }))
         if (filtered.length === config.widgets.length) return filtered
       }
     } catch {}
@@ -1498,7 +1502,7 @@ export default function Dashboard() {
     const customIds = new Set(readCustomCharts().map(c => c.id))
     const hh = isDashChart(w.id, customIds)
       ? Math.max(2, Math.ceil(((w.height ?? 300) + DASH_HEADER_H) / DASH_ROW_H))
-      : 2
+      : 1
     const maxY = dashLayout.reduce((m, l) => Math.max(m, l.y + l.h), 0)
     setDashLayout(prev => [...prev, { i: w.id, x: 0, y: maxY, w: w.colSpan, h: hh }])
   }
