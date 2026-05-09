@@ -175,7 +175,8 @@ async def dashboard(
     balances = await _compute_balances(db, user.id)
     account_map = {a.name: float(a.initial_balance) + balances.get(a.id, 0.0) for a in accounts}
 
-    uso_balance = account_map.get("De uso", 0.0)
+    main_account = next((a for a in accounts if a.is_main), None)
+    uso_balance = (float(main_account.initial_balance) + balances.get(main_account.id, 0.0)) if main_account else 0.0
     ahorro_balance = (
         account_map.get("Ahorro", 0.0)
         + account_map.get("Ahorro Capricho", 0.0)

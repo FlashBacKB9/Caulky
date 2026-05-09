@@ -36,7 +36,7 @@ const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct
 const EXCLUDE_GROUPS  = new Set(['Ingreso','Total','Ahorro','Gastos Anuales','Inversión'])
 const BALANCE_EXCLUDE = new Set(['Total','Ahorro','Gastos Anuales','Inversión'])
 const GRID_CLR = '#e5e7eb'
-const DASH_ROW_H = 120
+const DASH_ROW_H = 96
 const DASH_HEADER_H = 60
 const DASH_LAYOUT_KEY = 'spendly-dashboard-layout-v1'
 
