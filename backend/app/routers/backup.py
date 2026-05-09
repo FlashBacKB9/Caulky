@@ -128,7 +128,7 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
     rtp = payload.restore_templates
 
     try:
-        # Delete user's data in FK order
+        # ── 1. Delete current user's data in FK order ──────────────────────────
         if ri or rm or rt or ra or rg:
             mv_ids_res = await db.execute(select(Movement.id).where(Movement.user_id == uid))
             mv_ids = [r[0] for r in mv_ids_res.all()]
@@ -150,43 +150,86 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
             await db.execute(sa_delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == uid))
         await db.flush()
 
+        # ── 2. Insert without original IDs; build old→new maps for FK remapping ─
+        # IDs from the backup belong to another DB / user, so we never reuse them.
+        # After each batch flush SQLAlchemy populates obj.id with the new PK.
+
+        group_id_map: dict[int, int] = {}
+        account_id_map: dict[int, int] = {}
+        type_id_map: dict[int, int] = {}
+        movement_id_map: dict[int, int] = {}
+
         if rg:
+            pending = []
             for g in payload.db.get("groups", []):
-                db.add(IncomeExpenseGroup(**{k: v for k, v in g.items() if k != "user_id"}, user_id=uid))
+                obj = IncomeExpenseGroup(**{k: v for k, v in g.items() if k not in ("user_id", "id")}, user_id=uid)
+                db.add(obj)
+                pending.append((g["id"], obj))
             await db.flush()
+            group_id_map = {oid: obj.id for oid, obj in pending}
 
         if ra:
+            pending = []
             for a in payload.db.get("accounts", []):
-                db.add(Account(**{k: v for k, v in a.items() if k != "user_id"}, user_id=uid))
+                obj = Account(**{k: v for k, v in a.items() if k not in ("user_id", "id")}, user_id=uid)
+                db.add(obj)
+                pending.append((a["id"], obj))
             await db.flush()
+            account_id_map = {oid: obj.id for oid, obj in pending}
 
         if rt:
+            pending = []
             for t in payload.db.get("types", []):
-                db.add(MovementType(**{k: v for k, v in t.items() if k != "user_id"}, user_id=uid))
+                d = {k: v for k, v in t.items() if k not in ("user_id", "id")}
+                if d.get("income_expense_group_id") is not None:
+                    d["income_expense_group_id"] = group_id_map.get(d["income_expense_group_id"], d["income_expense_group_id"])
+                if d.get("linked_account_id") is not None:
+                    d["linked_account_id"] = account_id_map.get(d["linked_account_id"], d["linked_account_id"])
+                obj = MovementType(**d, user_id=uid)
+                db.add(obj)
+                pending.append((t["id"], obj))
             await db.flush()
+            type_id_map = {oid: obj.id for oid, obj in pending}
 
         if rm:
-            _mv_skip = {"user_id", "files"}
+            pending = []
+            _mv_skip = {"user_id", "files", "id"}
             for m in payload.db.get("movements", []):
-                m = {k: v for k, v in m.items() if k not in _mv_skip}
-                m["date"]      = _parse_date(m.get("date"))
-                m["bank_date"] = _parse_date(m.get("bank_date"))
-                db.add(Movement(**m, user_id=uid))
+                d = {k: v for k, v in m.items() if k not in _mv_skip}
+                d["date"]      = _parse_date(d.get("date"))
+                d["bank_date"] = _parse_date(d.get("bank_date"))
+                if d.get("movement_type_id") is not None:
+                    d["movement_type_id"] = type_id_map.get(d["movement_type_id"], d["movement_type_id"])
+                if d.get("account_id") is not None:
+                    d["account_id"] = account_id_map.get(d["account_id"], d["account_id"])
+                obj = Movement(**d, user_id=uid)
+                db.add(obj)
+                pending.append((m["id"], obj))
             await db.flush()
+            movement_id_map = {oid: obj.id for oid, obj in pending}
 
         if ri:
             for f in payload.db.get("investment_funds", []):
-                db.add(InvestmentFund(**{k: v for k, v in f.items() if k != "user_id"}, user_id=uid))
+                d = {k: v for k, v in f.items() if k not in ("user_id", "id")}
+                if d.get("movement_type_id") is not None:
+                    d["movement_type_id"] = type_id_map.get(d["movement_type_id"], d["movement_type_id"])
+                db.add(InvestmentFund(**d, user_id=uid))
             await db.flush()
             for p in payload.db.get("investment_purchases", []):
-                db.add(InvestmentPurchase(**p))
+                d = {k: v for k, v in p.items() if k != "id"}
+                if d.get("movement_id") is not None:
+                    d["movement_id"] = movement_id_map.get(d["movement_id"], d["movement_id"])
+                db.add(InvestmentPurchase(**d))
             await db.flush()
 
         if rtp:
             await db.execute(sa_delete(TemplateModel).where(TemplateModel.user_id == uid))
             await db.flush()
             for t in payload.db.get("templates", []):
-                db.add(TemplateModel(**{k: v for k, v in t.items() if k != "user_id"}, user_id=uid))
+                d = {k: v for k, v in t.items() if k not in ("user_id", "id")}
+                if d.get("movement_type_id") is not None:
+                    d["movement_type_id"] = type_id_map.get(d["movement_type_id"], d["movement_type_id"])
+                db.add(TemplateModel(**d, user_id=uid))
             await db.flush()
 
         if payload.restore_preferences:
@@ -196,8 +239,6 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
                 db.add(UserPreference(user_id=uid, key=key, value=value))
             await db.flush()
 
-        if not _is_sqlite:
-            await _fix_sequences(db)
         await db.commit()
 
     except Exception as exc:
