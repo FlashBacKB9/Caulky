@@ -806,7 +806,7 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
     const defDisp = (d: string): ComputedSeries['display'] => d==='bar'?'bar':d==='area'?'area':'line'
     if (def.splitBy==='none') {
       const data = xBuckets.map(({ key, label }) => ({ x:label, total:accounts.reduce((s,acc)=>s+balAt(acc,key),0) }))
-      const accSeries: ComputedSeries[] = [{ key:'total', label:'Total cuentas', color:def.defaultColor, display:defDisp(def.defaultDisplay), stacked:false, cumulative:false }]
+      const accSeries: ComputedSeries[] = [{ key:'total', label:t('charts.totalAccounts'), color:def.defaultColor, display:defDisp(def.defaultDisplay), stacked:false, cumulative:false }]
       return { data, accSeries }
     }
     const data = xBuckets.map(({ key, label }) => {
@@ -921,11 +921,11 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
           {def.xAxis!=='year' && (
             <div className="relative">
               <button onClick={()=>setShowYearPicker(v=>!v)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${showYearPicker||def.period||def.year!==CUR_YEAR?'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200':'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600'}`}>
-                {def.period==='current_year'?'Año actual':def.period==='current_month'?'Mes actual':(def.year??t('charts.allYears'))} <ChevronDown className="w-3 h-3"/>
+                {def.period==='current_year'?t('charts.currentYear'):def.period==='current_month'?t('charts.currentMonth'):(def.year??t('charts.allYears'))} <ChevronDown className="w-3 h-3"/>
               </button>
               {showYearPicker && (
                 <div className="absolute right-0 top-8 z-20 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-0.5 min-w-[90px]">
-                  {([['current_year','Año actual'],['current_month','Mes actual']] as const).map(([p,label])=>(
+                  {([['current_year',t('charts.currentYear')],['current_month',t('charts.currentMonth')]] as [string,string][]).map(([p,label])=>(
                     <button key={p} onClick={()=>{ upd({ period:p, year:CUR_YEAR }); setShowYearPicker(false) }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-colors ${def.period===p?'bg-gray-800 dark:bg-white text-white dark:text-gray-900':'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
                       {label}
@@ -1080,7 +1080,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
     const defDisp = (d: string): ComputedSeries['display'] => d==='bar'?'bar':d==='area'?'area':'line'
     if (def.splitBy==='none') {
       const data = xBuckets.map(({ key, label }) => ({ x:label, total:accounts.reduce((s,acc)=>s+balAt(acc,key),0) }))
-      const accSeries: ComputedSeries[] = [{ key:'total', label:'Total cuentas', color:def.defaultColor, display:defDisp(def.defaultDisplay), stacked:false, cumulative:false }]
+      const accSeries: ComputedSeries[] = [{ key:'total', label:t('charts.totalAccounts'), color:def.defaultColor, display:defDisp(def.defaultDisplay), stacked:false, cumulative:false }]
       return { data, accSeries }
     }
     const data = xBuckets.map(({ key, label }) => {

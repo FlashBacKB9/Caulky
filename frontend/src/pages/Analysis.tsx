@@ -319,8 +319,8 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
     const map = new Map<string, number>()
     realExpenseMovements.forEach(m => {
       const typeName = m.movement_type_id
-        ? (typeNameMap.get(m.movement_type_id) ?? m.label ?? 'Sin categoría')
-        : (m.label ?? 'Sin categoría')
+        ? (typeNameMap.get(m.movement_type_id) ?? m.label ?? t('analysis.noCategory'))
+        : (m.label ?? t('analysis.noCategory'))
       map.set(typeName, (map.get(typeName) ?? 0) + Math.abs(m.dinero))
     })
     if (map.size === 0) return null
@@ -352,28 +352,28 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
     {
       label: t('analysis.monthlySavings'),
       value: fmt(actualSavings / months),
-      sub: `${months} ${months === 1 ? 'mes' : 'meses'} analizados`,
+      sub: months === 1 ? t('analysis.monthsAnalyzed').replace('{n}', String(months)) : t('analysis.monthsAnalyzedP').replace('{n}', String(months)),
       color: actualSavings >= 0 ? 'text-green-500' : 'text-red-500',
       detail: `${fmt(income / months)} ing. · ${fmt(avgMonthlyExpenses)} gastos`,
     },
     {
       label: t('analysis.topExpense'),
       value: topCat ? topCat[0] : '—',
-      sub: topCat ? fmt(topCat[1]) : 'Sin datos de gastos',
+      sub: topCat ? fmt(topCat[1]) : t('analysis.noExpenseData'),
       color: 'text-gray-700 dark:text-gray-200',
       detail: topCat && realExpenses > 0 ? `${((topCat[1] / realExpenses) * 100).toFixed(0)}% del total de gastos` : '',
     },
     {
       label: t('analysis.totalSavings'),
       value: fmt(actualSavings),
-      sub: actualSavings >= 0 ? 'Ahorro acumulado' : 'Sin ahorro registrado',
+      sub: actualSavings >= 0 ? t('analysis.accumulatedSavings') : t('analysis.noSavingsRecorded'),
       color: actualSavings >= 0 ? 'text-green-500' : 'text-gray-400',
       detail: income > 0 ? `${fmt(income)} ingresos · ${fmt(actualSavings)} ahorrados` : '',
     },
   ]
 
   const summary = useMemo(() => {
-    if (income === 0) return 'No hay ingresos registrados en el período seleccionado.'
+    if (income === 0) return t('analysis.noIncomeMsg')
     const parts: string[] = []
     if (savingsRate >= 20) {
       parts.push(`Estás ahorrando el ${savingsRate.toFixed(0)}% de tus ingresos, por encima del 20% recomendado.`)
@@ -481,10 +481,10 @@ function PatronesDeGasto({ realExpenseMovements, fmt }: {
 type RuleBucket = 'necesidades' | 'deseos' | 'ahorro' | 'unassigned'
 const RULE_KEY = 'spendly-5030-assignment'
 
-const BUCKETS: { id: RuleBucket; label: string; target: number; color: string; textColor: string }[] = [
-  { id: 'necesidades', label: 'Necesidades', target: 50, color: '#3b82f6', textColor: 'text-blue-600 dark:text-blue-400' },
-  { id: 'deseos',      label: 'Deseos',       target: 30, color: '#8b5cf6', textColor: 'text-violet-600 dark:text-violet-400' },
-  { id: 'ahorro',      label: 'Ahorro/Inv.',  target: 20, color: '#22c55e', textColor: 'text-green-600 dark:text-green-400' },
+const BUCKETS: { id: RuleBucket; labelKey: string; target: number; color: string; textColor: string }[] = [
+  { id: 'necesidades', labelKey: 'analysis.bucketNeeds',   target: 50, color: '#3b82f6', textColor: 'text-blue-600 dark:text-blue-400' },
+  { id: 'deseos',      labelKey: 'analysis.bucketWants',   target: 30, color: '#8b5cf6', textColor: 'text-violet-600 dark:text-violet-400' },
+  { id: 'ahorro',      labelKey: 'analysis.bucketSavings', target: 20, color: '#22c55e', textColor: 'text-green-600 dark:text-green-400' },
 ]
 
 function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }: {
@@ -528,8 +528,8 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
 
   const pieData = useMemo(() => {
     const slices = [
-      ...BUCKETS.map(b => ({ name: b.label, value: byBucket[b.id], color: b.color, target: b.target, textColor: b.textColor })),
-      ...(byBucket.unassigned > 0 ? [{ name: 'Sin asignar', value: byBucket.unassigned, color: '#f59e0b', target: 0, textColor: 'text-yellow-600 dark:text-yellow-400' }] : []),
+      ...BUCKETS.map(b => ({ name: t(b.labelKey), value: byBucket[b.id], color: b.color, target: b.target, textColor: b.textColor })),
+      ...(byBucket.unassigned > 0 ? [{ name: t('analysis.unassigned'), value: byBucket.unassigned, color: '#f59e0b', target: 0, textColor: 'text-yellow-600 dark:text-yellow-400' }] : []),
     ]
     return slices.filter(s => s.value > 0)
   }, [byBucket])
@@ -537,7 +537,7 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
   const [assignOpen, setAssignOpen] = useState(false)
 
   if (total === 0) {
-    return <p className="text-sm text-gray-400 text-center py-8">Sin datos para el período seleccionado</p>
+    return <p className="text-sm text-gray-400 text-center py-8">{t('analysis.noDataPeriod')}</p>
   }
 
   return (
@@ -602,13 +602,13 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
           onClick={() => setAssignOpen(o => !o)}
           className="w-full flex items-center justify-between px-4 py-2.5 text-xs text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
         >
-          <span className="font-medium text-gray-600 dark:text-gray-300">Asignación de categorías</span>
+          <span className="font-medium text-gray-600 dark:text-gray-300">{t('analysis.sectionAssignment')}</span>
           {assignOpen ? <ChevronUp className="w-3.5 h-3.5" strokeWidth={1.5} /> : <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} />}
         </button>
         {assignOpen && (
         <div className="px-4 pb-4 pt-1 border-t border-gray-100 dark:border-gray-800">
         {expenseGroups.length === 0 ? (
-          <p className="text-xs text-gray-400">No hay categorías de gasto disponibles</p>
+          <p className="text-xs text-gray-400">{t('analysis.noExpenseCategories')}</p>
         ) : (
           <div className="space-y-1.5 mt-2">
             {expenseGroups.map(g => (
@@ -622,8 +622,8 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
                   onChange={e => assign(g.id, e.target.value as RuleBucket)}
                   className="text-xs px-2 py-1 border border-gray-200 dark:border-gray-700 rounded-lg bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300"
                 >
-                  <option value="unassigned">Sin asignar</option>
-                  {BUCKETS.map(b => <option key={b.id} value={b.id}>{b.label}</option>)}
+                  <option value="unassigned">{t('analysis.unassigned')}</option>
+                  {BUCKETS.map(b => <option key={b.id} value={b.id}>{t(b.labelKey)}</option>)}
                 </select>
               </div>
             ))}
@@ -643,7 +643,7 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
 }) {
   const points = useMemo(() =>
     Array.from({ length: 13 }, (_, i) => ({
-      label: i === 0 ? 'Hoy' : `+${i}m`,
+      label: i === 0 ? t('analysis.today') : `+${i}m`,
       balance: totalBalance + monthlySavings * i,
     })),
     [monthlySavings, totalBalance]
@@ -744,7 +744,7 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, excludedMovem
   const byCategory = useMemo(() => {
     const map = new Map<string, number>()
     realExpenseMovements.forEach(m => {
-      const label = m.label || 'Sin categoría'
+      const label = m.label || t('analysis.noCategory')
       map.set(label, (map.get(label) ?? 0) + Math.abs(m.dinero))
     })
     return [...map.entries()].sort((a, b) => b[1] - a[1])
@@ -829,7 +829,7 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, excludedMovem
           className="absolute top-3 right-3 flex items-center gap-1.5 px-2.5 py-1.5 bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg text-xs font-medium text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-600 transition-colors shadow-sm"
         >
           {copied ? <Check className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
-          {copied ? 'Copiado' : 'Copiar'}
+          {copied ? t('analysis.copied') : t('analysis.copy')}
         </button>
       </div>
 
@@ -951,7 +951,7 @@ export default function Analysis() {
         fmt={fmt}
       />
 
-      <SectionCard title="Salud Financiera" icon={Heart}>
+      <SectionCard title={t('analysis.sectionHealth')} icon={Heart}>
         <SaludFinanciera
           realExpenseMovements={realExpenseMovements}
           incomeMovementsCount={incomeMovementsCount}
@@ -967,11 +967,11 @@ export default function Analysis() {
         />
       </SectionCard>
 
-      <SectionCard title="Patrones de Gasto por Mes" icon={Activity}>
+      <SectionCard title={t('analysis.sectionPatterns')} icon={Activity}>
         <PatronesDeGasto realExpenseMovements={realExpenseMovements} fmt={fmt} />
       </SectionCard>
 
-      <SectionCard title="Regla 50/30/20" icon={Target}>
+      <SectionCard title={t('analysis.section5020')} icon={Target}>
         <Regla502030
           realExpenseMovements={realExpenseMovements}
           groups={groups}
@@ -981,11 +981,11 @@ export default function Analysis() {
         />
       </SectionCard>
 
-      <SectionCard title="Proyección de Patrimonio" icon={TrendingUp}>
+      <SectionCard title={t('analysis.sectionProjection')} icon={TrendingUp}>
         <ProyeccionPatrimonio monthlySavings={monthlySavings} totalBalance={totalBalance} fmt={fmt} />
       </SectionCard>
 
-      <SectionCard title="Prompt IA" icon={Sparkles}>
+      <SectionCard title={t('analysis.sectionPrompt')} icon={Sparkles}>
         <PromptIA
           allMovements={allMovements}
           typeGroupMap={typeGroupMap}

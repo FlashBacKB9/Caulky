@@ -1,5 +1,4 @@
 import { useState, useMemo, useCallback } from 'react'
-import { syncPref } from '../utils/prefSync'
 import { useQuery } from '@tanstack/react-query'
 import {
   Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -13,12 +12,12 @@ import {
 import { getMovements } from '../api/movements'
 import { getAccountsSummary } from '../api/accounts'
 import { useCurrency } from '../hooks/useCurrency'
-import { t, getMonthNames } from '../utils/i18n'
+import { t } from '../utils/i18n'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const MONTHS_SHORT = getMonthNames('short')
-const MONTH_NAMES  = getMonthNames('long')
+const MONTHS_SHORT = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
+const MONTH_NAMES  = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre']
 
 const AI_EXPENSE_GROWTH = 3
 const AI_INCOME_GROWTH  = 2
@@ -355,7 +354,7 @@ function ExpensesDrawer({ phase, onChange, label, onCopyFrom, canCopy, onClose }
               <button onClick={onCopyFrom}
                 className="flex items-center gap-1 px-2 py-1 text-xs text-blue-500 hover:text-blue-600 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
                 <Copy className="w-3 h-3" />
-                Copiar de {label === 'Fase 1' ? 'Fase 2' : 'Fase 1'}
+                {t('projection.copyFrom')}
               </button>
             )}
             <button onClick={onClose} className="p-1.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
@@ -403,10 +402,10 @@ function MortgageSection({ phase, onChange }: { phase: PhaseConfig; onChange: (p
           className="flex items-center gap-2 flex-1 text-left">
           <Home className="w-3.5 h-3.5 text-gray-400 shrink-0" />
           <span className="text-sm text-gray-600 dark:text-gray-400">
-            Hipoteca
+            {t('projection.mortgage')}
             {m.enabled && monthly > 0 && (
               <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
-                ({Math.round(monthly).toLocaleString('es-ES')}€/mes)
+                ({Math.round(monthly).toLocaleString('es-ES')}{t('projection.perMonth')})
               </span>
             )}
           </span>
@@ -421,23 +420,23 @@ function MortgageSection({ phase, onChange }: { phase: PhaseConfig; onChange: (p
           {/* Main mortgage params */}
           <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50 divide-y divide-gray-100 dark:divide-gray-800">
             <div className="flex items-center gap-2 px-3 py-2.5">
-              <span className="text-xs text-gray-500 dark:text-gray-400 flex-1">Capital</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 flex-1">{t('projection.capital')}</span>
               <input type="number" min={0} step={1000} className={`${INP_SM} w-28 text-right`}
                 value={m.amount || ''} placeholder="0"
                 onChange={e => set({ amount: parseFloat(e.target.value) || 0 })} />
               <span className="text-xs text-gray-400">€</span>
             </div>
             <div className="flex items-center gap-2 px-3 py-2.5">
-              <span className="text-xs text-gray-500 dark:text-gray-400 flex-1">Tipo de interés</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 flex-1">{t('projection.interest')}</span>
               <input type="number" min={0} max={20} step={0.05} className={`${INP_SM} w-20 text-right`}
                 value={m.interestPct} onChange={e => set({ interestPct: parseFloat(e.target.value) || 0 })} />
-              <span className="text-xs text-gray-400">%/año</span>
+              <span className="text-xs text-gray-400">{t('projection.perYear')}</span>
             </div>
             <div className="flex items-center gap-2 px-3 py-2.5">
-              <span className="text-xs text-gray-500 dark:text-gray-400 flex-1">Plazo</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 flex-1">{t('projection.term')}</span>
               <input type="number" min={1} max={40} step={1} className={`${INP_SM} w-16 text-right`}
                 value={m.termYears} onChange={e => set({ termYears: parseInt(e.target.value) || 1 })} />
-              <span className="text-xs text-gray-400">años</span>
+              <span className="text-xs text-gray-400">{t('projection.years_')}</span>
             </div>
           </div>
 
@@ -445,10 +444,10 @@ function MortgageSection({ phase, onChange }: { phase: PhaseConfig; onChange: (p
           {monthly > 0 && (
             <div className="rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800 px-3 py-2 space-y-0.5">
               <p className="text-xs text-blue-600 dark:text-blue-400">
-                Cuota mensual: <strong>{Math.round(monthly).toLocaleString('es-ES')} €</strong>
+                {t('projection.monthly')} <strong>{Math.round(monthly).toLocaleString('es-ES')} €</strong>
               </p>
               <p className="text-xs text-blue-500 dark:text-blue-400">
-                Total intereses: <strong>{Math.round(totalInterest).toLocaleString('es-ES')} €</strong>
+                {t('projection.totalInt')} <strong>{Math.round(totalInterest).toLocaleString('es-ES')} €</strong>
               </p>
             </div>
           )}
@@ -456,27 +455,27 @@ function MortgageSection({ phase, onChange }: { phase: PhaseConfig; onChange: (p
           {/* Amortization strategy */}
           <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800/50">
             <div className="flex items-center gap-3 px-3 py-2.5">
-              <span className="text-xs text-gray-500 dark:text-gray-400 flex-1 font-medium">Amortización anticipada</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 flex-1 font-medium">{t('projection.earlyAmort')}</span>
               <Toggle value={m.amortize} onChange={v => set({ amortize: v })} />
             </div>
             {m.amortize && (
               <div className="divide-y divide-gray-100 dark:divide-gray-800 border-t border-gray-100 dark:border-gray-800">
                 <div className="flex items-center gap-2 px-3 py-2.5">
-                  <span className="text-xs text-gray-500 dark:text-gray-400 flex-1">Si balance &gt;</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 flex-1">{t('projection.ifBalance')}</span>
                   <input type="number" min={0} step={1000} className={`${INP_SM} w-24 text-right`}
                     value={m.amortizeThreshold || ''} placeholder="0"
                     onChange={e => set({ amortizeThreshold: parseFloat(e.target.value) || 0 })} />
                   <span className="text-xs text-gray-400">€</span>
                 </div>
                 <div className="flex items-center gap-2 px-3 py-2.5">
-                  <span className="text-xs text-gray-500 dark:text-gray-400 flex-1">Amortizar al año</span>
+                  <span className="text-xs text-gray-500 dark:text-gray-400 flex-1">{t('projection.amortYear')}</span>
                   <input type="number" min={0} step={500} className={`${INP_SM} w-24 text-right`}
                     value={m.amortizePerYear || ''} placeholder="0"
                     onChange={e => set({ amortizePerYear: parseFloat(e.target.value) || 0 })} />
                   <span className="text-xs text-gray-400">€</span>
                 </div>
                 <div className="px-3 py-2 text-xs text-gray-400 dark:text-gray-500 leading-relaxed">
-                  Cuando el balance supere el umbral, se amortizará capital extra cada mes reduciendo el plazo.
+                  {t('projection.amortDesc')}
                 </div>
               </div>
             )}
@@ -501,7 +500,7 @@ function PhasePanel({ phase, onChange, label, onCopyFrom, canCopy, showMortgage 
     <div className="space-y-4">
       <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
         <div className="flex items-center gap-3 px-4 py-3">
-          <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">Ingreso mensual neto</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">{t('projection.netIncome')}</span>
           <div className="flex items-center gap-1">
             <input type="number" min={0} step={10} className={`${INP_SM} w-28 text-right`}
               value={phase.income || ''} placeholder="0"
@@ -510,31 +509,31 @@ function PhasePanel({ phase, onChange, label, onCopyFrom, canCopy, showMortgage 
           </div>
         </div>
         <div className="flex items-center gap-3 px-4 py-3">
-          <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">Subida anual ingresos</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">{t('projection.incomeGrowth')}</span>
           <div className="flex items-center gap-1">
             <input type="number" min={0} max={50} step={0.5} className={`${INP_SM} w-16 text-right`}
               value={phase.incomeGrowthPct}
               onChange={e => set({ incomeGrowthPct: parseFloat(e.target.value) || 0 })} />
-            <span className="text-xs text-gray-400">%/año</span>
+            <span className="text-xs text-gray-400">{t('projection.perYear')}</span>
           </div>
         </div>
         <div className="flex items-center gap-3 px-4 py-3">
-          <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">Subida anual gastos</span>
+          <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">{t('projection.expenseGrowth')}</span>
           <div className="flex items-center gap-1">
             <input type="number" min={0} max={50} step={0.5} className={`${INP_SM} w-16 text-right`}
               value={phase.expenseGrowthPct}
               onChange={e => set({ expenseGrowthPct: parseFloat(e.target.value) || 0 })} />
-            <span className="text-xs text-gray-400">%/año</span>
+            <span className="text-xs text-gray-400">{t('projection.perYear')}</span>
           </div>
         </div>
         {/* Expenses trigger */}
         <button onClick={() => setDrawerOpen(true)}
           className="flex items-center gap-3 w-full px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-left">
           <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">
-            Gastos
+            {t('projection.expensesLabel')}
             {phase.expenses.length > 0 && (
               <span className="ml-2 text-xs text-gray-400 dark:text-gray-500">
-                ({phase.expenses.length}{totalMonthly > 0 ? ` · ${totalMonthly}€/mes` : ''})
+                ({phase.expenses.length}{totalMonthly > 0 ? ` · ${totalMonthly}${t('projection.perMonth')}` : ''})
               </span>
             )}
           </span>
@@ -567,15 +566,15 @@ function ChartTooltip({ active, payload, label, fmt, twoPhases }: {
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg px-3 py-2 text-xs space-y-1 min-w-[160px]">
       <p className="font-semibold text-gray-700 dark:text-gray-200">{label}</p>
-      {main && <p className="text-gray-600 dark:text-gray-400">Balance: <span className="font-medium text-blue-500">{fmt(main.value)}</span></p>}
-      {noAmo && <p className="text-gray-500 dark:text-gray-400">Sin amortizar: <span className="font-medium text-orange-500">{fmt(noAmo.value)}</span></p>}
-      {snap && <p className="text-gray-400">Guardado: <span className="font-medium">{fmt(snap.value)}</span></p>}
+      {main && <p className="text-gray-600 dark:text-gray-400">{t('projection.balanceLabel')} <span className="font-medium text-blue-500">{fmt(main.value)}</span></p>}
+      {noAmo && <p className="text-gray-500 dark:text-gray-400">{t('projection.noAmoLabel')} <span className="font-medium text-orange-500">{fmt(noAmo.value)}</span></p>}
+      {snap && <p className="text-gray-400">{t('projection.savedLabel')} <span className="font-medium">{fmt(snap.value)}</span></p>}
       {pt?.payload && pt.payload.net !== 0 && (
         <p className={pt.payload.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}>
-          Neto: {pt.payload.net >= 0 ? '+' : ''}{fmt(pt.payload.net)}/mes
+          {t('projection.net')} {pt.payload.net >= 0 ? '+' : ''}{fmt(pt.payload.net)}/mes
         </p>
       )}
-      {twoPhases && pt?.payload && <p className="text-gray-400">Fase {pt.payload.phase}</p>}
+      {twoPhases && pt?.payload && <p className="text-gray-400">{t('projection.phaseLabel')} {pt.payload.phase}</p>}
     </div>
   )
 }
@@ -586,10 +585,10 @@ function ChartTooltip({ active, payload, label, fmt, twoPhases }: {
 type MortgageViewMode = 'side' | 'overlay'
 type MortgageChartKind = 'balance' | 'cashflow' | 'debt'
 
-const CHART_KINDS: { id: MortgageChartKind; label: string }[] = [
-  { id: 'balance',  label: 'Balance'          },
-  { id: 'cashflow', label: 'Ingresos / Gastos' },
-  { id: 'debt',     label: 'Deuda restante'    },
+const CHART_KINDS: { id: MortgageChartKind; label: () => string }[] = [
+  { id: 'balance',  label: () => t('projection.chartBalance')  },
+  { id: 'cashflow', label: () => t('projection.chartCashflow') },
+  { id: 'debt',     label: () => t('projection.chartDebt')     },
 ]
 
 function ScenarioCard({ title, color, children }: { title: string; color: string; children: React.ReactNode }) {
@@ -657,7 +656,7 @@ function MortgageScenarioCompare({ main, noAmo, xTicks, fmt }: {
         <ComposedChart data={pts} margin={margP}>
           <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP(balDomain)} />
           {tooltip}
-          <Area dataKey="balance" stroke={color} strokeWidth={2} fill={color + '20'} dot={false} name="Balance" />
+          <Area dataKey="balance" stroke={color} strokeWidth={2} fill={color + '20'} dot={false} name={t('projection.chartBalance')} />
         </ComposedChart>
       </ResponsiveContainer>
     )
@@ -666,8 +665,8 @@ function MortgageScenarioCompare({ main, noAmo, xTicks, fmt }: {
         <ComposedChart data={pts} margin={margP}>
           <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP([0, cfMax])} />
           {tooltip}
-          <Line dataKey="income"  stroke="#22c55e" strokeWidth={2} dot={false} name="Ingresos" />
-          <Line dataKey="expense" stroke="#ef4444" strokeWidth={2} dot={false} name="Gastos"   />
+          <Line dataKey="income"  stroke="#22c55e" strokeWidth={2} dot={false} name={t('projection.income')} />
+          <Line dataKey="expense" stroke="#ef4444" strokeWidth={2} dot={false} name={t('projection.expenses')} />
         </ComposedChart>
       </ResponsiveContainer>
     )
@@ -677,7 +676,7 @@ function MortgageScenarioCompare({ main, noAmo, xTicks, fmt }: {
         <ComposedChart data={pts} margin={margP}>
           <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP([0, debtMax])} />
           {tooltip}
-          <Area dataKey="mortgageDebt" stroke={color} strokeWidth={2} fill={color + '20'} dot={false} name="Deuda" />
+          <Area dataKey="mortgageDebt" stroke={color} strokeWidth={2} fill={color + '20'} dot={false} name={t('projection.chartDebt')} />
         </ComposedChart>
       </ResponsiveContainer>
     )
@@ -689,8 +688,8 @@ function MortgageScenarioCompare({ main, noAmo, xTicks, fmt }: {
         <ComposedChart data={overlayData} margin={margP}>
           <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP(balDomain)} />
           {tooltip}
-          <Line dataKey="noAmoBalance" stroke={COLOR_NOAMO} strokeWidth={2} dot={false} strokeDasharray="5 3" name="Sin amortizar" />
-          <Area dataKey="balance"      stroke={COLOR_MAIN}  strokeWidth={2} fill={COLOR_MAIN + '20'} dot={false} name="Con amortización" />
+          <Line dataKey="noAmoBalance" stroke={COLOR_NOAMO} strokeWidth={2} dot={false} strokeDasharray="5 3" name={t('projection.seriesNoAmort')} />
+          <Area dataKey="balance"      stroke={COLOR_MAIN}  strokeWidth={2} fill={COLOR_MAIN + '20'} dot={false} name={t('projection.withAmort')} />
         </ComposedChart>
       </ResponsiveContainer>
     )
@@ -699,9 +698,9 @@ function MortgageScenarioCompare({ main, noAmo, xTicks, fmt }: {
         <ComposedChart data={overlayData} margin={margP}>
           <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP([0, cfMax])} />
           {tooltip}
-          <Line dataKey="income"     stroke="#22c55e" strokeWidth={2} dot={false} name="Ingresos"              />
-          <Line dataKey="expense"    stroke="#ef4444" strokeWidth={2} dot={false} name="Gastos (con amort.)"   />
-          <Line dataKey="noAmoExpense" stroke="#f97316" strokeWidth={2} dot={false} strokeDasharray="5 3" name="Gastos (sin amort.)" />
+          <Line dataKey="income"     stroke="#22c55e" strokeWidth={2} dot={false} name={t('projection.income')}           />
+          <Line dataKey="expense"    stroke="#ef4444" strokeWidth={2} dot={false} name={t('projection.seriesExpAmort')}   />
+          <Line dataKey="noAmoExpense" stroke="#f97316" strokeWidth={2} dot={false} strokeDasharray="5 3" name={t('projection.seriesExpNoAmort')} />
         </ComposedChart>
       </ResponsiveContainer>
     )
@@ -710,10 +709,10 @@ function MortgageScenarioCompare({ main, noAmo, xTicks, fmt }: {
         <ComposedChart data={overlayData} margin={margP}>
           <CartesianGrid {...gridP} /><XAxis {...xP} /><YAxis {...yP([0, debtMax])} />
           {tooltip}
-          {debtPaidMain  && <ReferenceLine x={debtPaidMain.label}  stroke={COLOR_MAIN}  strokeDasharray="3 2" label={{ value: 'Pagada',       fill: COLOR_MAIN,  fontSize: 9, position: 'insideTopRight'  }} />}
-          {debtPaidNoAmo && <ReferenceLine x={debtPaidNoAmo.label} stroke={COLOR_NOAMO} strokeDasharray="3 2" label={{ value: 'Pagada sin amo.', fill: COLOR_NOAMO, fontSize: 9, position: 'insideBottomRight' }} />}
-          <Line dataKey="noAmoDebt" stroke={COLOR_NOAMO} strokeWidth={2} dot={false} strokeDasharray="5 3" name="Sin amortizar"     />
-          <Area dataKey="debt"      stroke={COLOR_MAIN}  strokeWidth={2} fill={COLOR_MAIN + '20'} dot={false} name="Con amortización" />
+          {debtPaidMain  && <ReferenceLine x={debtPaidMain.label}  stroke={COLOR_MAIN}  strokeDasharray="3 2" label={{ value: t('projection.paidLabel'),   fill: COLOR_MAIN,  fontSize: 9, position: 'insideTopRight'  }} />}
+          {debtPaidNoAmo && <ReferenceLine x={debtPaidNoAmo.label} stroke={COLOR_NOAMO} strokeDasharray="3 2" label={{ value: t('projection.paidNoAmort'), fill: COLOR_NOAMO, fontSize: 9, position: 'insideBottomRight' }} />}
+          <Line dataKey="noAmoDebt" stroke={COLOR_NOAMO} strokeWidth={2} dot={false} strokeDasharray="5 3" name={t('projection.seriesNoAmort')} />
+          <Area dataKey="debt"      stroke={COLOR_MAIN}  strokeWidth={2} fill={COLOR_MAIN + '20'} dot={false} name={t('projection.withAmort')} />
         </ComposedChart>
       </ResponsiveContainer>
     )
@@ -724,14 +723,14 @@ function MortgageScenarioCompare({ main, noAmo, xTicks, fmt }: {
       {/* Summary chips */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
-          <p className="text-xs text-gray-400 mb-1">Interés ahorrado</p>
+          <p className="text-xs text-gray-400 mb-1">{t('projection.intSaved')}</p>
           <p className="text-sm font-semibold text-green-600 dark:text-green-400">{intSaved > 0 ? `−${fmt(intSaved, 0)}` : fmt(intSaved, 0)}</p>
-          <p className="text-xs text-gray-400 mt-0.5">{fmt(intMain, 0)} vs {fmt(intNoAmo, 0)} sin amortizar</p>
+          <p className="text-xs text-gray-400 mt-0.5">{fmt(intMain, 0)} vs {fmt(intNoAmo, 0)} {t('projection.withoutAmort')}</p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
-          <p className="text-xs text-gray-400 mb-1">{monthsSaved != null ? 'Tiempo ahorrado' : 'Hipoteca pagada'}</p>
+          <p className="text-xs text-gray-400 mb-1">{monthsSaved != null ? t('projection.timeSaved') : t('projection.mortgagePaid')}</p>
           <p className="text-sm font-semibold text-gray-800 dark:text-white">
-            {monthsSaved != null ? `${Math.floor(monthsSaved/12)}a ${monthsSaved%12}m antes` : debtPaidMain?.label ?? 'Fuera del horizonte'}
+            {monthsSaved != null ? `${Math.floor(monthsSaved/12)}a ${monthsSaved%12}m antes` : debtPaidMain?.label ?? t('projection.beyondHorizon')}
           </p>
           <p className="text-xs text-gray-400 mt-0.5">
             {monthsSaved != null ? `${debtPaidMain?.label ?? '?'} vs ${debtPaidNoAmo?.label ?? '?'}` : ''}
@@ -745,7 +744,7 @@ function MortgageScenarioCompare({ main, noAmo, xTicks, fmt }: {
           {CHART_KINDS.map(k => (
             <button key={k.id} onClick={() => setChartKind(k.id)}
               className={`px-3 py-1.5 text-xs font-medium transition-colors ${chartKind === k.id ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-              {k.label}
+              {k.label()}
             </button>
           ))}
         </div>
@@ -766,18 +765,18 @@ function MortgageScenarioCompare({ main, noAmo, xTicks, fmt }: {
       {/* Charts */}
       {viewMode === 'side' ? (
         <div className="flex gap-4">
-          <ScenarioCard title="Con amortización" color={COLOR_MAIN}>
+          <ScenarioCard title={t('projection.withAmort')} color={COLOR_MAIN}>
             <SideChart pts={main} color={COLOR_MAIN} />
           </ScenarioCard>
-          <ScenarioCard title="Sin amortizar" color={COLOR_NOAMO}>
+          <ScenarioCard title={t('projection.withoutAmort')} color={COLOR_NOAMO}>
             <SideChart pts={noAmo} color={COLOR_NOAMO} />
           </ScenarioCard>
         </div>
       ) : (
         <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
           <div className="flex items-center gap-4 text-xs text-gray-400">
-            <span className="flex items-center gap-1.5"><span className="inline-block w-5 h-0.5" style={{ backgroundColor: COLOR_MAIN }} /> Con amortización</span>
-            <span className="flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed" style={{ borderColor: COLOR_NOAMO }} /> Sin amortizar</span>
+            <span className="flex items-center gap-1.5"><span className="inline-block w-5 h-0.5" style={{ backgroundColor: COLOR_MAIN }} /> {t('projection.withAmort')}</span>
+            <span className="flex items-center gap-1.5"><span className="inline-block w-5 border-t-2 border-dashed" style={{ borderColor: COLOR_NOAMO }} /> {t('projection.withoutAmort')}</span>
           </div>
           <OverlayChart />
         </div>
@@ -797,7 +796,7 @@ export default function Projection() {
   const setConfig = useCallback((next: Config | ((c: Config) => Config)) => {
     setCfg(prev => {
       const n = typeof next === 'function' ? next(prev) : next
-      syncPref(CONFIG_KEY, JSON.stringify(n))
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(n))
       return n
     })
   }, [])
@@ -876,7 +875,7 @@ export default function Projection() {
   const saveSnapshot = () => {
     const snap: Snapshot = { savedAt: new Date().toISOString(), points: points.map(p => ({ ...p })), targetAmount: cfg.targetAmount }
     setSnapshot(snap)
-    syncPref(SNAPSHOT_KEY, JSON.stringify(snap))
+    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap))
   }
   const deleteSnapshot = () => { setSnapshot(null); localStorage.removeItem(SNAPSHOT_KEY) }
   const snapDate = snapshot ? new Date(snapshot.savedAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : null
@@ -896,8 +895,8 @@ export default function Projection() {
           <TrendingUp className="w-5 h-5 text-blue-500" strokeWidth={1.5} />
         </div>
         <div>
-          <h1 className="text-lg font-semibold text-gray-800 dark:text-white">{t('projection.title')}</h1>
-          <p className="text-xs text-gray-400 dark:text-gray-500">Simula la evolución de tu dinero a largo plazo</p>
+          <h1 className="text-lg font-semibold text-gray-800 dark:text-white">Proyección a futuro</h1>
+          <p className="text-xs text-gray-400 dark:text-gray-500">{t('projection.subtitle')}</p>
         </div>
       </div>
 
@@ -907,12 +906,12 @@ export default function Projection() {
         <div className="space-y-5">
           {/* Mode */}
           <section className="space-y-3">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Modo</p>
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t('projection.mode')}</p>
             <div className="flex rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900">
               {(['manual', 'auto'] as const).map(m => (
                 <button key={m} onClick={() => setPatch({ mode: m })}
                   className={`flex-1 py-2 text-sm font-medium transition-colors ${cfg.mode === m ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                  {m === 'manual' ? 'Manual' : 'Usar mis datos'}
+                  {m === 'manual' ? t('projection.modeManual') : t('projection.modeAuto')}
                 </button>
               ))}
             </div>
@@ -921,20 +920,20 @@ export default function Projection() {
           {cfg.mode === 'auto' && (
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3 space-y-3">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600 dark:text-gray-400">Años de historial</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400">{t('projection.historyYears')}</span>
                 <select className={INP_SM} value={cfg.autoYears} onChange={e => setPatch({ autoYears: parseInt(e.target.value) })}>
-                  {[1, 2, 3, 5].map(n => <option key={n} value={n}>{n} {n === 1 ? 'año' : 'años'}</option>)}
+                  {[1, 2, 3, 5].map(n => <option key={n} value={n}>{n} {n === 1 ? t('projection.year_') : t('projection.years_')}</option>)}
                 </select>
               </div>
               {movementsQuery.isLoading ? (
-                <p className="text-xs text-gray-400 animate-pulse">Calculando medias…</p>
+                <p className="text-xs text-gray-400 animate-pulse">{t('projection.calculating')}</p>
               ) : (
                 <div className="text-xs text-gray-500 dark:text-gray-400 space-y-0.5">
-                  <p>Media mensual sobre <span className="font-medium">{autoMonths} meses</span>:</p>
-                  <p className="text-green-600 dark:text-green-400">Ingresos: +{fmt(autoIncome, 0)}</p>
-                  <p className="text-red-500">Gastos: −{fmt(autoExpense, 0)}</p>
+                  <p>{t('projection.monthlyAvg').replace('{n}', String(autoMonths))}</p>
+                  <p className="text-green-600 dark:text-green-400">{t('projection.income')}: +{fmt(autoIncome, 0)}</p>
+                  <p className="text-red-500">{t('projection.expenses')}: −{fmt(autoExpense, 0)}</p>
                   <p className={autoIncome - autoExpense >= 0 ? 'text-blue-500' : 'text-orange-500'}>
-                    Neto: {autoIncome - autoExpense >= 0 ? '+' : ''}{fmt(autoIncome - autoExpense, 0)}/mes
+                    {t('projection.net')} {autoIncome - autoExpense >= 0 ? '+' : ''}{fmt(autoIncome - autoExpense, 0)}/mes
                   </p>
                 </div>
               )}
@@ -943,10 +942,10 @@ export default function Projection() {
 
           {/* Global params */}
           <section className="space-y-2">
-            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Parámetros</p>
+            <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">{t('projection.params')}</p>
             <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
               <div className="flex items-center gap-3 px-4 py-3">
-                <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">Balance inicial</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">{t('projection.initialBalance')}</span>
                 <div className="flex items-center gap-1.5">
                   {accountsTotal !== null && (
                     <button onClick={() => setPatch({ initialBalance: Math.round(accountsTotal) })}
@@ -963,15 +962,15 @@ export default function Projection() {
                 </div>
               </div>
               <div className="flex items-center gap-3 px-4 py-3">
-                <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">Años de proyección</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">{t('projection.years')}</span>
                 <select className={INP_SM} value={cfg.projectionYears} onChange={e => setPatch({ projectionYears: parseInt(e.target.value) })}>
-                  {[5, 10, 15, 20, 25, 30, 35, 40].map(n => <option key={n} value={n}>{n} años</option>)}
+                  {[5, 10, 15, 20, 25, 30, 35, 40].map(n => <option key={n} value={n}>{n} {t('projection.years_')}</option>)}
                 </select>
               </div>
               <div className="flex items-center gap-3 px-4 py-3">
                 <div className="flex items-center gap-1.5 flex-1">
                   <Target className="w-3.5 h-3.5 text-gray-400" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Objetivo</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{t('projection.target')}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <input type="number" step={1000} className={`${INP_SM} w-28 text-right`}
@@ -981,7 +980,7 @@ export default function Projection() {
                 </div>
               </div>
               <div className="flex items-center gap-3 px-4 py-3">
-                <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">Dos fases</span>
+                <span className="text-sm text-gray-600 dark:text-gray-400 flex-1">{t('projection.twoPhases')}</span>
                 <Toggle value={cfg.twoPhases} onChange={v => setPatch({ twoPhases: v })} />
               </div>
               {cfg.twoPhases && (() => {
@@ -1047,7 +1046,7 @@ export default function Projection() {
             <section className="space-y-3">
               {cfg.twoPhases && (
                 <div className="flex rounded-xl border border-gray-200 dark:border-gray-700 overflow-hidden bg-white dark:bg-gray-900">
-                  {(['Fase 1', 'Fase 2'] as const).map((label, i) => (
+                  {([t('projection.phase1'), t('projection.phase2')] as const).map((label, i) => (
                     <button key={i} onClick={() => setActivePhaseTab(i as 0 | 1)}
                       className={`flex-1 py-2 text-sm font-medium transition-colors ${activePhaseTab === i ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
                       {label}
@@ -1057,7 +1056,7 @@ export default function Projection() {
               )}
               <PhasePanel
                 phase={cfg.phases[activePhaseTab]}
-                label={cfg.twoPhases ? `Fase ${activePhaseTab + 1}` : 'Fase 1'}
+                label={cfg.twoPhases ? (activePhaseTab === 0 ? t('projection.phase1') : t('projection.phase2')) : t('projection.phase1')}
                 onChange={p => updatePhase(activePhaseTab, p)}
                 canCopy={cfg.twoPhases}
                 showMortgage={cfg.twoPhases && activePhaseTab === 1}
@@ -1099,7 +1098,7 @@ export default function Projection() {
               <div className="flex items-center gap-2">
                 {snapshot && (
                   <div className="flex items-center gap-1.5">
-                    <span className="text-xs text-gray-400">Guardado el {snapDate}</span>
+                    <span className="text-xs text-gray-400">{t('projection.snapshotOf')} {snapDate}</span>
                     <button onClick={deleteSnapshot} className="p-1 text-gray-300 hover:text-red-400 rounded transition-colors">
                       <Trash2 className="w-3 h-3" />
                     </button>
@@ -1131,7 +1130,7 @@ export default function Projection() {
                   })()}
                   {(() => {
                     const pt = points.find((p, i) => i > 0 && (p.mortgageDebt ?? 1) === 0 && (points[i - 1]?.mortgageDebt ?? 1) > 0)
-                    return pt ? <ReferenceLine x={pt.label} stroke="#8b5cf6" strokeDasharray="3 2" label={{ value: 'Hipoteca pagada', fill: '#8b5cf6', fontSize: 10, position: 'insideTopLeft' }} /> : null
+                    return pt ? <ReferenceLine x={pt.label} stroke="#8b5cf6" strokeDasharray="3 2" label={{ value: t('projection.mortgagePaid'), fill: '#8b5cf6', fontSize: 10, position: 'insideTopLeft' }} /> : null
                   })()}
                   {target > 0 && <ReferenceLine y={target} stroke="#22c55e" strokeDasharray="4 2" label={{ value: `Objetivo ${fmt(target, 0)}`, fill: '#22c55e', fontSize: 10, position: 'insideTopLeft' }} />}
                   {snapshot && <Line dataKey="snapBalance" stroke="#9ca3af" strokeDasharray="4 2" dot={false} strokeWidth={1.5} />}
@@ -1143,8 +1142,8 @@ export default function Projection() {
             {(snapshot || projResult.noAmo) && (
               <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400 pt-1">
                 <span className="flex items-center gap-1"><span className="inline-block w-5 h-0.5 bg-blue-500" /> Balance proyectado</span>
-                {projResult.noAmo && <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-dashed border-orange-400" /> Sin amortizar</span>}
-                {snapshot && <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-dashed border-gray-400" /> Guardado {snapDate}</span>}
+                {projResult.noAmo && <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-dashed border-orange-400" /> {t('projection.withoutAmort')}</span>}
+                {snapshot && <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-dashed border-gray-400" /> {t('projection.snapshotOf')} {snapDate}</span>}
               </div>
             )}
           </div>
