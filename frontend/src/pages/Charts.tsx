@@ -1330,9 +1330,9 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
               {(isAccounts || def.splitBy==='none' || def.xAxis==='none') && (
                 <div className="flex flex-wrap gap-1.5">
                   {(def.xAxis==='none'
-                    ? [{ id:'bar',   icon:<BarChart2 className="w-3.5 h-3.5"/>, label:'Barras' },
-                       { id:'donut', icon:<PieIcon   className="w-3.5 h-3.5"/>, label:'Donut'  },
-                       { id:'pie',   icon:<PieIcon   className="w-3.5 h-3.5"/>, label:'Tarta'  }]
+                    ? [{ id:'bar',   icon:<BarChart2 className="w-3.5 h-3.5"/>, label:t('charts.typeBars')  },
+                       { id:'donut', icon:<PieIcon   className="w-3.5 h-3.5"/>, label:t('charts.typeDonut') },
+                       { id:'pie',   icon:<PieIcon   className="w-3.5 h-3.5"/>, label:t('charts.typePie')   }]
                     : [{ id:'bar',   icon:<BarChart2  className="w-3.5 h-3.5"/>, label:t('charts.modeColumns') },
                        { id:'line',  icon:<Activity   className="w-3.5 h-3.5"/>, label:t('charts.modeLines')   },
                        { id:'area',  icon:<TrendingUp className="w-3.5 h-3.5"/>, label:t('charts.modeArea')    }]
@@ -1656,7 +1656,7 @@ export default function Charts() {
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">{t('charts.title')}</h1>
-          <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">Filtros y vista independientes por gráfico</p>
+          <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">{t('charts.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2">
           {(hiddenBuiltins.size + hiddenCustom.size) > 0 && (
@@ -1674,7 +1674,7 @@ export default function Charts() {
                 return [...prev, ...buildPackedLayout(toAdd).map(item => ({ ...item, y: item.y + maxY }))]
               })
             }} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-              Restaurar ocultos ({hiddenBuiltins.size + hiddenCustom.size})
+              {t('charts.restoreHidden')} ({hiddenBuiltins.size + hiddenCustom.size})
             </button>
           )}
           <button onClick={addChart} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-800 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors shadow-sm">
@@ -1696,18 +1696,18 @@ export default function Charts() {
         {BUILTIN_DEFS.filter(b=>!hiddenBuiltins.has(b.id)).map(({id})=>{
           const bp = { ...shared, onDelete: ()=>hideBuiltin(id) }
           const renderMap: Record<string,()=>React.ReactNode> = {
-            monthly:       ()=><ChartWithFilter title="Ingresos y gastos por mes"       {...bp} modes={[M_BARS,M_STACKED,M_LINES,M_COMBO]} render={p=><MonthlyBarChart {...p}/>}/>,
-            net:           ()=><ChartWithFilter title="Balance neto por mes"            {...bp}                                             render={p=><NetMonthlyChart {...p}/>}/>,
-            cumulative:    ()=><ChartWithFilter title="Balance acumulado"               {...bp} modes={[M_AREA,M_LINES]}                   render={p=><CumulativeChart {...p}/>}/>,
-            expdnt:        ()=><ChartWithFilter title="Gastos por categoría"            {...bp} modes={[M_DONUT,M_BARS]}                   render={p=><ExpenseDonutChart {...p}/>}/>,
-            incdnt:        ()=><ChartWithFilter title="Ingresos por categoría"          {...bp} modes={[M_DONUT,M_BARS]}                   render={p=><IncomeDonutChart {...p}/>}/>,
-            top:           ()=><ChartWithFilter title="Top subtipos de gasto"           {...bp}                                             render={p=><TopTypesChart {...p}/>}/>,
-            savings:       ()=><ChartWithFilter title="Ahorro vs gasto mensual"         {...bp} modes={[M_STACKED,M_BARS,M_COMBO]}         render={p=><SavingsChart {...p}/>}/>,
-            trend:         ()=><ChartWithFilter title="Tendencia mensual por categoría" {...bp} modes={[M_LINES,M_AREA,M_BARS,M_COMBO]}    render={p=><TrendLineChart {...p}/>}/>,
-            subtypes:      ()=><ChartWithFilter title="Subtipos de gasto por categoría" {...bp} modes={[M_STACKED,M_BARS,M_LINES]}         render={p=><SubtypesByGroupChart {...p}/>}/>,
-            'dash-line':   ()=><ChartWithFilter title="Gastos por categoría vs Ingresos"{...bp}                                             render={p=><DashExpLineChart {...p}/>}/>,
-            'dash-pie':    ()=><ChartWithFilter title="Distribución de gastos"           {...bp}                                             render={p=><DashExpPieChart {...p}/>}/>,
-            'dash-balance':()=><ChartWithFilter title="Evolución del balance"            {...bp}                                             render={p=><DashBalanceChart {...p} accounts={accounts}/>}/>,
+            monthly:       ()=><ChartWithFilter title={t('charts.titleMonthly')}    {...bp} modes={[M_BARS,M_STACKED,M_LINES,M_COMBO]} render={p=><MonthlyBarChart {...p}/>}/>,
+            net:           ()=><ChartWithFilter title={t('charts.titleNet')}         {...bp}                                             render={p=><NetMonthlyChart {...p}/>}/>,
+            cumulative:    ()=><ChartWithFilter title={t('charts.titleCumulative')}  {...bp} modes={[M_AREA,M_LINES]}                   render={p=><CumulativeChart {...p}/>}/>,
+            expdnt:        ()=><ChartWithFilter title={t('charts.titleExpDnt')}      {...bp} modes={[M_DONUT,M_BARS]}                   render={p=><ExpenseDonutChart {...p}/>}/>,
+            incdnt:        ()=><ChartWithFilter title={t('charts.titleIncDnt')}      {...bp} modes={[M_DONUT,M_BARS]}                   render={p=><IncomeDonutChart {...p}/>}/>,
+            top:           ()=><ChartWithFilter title={t('charts.titleTop')}         {...bp}                                             render={p=><TopTypesChart {...p}/>}/>,
+            savings:       ()=><ChartWithFilter title={t('charts.titleSavings')}     {...bp} modes={[M_STACKED,M_BARS,M_COMBO]}         render={p=><SavingsChart {...p}/>}/>,
+            trend:         ()=><ChartWithFilter title={t('charts.titleTrend')}       {...bp} modes={[M_LINES,M_AREA,M_BARS,M_COMBO]}    render={p=><TrendLineChart {...p}/>}/>,
+            subtypes:      ()=><ChartWithFilter title={t('charts.titleSubtypes')}    {...bp} modes={[M_STACKED,M_BARS,M_LINES]}         render={p=><SubtypesByGroupChart {...p}/>}/>,
+            'dash-line':   ()=><ChartWithFilter title={t('charts.titleDashLine')}    {...bp}                                             render={p=><DashExpLineChart {...p}/>}/>,
+            'dash-pie':    ()=><ChartWithFilter title={t('charts.titleDashPie')}     {...bp}                                             render={p=><DashExpPieChart {...p}/>}/>,
+            'dash-balance':()=><ChartWithFilter title={t('charts.titleDashBalance')} {...bp}                                             render={p=><DashBalanceChart {...p} accounts={accounts}/>}/>,
           }
           const renderFn = renderMap[id]; if (!renderFn) return null
           return <div key={id} className="h-full overflow-hidden">{renderFn()}</div>

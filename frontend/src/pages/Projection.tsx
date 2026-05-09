@@ -302,7 +302,7 @@ function ExpenseRow({ exp, onChange, onDelete }: {
         <select className={INP_SM} value={exp.frequency}
           onChange={e => set({ frequency: e.target.value as FreqType })}>
           <option value="monthly">Mensual</option>
-          <option value="every-n">Cada N meses</option>
+          <option value="every-n">{t('projection.everyNMonths')}</option>
           <option value="annual">Anual</option>
         </select>
         {exp.frequency === 'every-n' && (
@@ -310,7 +310,7 @@ function ExpenseRow({ exp, onChange, onDelete }: {
             <span className="text-xs text-gray-400">Cada</span>
             <input type="number" min={1} max={60} className={`${INP_SM} w-14`}
               value={exp.everyN} onChange={e => set({ everyN: parseInt(e.target.value) || 1 })} />
-            <span className="text-xs text-gray-400">meses, empezando en el mes</span>
+            <span className="text-xs text-gray-400">{t('projection.monthsFrom')}</span>
             <input type="number" min={0} max={59} className={`${INP_SM} w-14`}
               value={exp.startOffset} onChange={e => set({ startOffset: parseInt(e.target.value) || 0 })} />
           </>
@@ -752,12 +752,12 @@ function MortgageScenarioCompare({ main, noAmo, xTicks, fmt }: {
           <button onClick={() => setViewMode('side')}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === 'side' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
             <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="6" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/><rect x="9" y="2" width="6" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/></svg>
-            Lado a lado
+            {t('projection.viewSide')}
           </button>
           <button onClick={() => setViewMode('overlay')}
             className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors ${viewMode === 'overlay' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
             <svg className="w-3.5 h-3.5" viewBox="0 0 16 16" fill="none"><rect x="1" y="2" width="14" height="12" rx="1" stroke="currentColor" strokeWidth="1.5"/><path d="M1 7h14" stroke="currentColor" strokeWidth="1" strokeDasharray="2 2"/></svg>
-            Superponer
+            {t('projection.viewOverlay')}
           </button>
         </div>
       </div>
@@ -1080,21 +1080,21 @@ export default function Projection() {
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800">
               <Target className="w-4 h-4 text-green-500 shrink-0" />
               <p className="text-sm text-green-700 dark:text-green-300">
-                Llegas a <strong>{fmt(target, 0)}</strong> en <strong>{targetCrossing.label}</strong> (mes {targetCrossing.t})
+                {t('projection.targetReached').replace('{amount}', fmt(target, 0)).replace('{date}', targetCrossing.label).replace('{month}', String(targetCrossing.t))}
               </p>
             </div>
           )}
           {target > 0 && !targetCrossing && (
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-100 dark:border-orange-800">
               <Info className="w-4 h-4 text-orange-500 shrink-0" />
-              <p className="text-sm text-orange-700 dark:text-orange-300">No alcanzas el objetivo de {fmt(target, 0)} en {cfg.projectionYears} años.</p>
+              <p className="text-sm text-orange-700 dark:text-orange-300">{t('projection.targetMissed').replace('{amount}', fmt(target, 0)).replace('{years}', String(cfg.projectionYears))}</p>
             </div>
           )}
 
           {/* Main chart */}
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">Evolución del balance</p>
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{t('projection.balanceEvolution')}</p>
               <div className="flex items-center gap-2">
                 {snapshot && (
                   <div className="flex items-center gap-1.5">
@@ -1107,7 +1107,7 @@ export default function Projection() {
                 <button onClick={saveSnapshot}
                   className="flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
                   {snapshot ? <BookmarkCheck className="w-3.5 h-3.5 text-blue-500" /> : <Bookmark className="w-3.5 h-3.5" />}
-                  Recordar
+                  {t('projection.remember')}
                 </button>
               </div>
             </div>
@@ -1126,13 +1126,13 @@ export default function Projection() {
                   <Tooltip content={<ChartTooltip fmt={v => fmt(v, 0)} twoPhases={cfg.twoPhases} />} />
                   {cfg.twoPhases && cfg.phases[0].durationMonths > 0 && (() => {
                     const pt = points.find(p => p.t === cfg.phases[0].durationMonths)
-                    return pt ? <ReferenceLine x={pt.label} stroke="#f59e0b" strokeDasharray="4 2" label={{ value: `Fase 2 · ${fmtK(pt.balance)}`, fill: '#f59e0b', fontSize: 10, position: 'insideTopRight' }} /> : null
+                    return pt ? <ReferenceLine x={pt.label} stroke="#f59e0b" strokeDasharray="4 2" label={{ value: `${t('projection.phase2')} · ${fmtK(pt.balance)}`, fill: '#f59e0b', fontSize: 10, position: 'insideTopRight' }} /> : null
                   })()}
                   {(() => {
                     const pt = points.find((p, i) => i > 0 && (p.mortgageDebt ?? 1) === 0 && (points[i - 1]?.mortgageDebt ?? 1) > 0)
                     return pt ? <ReferenceLine x={pt.label} stroke="#8b5cf6" strokeDasharray="3 2" label={{ value: t('projection.mortgagePaid'), fill: '#8b5cf6', fontSize: 10, position: 'insideTopLeft' }} /> : null
                   })()}
-                  {target > 0 && <ReferenceLine y={target} stroke="#22c55e" strokeDasharray="4 2" label={{ value: `Objetivo ${fmt(target, 0)}`, fill: '#22c55e', fontSize: 10, position: 'insideTopLeft' }} />}
+                  {target > 0 && <ReferenceLine y={target} stroke="#22c55e" strokeDasharray="4 2" label={{ value: `${t('projection.target')} ${fmt(target, 0)}`, fill: '#22c55e', fontSize: 10, position: 'insideTopLeft' }} />}
                   {snapshot && <Line dataKey="snapBalance" stroke="#9ca3af" strokeDasharray="4 2" dot={false} strokeWidth={1.5} />}
                   {projResult.noAmo && <Line dataKey="noAmoBalance" stroke="#f97316" strokeDasharray="4 2" dot={false} strokeWidth={1.5} />}
                   <Area dataKey="balance" stroke="#3b82f6" strokeWidth={2} fill="url(#balGrad)" dot={false} />
@@ -1141,7 +1141,7 @@ export default function Projection() {
             </div>
             {(snapshot || projResult.noAmo) && (
               <div className="flex flex-wrap items-center gap-4 text-xs text-gray-400 pt-1">
-                <span className="flex items-center gap-1"><span className="inline-block w-5 h-0.5 bg-blue-500" /> Balance proyectado</span>
+                <span className="flex items-center gap-1"><span className="inline-block w-5 h-0.5 bg-blue-500" /> {t('projection.projectedBalance')}</span>
                 {projResult.noAmo && <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-dashed border-orange-400" /> {t('projection.withoutAmort')}</span>}
                 {snapshot && <span className="flex items-center gap-1"><span className="inline-block w-5 border-t-2 border-dashed border-gray-400" /> {t('projection.snapshotOf')} {snapDate}</span>}
               </div>
@@ -1151,17 +1151,17 @@ export default function Projection() {
           {/* Summary table */}
           <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
             <div className={`grid px-4 py-2 text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide ${showMortgageCharts ? 'grid-cols-4' : 'grid-cols-3'}`}>
-              <span>Momento</span>
-              <span className="text-right">Balance</span>
-              <span className="text-right">Neto/mes</span>
-              {showMortgageCharts && <span className="text-right text-orange-400">Sin amort.</span>}
+              <span>{t('projection.colMoment')}</span>
+              <span className="text-right">{t('projection.balanceLabel').replace(':','')}</span>
+              <span className="text-right">{t('projection.colNetMonth')}</span>
+              {showMortgageCharts && <span className="text-right text-orange-400">{t('projection.colNoAmort')}</span>}
             </div>
             {[1, Math.floor(cfg.projectionYears / 2), cfg.projectionYears].filter((v, i, a) => a.indexOf(v) === i).map(yr => {
               const pt   = points.find(p => p.t === yr * 12) ?? points[points.length - 1]
               const noAm = projResult.noAmo?.find(p => p.t === yr * 12)
               return (
                 <div key={yr} className={`grid px-4 py-2.5 text-sm ${showMortgageCharts ? 'grid-cols-4' : 'grid-cols-3'}`}>
-                  <span className="text-gray-500 dark:text-gray-400">Año {yr}</span>
+                  <span className="text-gray-500 dark:text-gray-400">{t('projection.yearLabel')} {yr}</span>
                   <span className={`text-right font-medium ${pt.balance >= cfg.initialBalance ? 'text-gray-800 dark:text-white' : 'text-red-500'}`}>{fmt(pt.balance, 0)}</span>
                   <span className={`text-right text-xs ${pt.net >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>{pt.net >= 0 ? '+' : ''}{fmt(pt.net, 0)}</span>
                   {showMortgageCharts && <span className="text-right text-xs text-orange-500">{noAm ? fmt(noAm.balance, 0) : '—'}</span>}

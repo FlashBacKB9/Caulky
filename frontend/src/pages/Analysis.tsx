@@ -331,44 +331,44 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
     {
       label: t('analysis.savingsRate'),
       value: `${savingsRate.toFixed(1)}%`,
-      sub: savingsRate >= 20 ? 'Excelente (obj. >20%)' : savingsRate >= 10 ? 'Buena (obj. >20%)' : savingsRate >= 0 ? 'Mejorable (obj. >20%)' : 'Sin datos de ahorro',
+      sub: savingsRate >= 20 ? t('analysis.subExcellent') : savingsRate >= 10 ? t('analysis.subGood') : savingsRate >= 0 ? t('analysis.subFair') : t('analysis.subNoSavings'),
       color: savingsRate >= 20 ? 'text-green-500' : savingsRate >= 10 ? 'text-yellow-500' : savingsRate >= 0 ? 'text-orange-500' : 'text-gray-400',
-      detail: income > 0 ? `De cada 100€ ingresados, destinas ${savingsRate.toFixed(0)}€ al ahorro` : '',
+      detail: income > 0 ? t('analysis.savingsRateDetail').replace('{n}', savingsRate.toFixed(0)) : '',
     },
     {
       label: t('analysis.emergencyMonths'),
       value: `${emergencyMonths.toFixed(1)} meses`,
-      sub: emergencyMonths >= 6 ? 'Suficiente (obj. >6m)' : emergencyMonths >= 3 ? 'Mínimo (obj. >6m)' : 'Insuficiente (obj. >6m)',
+      sub: emergencyMonths >= 6 ? t('analysis.subSufficient') : emergencyMonths >= 3 ? t('analysis.subMinimum') : t('analysis.subInsufficient'),
       color: emergencyMonths >= 6 ? 'text-green-500' : emergencyMonths >= 3 ? 'text-yellow-500' : 'text-red-500',
-      detail: `${fmt(emergencyBalance)} ÷ ${fmt(avgMonthlyExpenses)}/mes`,
+      detail: t('analysis.emergencyDetail').replace('{balance}', fmt(emergencyBalance)).replace('{avg}', fmt(avgMonthlyExpenses)),
     },
     {
       label: t('analysis.incomeRatio'),
       value: ratio.toFixed(2),
-      sub: ratio >= 1.2 ? 'Saludable (obj. >1.2)' : ratio >= 1 ? 'Ajustado' : 'Deficitario',
+      sub: ratio >= 1.2 ? t('analysis.subHealthy') : ratio >= 1 ? t('analysis.subTight') : t('analysis.subDeficit'),
       color: ratio >= 1.2 ? 'text-green-500' : ratio >= 1 ? 'text-yellow-500' : 'text-red-500',
-      detail: `Por €1 de gasto real, ingresas €${ratio.toFixed(2)}`,
+      detail: t('analysis.incomeRatioDetail').replace('{ratio}', ratio.toFixed(2)),
     },
     {
       label: t('analysis.monthlySavings'),
       value: fmt(actualSavings / months),
       sub: months === 1 ? t('analysis.monthsAnalyzed').replace('{n}', String(months)) : t('analysis.monthsAnalyzedP').replace('{n}', String(months)),
       color: actualSavings >= 0 ? 'text-green-500' : 'text-red-500',
-      detail: `${fmt(income / months)} ing. · ${fmt(avgMonthlyExpenses)} gastos`,
+      detail: t('analysis.monthlySavingsDetail').replace('{income}', fmt(income / months)).replace('{expenses}', fmt(avgMonthlyExpenses)),
     },
     {
       label: t('analysis.topExpense'),
       value: topCat ? topCat[0] : '—',
       sub: topCat ? fmt(topCat[1]) : t('analysis.noExpenseData'),
       color: 'text-gray-700 dark:text-gray-200',
-      detail: topCat && realExpenses > 0 ? `${((topCat[1] / realExpenses) * 100).toFixed(0)}% del total de gastos` : '',
+      detail: topCat && realExpenses > 0 ? t('analysis.topExpenseDetail').replace('{pct}', ((topCat[1] / realExpenses) * 100).toFixed(0)) : '',
     },
     {
       label: t('analysis.totalSavings'),
       value: fmt(actualSavings),
       sub: actualSavings >= 0 ? t('analysis.accumulatedSavings') : t('analysis.noSavingsRecorded'),
       color: actualSavings >= 0 ? 'text-green-500' : 'text-gray-400',
-      detail: income > 0 ? `${fmt(income)} ingresos · ${fmt(actualSavings)} ahorrados` : '',
+      detail: income > 0 ? t('analysis.totalSavingsDetail').replace('{income}', fmt(income)).replace('{savings}', fmt(actualSavings)) : '',
     },
   ]
 
@@ -376,23 +376,23 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
     if (income === 0) return t('analysis.noIncomeMsg')
     const parts: string[] = []
     if (savingsRate >= 20) {
-      parts.push(`Estás ahorrando el ${savingsRate.toFixed(0)}% de tus ingresos, por encima del 20% recomendado.`)
+      parts.push(t('analysis.summaryExcellent').replace('{pct}', savingsRate.toFixed(0)))
     } else if (savingsRate >= 10) {
-      parts.push(`Tu tasa de ahorro del ${savingsRate.toFixed(0)}% es positiva pero no llega al objetivo del 20%.`)
+      parts.push(t('analysis.summaryGood').replace('{pct}', savingsRate.toFixed(0)))
     } else if (savingsRate > 0) {
-      parts.push(`Tu tasa de ahorro del ${savingsRate.toFixed(0)}% es baja. Revisa si puedes reducir alguna categoría de gasto.`)
+      parts.push(t('analysis.summaryFair').replace('{pct}', savingsRate.toFixed(0)))
     } else {
-      parts.push('No hay movimientos de ahorro registrados en el período. Configura tus categorías de ahorro arriba.')
+      parts.push(t('analysis.noSavingsInPeriod'))
     }
     if (emergencyMonths >= 6) {
-      parts.push(`El fondo de emergencia cubre ${emergencyMonths.toFixed(1)} meses de gastos — situación sólida.`)
+      parts.push(t('analysis.summaryEmergencyOk').replace('{m}', emergencyMonths.toFixed(1)))
     } else if (emergencyMonths >= 3) {
-      parts.push(`El fondo de emergencia cubre ${emergencyMonths.toFixed(1)} meses; el objetivo recomendado son 6 meses.`)
+      parts.push(t('analysis.summaryEmergencyLow').replace('{m}', emergencyMonths.toFixed(1)))
     } else {
-      parts.push(`El fondo de emergencia solo cubre ${emergencyMonths.toFixed(1)} meses. Prioriza construirlo hasta los 6 meses mínimos.`)
+      parts.push(t('analysis.summaryEmergencyCritical').replace('{m}', emergencyMonths.toFixed(1)))
     }
     if (topCat) {
-      parts.push(`Tu mayor tipo de gasto es "${topCat[0]}" con ${fmt(topCat[1])} (${realExpenses > 0 ? ((topCat[1] / realExpenses) * 100).toFixed(0) : 0}% del total).`)
+      parts.push(t('analysis.summaryTopCat').replace('{cat}', topCat[0]).replace('{amount}', fmt(topCat[1])).replace('{pct}', realExpenses > 0 ? ((topCat[1] / realExpenses) * 100).toFixed(0) : '0'))
     }
     return parts.join(' ')
   }, [income, savingsRate, actualSavings, emergencyMonths, topCat, realExpenses, fmt])
@@ -413,8 +413,7 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
         {summary}
       </div>
       <p className="text-xs text-gray-400 dark:text-gray-500 text-right">
-        {incomeMovementsCount} movimiento{incomeMovementsCount !== 1 ? 's' : ''} de ingreso ·{' '}
-        {realExpenseMovements.length} de gasto real usados en el cálculo
+        {t('analysis.movementsUsed').replace('{income}', String(incomeMovementsCount)).replace('{expense}', String(realExpenseMovements.length))}
       </p>
     </div>
   )
@@ -453,7 +452,7 @@ function PatronesDeGasto({ realExpenseMovements, fmt }: {
   return (
     <div>
       <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-        Media de gasto por mes del año, promediada entre todos los años del rango. Los movimientos excluidos en la configuración no se cuentan.
+        {t('analysis.patternsDesc')}
       </p>
       <ResponsiveContainer width="100%" height={180}>
         <BarChart data={byCalendarMonth} margin={{ top: 4, right: 0, left: 0, bottom: 0 }}>
@@ -654,7 +653,7 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        Basado en {fmt(monthlySavings)}/mes de ahorro y {fmt(totalBalance)} de patrimonio actual
+        {t('analysis.projectionDesc').replace('{monthly}', fmt(monthlySavings)).replace('{balance}', fmt(totalBalance))}
       </p>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={points} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
@@ -675,7 +674,7 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
       <div className="grid grid-cols-3 gap-3 text-center">
         {[3, 6, 12].map(m => (
           <div key={m} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
-            <p className="text-xs text-gray-500 dark:text-gray-400">En {m} meses</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">{t('analysis.inMonths').replace('{n}', String(m))}</p>
             <p className={`text-sm font-bold mt-0.5 ${totalBalance + monthlySavings * m >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
               {fmt(totalBalance + monthlySavings * m)}
             </p>

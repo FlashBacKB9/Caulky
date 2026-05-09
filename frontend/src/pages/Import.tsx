@@ -546,7 +546,7 @@ export default function Import() {
     <div className="p-3 md:p-6 max-w-3xl">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-800 dark:text-white">{t('import.title')}</h1>
-        <p className="text-sm text-gray-400 mt-1">Importa movimientos desde un archivo .xlsx</p>
+        <p className="text-sm text-gray-400 mt-1">{t('import.subtitle')}</p>
       </div>
 
       <Steps current={step} hasTypes={hasTypes} />
