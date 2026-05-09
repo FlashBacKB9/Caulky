@@ -329,42 +329,42 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
 
   const metrics = [
     {
-      label: 'Tasa de ahorro',
+      label: t('analysis.savingsRate'),
       value: `${savingsRate.toFixed(1)}%`,
       sub: savingsRate >= 20 ? 'Excelente (obj. >20%)' : savingsRate >= 10 ? 'Buena (obj. >20%)' : savingsRate >= 0 ? 'Mejorable (obj. >20%)' : 'Sin datos de ahorro',
       color: savingsRate >= 20 ? 'text-green-500' : savingsRate >= 10 ? 'text-yellow-500' : savingsRate >= 0 ? 'text-orange-500' : 'text-gray-400',
       detail: income > 0 ? `De cada 100€ ingresados, destinas ${savingsRate.toFixed(0)}€ al ahorro` : '',
     },
     {
-      label: 'Fondo de emergencia',
+      label: t('analysis.emergencyMonths'),
       value: `${emergencyMonths.toFixed(1)} meses`,
       sub: emergencyMonths >= 6 ? 'Suficiente (obj. >6m)' : emergencyMonths >= 3 ? 'Mínimo (obj. >6m)' : 'Insuficiente (obj. >6m)',
       color: emergencyMonths >= 6 ? 'text-green-500' : emergencyMonths >= 3 ? 'text-yellow-500' : 'text-red-500',
       detail: `${fmt(emergencyBalance)} ÷ ${fmt(avgMonthlyExpenses)}/mes`,
     },
     {
-      label: 'Ratio ingreso/gasto',
+      label: t('analysis.incomeRatio'),
       value: ratio.toFixed(2),
       sub: ratio >= 1.2 ? 'Saludable (obj. >1.2)' : ratio >= 1 ? 'Ajustado' : 'Deficitario',
       color: ratio >= 1.2 ? 'text-green-500' : ratio >= 1 ? 'text-yellow-500' : 'text-red-500',
       detail: `Por €1 de gasto real, ingresas €${ratio.toFixed(2)}`,
     },
     {
-      label: 'Ahorro mensual',
+      label: t('analysis.monthlySavings'),
       value: fmt(actualSavings / months),
       sub: `${months} ${months === 1 ? 'mes' : 'meses'} analizados`,
       color: actualSavings >= 0 ? 'text-green-500' : 'text-red-500',
       detail: `${fmt(income / months)} ing. · ${fmt(avgMonthlyExpenses)} gastos`,
     },
     {
-      label: 'Mayor tipo de gasto',
+      label: t('analysis.topExpense'),
       value: topCat ? topCat[0] : '—',
       sub: topCat ? fmt(topCat[1]) : 'Sin datos de gastos',
       color: 'text-gray-700 dark:text-gray-200',
       detail: topCat && realExpenses > 0 ? `${((topCat[1] / realExpenses) * 100).toFixed(0)}% del total de gastos` : '',
     },
     {
-      label: 'Ahorro total en período',
+      label: t('analysis.totalSavings'),
       value: fmt(actualSavings),
       sub: actualSavings >= 0 ? 'Ahorro acumulado' : 'Sin ahorro registrado',
       color: actualSavings >= 0 ? 'text-green-500' : 'text-gray-400',

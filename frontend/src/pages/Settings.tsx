@@ -42,7 +42,7 @@ function DeleteMovementsModal({ accountName, movCount, isPending, onDeleteMoveme
       <div className="absolute inset-0 bg-black/30 dark:bg-black/50 backdrop-blur-sm" onClick={onCancel} />
       <div className="relative bg-white dark:bg-gray-900 rounded-2xl shadow-xl border border-gray-100 dark:border-gray-800 w-full max-w-sm overflow-hidden">
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 dark:border-gray-800">
-          <h2 className="text-sm font-semibold text-gray-800 dark:text-white">Movimientos asociados</h2>
+          <h2 className="text-sm font-semibold text-gray-800 dark:text-white">{t('settings.accountMovements')}</h2>
           <button onClick={onCancel} className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
             <X className="w-4 h-4" />
           </button>
@@ -61,8 +61,8 @@ function DeleteMovementsModal({ accountName, movCount, isPending, onDeleteMoveme
           >
             <div className="mt-0.5 w-2 h-2 rounded-full bg-red-500 shrink-0 mt-1.5" />
             <div>
-              <p className="text-sm font-medium text-red-700 dark:text-red-400">Borrar los movimientos</p>
-              <p className="text-xs text-red-500/80 dark:text-red-400/70 mt-0.5">Se eliminan permanentemente del historial</p>
+              <p className="text-sm font-medium text-red-700 dark:text-red-400">{t('settings.deleteMovementsBtn')}</p>
+              <p className="text-xs text-red-500/80 dark:text-red-400/70 mt-0.5">{t('settings.deleteMovementsDesc')}</p>
             </div>
           </button>
           <button
@@ -71,15 +71,15 @@ function DeleteMovementsModal({ accountName, movCount, isPending, onDeleteMoveme
           >
             <div className="mt-0.5 w-2 h-2 rounded-full bg-amber-500 shrink-0 mt-1.5" />
             <div>
-              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Convertir en gastos</p>
-              <p className="text-xs text-amber-500/80 dark:text-amber-400/70 mt-0.5">Se mantienen pero dejan de contar como ahorro</p>
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-400">{t('settings.convertToExpense')}</p>
+              <p className="text-xs text-amber-500/80 dark:text-amber-400/70 mt-0.5">{t('settings.convertToExpenseDesc')}</p>
             </div>
           </button>
           <button
             onClick={onCancel}
             className="w-full px-4 py-2.5 rounded-xl text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors text-center"
           >
-            No borrar la cuenta
+            {t('settings.keepAccount')}
           </button>
         </div>
       </div>
@@ -195,7 +195,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Saldo inicial</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('settings.initialBalance')}</span>
             <input
               type="number" step="0.01" value={balance} onChange={e => setBalance(e.target.value)}
               className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -203,9 +203,9 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
           </div>
           {!account.is_main && (
             <div className="space-y-1.5">
-              <span className="text-xs text-gray-500 dark:text-gray-400">Subtipos que alimentan esta cuenta</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400">{t('settings.subtypesFeeding')}</span>
               {allTypes.length === 0 ? (
-                <p className="text-xs text-gray-400 dark:text-gray-500 px-1">No hay subtipos disponibles</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 px-1">{t('settings.noSubtypes')}</p>
               ) : (
                 <div className="border border-gray-100 dark:border-gray-800 rounded-lg p-2 max-h-40 overflow-y-auto space-y-0.5">
                   {allTypes.map(t => {
@@ -244,11 +244,11 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
           )}
           <div className="flex justify-end gap-2">
             <button onClick={cancelEdit} className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-              Cancelar
+              {t('common.cancel')}
             </button>
             <button onClick={() => mutUpdate.mutate()} disabled={mutUpdate.isPending}
               className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 transition-colors">
-              {mutUpdate.isPending ? '...' : 'Guardar'}
+              {mutUpdate.isPending ? '...' : t('common.save')}
             </button>
           </div>
         </div>
@@ -286,7 +286,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
               <div className="flex items-center gap-1">
                 <button onClick={() => mutDelete.mutate({})} disabled={mutDelete.isPending}
                   className="px-2 py-1 text-xs rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
-                  {mutDelete.isPending ? '...' : 'Eliminar'}
+                  {mutDelete.isPending ? '...' : t('common.delete')}
                 </button>
                 <button onClick={() => setConfirming(false)} className="p-1 text-gray-300 hover:text-gray-500">
                   <X className="w-3 h-3" />
@@ -344,7 +344,7 @@ function ColorPicker({ color, onChange }: { color: string; onChange: (c: string)
         onClick={() => ref.current?.click()}
         className="w-6 h-6 rounded-full border-2 border-white dark:border-gray-700 shadow ring-1 ring-gray-200 dark:ring-gray-600 transition-transform hover:scale-110"
         style={{ backgroundColor: color }}
-        title="Cambiar color"
+        title={t('settings.changeColor')}
       />
       <input
         ref={ref}
@@ -424,11 +424,11 @@ function TypeForm({
 
       {/* Row 2: kind selector */}
       <div className="flex items-center gap-2 flex-wrap">
-        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">Tipo:</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{t('settings.kindLabel')}</span>
         <div className="flex items-center bg-gray-100 dark:bg-gray-700 rounded-lg p-0.5 gap-0.5">
-          {kindBtn('gasto', 'Gasto')}
-          {kindBtn('ingreso', 'Ingreso')}
-          {kindBtn('ahorro', 'Ahorro')}
+          {kindBtn('gasto', t('settings.kindExpense'))}
+          {kindBtn('ingreso', t('settings.kindIncome'))}
+          {kindBtn('ahorro', t('settings.kindSavings'))}
         </div>
 
         {s.kind === 'gasto' && expenseGroups.length > 0 && (
@@ -459,14 +459,14 @@ function TypeForm({
       {/* Actions */}
       <div className="flex items-center justify-end gap-2">
         <button onClick={onCancel} className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-          Cancelar
+          {t('common.cancel')}
         </button>
         <button
           onClick={() => s.name.trim() && onSave(s)}
           disabled={isSaving || !s.name.trim()}
           className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 transition-colors"
         >
-          {isSaving ? '...' : 'Guardar'}
+          {isSaving ? '...' : t('common.save')}
         </button>
       </div>
     </div>
@@ -606,7 +606,7 @@ function TypesSection() {
                     <button
                       onClick={() => { if (groupTypes.length === 0) mutDeleteGroup.mutate(group.id) }}
                       className={`p-1 rounded transition-colors ${groupTypes.length === 0 ? 'text-gray-300 dark:text-gray-600 hover:text-red-400' : 'text-gray-200 dark:text-gray-700 cursor-not-allowed'}`}
-                      title={groupTypes.length > 0 ? 'Elimina los tipos primero' : 'Eliminar grupo'}
+                      title={groupTypes.length > 0 ? t('settings.deleteGroupFirst') : t('settings.deleteGroup')}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>
@@ -643,7 +643,7 @@ function TypesSection() {
                       <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: type.color }} />
                       <span className="flex-1 text-sm text-gray-700 dark:text-gray-200">{type.name}</span>
                       <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">
-                        {getKind(type) === 'ingreso' ? 'Ingreso' : getKind(type) === 'ahorro' ? 'Ahorro' : ''}
+                        {getKind(type) === 'ingreso' ? t('settings.kindIncome') : getKind(type) === 'ahorro' ? t('settings.kindSavings') : ''}
                       </span>
                       {locked ? (
                         <Lock className="w-3 h-3 text-gray-300 dark:text-gray-600 shrink-0" />
@@ -763,7 +763,7 @@ function NavSection({ entries, onChange }: { entries: NavEntry[]; onChange: (e: 
             <Link to={entry.id} className={`flex-1 text-sm transition-colors hover:underline underline-offset-2 ${
               entry.visible ? 'text-gray-700 dark:text-gray-200' : 'text-gray-300 dark:text-gray-600'
             }`}>
-              {meta.label}
+              {t(meta.labelKey)}
             </Link>
             <button
               onClick={() => toggle(entry.id)}
@@ -849,7 +849,7 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Saldo inicial</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('settings.initialBalance')}</span>
               <input
                 type="number" step="0.01" value={newBal} onChange={e => setNewBal(e.target.value)}
                 className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
@@ -857,11 +857,11 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
             </div>
             <div className="flex justify-end gap-2">
               <button onClick={() => setAdding(false)} className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                Cancelar
+                {t('common.cancel')}
               </button>
               <button onClick={() => newName.trim() && mutCreate.mutate()} disabled={!newName.trim() || mutCreate.isPending}
                 className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 transition-colors">
-                {mutCreate.isPending ? '...' : 'Crear cuenta'}
+                {mutCreate.isPending ? '...' : t('settings.createAccount')}
               </button>
             </div>
           </div>

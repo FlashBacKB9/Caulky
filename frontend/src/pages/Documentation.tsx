@@ -1,4 +1,5 @@
 import { Download } from 'lucide-react'
+import { t } from '../utils/i18n'
 
 // ── Markdown content for download ─────────────────────────────────────────────
 
@@ -718,7 +719,7 @@ export default function Documentation() {
 
       {/* ── Left TOC ── */}
       <aside className="hidden lg:flex flex-col w-56 shrink-0 overflow-y-auto border-r border-gray-100 dark:border-gray-800 py-8 px-4">
-        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3 px-1">Contenido</p>
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3 px-1">{t('docs.toc')}</p>
         <nav className="flex-1 space-y-0.5">
           {SECTIONS.map(s => (
             <button
@@ -737,8 +738,8 @@ export default function Documentation() {
         <div className="max-w-3xl px-6 md:px-10 py-10">
 
           <div className="mb-10">
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Documentación</h1>
-            <p className="text-base text-gray-500 dark:text-gray-400 mt-2">Guía completa de uso de Caulky</p>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">{t('docs.title')}</h1>
+            <p className="text-base text-gray-500 dark:text-gray-400 mt-2">{t('docs.subtitle')}</p>
           </div>
 
           {/* ── 0. Usar con IA ─────────────────────────────────────────── */}
@@ -755,7 +756,7 @@ export default function Documentation() {
               className="inline-flex items-center gap-2.5 px-5 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-base font-semibold rounded-xl hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors"
             >
               <Download className="w-5 h-5" />
-              Descargar guía .md para IA
+              {t('docs.download')}
             </button>
           </div>
 

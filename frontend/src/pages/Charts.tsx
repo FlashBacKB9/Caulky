@@ -424,7 +424,7 @@ function DonutLayout({ data, mode, fmt, outerR, side, onLayoutChange }: {
     <div key="pie" style={{ width: boxSize, height: boxSize, flexShrink: 0 }} className="relative">
       {editable && (
         <div onMouseDown={startDrag}
-          title="Arrastra para reposicionar"
+          title={t('charts.dragReposition')}
           className="absolute top-1 left-1 z-10 cursor-grab p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800">
           <GripVertical className="w-3.5 h-3.5"/>
         </div>
@@ -438,7 +438,7 @@ function DonutLayout({ data, mode, fmt, outerR, side, onLayoutChange }: {
         </PieChart>
       </ResponsiveContainer>
       {editable && (
-        <div onMouseDown={startResize} title="Arrastra para redimensionar"
+        <div onMouseDown={startResize} title={t('charts.dragResize')}
           className="absolute bottom-0.5 right-0.5 z-10 cursor-nwse-resize p-1">
           <div className="w-3 h-3 border-r-2 border-b-2 border-gray-400 dark:border-gray-500 rounded-br-sm"/>
         </div>
@@ -585,7 +585,7 @@ function TopTypesChart({ filtered, typeById }: ChartProps) {
   }, [filtered, typeById])
   const tt = (p: unknown) => <CT {...(p as Parameters<typeof CT>[0])} fmt={fmt}/>
   if (!data.length) return <Empty/>
-  return (<ResponsiveContainer width="100%" height={Math.max(180, data.length*30+20)}><BarChart data={data} layout="vertical" margin={{ left:0, right:8 }}><XAxis type="number" tickFormatter={fmtK} tick={{ fontSize:10 }} axisLine={false} tickLine={false}/><YAxis type="category" dataKey="name" tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={100}/><Tooltip content={tt}/><Bar dataKey="value" name="Gasto" radius={[0,4,4,0]} maxBarSize={22}>{data.map((d,i)=><Cell key={i} fill={d.color}/>)}</Bar></BarChart></ResponsiveContainer>)
+  return (<ResponsiveContainer width="100%" height={Math.max(180, data.length*30+20)}><BarChart data={data} layout="vertical" margin={{ left:0, right:8 }}><XAxis type="number" tickFormatter={fmtK} tick={{ fontSize:10 }} axisLine={false} tickLine={false}/><YAxis type="category" dataKey="name" tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={100}/><Tooltip content={tt}/><Bar dataKey="value" name={t('charts.expense')} radius={[0,4,4,0]} maxBarSize={22}>{data.map((d,i)=><Cell key={i} fill={d.color}/>)}</Bar></BarChart></ResponsiveContainer>)
 }
 
 function SavingsChart({ filtered, typeToGroup, groupById, year, mode }: ChartProps) {
@@ -598,9 +598,9 @@ function SavingsChart({ filtered, typeToGroup, groupById, year, mode }: ChartPro
     return series.map(({ key, label }) => ({ month:label, ...m[key] }))
   }, [filtered, typeToGroup, ahorroId, year])
   const tt = (p: unknown) => <CT {...(p as Parameters<typeof CT>[0])} fmt={fmt}/>
-  if (mode==='combo') return (<ResponsiveContainer width="100%" height={220}><ComposedChart data={data} barCategoryGap="35%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Legend wrapperStyle={{ fontSize:11, paddingTop:6 }}/><Bar dataKey="gasto" name="Gastos" fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40}/><Area type="monotone" dataKey="ahorro" name="Ahorro" stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.2} strokeWidth={2.5} dot={false}/></ComposedChart></ResponsiveContainer>)
+  if (mode==='combo') return (<ResponsiveContainer width="100%" height={220}><ComposedChart data={data} barCategoryGap="35%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Legend wrapperStyle={{ fontSize:11, paddingTop:6 }}/><Bar dataKey="gasto" name={t('charts.expense')} fill="#ef4444" radius={[4,4,0,0]} maxBarSize={40}/><Area type="monotone" dataKey="ahorro" name={t('charts.savings')} stroke="#8b5cf6" fill="#8b5cf6" fillOpacity={0.2} strokeWidth={2.5} dot={false}/></ComposedChart></ResponsiveContainer>)
   const isStacked = mode!=='bars'
-  return (<ResponsiveContainer width="100%" height={220}><BarChart data={data} barCategoryGap="30%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Legend wrapperStyle={{ fontSize:11, paddingTop:6 }}/><Bar dataKey="ahorro" name="Ahorro" fill="#8b5cf6" radius={[4,4,0,0]} maxBarSize={40} stackId={isStacked?'a':undefined}/><Bar dataKey="gasto" name="Gastos" fill="#ef4444" radius={isStacked?[0,0,0,0]:[4,4,0,0]} maxBarSize={40} stackId={isStacked?'a':undefined}/></BarChart></ResponsiveContainer>)
+  return (<ResponsiveContainer width="100%" height={220}><BarChart data={data} barCategoryGap="30%"><CartesianGrid strokeDasharray="3 3" stroke={GRID} vertical={false}/><XAxis dataKey="month" tick={{ fontSize:11 }} axisLine={false} tickLine={false}/><YAxis tickFormatter={fmtK} tick={{ fontSize:11 }} axisLine={false} tickLine={false} width={60}/><Tooltip content={tt}/><Legend wrapperStyle={{ fontSize:11, paddingTop:6 }}/><Bar dataKey="ahorro" name={t('charts.savings')} fill="#8b5cf6" radius={[4,4,0,0]} maxBarSize={40} stackId={isStacked?'a':undefined}/><Bar dataKey="gasto" name={t('charts.expense')} fill="#ef4444" radius={isStacked?[0,0,0,0]:[4,4,0,0]} maxBarSize={40} stackId={isStacked?'a':undefined}/></BarChart></ResponsiveContainer>)
 }
 
 function TrendLineChart({ filtered, typeToGroup, groupById, year, mode }: ChartProps) {
@@ -682,20 +682,20 @@ function ChartWithFilter({ title, groups, types, allYears, modes, onDelete,
           {/* Year picker */}
           <div className="relative">
             <button onClick={()=>setShowYearPicker(v=>!v)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${showYearPicker||year!==CUR_YEAR?'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200':'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600'}`}>
-              {year??'Todos'} <ChevronDown className="w-3 h-3"/>
+              {year??t('charts.allYears')} <ChevronDown className="w-3 h-3"/>
             </button>
             {showYearPicker && (
               <div className="absolute right-0 top-8 z-20 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-0.5 min-w-[80px]">
                 {[null,...allYears].map(y=>(
                   <button key={y??'all'} onClick={()=>{ setYear(y); setShowYearPicker(false) }}
                     className={`px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-colors ${year===y?'bg-gray-800 dark:bg-white text-white dark:text-gray-900':'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                    {y??'Todos'}
+                    {y??t('charts.allYears')}
                   </button>
                 ))}
               </div>
             )}
           </div>
-          <button onClick={()=>setShowFilters(v=>!v)} title="Filtros avanzados" className={`relative p-1.5 rounded-lg transition-colors ${showFilters||activeCount>0?'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200':'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+          <button onClick={()=>setShowFilters(v=>!v)} title={t('charts.filterLabel')} className={`relative p-1.5 rounded-lg transition-colors ${showFilters||activeCount>0?'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200':'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
             <SlidersHorizontal className="w-3.5 h-3.5" strokeWidth={1.5}/>
             {activeCount>0&&!showFilters&&<span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-blue-500 text-white text-[8px] flex items-center justify-center font-bold leading-none">{activeCount}</span>}
           </button>
@@ -704,14 +704,14 @@ function ChartWithFilter({ title, groups, types, allYears, modes, onDelete,
               <div className="flex items-center gap-1 shrink-0">
                 <button onClick={()=>{ onDelete(); setConfirmingDelete(false) }}
                   className="px-2 py-1 text-xs rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors whitespace-nowrap">
-                  Ocultar
+                  {t('charts.hide')}
                 </button>
                 <button onClick={()=>setConfirmingDelete(false)} className="p-1 rounded-lg text-gray-300 dark:text-gray-600 hover:text-gray-500 transition-colors">
                   <X className="w-3 h-3" strokeWidth={1.5}/>
                 </button>
               </div>
             ) : (
-              <button onClick={()=>setConfirmingDelete(true)} title="Ocultar gráfico" className="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+              <button onClick={()=>setConfirmingDelete(true)} title={t('charts.hideChart')} className="p-1.5 rounded-lg text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                 <Trash2 className="w-3.5 h-3.5" strokeWidth={1.5}/>
               </button>
             )
@@ -921,7 +921,7 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
           {def.xAxis!=='year' && (
             <div className="relative">
               <button onClick={()=>setShowYearPicker(v=>!v)} className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs transition-colors ${showYearPicker||def.period||def.year!==CUR_YEAR?'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-200':'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600'}`}>
-                {def.period==='current_year'?'Año actual':def.period==='current_month'?'Mes actual':(def.year??'Todos')} <ChevronDown className="w-3 h-3"/>
+                {def.period==='current_year'?'Año actual':def.period==='current_month'?'Mes actual':(def.year??t('charts.allYears'))} <ChevronDown className="w-3 h-3"/>
               </button>
               {showYearPicker && (
                 <div className="absolute right-0 top-8 z-20 bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-700 rounded-xl shadow-xl p-1.5 flex flex-col gap-0.5 min-w-[90px]">
@@ -935,7 +935,7 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
                   {[null,...allYears].map(y=>(
                     <button key={y??'all'} onClick={()=>{ upd({ year:y, period:undefined }); setShowYearPicker(false) }}
                       className={`px-3 py-1.5 rounded-lg text-xs font-medium text-left transition-colors ${!def.period&&def.year===y?'bg-gray-800 dark:bg-white text-white dark:text-gray-900':'text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                      {y??'Todos'}
+                      {y??t('charts.allYears')}
                     </button>
                   ))}
                 </div>
@@ -1295,7 +1295,7 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
                   <button key={p} onClick={()=>upd({ period:p, year:CUR_YEAR })} className={`px-2.5 py-0.5 rounded-lg text-[11px] font-medium border transition-colors ${def.period===p?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{label}</button>
                 ))}
                 {[null,...allYears].map(y=>(
-                  <button key={y??'all'} onClick={()=>upd({ year:y, period:undefined })} className={`px-2.5 py-0.5 rounded-lg text-[11px] font-medium border transition-colors ${!def.period&&def.year===y?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{y??'Todos'}</button>
+                  <button key={y??'all'} onClick={()=>upd({ year:y, period:undefined })} className={`px-2.5 py-0.5 rounded-lg text-[11px] font-medium border transition-colors ${!def.period&&def.year===y?'bg-gray-800 dark:bg-white text-white dark:text-gray-900 border-transparent':'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'}`}>{y??t('charts.allYears')}</button>
                 ))}
               </div>
               {!def.period && def.xAxis==='none' && (
@@ -1678,7 +1678,7 @@ export default function Charts() {
             </button>
           )}
           <button onClick={addChart} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-gray-800 dark:bg-white text-white dark:text-gray-900 text-sm font-medium hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors shadow-sm">
-            <Plus className="w-4 h-4"/> Añadir gráfico
+            <Plus className="w-4 h-4"/> {t('charts.newChart')}
           </button>
         </div>
       </div>
