@@ -93,7 +93,7 @@ function CyclingPanel({ accounts }: { accounts: Account[] }) {
       onClick={() => setIdx(i => (i + 1) % accounts.length)}
       className="h-full w-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden flex flex-col text-left hover:shadow-md transition-shadow"
     >
-      <div className="px-5 pt-4 pb-3 border-b border-gray-50 dark:border-gray-800 flex items-center justify-between">
+      <div className="px-5 pt-3 pb-2 border-b border-gray-50 dark:border-gray-800 flex items-center justify-between">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">{current.name}</h2>
         <div className="flex gap-1">
           {accounts.map((_, i) => (
