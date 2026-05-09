@@ -84,6 +84,47 @@ function StaticPanel({ title, value, color, Icon }: {
   )
 }
 
+function SparklineStatPanel({ title, value, color, Icon, series }: {
+  title: string; value: number; color: string; Icon: LucideIcon; series: Record<number, number>
+}) {
+  const { fmt } = useCurrency()
+  let cumulative = 0
+  const data = Array.from({ length: 12 }, (_, i) => {
+    cumulative += series[i + 1] ?? 0
+    return { v: cumulative }
+  })
+  return (
+    <div className="relative h-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden flex flex-col">
+      <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.2 }}>
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+            <defs>
+              <linearGradient id="incomeSparkGrad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="10%" stopColor={color} stopOpacity={0.5} />
+                <stop offset="100%" stopColor={color} stopOpacity={0} />
+              </linearGradient>
+            </defs>
+            <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill="url(#incomeSparkGrad)" dot={false} isAnimationActive={false} />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="px-5 pt-3 pb-2 border-b border-gray-50 dark:border-gray-800 relative z-10">
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">{title}</h2>
+      </div>
+      <div className="flex-1 flex items-center px-5 relative z-10">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: color + '20' }}>
+            <Icon className="w-5 h-5" style={{ color }} strokeWidth={1.5} />
+          </div>
+          <p className="text-2xl font-bold tabular-nums leading-tight" style={{ color }}>
+            {fmt(value)}
+          </p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function CyclingPanel({ accounts }: { accounts: Account[] }) {
   const { fmt } = useCurrency()
   const [idx, setIdx] = useState(0)
@@ -1532,7 +1573,7 @@ export default function Dashboard() {
   function renderContent(w: DashboardWidget, chartH: number) {
     // ── Stat panels ──
     if (w.id === 'stat-uso')      return <StaticPanel title={t('dashboard.widgetUso')}   value={data!.uso_balance}      color="#3b82f6" Icon={CreditCard}     />
-    if (w.id === 'stat-income')   return <StaticPanel title={t('dashboard.widgetIncome')}  value={data!.annual.income}    color="#22c55e" Icon={ArrowUpRight}   />
+    if (w.id === 'stat-income')   return <SparklineStatPanel title={t('dashboard.widgetIncome')} value={data!.annual.income} color="#22c55e" Icon={ArrowUpRight} series={data!.income_by_month ?? {}} />
     if (w.id === 'stat-expense')  return <StaticPanel title={t('dashboard.widgetExpense')}    value={data!.annual.expenses}  color="#ef4444" Icon={ArrowDownRight} />
     if (w.id === 'stat-accounts')      return <CyclingPanel accounts={savingsAccounts} />
     if (w.id === 'stat-total-balance') return <StaticPanel title={t('dashboard.widgetTotalBalance')} value={accountsData?.total ?? 0} color="#8b5cf6" Icon={Landmark} />
