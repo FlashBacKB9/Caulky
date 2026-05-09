@@ -13,7 +13,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
-            <h2 className="text-base font-semibold text-gray-800 dark:text-white">Acerca de Caulky</h2>
+            <h2 className="text-base font-semibold text-gray-800 dark:text-white">{t('about.title')}</h2>
             <span className="text-xs text-gray-400 dark:text-gray-500">v1.2</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-400 hover:text-gray-600">
@@ -21,7 +21,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
         <div className="px-5 py-4 text-sm">
-          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">Desarrollado por</p>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">{t('about.developedBy')}</p>
           <a
             href="https://github.com/FlashBacKB9"
             target="_blank" rel="noreferrer"

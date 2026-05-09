@@ -542,7 +542,7 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
   return (
     <div className="space-y-5">
       <div className="bg-blue-50 dark:bg-blue-950 rounded-xl px-4 py-3 text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
-        La regla 50/30/20 sugiere destinar el <strong>50%</strong> de tus ingresos a <strong>necesidades</strong> (vivienda, alimentación, transporte), el <strong>30%</strong> a <strong>deseos</strong> (ocio, restaurantes, compras) y el <strong>20%</strong> a <strong>ahorro</strong>. Aquí se muestra la distribución real de tu dinero. El ahorro se detecta automáticamente desde las categorías marcadas como ahorro en la configuración.
+        {t('analysis.rule5020Desc')}
       </div>
 
       <div className="flex flex-col sm:flex-row gap-5 items-center">
@@ -757,55 +757,55 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, excludedMovem
   const hasSavingsFilter = savingsGroupIdSet.size > 0
 
   const prompt = useMemo(() => {
-    if (movements.length === 0) return 'Sin datos para el período seleccionado. Elige un rango con movimientos.'
+    if (movements.length === 0) return t('analysis.promptNoData')
 
     const excludedSection = excludedInPeriod.length > 0 ? [
       '',
-      '### Gastos excluidos manualmente del análisis',
-      '(Gastos puntuales que el usuario consideró no representativos)',
+      t('analysis.promptExclTitle'),
+      t('analysis.promptExclSub'),
       ...excludedInPeriod.map((m, i) =>
         `${i + 1}. ${m.name} — ${fmt(Math.abs(m.dinero))} (${m.date})`
       ),
     ] : []
 
     return [
-      `Actúa como un asesor financiero personal experto. Analiza mis finanzas del ${start} al ${end} y dame un informe completo con recomendaciones accionables.`,
+      t('analysis.promptIntro').replace('{start}', start).replace('{end}', end),
       '',
-      '## CONTEXTO SOBRE LOS DATOS',
+      t('analysis.promptContextTitle'),
       '',
       hasSavingsFilter
-        ? 'Los datos ya están filtrados: las transferencias a cuentas de ahorro/inversión están excluidas de los gastos. La tasa de ahorro se calcula directamente sobre los movimientos de ahorro registrados.'
-        : 'AVISO: Esta aplicación puede registrar transferencias a cuentas de ahorro propias como "gastos". Si ves categorías relacionadas con ahorro o inversión, esos importes son en realidad ahorro, no consumo. Ajusta tu análisis si detectas este patrón.',
+        ? t('analysis.promptFiltered')
+        : t('analysis.promptWarning'),
       '',
-      '## DATOS FINANCIEROS',
+      t('analysis.promptDataTitle'),
       '',
-      '### Resumen del período',
-      `- Ingresos totales: ${fmt(income)}`,
-      `- Gastos reales (consumo): ${fmt(realExpenses)}`,
-      `- Ahorro registrado: ${fmt(actualSavings)}`,
-      `- Tasa de ahorro: ${savingsRate.toFixed(1)}%`,
-      `- Total movimientos: ${movements.length}`,
+      t('analysis.promptSummaryTitle'),
+      t('analysis.promptIncome').replace('{amount}', fmt(income)),
+      t('analysis.promptExpenses').replace('{amount}', fmt(realExpenses)),
+      t('analysis.promptSavings').replace('{amount}', fmt(actualSavings)),
+      t('analysis.promptSavingsRate').replace('{pct}', savingsRate.toFixed(1)),
+      t('analysis.promptTotalMov').replace('{n}', String(movements.length)),
       '',
-      '### Gastos por categoría',
+      t('analysis.promptCatTitle'),
       ...byCategory.map(([cat, amount]) =>
-        `- ${cat}: ${fmt(amount)}${income > 0 ? ` (${((amount / income) * 100).toFixed(1)}% sobre ingresos)` : ''}`
+        `- ${cat}: ${fmt(amount)}${income > 0 ? ` (${t('analysis.promptPctIncome').replace('{pct}', ((amount / income) * 100).toFixed(1))})` : ''}`
       ),
       '',
-      '### Top 10 gastos individuales',
+      t('analysis.promptTopTitle'),
       ...topExpenses.map((m, i) =>
         `${i + 1}. ${m.name} — ${fmt(Math.abs(m.dinero))} (${m.date})${m.label ? ` [${m.label}]` : ''}`
       ),
       ...excludedSection,
       '',
-      '## ANÁLISIS SOLICITADO',
+      t('analysis.promptAnalTitle'),
       '',
-      'Por favor proporciona:',
-      '1. **Evaluación general** de mi situación financiera en este período',
-      '2. **Tasa de ahorro real** — si es adecuada y cómo mejorarla',
-      '3. **Análisis de gastos** — categorías preocupantes y por qué',
-      '4. **3 recomendaciones concretas** y fáciles de implementar',
-      '5. **Alertas** — patrones o gastos que deberían preocuparme',
-      '6. **Proyección** — si continúo así, ¿dónde estaré en 6 y 12 meses?',
+      t('analysis.promptPlease'),
+      t('analysis.promptItem1'),
+      t('analysis.promptItem2'),
+      t('analysis.promptItem3'),
+      t('analysis.promptItem4'),
+      t('analysis.promptItem5'),
+      t('analysis.promptItem6'),
     ].join('\n')
   }, [movements, realExpenseMovements, start, end, income, realExpenses, actualSavings, savingsRate, byCategory, topExpenses, excludedInPeriod, fmt, hasSavingsFilter])
 
@@ -816,7 +816,7 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, excludedMovem
           start={start} end={end}
           onChange={(s, e) => { setStart(s); setEnd(e) }}
         />
-        <span className="text-xs text-gray-400 dark:text-gray-500">{movements.length} movimientos</span>
+        <span className="text-xs text-gray-400 dark:text-gray-500">{t('analysis.movCount').replace('{n}', String(movements.length))}</span>
       </div>
 
       <div className="relative">
@@ -833,7 +833,7 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, excludedMovem
       </div>
 
       <p className="text-xs text-gray-400 dark:text-gray-500">
-        Pega este prompt en ChatGPT, Claude u otro asistente de IA para obtener un análisis personalizado.
+        {t('analysis.pasteHint')}
       </p>
     </div>
   )
@@ -929,10 +929,10 @@ export default function Analysis() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold text-gray-800 dark:text-white">{t('analysis.title')}</h1>
-          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Métricas y patrones de tus finanzas</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t('analysis.subtitle')}</p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Período global:</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('analysis.globalPeriod')}</span>
           <DateRangeInputs
             start={rangeStart} end={rangeEnd}
             onChange={(s, e) => { setRangeStart(s); setRangeEnd(e) }}

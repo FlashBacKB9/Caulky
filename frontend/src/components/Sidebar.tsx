@@ -13,7 +13,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
       <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-[80vh] overflow-y-auto overscroll-y-contain scrollbar-none" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
-            <h2 className="text-base font-semibold text-gray-800 dark:text-white">Acerca de Caulky</h2>
+            <h2 className="text-base font-semibold text-gray-800 dark:text-white">{t('about.title')}</h2>
             <span className="text-xs text-gray-400 dark:text-gray-500">v1.2</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600">
@@ -23,7 +23,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
 
         <div className="px-5 py-4 space-y-5 text-sm">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">Desarrollado por</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">{t('about.developedBy')}</p>
             <a
               href="https://github.com/FlashBacKB9"
               target="_blank" rel="noreferrer"
@@ -35,32 +35,32 @@ function InfoModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">APIs y servicios externos</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">{t('about.externalApis')}</p>
             <div className="space-y-1.5">
               <div className="px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800">
                 <p className="font-medium text-gray-800 dark:text-gray-100">Yahoo Finance</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Precios actuales e históricos de fondos de inversión</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t('about.yahooDesc')}</p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5">query1.finance.yahoo.com</p>
               </div>
               <div className="px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800">
                 <p className="font-medium text-gray-800 dark:text-gray-100">Google Fonts</p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Tipografías para skins personalizados</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{t('about.googleDesc')}</p>
                 <p className="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5">fonts.googleapis.com</p>
               </div>
             </div>
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">Frontend</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">{t('about.frontend')}</p>
             <div className="space-y-1.5">
               {[
-                { name: 'React + TypeScript', desc: 'Interfaz de usuario' },
-                { name: 'Vite', desc: 'Bundler y servidor de desarrollo' },
-                { name: 'TanStack Query', desc: 'Gestión de estado y caché de datos' },
-                { name: 'React Router', desc: 'Enrutamiento SPA' },
-                { name: 'Tailwind CSS v4', desc: 'Estilos y diseño' },
-                { name: 'Lucide React', desc: 'Iconografía' },
-                { name: 'Axios', desc: 'Cliente HTTP' },
+                { name: 'React + TypeScript', desc: t('about.reactDesc') },
+                { name: 'Vite', desc: t('about.viteDesc') },
+                { name: 'TanStack Query', desc: t('about.tanstackDesc') },
+                { name: 'React Router', desc: t('about.routerDesc') },
+                { name: 'Tailwind CSS v4', desc: t('about.tailwindDesc') },
+                { name: 'Lucide React', desc: t('about.lucideDesc') },
+                { name: 'Axios', desc: t('about.axiosDesc') },
               ].map(item => (
                 <div key={item.name} className="flex items-baseline gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800">
                   <span className="font-medium text-gray-800 dark:text-gray-100 shrink-0">{item.name}</span>
@@ -71,15 +71,15 @@ function InfoModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">Backend</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">{t('about.backend')}</p>
             <div className="space-y-1.5">
               {[
-                { name: 'FastAPI', desc: 'Framework de API REST en Python' },
-                { name: 'SQLAlchemy 2.0', desc: 'ORM asíncrono' },
-                { name: 'PostgreSQL', desc: 'Base de datos relacional' },
-                { name: 'Alembic', desc: 'Migraciones de base de datos' },
-                { name: 'Pydantic v2', desc: 'Validación de datos y schemas' },
-                { name: 'httpx', desc: 'Cliente HTTP asíncrono (Yahoo Finance)' },
+                { name: 'FastAPI', desc: t('about.fastapiDesc') },
+                { name: 'SQLAlchemy 2.0', desc: t('about.sqlalchemyDesc') },
+                { name: 'PostgreSQL', desc: t('about.postgresDesc') },
+                { name: 'Alembic', desc: t('about.alembicDesc') },
+                { name: 'Pydantic v2', desc: t('about.pydanticDesc') },
+                { name: 'httpx', desc: t('about.httpxDesc') },
               ].map(item => (
                 <div key={item.name} className="flex items-baseline gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800">
                   <span className="font-medium text-gray-800 dark:text-gray-100 shrink-0">{item.name}</span>
@@ -90,12 +90,12 @@ function InfoModal({ onClose }: { onClose: () => void }) {
           </div>
 
           <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">Extensibilidad</p>
+            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">{t('about.extensibility')}</p>
             <div className="space-y-1.5">
               {[
-                { name: 'Plugins', desc: 'Scripts .js para extender la app con widgets y lógica personalizada' },
-                { name: 'Skins', desc: 'Archivos .js para cambiar completamente el aspecto visual y el layout' },
-                { name: 'Idiomas', desc: 'Archivos .js para traducir la interfaz a cualquier idioma' },
+                { name: 'Plugins', desc: t('about.pluginsDesc') },
+                { name: 'Skins', desc: t('about.skinsDesc') },
+                { name: 'Idiomas', desc: t('about.langsDesc') },
               ].map(item => (
                 <div key={item.name} className="flex items-baseline gap-2 px-3 py-2 rounded-xl bg-gray-50 dark:bg-gray-800">
                   <span className="font-medium text-gray-800 dark:text-gray-100 shrink-0">{item.name}</span>
