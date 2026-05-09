@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+﻿import { useState, useEffect, useCallback } from 'react'
 import { syncPref } from '../utils/prefSync'
 
 const KEY = 'spendly-currency'
@@ -43,7 +43,7 @@ export function useCurrency() {
   const fmt = useCallback(
     (v: number, maxDecimals = 2) =>
       v.toLocaleString('es-ES', { style: 'currency', currency, maximumFractionDigits: maxDecimals })
-        .replace(/[   ]/g, ' '),
+        .replace(/[   ]/g, ''),
     [currency]
   )
 
