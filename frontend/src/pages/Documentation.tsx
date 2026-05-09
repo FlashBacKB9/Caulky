@@ -618,9 +618,6 @@ function UL({ children }: { children: React.ReactNode }) {
 function LI({ children }: { children: React.ReactNode }) {
   return <li>{children}</li>
 }
-function B({ children }: { children: React.ReactNode }) {
-  return <span className="font-semibold text-gray-800 dark:text-gray-100">{children}</span>
-}
 function Code({ children }: { children: React.ReactNode }) {
   return <code className="font-mono text-sm bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 px-1.5 py-0.5 rounded">{children}</code>
 }
