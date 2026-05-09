@@ -57,12 +57,25 @@ export async function initPreferences(): Promise<{ changed: boolean }> {
   try {
     const serverPrefs = await getAllPreferences()
     let changed = false
-    for (const [key, value] of Object.entries(serverPrefs)) {
-      if (localStorage.getItem(key) !== value) {
-        localStorage.setItem(key, value)
-        changed = true
+    const uploads: Promise<void>[] = []
+
+    for (const key of PREF_KEYS) {
+      const local = localStorage.getItem(key)
+      const remote = serverPrefs[key]
+
+      if (remote !== undefined) {
+        // Server has a value → apply to localStorage (server wins)
+        if (local !== remote) {
+          localStorage.setItem(key, remote)
+          changed = true
+        }
+      } else if (local !== null) {
+        // Local has a value but server doesn't → upload it
+        uploads.push(setPreference(key, local).catch(() => {}))
       }
     }
+
+    await Promise.all(uploads)
     return { changed }
   } catch {
     return { changed: false }
