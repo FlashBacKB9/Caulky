@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { t } from '../utils/i18n'
 import { useSharedMovements } from '../hooks/useSharedMovements'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
@@ -58,7 +59,7 @@ function TypeSelect({ value, onChange, types, byCategory }: {
     <div className="relative">
       {sel && <span className="absolute left-3 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: sel.color }} />}
       <select value={value} onChange={e => onChange(e.target.value)} className={`${INP} ${sel ? 'pl-8' : ''}`}>
-        <option value="">Sin categoría</option>
+        <option value="">{t('form.noCategory')}</option>
         {Object.entries(byCategory).map(([cat, items]) => (
           <optgroup key={cat} label={cat}>
             {items.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -80,10 +81,10 @@ function defaultRule(): RecurrenceRule {
 function RuleEditor({ rule, onChange }: { rule: RecurrenceRule; onChange: (r: RecurrenceRule) => void }) {
   const set = (patch: Partial<RecurrenceRule>) => onChange({ ...rule, ...patch })
   const kinds: { value: RecurrenceRule['kind']; label: string }[] = [
-    { value: 'daily',            label: 'Diario' },
-    { value: 'weekly',           label: 'Semanal' },
-    { value: 'monthly_day',      label: 'Mensual (día)' },
-    { value: 'monthly_weekday',  label: 'Mensual (semana)' },
+    { value: 'daily',            label: t('recurrence.daily') },
+    { value: 'weekly',           label: t('recurrence.weekly') },
+    { value: 'monthly_day',      label: t('recurrence.monthlyDay') },
+    { value: 'monthly_weekday',  label: t('recurrence.monthlyWeekday') },
   ]
   return (
     <div className="space-y-3">
@@ -100,16 +101,16 @@ function RuleEditor({ rule, onChange }: { rule: RecurrenceRule; onChange: (r: Re
       {/* Kind-specific config */}
       {rule.kind === 'daily' && (
         <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-          <span>Cada</span>
+          <span>{t('recurrence.every')}</span>
           <input type="number" min={1} value={rule.everyN} onChange={e => set({ everyN: parseInt(e.target.value) || 1 })}
             className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-300" />
-          <span>días</span>
+          <span>{t('recurrence.days')}</span>
         </div>
       )}
 
       {rule.kind === 'weekly' && (
         <div className="space-y-1">
-          <span className="text-xs text-gray-500 dark:text-gray-400">Días de la semana</span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">{t('recurrence.weekdays')}</span>
           <div className="flex gap-1 flex-wrap">
             {WEEKDAY_NAMES.map((name, i) => {
               const active = rule.weekdays.includes(i)
@@ -127,21 +128,21 @@ function RuleEditor({ rule, onChange }: { rule: RecurrenceRule; onChange: (r: Re
 
       {rule.kind === 'monthly_day' && (
         <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 flex-wrap">
-          <span>El día</span>
+          <span>{t('recurrence.onDay')}</span>
           <input type="number" min={1} max={28} value={rule.monthDay}
             onChange={e => set({ monthDay: Math.min(28, Math.max(1, parseInt(e.target.value) || 1)) })}
             className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-300" />
-          <span>de cada</span>
+          <span>{t('recurrence.ofEvery')}</span>
           <input type="number" min={1} value={rule.everyN} onChange={e => set({ everyN: parseInt(e.target.value) || 1 })}
             className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-300" />
-          <span>mes(es)</span>
+          <span>{t('recurrence.months')}</span>
         </div>
       )}
 
       {rule.kind === 'monthly_weekday' && (
         <div className="space-y-2">
           <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300">
-            <span>El</span>
+            <span>{t('recurrence.the')}</span>
             <select value={rule.monthWeek} onChange={e => set({ monthWeek: parseInt(e.target.value) })}
               className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-2 py-1 text-sm focus:outline-none">
               {WEEK_ORD_VALUES.map((v, i) => <option key={v} value={v}>{WEEK_ORD_NAMES[i]}</option>)}
@@ -150,7 +151,7 @@ function RuleEditor({ rule, onChange }: { rule: RecurrenceRule; onChange: (r: Re
               className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-2 py-1 text-sm focus:outline-none">
               {WEEKDAY_NAMES.map((n, i) => <option key={i} value={i}>{n}</option>)}
             </select>
-            <span>de cada mes</span>
+            <span>{t('recurrence.ofEachMonth')}</span>
           </div>
         </div>
       )}
@@ -445,12 +446,12 @@ export default function MovementForm({ onClose, initialDate }: Props) {
 
   // ── Panel titles ─────────────────────────────────────────────────────────────
   const panelTitle = panel === 'template'
-    ? (editingId ? 'Editar plantilla' : 'Nueva plantilla')
+    ? (editingId ? t('form.editTemplate') : t('form.newTemplate'))
     : panel === 'recurrence'
-    ? 'Recurrencia'
+    ? t('form.recurrenceTitle')
     : panel === 'multibulk'
-    ? 'Crear varios movimientos'
-    : 'Nuevo movimiento'
+    ? t('form.createMultipleTitle')
+    : t('form.newMovement')
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -481,42 +482,42 @@ export default function MovementForm({ onClose, initialDate }: Props) {
             {panel === 'form' && (
               <form onSubmit={e => { e.preventDefault(); if (valid) mutation.mutate() }} className="space-y-4">
                 <div>
-                  <label className={LBL}>Nombre *</label>
+                  <label className={LBL}>{t('common.name')} *</label>
                   <input type="text" value={form.name} onChange={e => set('name', e.target.value)}
                     placeholder="Ej: Supermercado Mercadona" className={INP} autoFocus />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={LBL}>Importe *</label>
+                    <label className={LBL}>{t('form.amountLabel')} *</label>
                     <div className="relative">
                       <input type="number" step="0.01" value={form.money} onChange={e => set('money', e.target.value)}
                         placeholder="0.00" className={INP + ' pr-7'} />
                       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
                     </div>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Negativo = devolución</p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{t('form.negativeHint')}</p>
                   </div>
                   <div>
-                    <label className={LBL}>Fecha *</label>
+                    <label className={LBL}>{t('common.date')} *</label>
                     <input type="date" value={form.date} onChange={e => set('date', e.target.value)} className={INP} />
                   </div>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={LBL}>Tipo de movimiento</label>
+                    <label className={LBL}>{t('movement.type')}</label>
                     <div className="space-y-1.5">
                       <TypeSelect value={form.movement_type_id} onChange={v => set('movement_type_id', v)} types={types} byCategory={byCategory} />
                       <SavingsHint typeId={form.movement_type_id} money={form.money} />
                     </div>
                   </div>
                   <div>
-                    <label className={LBL}>Fecha banco</label>
+                    <label className={LBL}>{t('movement.bankDate')}</label>
                     <input type="date" value={form.bank_date} onChange={e => set('bank_date', e.target.value)} className={INP} />
                   </div>
                 </div>
                 <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   {sharedEnabled && (
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Compartido</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('form.shared')}</label>
                       <Toggle
                         value={form.is_shared}
                         onChange={v => setForm(f => ({ ...f, is_shared: v, ...(v ? {} : { shared_between: '2', my_share: '' }) }))}
@@ -525,11 +526,11 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                     </div>
                   )}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Pagado</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('form.paid')}</label>
                     <Toggle value={form.paid} onChange={v => set('paid', v)} color="#22c55e" />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">No contar</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('form.noCount')}</label>
                     <Toggle value={form.no_count} onChange={v => set('no_count', v)} color="#f59e0b" />
                   </div>
                 </div>
@@ -565,36 +566,36 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                   </div>
                 )}
                 <div>
-                  <label className={LBL}>Notas</label>
+                  <label className={LBL}>{t('common.notes')}</label>
                   <textarea value={form.notes} onChange={e => set('notes', e.target.value)}
                     rows={2} placeholder="Opcional..." className={INP + ' resize-none'} />
                 </div>
                 <div>
-                  <label className={LBL}>Adjuntos</label>
+                  <label className={LBL}>{t('form.attachments')}</label>
                   {largePending && (
                     <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-3 mb-2 space-y-2">
                       <div className="flex items-start gap-2">
                         <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" strokeWidth={1.5} />
                         <div className="space-y-1">
-                          <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Archivo grande detectado</p>
+                          <p className="text-xs font-medium text-amber-800 dark:text-amber-300">{t('form.largeFileTitle')}</p>
                           <ul className="text-xs text-amber-700 dark:text-amber-400">
                             {largePending.filter(f => f.size > WARN_BYTES).map(f => (
                               <li key={f.name}>{f.name} — <strong>{fmtSize(f.size)}</strong></li>
                             ))}
                           </ul>
                           <p className="text-xs text-amber-600 dark:text-amber-500">
-                            El espacio es limitado. Usa documentos ligeros: tickets (1–5 MB), PDFs (1–3 MB). No tiene sentido subir vídeos o fotos sin comprimir.
+                            {t('form.largeFileHint')}
                           </p>
                         </div>
                       </div>
                       <div className="flex gap-2 justify-end">
                         <button type="button" onClick={() => { setLargePending(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
                           className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
-                          Cancelar
+                          {t('common.cancel')}
                         </button>
                         <button type="button" onClick={() => { setPendingFiles(prev => [...prev, ...largePending]); setLargePending(null) }}
                           className="text-xs px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white">
-                          Subir de todas formas
+                          {t('form.uploadAnyway')}
                         </button>
                       </div>
                     </div>
@@ -619,24 +620,24 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                   >
                     <span className="flex items-center justify-center gap-2 text-xs text-gray-400 dark:text-gray-500">
                       <Paperclip className="w-3.5 h-3.5" strokeWidth={1.5} />
-                      Arrastra o haz clic para adjuntar
+                      {t('form.dragOrClick')}
                     </span>
                     <input ref={fileInputRef} type="file" multiple className="hidden" onChange={e => addFiles(e.target.files)} />
                   </div>
                 </div>
                 <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Cancelar</button>
+                  <button type="button" onClick={onClose} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">{t('common.cancel')}</button>
                   <button type="button" disabled={!valid}
                     onClick={() => { setRecStart(form.date || today); setRecBulkDone(null); setMultiBulkDone(null); setRecBulkNumbered(false); setRecBulkDivide(false); setPanel('multibulk') }}
                     className="px-4 py-2 text-sm font-medium rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                    Crear varios
+                    {t('form.createMultiple')}
                   </button>
                   <button type="submit" disabled={!valid || mutation.isPending}
                     className="px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                    {mutation.isPending ? 'Guardando...' : 'Guardar'}
+                    {mutation.isPending ? t('form.saving') : t('common.save')}
                   </button>
                 </div>
-                {mutation.isError && <p className="text-red-500 text-sm">Error al guardar. Inténtalo de nuevo.</p>}
+                {mutation.isError && <p className="text-red-500 text-sm">{t('form.saveError')}</p>}
               </form>
             )}
 
@@ -644,12 +645,12 @@ export default function MovementForm({ onClose, initialDate }: Props) {
             {panel === 'template' && (
               <div className="space-y-4">
                 <div>
-                  <label className={LBL}>Nombre de la plantilla *</label>
+                  <label className={LBL}>{t('form.templateNameLabel')} *</label>
                   <input autoFocus value={tplDraft.label} onChange={e => setTpl('label', e.target.value)}
                     placeholder="Ej: Ahorro mensual" className={INP} />
                 </div>
                 <div>
-                  <label className={LBL}>Nombre del movimiento</label>
+                  <label className={LBL}>{t('form.movementNameLabel')}</label>
                   <input value={tplDraft.name} onChange={e => setTpl('name', e.target.value)}
                     placeholder="Ej: Ahorro {mes}" className={INP} />
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
@@ -660,7 +661,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                   </p>
                 </div>
                 <div>
-                  <label className={LBL}>Importe</label>
+                  <label className={LBL}>{t('form.amountLabel')}</label>
                   <div className="relative">
                     <input type="number" step="0.01" value={tplDraft.money}
                       onChange={e => setTpl('money', e.target.value)} placeholder="0.00" className={INP + ' pr-7'} />
@@ -669,28 +670,28 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className={LBL}>Fecha al aplicar</label>
+                    <label className={LBL}>{t('form.dateOnApply')}</label>
                     <div className="flex flex-col gap-2">
                       {(['today', 'manual'] as const).map(mode => (
                         <button key={mode} type="button" onClick={() => setTpl('dateMode', mode)} className={BTN_PILL(tplDraft.dateMode === mode)}>
-                          {mode === 'today' ? 'Fecha de creación' : 'Vacía'}
+                          {mode === 'today' ? t('form.creationDate') : t('form.empty')}
                         </button>
                       ))}
                     </div>
                   </div>
                   <div>
-                    <label className={LBL}>Fecha banco</label>
+                    <label className={LBL}>{t('movement.bankDate')}</label>
                     <div className="flex flex-col gap-2">
                       {(['today', 'manual'] as const).map(mode => (
                         <button key={mode} type="button" onClick={() => setTpl('bankDateMode', mode)} className={BTN_PILL(tplDraft.bankDateMode === mode)}>
-                          {mode === 'today' ? 'Fecha de creación' : 'Vacía'}
+                          {mode === 'today' ? t('form.creationDate') : t('form.empty')}
                         </button>
                       ))}
                     </div>
                   </div>
                 </div>
                 <div>
-                  <label className={LBL}>Tipo de movimiento</label>
+                  <label className={LBL}>{t('movement.type')}</label>
                   <div className="space-y-1.5">
                     <TypeSelect value={tplDraft.movement_type_id} onChange={v => setTpl('movement_type_id', v)} types={types} byCategory={byCategory} />
                     <SavingsHint typeId={tplDraft.movement_type_id} money={tplDraft.money} />
@@ -699,24 +700,24 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                 <div className="flex gap-5">
                   <div className="flex items-center gap-2.5">
                     <Toggle value={tplDraft.paid} onChange={v => setTpl('paid', v)} color="#22c55e" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Pagado</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{t('form.paid')}</span>
                   </div>
                   <div className="flex items-center gap-2.5">
                     <Toggle value={tplDraft.no_count} onChange={v => setTpl('no_count', v)} color="#f59e0b" />
-                    <span className="text-sm text-gray-600 dark:text-gray-400">No contar</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400">{t('form.noCount')}</span>
                   </div>
                 </div>
                 <div>
-                  <label className={LBL}>Notas</label>
+                  <label className={LBL}>{t('common.notes')}</label>
                   <textarea value={tplDraft.notes} onChange={e => setTpl('notes', e.target.value)}
                     rows={2} placeholder="Opcional..." className={INP + ' resize-none'} />
                 </div>
                 <div className="flex justify-end gap-3 pt-2">
                   <button type="button" onClick={() => setPanel('form')}
-                    className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Cancelar</button>
+                    className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">{t('common.cancel')}</button>
                   <button type="button" onClick={saveTemplate} disabled={!tplDraft.label.trim()}
                     className="px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                    {editingId ? 'Guardar cambios' : 'Guardar plantilla'}
+                    {editingId ? t('form.saveChanges') : t('form.saveTemplate')}
                   </button>
                 </div>
               </div>
@@ -740,17 +741,17 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                 </div>
 
                 <div>
-                  <label className={LBL}>Tipo de repetición</label>
+                  <label className={LBL}>{t('recurrence.type')}</label>
                   <RuleEditor rule={recRule} onChange={setRecRule} />
                 </div>
 
                 <div>
-                  <label className={LBL}>Fecha del primer movimiento</label>
+                  <label className={LBL}>{t('recurrence.startDate')}</label>
                   <input type="date" value={recStart} onChange={e => setRecStart(e.target.value)} className={INP} />
                 </div>
 
                 <div>
-                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Vista previa</p>
+                  <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">{t('recurrence.preview')}</p>
                   <div className="space-y-1">
                     {computeDates(recRule, new Date(recStart), Math.min(recBulkN, 3)).map((d, i) => (
                       <div key={i} className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400">
@@ -767,22 +768,22 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                 </div>
 
                 <div className="flex items-center gap-3">
-                  <span className="text-sm text-gray-600 dark:text-gray-400">Crear</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{t('recurrence.create')}</span>
                   <input type="number" min={1} max={60} value={recBulkN}
                     onChange={e => { setRecBulkN(Math.max(1, parseInt(e.target.value) || 1)); setMultiBulkDone(null) }}
                     className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-300" />
-                  <span className="text-sm text-gray-600 dark:text-gray-400">movimientos</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">{t('recurrence.movements')}</span>
                 </div>
 
                 <div className="space-y-2">
                   <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
                     <input type="checkbox" checked={recBulkDivide} onChange={e => setRecBulkDivide(e.target.checked)} className="rounded" />
-                    Dividir importe entre los {recBulkN} pagos
-                    <span className="text-gray-400 dark:text-gray-500">({previewAmount} € / pago)</span>
+                    {t('recurrence.divideAmount')} {recBulkN} {t('recurrence.payments')}
+                    <span className="text-gray-400 dark:text-gray-500">(= {previewAmount} €)</span>
                   </label>
                   <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
                     <input type="checkbox" checked={recBulkNumbered} onChange={e => setRecBulkNumbered(e.target.checked)} className="rounded" />
-                    Numerar pagos en el nombre <span className="text-gray-400 dark:text-gray-500">(1/{recBulkN}, 2/{recBulkN}…)</span>
+                    {t('recurrence.numberedPayments')} <span className="text-gray-400 dark:text-gray-500">(1/{recBulkN}, 2/{recBulkN}…)</span>
                   </label>
                 </div>
 
@@ -795,10 +796,10 @@ export default function MovementForm({ onClose, initialDate }: Props) {
 
                 <div className="flex justify-end gap-3 pt-1">
                   <button type="button" onClick={() => setPanel('form')}
-                    className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Volver</button>
+                    className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">{t('common.back')}</button>
                   <button type="button" onClick={multiBulkCreate} disabled={multiBulkDone !== null}
                     className="px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors">
-                    Crear {recBulkN} movimientos
+                    {t('recurrence.create')} {recBulkN} {t('recurrence.movements')}
                   </button>
                 </div>
               </div>
@@ -810,23 +811,23 @@ export default function MovementForm({ onClose, initialDate }: Props) {
               const tpl = templates.find(t => t.id === recurrenceId)
               return (
                 <div className="space-y-5">
-                  {tpl && <p className="text-sm text-gray-500 dark:text-gray-400">Plantilla: <span className="font-medium text-gray-800 dark:text-white">{tpl.label}</span></p>}
+                  {tpl && <p className="text-sm text-gray-500 dark:text-gray-400">{t('form.template')}: <span className="font-medium text-gray-800 dark:text-white">{tpl.label}</span></p>}
 
                   {/* Rule editor */}
                   <div>
-                    <label className={LBL}>Tipo de recurrencia</label>
+                    <label className={LBL}>{t('recurrence.type')}</label>
                     <RuleEditor rule={recRule} onChange={setRecRule} />
                   </div>
 
                   {/* Start date */}
                   <div>
-                    <label className={LBL}>Fecha de inicio</label>
+                    <label className={LBL}>{t('recurrence.startDate')}</label>
                     <input type="date" value={recStart} onChange={e => setRecStart(e.target.value)} className={INP} />
                   </div>
 
                   {/* Preview */}
                   <div>
-                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">Vista previa</p>
+                    <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">{t('recurrence.preview')}</p>
                     <div className="space-y-1">
                       {previewDates.map((d, i) => {
                         const baseName = tpl ? applyFormula(tpl.name || tpl.label, d, d) : ''
@@ -847,17 +848,17 @@ export default function MovementForm({ onClose, initialDate }: Props) {
 
                   {/* Mode selector */}
                   <div>
-                    <label className={LBL}>¿Qué quieres hacer?</label>
+                    <label className={LBL}>{t('recurrence.whatToDo')}</label>
                     <div className="grid grid-cols-2 gap-2">
                       <button type="button" onClick={() => { setRecMode('bulk'); setRecBulkDone(null) }}
                         className={`py-2.5 px-3 rounded-xl text-sm border transition-colors text-left ${recMode === 'bulk' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                        <p className="font-medium">Crear de golpe</p>
-                        <p className={`text-xs mt-0.5 ${recMode === 'bulk' ? 'text-gray-300 dark:text-gray-600' : 'text-gray-400'}`}>Elige cuántos y se crean ahora</p>
+                        <p className="font-medium">{t('recurrence.createBulk')}</p>
+                        <p className={`text-xs mt-0.5 ${recMode === 'bulk' ? 'text-gray-300 dark:text-gray-600' : 'text-gray-400'}`}>{t('recurrence.createBulkDesc')}</p>
                       </button>
                       <button type="button" onClick={() => setRecMode('auto')}
                         className={`py-2.5 px-3 rounded-xl text-sm border transition-colors text-left ${recMode === 'auto' ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-transparent' : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
-                        <p className="font-medium">Automático</p>
-                        <p className={`text-xs mt-0.5 ${recMode === 'auto' ? 'text-gray-300 dark:text-gray-600' : 'text-gray-400'}`}>Se crean solos al llegar la fecha</p>
+                        <p className="font-medium">{t('recurrence.auto')}</p>
+                        <p className={`text-xs mt-0.5 ${recMode === 'auto' ? 'text-gray-300 dark:text-gray-600' : 'text-gray-400'}`}>{t('recurrence.autoDesc')}</p>
                       </button>
                     </div>
                   </div>
@@ -866,18 +867,18 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                   {recMode === 'bulk' && (
                     <div className="space-y-3">
                       <div className="flex items-center gap-3">
-                        <span className="text-sm text-gray-600 dark:text-gray-400">Próximos</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">{t('recurrence.next')}</span>
                         <input type="number" min={1} max={60} value={recBulkN} onChange={e => { setRecBulkN(Math.max(1, parseInt(e.target.value) || 1)); setRecBulkDone(null) }}
                           className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-2 py-1.5 text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-300" />
-                        <span className="text-sm text-gray-600 dark:text-gray-400">movimientos</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400">{t('recurrence.movements')}</span>
                         <button type="button" onClick={bulkCreate} disabled={bulkMut.isPending}
                           className="ml-auto px-4 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 transition-colors">
-                          {bulkMut.isPending ? 'Creando...' : 'Crear'}
+                          {bulkMut.isPending ? t('recurrence.creating') : t('recurrence.create')}
                         </button>
                       </div>
                       <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
                         <input type="checkbox" checked={recBulkNumbered} onChange={e => setRecBulkNumbered(e.target.checked)} className="rounded" />
-                        Numerar pagos en el nombre <span className="text-gray-400 dark:text-gray-500">(1/{recBulkN}, 2/{recBulkN}…)</span>
+                        {t('recurrence.numberedPayments')} <span className="text-gray-400 dark:text-gray-500">(1/{recBulkN}, 2/{recBulkN}…)</span>
                       </label>
                       {recBulkDone !== null && (
                         <div className="flex items-center gap-2 text-sm text-green-600 dark:text-green-400">
@@ -891,7 +892,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                   {/* Auto */}
                   {recMode === 'auto' && (
                     <div className="bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 rounded-xl px-4 py-3 text-sm text-blue-700 dark:text-blue-300">
-                      Cada vez que abras Movimientos se comprobará si hay fechas pendientes y se crearán automáticamente. Puedes cancelarlo volviendo aquí y eligiendo otra opción.
+                      {t('recurrence.autoInfo')}
                     </div>
                   )}
 
@@ -899,16 +900,16 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                     {tpl?.recurrence && (
                       <button type="button" onClick={clearRecurrence}
                         className="text-sm text-red-400 hover:text-red-600 transition-colors">
-                        Cancelar recurrencia
+                        {t('recurrence.cancelRecurrence')}
                       </button>
                     )}
                     <div className="flex gap-3 ml-auto">
                       <button type="button" onClick={() => setPanel('form')}
-                        className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">Cancelar</button>
+                        className="px-4 py-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200">{t('common.cancel')}</button>
                       {recMode === 'auto' && (
                         <button type="button" onClick={saveRecurrence}
                           className="px-5 py-2 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors">
-                          Guardar
+                          {t('common.save')}
                         </button>
                       )}
                     </div>
@@ -922,12 +923,12 @@ export default function MovementForm({ onClose, initialDate }: Props) {
         {/* ── Right: templates sidebar ─────────────────────────────────────── */}
         <div className="w-56 border-l border-gray-100 dark:border-gray-800 flex flex-col shrink-0 bg-gray-50/50 dark:bg-gray-800/30">
           <div className="px-4 py-4 border-b border-gray-100 dark:border-gray-800">
-            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">Plantillas</span>
+            <span className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{t('quickadd.templates')}</span>
           </div>
 
           <div className="flex-1 overflow-y-auto">
             {templates.length === 0 && (
-              <p className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 italic">Sin plantillas aún</p>
+              <p className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 italic">{t('form.noTemplates')}</p>
             )}
             {templates.map(tpl => (
               <div key={tpl.id}
@@ -967,7 +968,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
             <button type="button" onClick={openCreate}
               className="flex items-center gap-1.5 text-xs text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors w-full">
               <Plus className="w-3.5 h-3.5" />
-              Nueva plantilla
+              {t('form.newTemplate')}
             </button>
           </div>
         </div>
