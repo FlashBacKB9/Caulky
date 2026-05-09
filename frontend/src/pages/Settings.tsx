@@ -1642,11 +1642,7 @@ export default function Settings() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{t('settings.sharedMovements')}</p>
                   <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5 leading-relaxed">
-                    Activa los campos de compartido al añadir un movimiento. Útil cuando pagas el total
-                    pero solo deberías contar tu parte: la app resta el importe completo del balance pero
-                    solo tu parte cuenta en estadísticas. Cuando te devuelvan lo que no te corresponde,
-                    regístralo con el subtipo <span className="font-medium text-gray-500 dark:text-gray-400">Devolución de dinero</span>.
-                    Sin esta opción, la devolución se anota como un movimiento negativo del mismo tipo que el gasto original.
+                    {t('settings.sharedMovementsDesc')}
                   </p>
                 </div>
                 <button

@@ -949,10 +949,10 @@ export default function Projection() {
                 <div className="flex items-center gap-1.5">
                   {accountsTotal !== null && (
                     <button onClick={() => setPatch({ initialBalance: Math.round(accountsTotal) })}
-                      title={`Usar saldo actual (${Math.round(accountsTotal).toLocaleString('es-ES')} €)`}
+                      title={t('projection.useAccountsTitle').replace('{amount}', Math.round(accountsTotal).toLocaleString('es-ES'))}
                       className="flex items-center gap-1 px-2 py-1 text-xs rounded-lg border border-blue-200 dark:border-blue-700 bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-900/40 transition-colors whitespace-nowrap">
                       <Landmark className="w-3 h-3" />
-                      Usar cuentas
+                      {t('projection.useAccounts')}
                     </button>
                   )}
                   <input type="number" step={100} className={`${INP_SM} w-24 text-right`}
@@ -998,7 +998,7 @@ export default function Projection() {
                 const yearOptions = Array.from({ length: 41 }, (_, i) => now.getFullYear() + i)
                 return (
                   <div className="flex items-center gap-3 px-4 py-3">
-                    <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">Fin Fase 1</span>
+                    <span className="text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">{t('projection.endPhase1')}</span>
                     <div className="flex items-center gap-1 ml-auto">
                       <select className={INP_SM} value={selMonth}
                         onChange={e => setPhase(0, { durationMonths: toMonths(`${selYear}-${String(parseInt(e.target.value)).padStart(2, '0')}`) })}>
@@ -1021,20 +1021,20 @@ export default function Projection() {
             <div className="rounded-xl border border-amber-100 dark:border-amber-800/50 bg-amber-50 dark:bg-amber-900/10 px-4 py-3">
               <button className="flex items-center gap-2 w-full text-left" onClick={() => setShowAiTip(!showAiTip)}>
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-                <span className="text-xs font-medium text-amber-700 dark:text-amber-400 flex-1">Recomendación para las subidas anuales</span>
+                <span className="text-xs font-medium text-amber-700 dark:text-amber-400 flex-1">{t('projection.aiTipTitle')}</span>
                 {showAiTip ? <ChevronUp className="w-3 h-3 text-amber-400" /> : <ChevronDown className="w-3 h-3 text-amber-400" />}
               </button>
               {showAiTip && (
                 <div className="mt-2 text-xs text-amber-700 dark:text-amber-400 space-y-1">
-                  <p>• <strong>Gastos ({AI_EXPENSE_GROWTH}%):</strong> IPC histórico en España.</p>
-                  <p>• <strong>Ingresos ({AI_INCOME_GROWTH}%):</strong> Subida media salarial en España.</p>
+                  <p>• <strong>{t('projection.aiTipExpensesLabel')} ({AI_EXPENSE_GROWTH}%):</strong> {t('projection.aiTipExpensesDesc')}</p>
+                  <p>• <strong>{t('projection.aiTipIncomeLabel')} ({AI_INCOME_GROWTH}%):</strong> {t('projection.aiTipIncomeDesc')}</p>
                   <button onClick={() => setConfig(c => {
                     const phases = [...c.phases] as [PhaseConfig, PhaseConfig]
                     phases[0] = { ...phases[0], expenseGrowthPct: AI_EXPENSE_GROWTH, incomeGrowthPct: AI_INCOME_GROWTH }
                     phases[1] = { ...phases[1], expenseGrowthPct: AI_EXPENSE_GROWTH, incomeGrowthPct: AI_INCOME_GROWTH }
                     return { ...c, phases }
                   })} className="mt-1 px-2 py-1 rounded-lg bg-amber-100 dark:bg-amber-800/30 text-amber-700 dark:text-amber-300 hover:bg-amber-200 dark:hover:bg-amber-800/50 transition-colors">
-                    Aplicar a todas las fases
+                    {t('projection.applyAllPhases')}
                   </button>
                 </div>
               )}

@@ -818,11 +818,11 @@ export default function Comparaciones() {
         {sortedYearData.length >= 2 && (
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
-              <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-3">Evolución Anual Gastos</h3>
+              <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-3">{t('comparison.annualExpenses')}</h3>
               <EvolutionLineChart yearData={sortedYearData}/>
             </div>
             <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4">
-              <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-3">Evolución Anual</h3>
+              <h3 className="text-sm font-semibold text-gray-600 dark:text-gray-300 mb-3">{t('comparison.annualEvolution')}</h3>
               <EvolutionStackedChart yearData={sortedYearData}/>
             </div>
           </div>

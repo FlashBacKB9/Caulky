@@ -567,24 +567,7 @@ R: Configuración → Plugins → "Instalar plugin (.js)" → seleccionar el arc
 
 // ── Section IDs for TOC ────────────────────────────────────────────────────────
 
-const SECTIONS = [
-  { id: 'ia',            label: 'Usar con IA' },
-  { id: 'intro',         label: 'Introducción' },
-  { id: 'conceptos',     label: 'Conceptos clave' },
-  { id: 'movimientos',   label: 'Movimientos' },
-  { id: 'plantillas',    label: 'Plantillas y recurrencias' },
-  { id: 'graficos',      label: 'Gráficos' },
-  { id: 'cuentas',       label: 'Cuentas' },
-  { id: 'comparaciones', label: 'Comparaciones' },
-  { id: 'annual',        label: 'Finanzas del Año' },
-  { id: 'dashboard',     label: 'Dashboard' },
-  { id: 'inversiones',   label: 'Inversiones' },
-  { id: 'presupuestos',  label: 'Presupuestos' },
-  { id: 'importar',      label: 'Importar Excel' },
-  { id: 'config',        label: 'Configuración' },
-  { id: 'plugins',       label: 'Plugins' },
-  { id: 'trucos',        label: 'Atajos y trucos' },
-]
+const SECTION_IDS = ['ia','intro','conceptos','movimientos','plantillas','graficos','cuentas','comparaciones','annual','dashboard','inversiones','presupuestos','importar','config','plugins','trucos'] as const
 
 // ── Typography helpers ─────────────────────────────────────────────────────────
 
@@ -721,13 +704,13 @@ export default function Documentation() {
       <aside className="hidden lg:flex flex-col w-56 shrink-0 overflow-y-auto border-r border-gray-100 dark:border-gray-800 py-8 px-4">
         <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-3 px-1">{t('docs.toc')}</p>
         <nav className="flex-1 space-y-0.5">
-          {SECTIONS.map(s => (
+          {SECTION_IDS.map(id => (
             <button
-              key={s.id}
-              onClick={() => scrollTo(s.id)}
+              key={id}
+              onClick={() => scrollTo(id)}
               className="block w-full text-left text-sm py-2 px-3 rounded-lg text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
-              {s.label}
+              {t(`docs.toc.${id}`)}
             </button>
           ))}
         </nav>
@@ -743,12 +726,8 @@ export default function Documentation() {
           </div>
 
           {/* ── 0. Usar con IA ─────────────────────────────────────────── */}
-          <H2 id="ia">Usar con IA</H2>
-          <P>
-            Descarga el archivo <B>.md</B> y adjúntalo al inicio de una conversación con cualquier IA
-            (ChatGPT, Claude, Gemini…). La IA leerá la guía completa y podrá guiarte en cualquier tarea
-            como si fuera un experto en Caulky.
-          </P>
+          <H2 id="ia">{t('docs.useWithAI')}</H2>
+          <P>{t('docs.useWithAIDesc')}</P>
 
           <div className="my-6">
             <button
@@ -760,19 +739,16 @@ export default function Documentation() {
             </button>
           </div>
 
-          <P>Con el archivo adjunto puedes preguntar cosas como:</P>
+          <P>{t('docs.withFileAsk')}</P>
           <UL>
-            <LI>"Quiero que el alquiler aparezca solo el día 5 de cada mes"</LI>
-            <LI>"¿Cómo veo la evolución del saldo de mis cuentas?"</LI>
-            <LI>"Quiero comparar cuánto gasté este año vs el año pasado"</LI>
-            <LI>"¿Cómo divido un gasto con otra persona?"</LI>
-            <LI>"¿Cómo instalo un plugin para cambiar la fuente?"</LI>
-            <LI>"¿Cómo exporto todos mis datos?"</LI>
+            <LI>{t('docs.q1')}</LI>
+            <LI>{t('docs.q2')}</LI>
+            <LI>{t('docs.q3')}</LI>
+            <LI>{t('docs.q4')}</LI>
+            <LI>{t('docs.q5')}</LI>
+            <LI>{t('docs.q6')}</LI>
           </UL>
-          <Tip>
-            El archivo incluye todos los conceptos, páginas, campos, flujos paso a paso, atajos y preguntas
-            frecuentes. La IA puede darte instrucciones precisas sin necesidad de que conozcas la app de antemano.
-          </Tip>
+          <Tip>{t('docs.useWithAITip')}</Tip>
 
           <Divider />
 
