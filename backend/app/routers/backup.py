@@ -145,26 +145,24 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
         await db.execute(sa_delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == uid))
     await db.flush()
 
-    _skip = {"id", "user_id"}
-
     if rg:
         for g in payload.db.get("groups", []):
-            db.add(IncomeExpenseGroup(**{k: v for k, v in g.items() if k not in _skip}, user_id=uid))
+            db.add(IncomeExpenseGroup(**{k: v for k, v in g.items() if k != "user_id"}, user_id=uid))
         await db.flush()
 
     if ra:
         for a in payload.db.get("accounts", []):
-            db.add(Account(**{k: v for k, v in a.items() if k not in _skip}, user_id=uid))
+            db.add(Account(**{k: v for k, v in a.items() if k != "user_id"}, user_id=uid))
         await db.flush()
 
     if rt:
         for t in payload.db.get("types", []):
-            db.add(MovementType(**{k: v for k, v in t.items() if k not in _skip}, user_id=uid))
+            db.add(MovementType(**{k: v for k, v in t.items() if k != "user_id"}, user_id=uid))
         await db.flush()
 
     if rm:
         for m in payload.db.get("movements", []):
-            m = {k: v for k, v in m.items() if k not in _skip}
+            m = {k: v for k, v in m.items() if k != "user_id"}
             m["date"]      = _parse_date(m.get("date"))
             m["bank_date"] = _parse_date(m.get("bank_date"))
             db.add(Movement(**m, user_id=uid))
@@ -172,17 +170,17 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
 
     if ri:
         for f in payload.db.get("investment_funds", []):
-            db.add(InvestmentFund(**{k: v for k, v in f.items() if k not in _skip}, user_id=uid))
+            db.add(InvestmentFund(**{k: v for k, v in f.items() if k != "user_id"}, user_id=uid))
         await db.flush()
         for p in payload.db.get("investment_purchases", []):
-            db.add(InvestmentPurchase(**{k: v for k, v in p.items() if k != "id"}))
+            db.add(InvestmentPurchase(**p))
         await db.flush()
 
     if rtp:
         await db.execute(sa_delete(TemplateModel).where(TemplateModel.user_id == uid))
         await db.flush()
         for t in payload.db.get("templates", []):
-            db.add(TemplateModel(**{k: v for k, v in t.items() if k not in _skip}, user_id=uid))
+            db.add(TemplateModel(**{k: v for k, v in t.items() if k != "user_id"}, user_id=uid))
         await db.flush()
 
     if payload.restore_preferences:

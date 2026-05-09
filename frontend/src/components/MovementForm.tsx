@@ -7,7 +7,7 @@ import { getAccountsSummary } from '../api/accounts'
 import api from '../api/client'
 import {
   Paperclip, Image as ImageIcon, FileText, X, Plus, ChevronLeft,
-  Pencil, Calendar, Check,
+  Pencil, Calendar, Check, AlertTriangle,
 } from 'lucide-react'
 import {
   applyFormula, computeDates,
@@ -425,9 +425,21 @@ export default function MovementForm({ onClose, initialDate }: Props) {
     )
   }
 
+  const WARN_BYTES = 20 * 1024 * 1024
+  const [largePending, setLargePending] = useState<File[] | null>(null)
+
   const addFiles = (files: FileList | null) => {
-    if (files) setPendingFiles(prev => [...prev, ...Array.from(files)])
+    if (!files || !files.length) return
+    const arr = Array.from(files)
+    const large = arr.filter(f => f.size > WARN_BYTES)
+    if (large.length > 0) {
+      setLargePending(arr)
+    } else {
+      setPendingFiles(prev => [...prev, ...arr])
+    }
   }
+
+  const fmtSize = (b: number) => b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${(b / 1024).toFixed(0)} KB`
   const removeFile = (i: number) => setPendingFiles(prev => prev.filter((_, idx) => idx !== i))
   const valid = form.name.trim() && form.money && !isNaN(parseFloat(form.money))
 
@@ -559,6 +571,34 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                 </div>
                 <div>
                   <label className={LBL}>Adjuntos</label>
+                  {largePending && (
+                    <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-3 mb-2 space-y-2">
+                      <div className="flex items-start gap-2">
+                        <AlertTriangle className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" strokeWidth={1.5} />
+                        <div className="space-y-1">
+                          <p className="text-xs font-medium text-amber-800 dark:text-amber-300">Archivo grande detectado</p>
+                          <ul className="text-xs text-amber-700 dark:text-amber-400">
+                            {largePending.filter(f => f.size > WARN_BYTES).map(f => (
+                              <li key={f.name}>{f.name} — <strong>{fmtSize(f.size)}</strong></li>
+                            ))}
+                          </ul>
+                          <p className="text-xs text-amber-600 dark:text-amber-500">
+                            El espacio es limitado. Usa documentos ligeros: tickets (1–5 MB), PDFs (1–3 MB). No tiene sentido subir vídeos o fotos sin comprimir.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 justify-end">
+                        <button type="button" onClick={() => { setLargePending(null); if (fileInputRef.current) fileInputRef.current.value = '' }}
+                          className="text-xs px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800">
+                          Cancelar
+                        </button>
+                        <button type="button" onClick={() => { setPendingFiles(prev => [...prev, ...largePending]); setLargePending(null) }}
+                          className="text-xs px-2.5 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white">
+                          Subir de todas formas
+                        </button>
+                      </div>
+                    </div>
+                  )}
                   {pendingFiles.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-2">
                       {pendingFiles.map((f, i) => (
