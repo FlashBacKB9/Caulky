@@ -1,4 +1,5 @@
 import api from './client'
+import { syncPref } from '../utils/prefSync'
 
 export interface RestoreOptions {
   // DB
@@ -74,7 +75,7 @@ export async function importBackup(file: File, options: RestoreOptions): Promise
     if (!options[optKey]) continue
     for (const key of keys) {
       if (ls[key] !== undefined) {
-        localStorage.setItem(key, typeof ls[key] === 'string' ? ls[key] : JSON.stringify(ls[key]))
+        syncPref(key, typeof ls[key] === 'string' ? ls[key] as string : JSON.stringify(ls[key]))
       }
     }
   }

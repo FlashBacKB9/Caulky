@@ -1,4 +1,5 @@
 import { useLayoutEffect, useState } from 'react'
+import { syncPref } from '../utils/prefSync'
 
 const ZOOM_KEY  = 'ui-zoom-v2'   // v2: 100 display → 120% actual
 const ZOOM_MIN  = 70
@@ -16,7 +17,7 @@ export function useUiZoom() {
     const actual = zoom * ZOOM_SCALE
     document.documentElement.style.zoom = actual + '%'
     document.documentElement.style.minHeight = actual < 100 ? `${(100 * 100 / actual).toFixed(2)}%` : ''
-    localStorage.setItem(ZOOM_KEY, String(zoom))
+    syncPref(ZOOM_KEY, String(zoom))
   }, [zoom])
 
   const setZoom = (v: number) => setZoomState(Math.max(ZOOM_MIN, Math.min(ZOOM_MAX, Math.round(v))))

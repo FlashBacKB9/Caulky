@@ -1,4 +1,4 @@
-import { useState, useLayoutEffect } from 'react'
+import { useState, useLayoutEffect, useEffect } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Menu, Wallet } from 'lucide-react'
@@ -20,6 +20,7 @@ import Analysis from './pages/Analysis'
 import QuickAdd from './pages/QuickAdd'
 import LoginPage from './pages/LoginPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
+import { initPreferences } from './utils/prefSync'
 import { useDarkMode } from './hooks/useDarkMode'
 import { useUiZoom } from './hooks/useUiZoom'
 import { usePluginLoader } from './hooks/usePlugins'
@@ -117,8 +118,15 @@ function Layout() {
 
 function AppRoutes() {
   const { user, loading } = useAuth()
+  const [prefsReady, setPrefsReady] = useState(false)
 
-  if (loading) {
+  useEffect(() => {
+    if (!user) { setPrefsReady(false); return }
+    setPrefsReady(false)
+    initPreferences().then(() => setPrefsReady(true))
+  }, [user?.id])
+
+  if (loading || (user && !prefsReady)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-800 dark:border-t-white rounded-full animate-spin" />

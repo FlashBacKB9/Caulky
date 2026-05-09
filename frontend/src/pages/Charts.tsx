@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { syncPref } from '../utils/prefSync'
 import { useQuery } from '@tanstack/react-query'
 import { GridLayout, useContainerWidth, verticalCompactor, type LayoutItem } from 'react-grid-layout'
 import 'react-grid-layout/css/styles.css'
@@ -1531,7 +1532,7 @@ export default function Charts() {
   })
   const [draftChart, setDraftChart] = useState<CustomChartDef|null>(null)
 
-  useEffect(() => { localStorage.setItem('spendly-custom-charts-v2', JSON.stringify(customCharts)) }, [customCharts])
+  useEffect(() => { syncPref('spendly-custom-charts-v2', JSON.stringify(customCharts)) }, [customCharts])
 
   const { data: allMovements = [] } = useQuery({ queryKey:['movements-all'],  queryFn:()=>getMovements() })
   const { data: groups = [] }       = useQuery({ queryKey:['groups'],          queryFn:getGroups })
@@ -1556,11 +1557,11 @@ export default function Charts() {
   const [builtinCfg, setBuiltinCfg] = useState<Record<string,{ colSpan?:number; height?:number }>>(()=>{
     try { return JSON.parse(localStorage.getItem('spendly-builtin-cfg') ?? '{}') } catch { return {} }
   })
-  useEffect(()=>{ localStorage.setItem('spendly-builtin-cfg', JSON.stringify(builtinCfg)) },[builtinCfg])
+  useEffect(()=>{ syncPref('spendly-builtin-cfg', JSON.stringify(builtinCfg)) },[builtinCfg])
 
 
   function hideBuiltin(id: string) {
-    setHiddenBuiltins(prev=>{ const s=new Set(prev); s.add(id); localStorage.setItem('spendly-hidden-builtins', JSON.stringify([...s])); return s })
+    setHiddenBuiltins(prev=>{ const s=new Set(prev); s.add(id); syncPref('spendly-hidden-builtins', JSON.stringify([...s])); return s })
     setLayout(prev => prev.filter(l => l.i !== id))
   }
 
@@ -1568,7 +1569,7 @@ export default function Charts() {
     try { return new Set(JSON.parse(localStorage.getItem('spendly-hidden-customs')??'[]')) } catch { return new Set() }
   })
   function hideCustomChart(id: string) {
-    setHiddenCustom(prev=>{ const s=new Set(prev); s.add(id); localStorage.setItem('spendly-hidden-customs',JSON.stringify([...s])); return s })
+    setHiddenCustom(prev=>{ const s=new Set(prev); s.add(id); syncPref('spendly-hidden-customs',JSON.stringify([...s])); return s })
     setLayout(prev => prev.filter(l => l.i !== id))
   }
 
@@ -1604,7 +1605,7 @@ export default function Charts() {
       })),
     ])
   })
-  useEffect(() => { localStorage.setItem('spendly-charts-layout-v1', JSON.stringify(layout)) }, [layout])
+  useEffect(() => { syncPref('spendly-charts-layout-v1', JSON.stringify(layout)) }, [layout])
 
   function handleLayoutChange(newLayout: readonly LayoutItem[]) {
     setLayout(newLayout)

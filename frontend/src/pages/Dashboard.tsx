@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { syncPref } from '../utils/prefSync'
 import { GridLayout, verticalCompactor, type LayoutItem } from 'react-grid-layout'
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams, useNavigate } from 'react-router-dom'
@@ -517,7 +518,7 @@ function budgetPeriodLabel(b: StoredBudget, start: string, end: string): string 
 function readBudgets(): StoredBudget[] {
   try { return JSON.parse(localStorage.getItem('spendly-budgets') ?? '[]') } catch { return [] }
 }
-function writeBudgets(b: StoredBudget[]) { localStorage.setItem('spendly-budgets', JSON.stringify(b)) }
+function writeBudgets(b: StoredBudget[]) { syncPref('spendly-budgets', JSON.stringify(b)) }
 
 // ── Custom chart support ──────────────────────────────────────────────────────
 
@@ -1456,7 +1457,7 @@ export default function Dashboard() {
     const customIds = new Set(readCustomCharts().map(c => c.id))
     const newLayout = buildDashLayout(config.widgets, customIds)
     setDashLayout(newLayout)
-    localStorage.setItem(DASH_LAYOUT_KEY, JSON.stringify(newLayout))
+    syncPref(DASH_LAYOUT_KEY, JSON.stringify(newLayout))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.widgets])
 
@@ -1478,7 +1479,7 @@ export default function Dashboard() {
     // Only save clean positional data — never persist static/enabled flags
     const clean = newLayout.map(({ i, x, y, w, h }) => ({ i, x, y, w, h }))
     setDashLayout(clean)
-    localStorage.setItem(DASH_LAYOUT_KEY, JSON.stringify(clean))
+    syncPref(DASH_LAYOUT_KEY, JSON.stringify(clean))
     const customIds = new Set(readCustomCharts().map(c => c.id))
     save({
       widgets: config.widgets.map(w => {
@@ -1762,7 +1763,7 @@ export default function Dashboard() {
               const customIds = new Set(readCustomCharts().map(c => c.id))
               const nl = buildDashLayout(DEFAULT_DASHBOARD_CONFIG.widgets, customIds)
               setDashLayout(nl)
-              localStorage.setItem(DASH_LAYOUT_KEY, JSON.stringify(nl))
+              syncPref(DASH_LAYOUT_KEY, JSON.stringify(nl))
             }}
               className="px-3 py-1.5 rounded-xl text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-700 transition-colors"
             >

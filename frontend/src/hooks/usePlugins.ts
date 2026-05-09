@@ -62,6 +62,8 @@ export function scanPlugin(code: string): PluginScanResult {
 
 // ── Storage ───────────────────────────────────────────────────────────────────
 
+import { syncPref } from '../utils/prefSync'
+
 const STORAGE_KEY = 'caulky_plugins'
 
 function loadPlugins(): Plugin[] {
@@ -70,7 +72,7 @@ function loadPlugins(): Plugin[] {
 }
 
 function savePlugins(plugins: Plugin[]) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(plugins))
+  syncPref(STORAGE_KEY, JSON.stringify(plugins))
   window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEY, newValue: JSON.stringify(plugins) }))
 }
 

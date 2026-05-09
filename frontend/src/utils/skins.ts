@@ -1,3 +1,5 @@
+import { syncPref } from './prefSync'
+
 export interface Skin {
   id: string
   name: string
@@ -20,7 +22,7 @@ export function loadSkins(): Skin[] {
 }
 
 export function saveSkins(skins: Skin[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(skins))
+  syncPref(STORAGE_KEY, JSON.stringify(skins))
 }
 
 export function getActiveSkin(): Skin | null {

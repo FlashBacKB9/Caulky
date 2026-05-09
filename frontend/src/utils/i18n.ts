@@ -1,3 +1,5 @@
+import { syncPref, syncPrefNow } from './prefSync'
+
 // ── Built-in translations ──────────────────────────────────────────────────────
 
 const ES: Record<string, string> = {
@@ -586,7 +588,7 @@ export function loadCustomLanguages(): CustomLanguage[] {
 }
 
 export function saveCustomLanguages(langs: CustomLanguage[]): void {
-  localStorage.setItem(CUSTOM_LANGS_KEY, JSON.stringify(langs))
+  syncPref(CUSTOM_LANGS_KEY, JSON.stringify(langs))
 }
 
 export async function parseLanguageFile(file: File): Promise<Omit<CustomLanguage, 'id'>> {
@@ -617,8 +619,7 @@ export function getLanguage(): string {
 }
 
 export function setLanguage(id: string): void {
-  localStorage.setItem(LANG_KEY, id)
-  window.location.reload()
+  syncPrefNow(LANG_KEY, id).then(() => window.location.reload())
 }
 
 function resolveTranslations(): Record<string, string> {

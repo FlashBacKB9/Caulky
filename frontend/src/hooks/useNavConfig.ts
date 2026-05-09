@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { syncPref } from '../utils/prefSync'
 import {
   Home, List, Landmark, BarChart2, LineChart, GitCompare,
   ChartCandlestick, TrendingUp, Upload, BookOpen, Telescope, Brain,
@@ -52,7 +53,7 @@ export function loadNavConfig(): NavEntry[] {
 }
 
 export function saveNavConfig(entries: NavEntry[]) {
-  localStorage.setItem(NAV_KEY, JSON.stringify(entries))
+  syncPref(NAV_KEY, JSON.stringify(entries))
   window.dispatchEvent(new StorageEvent('storage', { key: NAV_KEY, newValue: JSON.stringify(entries) }))
 }
 

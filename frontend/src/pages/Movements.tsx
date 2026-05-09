@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { syncPref } from '../utils/prefSync'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMovements, updateMovement, deleteMovement, createMovement, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
@@ -19,7 +20,7 @@ function loadFavorites(): FilterFavorite[] {
   return []
 }
 function saveFavorites(favs: FilterFavorite[]) {
-  localStorage.setItem('movements-filter-favorites', JSON.stringify(favs))
+  syncPref('movements-filter-favorites', JSON.stringify(favs))
 }
 
 // ── Column definitions ───────────────────────────────────────────────────────
@@ -57,7 +58,7 @@ function loadSet<T extends string>(key: string, fallback: Set<T>): Set<T> {
   return new Set(fallback)
 }
 function saveSet<T extends string>(key: string, set: Set<T>) {
-  localStorage.setItem(key, JSON.stringify([...set]))
+  syncPref(key, JSON.stringify([...set]))
 }
 function loadWidths(): Record<ColKey, number> {
   const defaults = Object.fromEntries(COLS.map(c => [c.key, c.defaultWidth])) as Record<ColKey, number>
@@ -443,7 +444,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
     next.splice(from, 1)
     next.splice(to, 0, draggingId)
     setGroupOrder(next)
-    localStorage.setItem('kanban-group-order', JSON.stringify(next))
+    syncPref('kanban-group-order', JSON.stringify(next))
     setDraggingId(null)
     setDragOverId(null)
   }
@@ -863,7 +864,7 @@ export default function Movements() {
     const startX = e.clientX, startW = colWidths[key]
     const onMove = (ev: MouseEvent) => {
       const w = Math.max(50, startW + ev.clientX - startX)
-      setColWidths(prev => { const next = { ...prev, [key]: w }; localStorage.setItem('movements-widths', JSON.stringify(next)); return next })
+      setColWidths(prev => { const next = { ...prev, [key]: w }; syncPref('movements-widths', JSON.stringify(next)); return next })
     }
     const onUp = () => { document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp) }
     document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp)
@@ -876,7 +877,7 @@ export default function Movements() {
     const toIdx = order.indexOf(to)
     order.splice(side === 'right' ? toIdx + 1 : toIdx, 0, from)
     setColOrder(order)
-    localStorage.setItem('movements-col-order', JSON.stringify(order))
+    syncPref('movements-col-order', JSON.stringify(order))
   }
 
   const { data: allMovementsForYears = [] } = useQuery({
@@ -1003,7 +1004,7 @@ export default function Movements() {
     withoutFrom.splice(toIdx, 0, fromId)
     const next = { ...dayOrder, [date]: withoutFrom }
     setDayOrder(next)
-    localStorage.setItem('movements-day-order', JSON.stringify(next))
+    syncPref('movements-day-order', JSON.stringify(next))
   }
 
   const updateMut = useMutation({

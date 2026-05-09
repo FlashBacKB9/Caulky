@@ -1,4 +1,5 @@
 import { useState, useMemo, useCallback } from 'react'
+import { syncPref } from '../utils/prefSync'
 import { useQuery } from '@tanstack/react-query'
 import {
   Area, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -795,7 +796,7 @@ export default function Projection() {
   const setConfig = useCallback((next: Config | ((c: Config) => Config)) => {
     setCfg(prev => {
       const n = typeof next === 'function' ? next(prev) : next
-      localStorage.setItem(CONFIG_KEY, JSON.stringify(n))
+      syncPref(CONFIG_KEY, JSON.stringify(n))
       return n
     })
   }, [])
@@ -874,7 +875,7 @@ export default function Projection() {
   const saveSnapshot = () => {
     const snap: Snapshot = { savedAt: new Date().toISOString(), points: points.map(p => ({ ...p })), targetAmount: cfg.targetAmount }
     setSnapshot(snap)
-    localStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snap))
+    syncPref(SNAPSHOT_KEY, JSON.stringify(snap))
   }
   const deleteSnapshot = () => { setSnapshot(null); localStorage.removeItem(SNAPSHOT_KEY) }
   const snapDate = snapshot ? new Date(snapshot.savedAt).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : null

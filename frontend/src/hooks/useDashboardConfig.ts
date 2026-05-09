@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { syncPref } from '../utils/prefSync'
 
 export interface DashboardWidget {
   id: string
@@ -44,7 +45,7 @@ export function useDashboardConfig() {
 
   const save = (next: DashboardConfig) => {
     setConfig(next)
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next))
+    syncPref(STORAGE_KEY, JSON.stringify(next))
   }
 
   return { config, save }

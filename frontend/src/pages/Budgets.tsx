@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { syncPref } from '../utils/prefSync'
 import { useQuery } from '@tanstack/react-query'
 import { Plus, Edit2, Trash2, X, ChevronLeft, History, ChartCandlestick, Table2, TrendingUp } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
@@ -569,7 +570,7 @@ export default function Budgets() {
 
   function saveBudgets(next: Budget[]) {
     setBudgets(next)
-    localStorage.setItem('spendly-budgets', JSON.stringify(next))
+    syncPref('spendly-budgets', JSON.stringify(next))
   }
 
   function handleSave(b: Budget) {

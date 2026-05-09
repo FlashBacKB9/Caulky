@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { syncPref } from '../utils/prefSync'
 
 const KEY = 'shared-movements-enabled'
 
@@ -9,7 +10,7 @@ export function useSharedMovements() {
   })
 
   useEffect(() => {
-    localStorage.setItem(KEY, String(enabled))
+    syncPref(KEY, String(enabled))
   }, [enabled])
 
   return { sharedEnabled: enabled, setSharedEnabled: setEnabled }

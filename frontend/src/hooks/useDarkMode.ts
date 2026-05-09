@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { syncPref } from '../utils/prefSync'
 
 export function useDarkMode() {
   const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
@@ -7,10 +8,10 @@ export function useDarkMode() {
     const root = document.documentElement
     if (dark) {
       root.classList.add('dark')
-      localStorage.setItem('theme', 'dark')
+      syncPref('theme', 'dark')
     } else {
       root.classList.remove('dark')
-      localStorage.setItem('theme', 'light')
+      syncPref('theme', 'light')
     }
   }, [dark])
 

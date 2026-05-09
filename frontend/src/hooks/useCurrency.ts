@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { syncPref } from '../utils/prefSync'
 
 const KEY = 'spendly-currency'
 const EVENT = 'spendly-currency-change'
@@ -35,7 +36,7 @@ export function useCurrency() {
   }, [])
 
   const setCurrency = useCallback((code: string) => {
-    localStorage.setItem(KEY, code)
+    syncPref(KEY, code)
     window.dispatchEvent(new Event(EVENT))
   }, [])
 

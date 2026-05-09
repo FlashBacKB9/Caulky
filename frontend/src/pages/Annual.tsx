@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react'
+import { syncPref } from '../utils/prefSync'
 import { useQuery } from '@tanstack/react-query'
 import { getAnnualStats } from '../api/stats'
 import { getMovements } from '../api/movements'
@@ -15,7 +16,7 @@ function loadLS<T>(key: string, fallback: T): T {
   return fallback
 }
 function saveLS(key: string, value: unknown) {
-  try { localStorage.setItem(key, JSON.stringify(value)) } catch { /**/ }
+  try { syncPref(key, JSON.stringify(value)) } catch { /**/ }
 }
 
 export default function Annual() {

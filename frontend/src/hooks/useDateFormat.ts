@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { syncPref } from '../utils/prefSync'
 
 const KEY = 'spendly-date-format'
 const EVENT = 'spendly-date-format-change'
@@ -30,7 +31,7 @@ export function useDateFormat() {
   }, [])
 
   const setFormat = useCallback((f: DateFormat) => {
-    localStorage.setItem(KEY, f)
+    syncPref(KEY, f)
     window.dispatchEvent(new Event(EVENT))
   }, [])
 

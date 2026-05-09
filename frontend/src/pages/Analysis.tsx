@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react'
+import { syncPref } from '../utils/prefSync'
 import { useQuery } from '@tanstack/react-query'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
@@ -502,7 +503,7 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
   function assign(groupId: number, bucket: RuleBucket) {
     const next = { ...assignment, [groupId]: bucket }
     setAssignment(next)
-    localStorage.setItem(RULE_KEY, JSON.stringify(next))
+    syncPref(RULE_KEY, JSON.stringify(next))
   }
 
   const byBucket = useMemo(() => {
@@ -850,7 +851,7 @@ export default function Analysis() {
 
   function updateConfig(c: AnalysisConfig) {
     setAnalysisConfig(c)
-    localStorage.setItem(ANALYSIS_CONFIG_KEY, JSON.stringify(c))
+    syncPref(ANALYSIS_CONFIG_KEY, JSON.stringify(c))
   }
 
   const { data: allMovements = [] } = useQuery({ queryKey: ['movements'], queryFn: () => getMovements() })
