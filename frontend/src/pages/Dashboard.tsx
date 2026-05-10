@@ -94,25 +94,25 @@ function SparklineStatPanel({ title, value, color, Icon, series, maxMonth }: {
     return { v: cumulative }
   })
   return (
-    <div className="relative h-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden flex flex-col">
-      <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.2 }}>
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-            <defs>
-              <linearGradient id={`sparkGrad-${color}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="10%" stopColor={color} stopOpacity={0.5} />
-                <stop offset="100%" stopColor={color} stopOpacity={0} />
-              </linearGradient>
-            </defs>
-            <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={`url(#sparkGrad-${color})`} dot={false} isAnimationActive={false} />
-          </AreaChart>
-        </ResponsiveContainer>
-      </div>
-      <div className="px-5 pt-3 pb-2 border-b border-gray-50 dark:border-gray-800 relative z-10">
+    <div className="h-full bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden flex flex-col">
+      <div className="px-5 pt-3 pb-2 border-b border-gray-50 dark:border-gray-800">
         <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">{title}</h2>
       </div>
-      <div className="flex-1 flex items-center px-5 relative z-10">
-        <div className="flex items-center gap-3">
+      <div className="relative flex-1 flex items-center px-5">
+        <div className="absolute inset-0 pointer-events-none" style={{ opacity: 0.2 }}>
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+              <defs>
+                <linearGradient id={`sparkGrad-${color}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="10%" stopColor={color} stopOpacity={0.5} />
+                  <stop offset="100%" stopColor={color} stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={`url(#sparkGrad-${color})`} dot={false} isAnimationActive={false} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="flex items-center gap-3 relative z-10">
           <div className="w-9 h-9 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: color + '20' }}>
             <Icon className="w-5 h-5" style={{ color }} strokeWidth={1.5} />
           </div>
