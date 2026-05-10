@@ -132,6 +132,7 @@ async def dashboard(
     annual = {"income": 0.0, "expenses": 0.0, "savings": 0.0}
     monthly = {"income": 0.0, "expenses": 0.0, "savings": 0.0}
     income_by_month = {m: 0.0 for m in range(1, 13)}
+    expenses_by_month = {m: 0.0 for m in range(1, 13)}
     budget_groups = []
 
     for group in groups:
@@ -151,6 +152,8 @@ async def dashboard(
                     group_monthly += dinero
                 if group.name == "Ingreso":
                     income_by_month[mv.date.month] += dinero
+                elif group.name not in SAVINGS_GROUPS:
+                    expenses_by_month[mv.date.month] += dinero
 
         if group.name == "Ingreso":
             annual["income"] += group_annual
@@ -195,5 +198,6 @@ async def dashboard(
         "annual": annual,
         "monthly": monthly,
         "income_by_month": income_by_month,
+        "expenses_by_month": expenses_by_month,
         "budget_groups": budget_groups,
     }

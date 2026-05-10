@@ -84,13 +84,13 @@ function StaticPanel({ title, value, color, Icon }: {
   )
 }
 
-function SparklineStatPanel({ title, value, color, Icon, series }: {
-  title: string; value: number; color: string; Icon: LucideIcon; series: Record<number, number>
+function SparklineStatPanel({ title, value, color, Icon, series, maxMonth }: {
+  title: string; value: number; color: string; Icon: LucideIcon; series: Record<number, number>; maxMonth: number
 }) {
   const { fmt } = useCurrency()
   let cumulative = 0
-  const data = Array.from({ length: 12 }, (_, i) => {
-    cumulative += series[i + 1] ?? 0
+  const data = Array.from({ length: maxMonth }, (_, i) => {
+    cumulative += Math.abs(series[i + 1] ?? 0)
     return { v: cumulative }
   })
   return (
@@ -99,12 +99,12 @@ function SparklineStatPanel({ title, value, color, Icon, series }: {
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={data} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
             <defs>
-              <linearGradient id="incomeSparkGrad" x1="0" y1="0" x2="0" y2="1">
+              <linearGradient id={`sparkGrad-${color}`} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="10%" stopColor={color} stopOpacity={0.5} />
                 <stop offset="100%" stopColor={color} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill="url(#incomeSparkGrad)" dot={false} isAnimationActive={false} />
+            <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={`url(#sparkGrad-${color})`} dot={false} isAnimationActive={false} />
           </AreaChart>
         </ResponsiveContainer>
       </div>
@@ -1573,8 +1573,8 @@ export default function Dashboard() {
   function renderContent(w: DashboardWidget, chartH: number) {
     // ── Stat panels ──
     if (w.id === 'stat-uso')      return <StaticPanel title={t('dashboard.widgetUso')}   value={data!.uso_balance}      color="#3b82f6" Icon={CreditCard}     />
-    if (w.id === 'stat-income')   return <SparklineStatPanel title={t('dashboard.widgetIncome')} value={data!.annual.income} color="#22c55e" Icon={ArrowUpRight} series={data!.income_by_month ?? {}} />
-    if (w.id === 'stat-expense')  return <StaticPanel title={t('dashboard.widgetExpense')}    value={data!.annual.expenses}  color="#ef4444" Icon={ArrowDownRight} />
+    if (w.id === 'stat-income')   return <SparklineStatPanel title={t('dashboard.widgetIncome')} value={data!.annual.income} color="#22c55e" Icon={ArrowUpRight} series={data!.income_by_month ?? {}} maxMonth={year < new Date().getFullYear() ? 12 : year > new Date().getFullYear() ? 0 : new Date().getMonth() + 1} />
+    if (w.id === 'stat-expense')  return <SparklineStatPanel title={t('dashboard.widgetExpense')} value={data!.annual.expenses} color="#ef4444" Icon={ArrowDownRight} series={data!.expenses_by_month ?? {}} maxMonth={year < new Date().getFullYear() ? 12 : year > new Date().getFullYear() ? 0 : new Date().getMonth() + 1} />
     if (w.id === 'stat-accounts')      return <CyclingPanel accounts={savingsAccounts} />
     if (w.id === 'stat-total-balance') return <StaticPanel title={t('dashboard.widgetTotalBalance')} value={accountsData?.total ?? 0} color="#8b5cf6" Icon={Landmark} />
     if (w.id === 'stat-income-monthly')  return <StaticPanel title={t('dashboard.widgetIncomeMonthly')}     value={data!.monthly.income}                         color="#22c55e" Icon={ArrowUpRight}   />
