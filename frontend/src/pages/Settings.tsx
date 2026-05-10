@@ -503,10 +503,10 @@ function TypesSection() {
   }
 
   const invalidate = () => {
-    qc.refetchQueries({ queryKey: ['groups'], type: 'all' })
-    qc.refetchQueries({ queryKey: ['movement-types'], type: 'all' })
-    qc.refetchQueries({ queryKey: ['annual'], type: 'all' })
-    qc.refetchQueries({ queryKey: ['dashboard'], type: 'all' })
+    qc.invalidateQueries({ queryKey: ['groups'] })
+    qc.invalidateQueries({ queryKey: ['movement-types'] })
+    qc.invalidateQueries({ queryKey: ['annual'] })
+    qc.invalidateQueries({ queryKey: ['dashboard'] })
   }
 
   const buildPayload = (s: TypeFormState) => {
@@ -527,7 +527,9 @@ function TypesSection() {
     mutationFn: ({ id, g }: { id: number; g: Group }) => updateGroup(id, g),
     onSuccess: (updatedGroup) => {
       qc.setQueryData<Group[]>(['groups'], old => old?.map(g => g.id === updatedGroup.id ? updatedGroup : g))
-      invalidate()
+      qc.invalidateQueries({ queryKey: ['movement-types'] })
+      qc.invalidateQueries({ queryKey: ['annual'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
       setEditingGroup(null)
     },
   })
