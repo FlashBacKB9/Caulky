@@ -523,7 +523,14 @@ function TypesSection() {
   const mutUpdateType  = useMutation({ mutationFn: ({ id, s }: { id: number; s: TypeFormState }) => updateMovementType(id, buildPayload(s)), onSuccess: () => { invalidate(); setEditingTypeId(null) } })
   const mutCreateType  = useMutation({ mutationFn: (s: AddingTypeState) => createMovementType(buildPayload(s)), onSuccess: () => { invalidate(); setAddingType(null) } })
   const mutDeleteType  = useMutation({ mutationFn: deleteMovementType, onSuccess: invalidate })
-  const mutUpdateGroup = useMutation({ mutationFn: ({ id, g }: { id: number; g: Group }) => updateGroup(id, g), onSuccess: () => { invalidate(); setEditingGroup(null) } })
+  const mutUpdateGroup = useMutation({
+    mutationFn: ({ id, g }: { id: number; g: Group }) => updateGroup(id, g),
+    onSuccess: (updatedGroup) => {
+      qc.setQueryData<Group[]>(['groups'], old => old?.map(g => g.id === updatedGroup.id ? updatedGroup : g))
+      invalidate()
+      setEditingGroup(null)
+    },
+  })
   const mutDeleteGroup = useMutation({ mutationFn: deleteGroup, onSuccess: invalidate })
   const mutCreateGroup = useMutation({ mutationFn: (name: string) => createGroup({ name, color: '#6b7280' }), onSuccess: () => { invalidate(); setAddingGroup(false); setNewGroupName('') } })
 

@@ -1643,16 +1643,16 @@ export default function Charts() {
   }
   function cancelDraft() { setDraftChart(null); setEditingId(null) }
 
-  if (draftChart) return (
-    <ChartBuilderScreen
-      def={draftChart} onUpdate={setDraftChart}
-      onSave={saveDraft} onCancel={cancelDraft}
-      allYears={allYears} groups={groups} types={types} accounts={accounts}
-    />
-  )
-
   return (
-    <div className="p-3 md:p-6 space-y-4">
+    <>
+      {draftChart && (
+        <ChartBuilderScreen
+          def={draftChart} onUpdate={setDraftChart}
+          onSave={saveDraft} onCancel={cancelDraft}
+          allYears={allYears} groups={groups} types={types} accounts={accounts}
+        />
+      )}
+    <div className="p-3 md:p-6 space-y-4" style={draftChart ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}>
       <div className="flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">{t('charts.title')}</h1>
@@ -1733,5 +1733,6 @@ export default function Charts() {
       </GridLayout>}
       </div>
     </div>
+    </>
   )
 }
