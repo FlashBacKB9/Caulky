@@ -338,7 +338,7 @@ function InlineInput({
 function ColorPicker({ color, onChange }: { color: string; onChange: (c: string) => void }) {
   const ref = useRef<HTMLInputElement>(null)
   return (
-    <div className="flex items-center gap-1 shrink-0">
+    <div className="relative flex items-center gap-1 shrink-0">
       <button
         type="button"
         onClick={() => ref.current?.click()}
@@ -351,7 +351,7 @@ function ColorPicker({ color, onChange }: { color: string; onChange: (c: string)
         type="color"
         value={color}
         onChange={e => onChange(e.target.value)}
-        className="sr-only"
+        style={{ position: 'absolute', left: 0, top: 0, width: 0, height: 0, opacity: 0, border: 'none', padding: 0 }}
       />
     </div>
   )
