@@ -1538,7 +1538,7 @@ export default function Charts() {
   const { data: allMovements = [] } = useQuery({ queryKey:['movements-all'],  queryFn:()=>getMovements() })
   const { data: groups = [] }       = useQuery({ queryKey:['groups'],          queryFn:getGroups })
   const { data: types  = [] }       = useQuery({ queryKey:['movement-types'],  queryFn:getMovementTypes })
-  const { data: summary }           = useQuery({ queryKey:['accounts'],         queryFn:getAccountsSummary })
+  const { data: summary }           = useQuery({ queryKey:['accounts-summary'], queryFn:getAccountsSummary })
   const accounts = summary?.accounts ?? []
 
   const allYears = useMemo(()=>[...new Set(allMovements.map(m=>+m.date.slice(0,4)))].sort((a,b)=>b-a),[allMovements])
