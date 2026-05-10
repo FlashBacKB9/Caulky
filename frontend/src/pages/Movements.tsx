@@ -6,7 +6,7 @@ import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getGroups } from '../api/groups'
 import MovementForm from '../components/MovementForm'
 import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePayload } from '../components/MovementDetailModal'
-import { runAutoRecurring } from '../utils/recurringTemplates'
+import { runAutoRecurring, computeDates, applyFormula } from '../utils/recurringTemplates'
 import { getTemplates, updateTemplate } from '../api/templates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
 import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search } from 'lucide-react'
@@ -179,6 +179,31 @@ function CalendarView({ movements, types, selectedYear }: {
     return map
   }, [movements, dateField])
 
+  const { data: templates = [] } = useQuery({ queryKey: ['templates'], queryFn: getTemplates })
+
+  const previewByDate = useMemo(() => {
+    if (dateField !== 'date') return {}
+    const map: Record<string, { name: string; money: number; movement_type_id?: number }[]> = {}
+    const now = new Date(); now.setHours(0, 0, 0, 0)
+    const previewEnd = new Date(now); previewEnd.setMonth(previewEnd.getMonth() + 6)
+    for (const tpl of templates) {
+      if (!tpl.recurrence?.rule) continue
+      const allDates = computeDates(tpl.recurrence.rule, new Date(tpl.recurrence.startDate), 300)
+      for (const d of allDates) {
+        const dd = new Date(d); dd.setHours(0, 0, 0, 0)
+        if (dd <= now || dd > previewEnd) continue
+        const dateStr = `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, '0')}-${String(dd.getDate()).padStart(2, '0')}`
+        if (!map[dateStr]) map[dateStr] = []
+        map[dateStr].push({
+          name: applyFormula(tpl.name || tpl.label, dd),
+          money: parseFloat(tpl.money) || 0,
+          movement_type_id: tpl.movement_type_id ? parseInt(tpl.movement_type_id) : undefined,
+        })
+      }
+    }
+    return map
+  }, [templates, dateField])
+
   const firstDow = (new Date(calYear, calMonth, 1).getDay() + 6) % 7
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()
 
@@ -270,6 +295,7 @@ function CalendarView({ movements, types, selectedYear }: {
         <div className="grid grid-cols-7">
           {cells.map((cell, i) => {
             const mvs = byDate[cell.dateStr] ?? []
+            const previews = cell.current && cell.dateStr > todayStr ? (previewByDate[cell.dateStr] ?? []) : []
             const isToday = cell.dateStr === todayStr
             const extra = mvs.length > MAX ? mvs.length - MAX : 0
             const isDropTarget = dragOverDate === cell.dateStr
@@ -305,6 +331,22 @@ function CalendarView({ movements, types, selectedYear }: {
                       <span className="truncate text-[11px] text-gray-700 dark:text-gray-300 leading-tight block">{mv.name}</span>
                       <span className={`text-[11px] font-mono ${mv.dinero >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
                         {fmtCal(mv.dinero)}
+                      </span>
+                      {typ && (
+                        <span className="block text-[10px] px-1 rounded mt-0.5 w-full" style={{ backgroundColor: typ.color + '22', color: typ.color }}>
+                          {typ.name}
+                        </span>
+                      )}
+                    </div>
+                  )
+                })}
+                {previews.map((pv, pi) => {
+                  const typ = pv.movement_type_id ? typeMap[pv.movement_type_id] : undefined
+                  return (
+                    <div key={`preview-${pi}`} className="mb-1 rounded-md border border-dashed border-gray-300 dark:border-gray-600 px-1.5 py-1 opacity-45 pointer-events-none">
+                      <span className="truncate text-[11px] text-gray-500 dark:text-gray-400 leading-tight block">{pv.name}</span>
+                      <span className={`text-[11px] font-mono ${pv.money >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {fmtCal(pv.money)}
                       </span>
                       {typ && (
                         <span className="block text-[10px] px-1 rounded mt-0.5 w-full" style={{ backgroundColor: typ.color + '22', color: typ.color }}>
