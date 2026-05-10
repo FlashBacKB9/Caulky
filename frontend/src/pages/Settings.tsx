@@ -505,8 +505,8 @@ function TypesSection() {
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['groups'] })
     qc.invalidateQueries({ queryKey: ['movement-types'] })
-    qc.invalidateQueries({ queryKey: ['annual'] })
-    qc.invalidateQueries({ queryKey: ['dashboard'] })
+    qc.refetchQueries({ queryKey: ['annual'], type: 'all' })
+    qc.refetchQueries({ queryKey: ['dashboard'], type: 'all' })
   }
 
   const buildPayload = (s: TypeFormState) => {
