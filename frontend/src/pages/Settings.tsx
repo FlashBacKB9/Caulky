@@ -1612,7 +1612,7 @@ function LogEntry({ entry }: { entry: AuditLogEntry }) {
 function LogsSection() {
   const queryClient = useQueryClient()
   const [limit, setLimit] = useState(50)
-  const { data: entries = [], isLoading } = useQuery({
+  const { data: entries = [], isLoading, refetch } = useQuery({
     queryKey: ['audit-log', limit],
     queryFn: () => getAuditLog({ limit }),
   })
@@ -1629,14 +1629,22 @@ function LogsSection() {
         <p className="text-xs text-gray-400 dark:text-gray-500">
           {entries.length === 0 ? 'Sin actividad registrada.' : `${entries.length} entradas`}
         </p>
-        {entries.length > 0 && (
+        <div className="flex items-center gap-3">
           <button
-            onClick={() => { if (confirm('¿Borrar todo el historial de actividad?')) clearMut.mutate() }}
-            className="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
+            onClick={() => refetch()}
+            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
           >
-            Borrar todo
+            Actualizar
           </button>
-        )}
+          {entries.length > 0 && (
+            <button
+              onClick={() => { if (confirm('¿Borrar todo el historial de actividad?')) clearMut.mutate() }}
+              className="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
+            >
+              Borrar todo
+            </button>
+          )}
+        </div>
       </div>
       {entries.length > 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
