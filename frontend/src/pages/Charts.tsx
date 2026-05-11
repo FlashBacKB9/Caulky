@@ -168,7 +168,8 @@ function computeChartData(
   function makeSeries(key: string): ComputedSeries {
     const info = baseInfo(key); const ov = overrideMap[key]
     const fallback = (def.defaultDisplay === 'donut' || def.defaultDisplay === 'pie') ? 'bar' : def.defaultDisplay
-    return { key, label: ov?.label ?? info.label, color: ov?.color ?? info.color, display: ov?.display ?? fallback, stacked: ov?.stacked ?? false, cumulative: ov?.cumulative ?? false }
+    const liveColor = (def.splitBy === 'group' || def.splitBy === 'type') ? info.color : (ov?.color ?? info.color)
+    return { key, label: ov?.label ?? info.label, color: liveColor, display: ov?.display ?? fallback, stacked: ov?.stacked ?? false, cumulative: ov?.cumulative ?? false }
   }
   // Use signed dinero so refunds/returns properly cancel out within a category.
   // We take Math.abs of the final accumulated value per bucket so bars are always positive.
@@ -183,7 +184,8 @@ function computeChartData(
     for (const mv of movements) { const k = seriesKey(mv); if (k) byKey[k] = (byKey[k] ?? 0) + val(mv) }
     const data = keyOrder.map(key => {
       const info = baseInfo(key); const ov = overrideMap[key]
-      return { name: ov?.label ?? info.label, value: Math.abs(byKey[key] ?? 0), color: ov?.color ?? info.color }
+      const liveColor = (def.splitBy === 'group' || def.splitBy === 'type') ? info.color : (ov?.color ?? info.color)
+      return { name: ov?.label ?? info.label, value: Math.abs(byKey[key] ?? 0), color: liveColor }
     }).sort((a, b) => (b.value as number) - (a.value as number))
     return { data, series: keyOrder.map(makeSeries) }
   }

@@ -615,7 +615,8 @@ function computeChartData(
   function makeSeries(key: string): ComputedSeries {
     const info = baseInfo(key); const ov = overrideMap[key]
     const fallback = (def.defaultDisplay === 'donut' || def.defaultDisplay === 'pie') ? 'bar' : def.defaultDisplay
-    return { key, label: ov?.label ?? info.label, color: ov?.color ?? info.color, display: ov?.display ?? fallback, stacked: ov?.stacked ?? false }
+    const liveColor = (def.splitBy === 'group' || def.splitBy === 'type') ? info.color : (ov?.color ?? info.color)
+    return { key, label: ov?.label ?? info.label, color: liveColor, display: ov?.display ?? fallback, stacked: ov?.stacked ?? false }
   }
   const val = (mv: Movement) => def.metric === 'count' ? 1 : Math.abs(mv.dinero)
   const keyOrder: string[] = []; const keySeen = new Set<string>()
@@ -625,7 +626,8 @@ function computeChartData(
     for (const mv of movements) { const k = seriesKey(mv); if (k) byKey[k] = (byKey[k] ?? 0) + val(mv) }
     const data = keyOrder.map(key => {
       const info = baseInfo(key); const ov = overrideMap[key]
-      return { name: ov?.label ?? info.label, value: byKey[key] ?? 0, color: ov?.color ?? info.color }
+      const liveColor = (def.splitBy === 'group' || def.splitBy === 'type') ? info.color : (ov?.color ?? info.color)
+      return { name: ov?.label ?? info.label, value: byKey[key] ?? 0, color: liveColor }
     }).sort((a, b) => (b.value as number) - (a.value as number))
     return { data, series: keyOrder.map(makeSeries) }
   }
