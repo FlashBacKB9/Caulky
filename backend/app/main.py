@@ -1,12 +1,22 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin, templates, preferences, audit_log
 from app.auth.setup import fastapi_users, auth_backend
 from app.auth.schemas import UserRead, UserCreate, UserUpdate
 from app.config import settings
+from app.database import engine
+from app.models.audit_log import AuditLog
 
 
-app = FastAPI(title="Caulky API", version="2.0.0")
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    async with engine.begin() as conn:
+        await conn.run_sync(AuditLog.__table__.create, checkfirst=True)
+    yield
+
+
+app = FastAPI(title="Caulky API", version="2.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
