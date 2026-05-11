@@ -1,6 +1,6 @@
 import json
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime
 from app.database import AsyncSessionLocal
 from app.models.audit_log import AuditLog
 
@@ -25,7 +25,7 @@ async def write_log(
         async with AsyncSessionLocal() as db:
             db.add(AuditLog(
                 user_id=user_id,
-                created_at=datetime.now(timezone.utc),
+                created_at=datetime.utcnow(),
                 entity_type=entity_type,
                 entity_id=entity_id,
                 action=action,
