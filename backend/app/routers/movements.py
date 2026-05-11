@@ -75,9 +75,9 @@ async def create_movement(body: MovementCreate, db: AsyncSession = Depends(get_d
     db.add(mv)
     await db.flush()
     after = _mv_snap(mv)
-    write_log(db, user.id, "movement", mv.id, "create",
-              f"Movimiento creado: {mv.name} {float(mv.money):.2f}€ ({mv.date})",
-              after=after)
+    await write_log(db, user.id, "movement", mv.id, "create",
+                   f"Movimiento creado: {mv.name} {float(mv.money):.2f}€ ({mv.date})",
+                   after=after)
     await db.commit()
     result = await db.execute(
         select(Movement).where(Movement.id == mv.id).options(
@@ -115,9 +115,9 @@ async def update_movement(movement_id: int, body: MovementUpdate, db: AsyncSessi
     for k, v in changes.items():
         setattr(mv, k, v)
     after_snap = {k: _mv_snap(mv)[k] for k in changes if k in _mv_snap(mv)}
-    write_log(db, user.id, "movement", mv.id, "update",
-              f"Movimiento editado: {mv.name}",
-              before=before_snap, after=after_snap)
+    await write_log(db, user.id, "movement", mv.id, "update",
+                   f"Movimiento editado: {mv.name}",
+                   before=before_snap, after=after_snap)
     await db.commit()
     result = await db.execute(
         select(Movement).where(Movement.id == movement_id).options(
@@ -133,8 +133,8 @@ async def delete_movement(movement_id: int, db: AsyncSession = Depends(get_db), 
     if not mv or mv.user_id != user.id:
         raise HTTPException(status_code=404, detail="Movement not found")
     before = _mv_snap(mv)
-    write_log(db, user.id, "movement", mv.id, "delete",
-              f"Movimiento eliminado: {mv.name} {float(mv.money):.2f}€ ({mv.date})",
-              before=before)
+    await write_log(db, user.id, "movement", mv.id, "delete",
+                   f"Movimiento eliminado: {mv.name} {float(mv.money):.2f}€ ({mv.date})",
+                   before=before)
     await db.delete(mv)
     await db.commit()

@@ -1,8 +1,11 @@
 import json
+import logging
 import uuid
 from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit_log import AuditLog
+
+_logger = logging.getLogger(__name__)
 
 
 def _dumps(d: dict | None) -> str | None:
@@ -11,7 +14,7 @@ def _dumps(d: dict | None) -> str | None:
     return json.dumps(d, default=str, ensure_ascii=False)
 
 
-def write_log(
+async def write_log(
     db: AsyncSession,
     user_id: uuid.UUID,
     entity_type: str,
@@ -21,7 +24,6 @@ def write_log(
     before: dict | None = None,
     after: dict | None = None,
 ) -> None:
-    """Add an audit log entry to the session. Caller must commit."""
     log = AuditLog(
         user_id=user_id,
         created_at=datetime.now(timezone.utc),
@@ -32,4 +34,9 @@ def write_log(
         before=_dumps(before),
         after=_dumps(after),
     )
-    db.add(log)
+    try:
+        async with db.begin_nested():
+            db.add(log)
+            await db.flush([log])
+    except Exception as e:
+        _logger.error("Audit log write failed: %s", e)

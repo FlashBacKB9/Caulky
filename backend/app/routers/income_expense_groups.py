@@ -32,7 +32,7 @@ async def create_group(body: IncomeExpenseGroupCreate, db: AsyncSession = Depend
     group = IncomeExpenseGroup(**body.model_dump(), user_id=user.id)
     db.add(group)
     await db.flush()
-    write_log(db, user.id, "group", group.id, "create",
+    await write_log(db, user.id, "group", group.id, "create",
               f"Grupo creado: {group.name}",
               after=_grp_snap(group))
     await db.commit()
@@ -56,7 +56,7 @@ async def update_group(group_id: int, body: IncomeExpenseGroupUpdate, db: AsyncS
     before = _grp_snap(group)
     for k, v in body.model_dump().items():
         setattr(group, k, v)
-    write_log(db, user.id, "group", group.id, "update",
+    await write_log(db, user.id, "group", group.id, "update",
               f"Grupo editado: {group.name}",
               before=before, after=_grp_snap(group))
     await db.commit()
@@ -69,7 +69,7 @@ async def delete_group(group_id: int, db: AsyncSession = Depends(get_db), user: 
     group = await db.get(IncomeExpenseGroup, group_id)
     if not group or group.user_id != user.id:
         raise HTTPException(status_code=404, detail="Group not found")
-    write_log(db, user.id, "group", group.id, "delete",
+    await write_log(db, user.id, "group", group.id, "delete",
               f"Grupo eliminado: {group.name}",
               before=_grp_snap(group))
     await db.delete(group)
