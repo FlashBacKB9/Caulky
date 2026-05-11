@@ -169,7 +169,7 @@ async def create_fund(body: FundCreate, db: AsyncSession = Depends(get_db), user
     fund = InvestmentFund(**body.model_dump(), user_id=user.id)
     db.add(fund)
     await db.flush()
-    await write_log(db, user.id, "fund", fund.id, "create",
+    await write_log(user.id, "fund", fund.id, "create",
               f"Fondo creado: {fund.name}" + (f" ({fund.ticker})" if fund.ticker else ""),
               after=_fund_snap(fund))
     await db.commit()
@@ -186,7 +186,7 @@ async def update_fund(fund_id: int, body: FundPatch, db: AsyncSession = Depends(
     before = {k: _fund_snap(fund)[k] for k in changes if k in _fund_snap(fund)}
     for k, v in changes.items():
         setattr(fund, k, v)
-    await write_log(db, user.id, "fund", fund.id, "update",
+    await write_log(user.id, "fund", fund.id, "update",
               f"Fondo editado: {fund.name}",
               before=before, after={k: _fund_snap(fund)[k] for k in changes if k in _fund_snap(fund)})
     await db.commit()
@@ -199,7 +199,7 @@ async def delete_fund(fund_id: int, db: AsyncSession = Depends(get_db), user: Us
     fund = await db.get(InvestmentFund, fund_id)
     if not fund or fund.user_id != user.id:
         raise HTTPException(404, "Fondo no encontrado")
-    await write_log(db, user.id, "fund", fund.id, "delete",
+    await write_log(user.id, "fund", fund.id, "delete",
               f"Fondo eliminado: {fund.name}",
               before=_fund_snap(fund))
     await db.delete(fund)
@@ -257,7 +257,7 @@ async def upsert_purchase_supplement(movement_id: int, body: PurchasePatch, db: 
 
     units_str = f"{float(sup.units):.4g} uds" if sup.units else ""
     price_str = f"@ {float(sup.price_at_purchase):.2f}€" if sup.price_at_purchase else ""
-    await write_log(db, user.id, "purchase", movement_id, "update",
+    await write_log(user.id, "purchase", movement_id, "update",
               f"Compra actualizada: {movement.name} {units_str} {price_str}".strip(),
               after={"units": float(sup.units) if sup.units else None,
                      "price_at_purchase": float(sup.price_at_purchase) if sup.price_at_purchase else None})
@@ -276,7 +276,7 @@ async def delete_purchase_supplement(movement_id: int, db: AsyncSession = Depend
     )
     sup = sup_res.scalar_one_or_none()
     if sup:
-        await write_log(db, user.id, "purchase", movement_id, "delete",
+        await write_log(user.id, "purchase", movement_id, "delete",
                   f"Compra eliminada: {movement.name}",
                   before={"units": float(sup.units) if sup.units else None,
                           "price_at_purchase": float(sup.price_at_purchase) if sup.price_at_purchase else None})

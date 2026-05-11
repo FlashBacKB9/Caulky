@@ -44,7 +44,7 @@ async def create_type(body: MovementTypeCreate, db: AsyncSession = Depends(get_d
     mt = MovementType(**body.model_dump(), user_id=user.id)
     db.add(mt)
     await db.flush()
-    await write_log(db, user.id, "movement_type", mt.id, "create",
+    await write_log(user.id, "movement_type", mt.id, "create",
               f"Tipo creado: {mt.name}",
               after=_type_snap(mt))
     await db.commit()
@@ -79,7 +79,7 @@ async def update_type(type_id: int, body: MovementTypeUpdate, db: AsyncSession =
     before = _type_snap(mt)
     for k, v in body.model_dump().items():
         setattr(mt, k, v)
-    await write_log(db, user.id, "movement_type", mt.id, "update",
+    await write_log(user.id, "movement_type", mt.id, "update",
               f"Tipo editado: {mt.name}",
               before=before, after=_type_snap(mt))
     await db.commit()
@@ -95,7 +95,7 @@ async def delete_type(type_id: int, db: AsyncSession = Depends(get_db), user: Us
     mt = await db.get(MovementType, type_id)
     if not mt or mt.user_id != user.id:
         raise HTTPException(status_code=404, detail="Movement type not found")
-    await write_log(db, user.id, "movement_type", mt.id, "delete",
+    await write_log(user.id, "movement_type", mt.id, "delete",
               f"Tipo eliminado: {mt.name}",
               before=_type_snap(mt))
     await db.delete(mt)

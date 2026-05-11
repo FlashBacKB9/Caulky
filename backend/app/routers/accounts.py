@@ -98,7 +98,7 @@ async def create_account(body: AccountCreate, db: AsyncSession = Depends(get_db)
     )
     db.add(account)
     await db.flush()
-    await write_log(db, user.id, "account", account.id, "create",
+    await write_log(user.id, "account", account.id, "create",
               f"Cuenta creada: {account.name}",
               after=_acc_snap(account))
     await db.commit()
@@ -117,7 +117,7 @@ async def update_account(account_id: int, body: AccountPatch, db: AsyncSession =
     before = {k: _acc_snap(account)[k] for k in changes if k in _acc_snap(account)}
     for k, v in changes.items():
         setattr(account, k, v)
-    await write_log(db, user.id, "account", account.id, "update",
+    await write_log(user.id, "account", account.id, "update",
               f"Cuenta editada: {account.name}",
               before=before, after={k: _acc_snap(account)[k] for k in changes if k in _acc_snap(account)})
     await db.commit()
@@ -170,7 +170,7 @@ async def delete_account(
             .values(linked_account_id=None)
         )
 
-    await write_log(db, user.id, "account", account.id, "delete",
+    await write_log(user.id, "account", account.id, "delete",
               f"Cuenta eliminada: {account.name}",
               before=_acc_snap(account))
     await db.delete(account)
