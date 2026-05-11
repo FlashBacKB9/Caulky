@@ -737,6 +737,27 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
+function CollapsibleSection({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="space-y-3">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 w-full text-left group"
+      >
+        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-400 transition-colors">
+          {title}
+        </h2>
+        {open
+          ? <ChevronUp className="w-3 h-3 text-gray-400 dark:text-gray-500" />
+          : <ChevronDown className="w-3 h-3 text-gray-400 dark:text-gray-500" />
+        }
+      </button>
+      {open && <div>{children}</div>}
+    </div>
+  )
+}
+
 // ── Nav config section ────────────────────────────────────────────────────────
 
 function NavSection({ entries, onChange }: { entries: NavEntry[]; onChange: (e: NavEntry[]) => void }) {
@@ -1835,6 +1856,10 @@ export default function Settings() {
             <PluginsSection />
           </Section>
 
+          <CollapsibleSection title="Historial de actividad">
+            <LogsSection />
+          </CollapsibleSection>
+
           <Section title={t('settings.danger')}>
             <ResetSection />
           </Section>
@@ -1842,13 +1867,6 @@ export default function Settings() {
         </div>
 
       </div>
-
-      <Section title="Historial de actividad">
-        <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
-          Registro de todos los cambios: movimientos, grupos, tipos, cuentas e inversiones. Haz clic en una entrada para ver los valores antes y después.
-        </p>
-        <LogsSection />
-      </Section>
 
     </div>
   )
