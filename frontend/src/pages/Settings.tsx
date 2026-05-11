@@ -8,7 +8,7 @@ import {
   type MovementType,
 } from '../api/movementTypes'
 import { exportBackup, importBackup, resetSystem } from '../api/backup'
-import { getAuditLog, clearAuditLog, type AuditLogEntry } from '../api/auditLog'
+import { getAuditLog, clearAuditLog } from '../api/auditLog'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat, DATE_FORMATS } from '../hooks/useDateFormat'
