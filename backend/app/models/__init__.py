@@ -6,3 +6,4 @@ from app.models.account import Account
 from app.models.investment import InvestmentFund, InvestmentPurchase
 from app.models.template import MovementTemplate
 from app.models.user_preference import UserPreference
+from app.models.audit_log import AuditLog

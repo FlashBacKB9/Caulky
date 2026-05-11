@@ -8,6 +8,7 @@ from app.models.movement import Movement
 from app.models.movement_type import MovementType
 from app.schemas.movement import MovementCreate, MovementRead, MovementUpdate
 from app.services.calculations import compute_dinero, compute_label
+from app.services.audit import write_log
 from app.auth.setup import current_active_user
 from app.models.user import User
 
@@ -27,6 +28,23 @@ def _enrich(mv: Movement) -> MovementRead:
     data.label = label
     data.color = color
     return data
+
+
+def _mv_snap(mv: Movement) -> dict:
+    return {
+        "name": mv.name,
+        "money": float(mv.money),
+        "date": str(mv.date),
+        "bank_date": str(mv.bank_date) if mv.bank_date else None,
+        "movement_type_id": mv.movement_type_id,
+        "paid": mv.paid,
+        "no_count": mv.no_count,
+        "notes": mv.notes,
+        "account_id": mv.account_id,
+        "is_shared": mv.is_shared,
+        "shared_between": mv.shared_between,
+        "my_share": float(mv.my_share) if mv.my_share is not None else None,
+    }
 
 
 @router.get("", response_model=list[MovementRead])
@@ -55,6 +73,11 @@ async def list_movements(
 async def create_movement(body: MovementCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     mv = Movement(**body.model_dump(), user_id=user.id)
     db.add(mv)
+    await db.flush()
+    after = _mv_snap(mv)
+    write_log(db, user.id, "movement", mv.id, "create",
+              f"Movimiento creado: {mv.name} {float(mv.money):.2f}€ ({mv.date})",
+              after=after)
     await db.commit()
     result = await db.execute(
         select(Movement).where(Movement.id == mv.id).options(
@@ -87,8 +110,14 @@ async def update_movement(movement_id: int, body: MovementUpdate, db: AsyncSessi
     mv = result.scalar_one_or_none()
     if not mv:
         raise HTTPException(status_code=404, detail="Movement not found")
-    for k, v in body.model_dump(exclude_unset=True).items():
+    changes = body.model_dump(exclude_unset=True)
+    before_snap = {k: _mv_snap(mv)[k] for k in changes if k in _mv_snap(mv)}
+    for k, v in changes.items():
         setattr(mv, k, v)
+    after_snap = {k: _mv_snap(mv)[k] for k in changes if k in _mv_snap(mv)}
+    write_log(db, user.id, "movement", mv.id, "update",
+              f"Movimiento editado: {mv.name}",
+              before=before_snap, after=after_snap)
     await db.commit()
     result = await db.execute(
         select(Movement).where(Movement.id == movement_id).options(
@@ -103,5 +132,9 @@ async def delete_movement(movement_id: int, db: AsyncSession = Depends(get_db), 
     mv = await db.get(Movement, movement_id)
     if not mv or mv.user_id != user.id:
         raise HTTPException(status_code=404, detail="Movement not found")
+    before = _mv_snap(mv)
+    write_log(db, user.id, "movement", mv.id, "delete",
+              f"Movimiento eliminado: {mv.name} {float(mv.money):.2f}€ ({mv.date})",
+              before=before)
     await db.delete(mv)
     await db.commit()

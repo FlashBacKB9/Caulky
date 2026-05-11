@@ -8,10 +8,15 @@ from app.models.movement import Movement
 from app.models.movement_type import MovementType
 from app.models.income_expense_group import IncomeExpenseGroup
 from app.schemas.account import AccountRead, AccountCreate, AccountPatch
+from app.services.audit import write_log
 from app.auth.setup import current_active_user
 from app.models.user import User
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
+
+
+def _acc_snap(a: Account) -> dict:
+    return {"name": a.name, "color": a.color, "icon": a.icon, "initial_balance": float(a.initial_balance)}
 
 
 async def _compute_balances(db: AsyncSession, user_id: uuid.UUID) -> dict[int, float]:
@@ -92,6 +97,10 @@ async def create_account(body: AccountCreate, db: AsyncSession = Depends(get_db)
         is_main=False, user_id=user.id,
     )
     db.add(account)
+    await db.flush()
+    write_log(db, user.id, "account", account.id, "create",
+              f"Cuenta creada: {account.name}",
+              after=_acc_snap(account))
     await db.commit()
     await db.refresh(account)
     data = AccountRead.model_validate(account)
@@ -104,8 +113,13 @@ async def update_account(account_id: int, body: AccountPatch, db: AsyncSession =
     account = await db.get(Account, account_id)
     if not account or account.user_id != user.id:
         raise HTTPException(status_code=404, detail="Account not found")
-    for k, v in body.model_dump(exclude_unset=True).items():
+    changes = body.model_dump(exclude_unset=True)
+    before = {k: _acc_snap(account)[k] for k in changes if k in _acc_snap(account)}
+    for k, v in changes.items():
         setattr(account, k, v)
+    write_log(db, user.id, "account", account.id, "update",
+              f"Cuenta editada: {account.name}",
+              before=before, after={k: _acc_snap(account)[k] for k in changes if k in _acc_snap(account)})
     await db.commit()
     balances = await _compute_balances(db, user.id)
     data = AccountRead.model_validate(account)
@@ -156,5 +170,8 @@ async def delete_account(
             .values(linked_account_id=None)
         )
 
+    write_log(db, user.id, "account", account.id, "delete",
+              f"Cuenta eliminada: {account.name}",
+              before=_acc_snap(account))
     await db.delete(account)
     await db.commit()

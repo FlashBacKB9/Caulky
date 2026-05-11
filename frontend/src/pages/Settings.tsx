@@ -8,6 +8,7 @@ import {
   type MovementType,
 } from '../api/movementTypes'
 import { exportBackup, importBackup, resetSystem } from '../api/backup'
+import { getAuditLog, clearAuditLog, type AuditLogEntry } from '../api/auditLog'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat, DATE_FORMATS } from '../hooks/useDateFormat'
@@ -1512,6 +1513,127 @@ function ResetSection() {
   )
 }
 
+// ── Audit Log ─────────────────────────────────────────────────────────────────
+
+const ENTITY_LABELS: Record<string, string> = {
+  movement: 'Movimiento', group: 'Grupo', movement_type: 'Tipo',
+  account: 'Cuenta', fund: 'Fondo', purchase: 'Compra',
+}
+const ACTION_LABELS: Record<string, { label: string; cls: string }> = {
+  create: { label: 'Creado',   cls: 'bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400' },
+  update: { label: 'Editado',  cls: 'bg-blue-100  dark:bg-blue-900/30  text-blue-700  dark:text-blue-400'  },
+  delete: { label: 'Eliminado', cls: 'bg-red-100  dark:bg-red-900/30   text-red-700   dark:text-red-400'   },
+}
+
+function DiffRow({ label, before, after }: { label: string; before: unknown; after: unknown }) {
+  const fmt = (v: unknown) => v === null || v === undefined ? '—' : String(v)
+  if (before === after) return null
+  return (
+    <div className="flex items-baseline gap-1.5 text-xs text-gray-600 dark:text-gray-400">
+      <span className="font-medium text-gray-500 dark:text-gray-500 shrink-0">{label}:</span>
+      {before !== undefined && (
+        <span className="line-through text-red-400 dark:text-red-500">{fmt(before)}</span>
+      )}
+      {before !== undefined && after !== undefined && <span className="text-gray-400">→</span>}
+      {after !== undefined && (
+        <span className="text-green-600 dark:text-green-400">{fmt(after)}</span>
+      )}
+    </div>
+  )
+}
+
+function LogEntry({ entry }: { entry: AuditLogEntry }) {
+  const [open, setOpen] = useState(false)
+  const action = ACTION_LABELS[entry.action] ?? { label: entry.action, cls: 'bg-gray-100 text-gray-600' }
+  const entity = ENTITY_LABELS[entry.entity_type] ?? entry.entity_type
+  const date = new Date(entry.created_at)
+  const hasDiff = entry.before || entry.after
+
+  const diffKeys = Array.from(new Set([
+    ...Object.keys(entry.before ?? {}),
+    ...Object.keys(entry.after ?? {}),
+  ]))
+
+  return (
+    <div className="border-b border-gray-50 dark:border-gray-800 last:border-0">
+      <button
+        onClick={() => hasDiff && setOpen(v => !v)}
+        className={`w-full flex items-start gap-3 px-4 py-3 text-left transition-colors ${hasDiff ? 'hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer' : 'cursor-default'}`}
+      >
+        <div className="flex flex-col items-center gap-1 shrink-0 pt-0.5">
+          <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${action.cls}`}>{action.label}</span>
+          <span className="text-[10px] text-gray-400 dark:text-gray-600">{entity}</span>
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm text-gray-700 dark:text-gray-200 truncate">{entry.summary}</p>
+          <p className="text-[11px] text-gray-400 dark:text-gray-600 mt-0.5">
+            {date.toLocaleDateString()} {date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+        {hasDiff && (
+          <ChevronRight className={`w-3.5 h-3.5 text-gray-400 shrink-0 mt-1 transition-transform ${open ? 'rotate-90' : ''}`} />
+        )}
+      </button>
+      {open && hasDiff && (
+        <div className="px-4 pb-3 pt-0 ml-[72px] space-y-1">
+          {diffKeys.map(k => (
+            <DiffRow key={k} label={k}
+              before={entry.before?.[k]}
+              after={entry.after?.[k]}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function LogsSection() {
+  const queryClient = useQueryClient()
+  const [limit, setLimit] = useState(50)
+  const { data: entries = [], isLoading } = useQuery({
+    queryKey: ['audit-log', limit],
+    queryFn: () => getAuditLog({ limit }),
+  })
+  const clearMut = useMutation({
+    mutationFn: clearAuditLog,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['audit-log'] }),
+  })
+
+  if (isLoading) return <p className="text-xs text-gray-400 px-1">{t('common.loading')}</p>
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs text-gray-400 dark:text-gray-500">
+          {entries.length === 0 ? 'Sin actividad registrada.' : `${entries.length} entradas`}
+        </p>
+        {entries.length > 0 && (
+          <button
+            onClick={() => { if (confirm('¿Borrar todo el historial de actividad?')) clearMut.mutate() }}
+            className="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
+          >
+            Borrar todo
+          </button>
+        )}
+      </div>
+      {entries.length > 0 && (
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+          {entries.map(e => <LogEntry key={e.id} entry={e} />)}
+        </div>
+      )}
+      {entries.length === limit && (
+        <button
+          onClick={() => setLimit(l => l + 50)}
+          className="w-full text-xs text-blue-500 hover:text-blue-600 py-1 transition-colors"
+        >
+          Cargar más
+        </button>
+      )}
+    </div>
+  )
+}
+
 export default function Settings() {
   const { dark, toggle } = useDarkMode()
   const { currency, setCurrency, fmt, currencies } = useCurrency()
@@ -1720,6 +1842,14 @@ export default function Settings() {
         </div>
 
       </div>
+
+      <Section title="Historial de actividad">
+        <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
+          Registro de todos los cambios: movimientos, grupos, tipos, cuentas e inversiones. Haz clic en una entrada para ver los valores antes y después.
+        </p>
+        <LogsSection />
+      </Section>
+
     </div>
   )
 }

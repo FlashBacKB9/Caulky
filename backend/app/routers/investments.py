@@ -11,6 +11,7 @@ from app.models.movement import Movement
 from app.schemas.investment import (
     FundCreate, FundPatch, FundRead, PurchasePatch, PurchaseRead,
 )
+from app.services.audit import write_log
 from app.auth.setup import current_active_user
 from app.models.user import User
 
@@ -155,10 +156,22 @@ async def list_funds(db: AsyncSession = Depends(get_db), user: User = Depends(cu
     return await _load_all_funds(db, user.id)
 
 
+def _fund_snap(f: InvestmentFund) -> dict:
+    return {
+        "name": f.name, "ticker": f.ticker, "color": f.color,
+        "current_price": float(f.current_price) if f.current_price is not None else None,
+        "current_value_override": float(f.current_value_override) if f.current_value_override is not None else None,
+    }
+
+
 @router.post("/funds", response_model=FundRead, status_code=201)
 async def create_fund(body: FundCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     fund = InvestmentFund(**body.model_dump(), user_id=user.id)
     db.add(fund)
+    await db.flush()
+    write_log(db, user.id, "fund", fund.id, "create",
+              f"Fondo creado: {fund.name}" + (f" ({fund.ticker})" if fund.ticker else ""),
+              after=_fund_snap(fund))
     await db.commit()
     await db.refresh(fund)
     return _compute_fund(fund, [], {})
@@ -169,8 +182,13 @@ async def update_fund(fund_id: int, body: FundPatch, db: AsyncSession = Depends(
     fund = await db.get(InvestmentFund, fund_id)
     if not fund or fund.user_id != user.id:
         raise HTTPException(404, "Fondo no encontrado")
-    for k, v in body.model_dump(exclude_unset=True).items():
+    changes = body.model_dump(exclude_unset=True)
+    before = {k: _fund_snap(fund)[k] for k in changes if k in _fund_snap(fund)}
+    for k, v in changes.items():
         setattr(fund, k, v)
+    write_log(db, user.id, "fund", fund.id, "update",
+              f"Fondo editado: {fund.name}",
+              before=before, after={k: _fund_snap(fund)[k] for k in changes if k in _fund_snap(fund)})
     await db.commit()
     all_funds = await _load_all_funds(db, user.id)
     return next(f for f in all_funds if f.id == fund_id)
@@ -181,6 +199,9 @@ async def delete_fund(fund_id: int, db: AsyncSession = Depends(get_db), user: Us
     fund = await db.get(InvestmentFund, fund_id)
     if not fund or fund.user_id != user.id:
         raise HTTPException(404, "Fondo no encontrado")
+    write_log(db, user.id, "fund", fund.id, "delete",
+              f"Fondo eliminado: {fund.name}",
+              before=_fund_snap(fund))
     await db.delete(fund)
     await db.commit()
 
@@ -234,6 +255,12 @@ async def upsert_purchase_supplement(movement_id: int, body: PurchasePatch, db: 
     if sup.price_at_purchase and not sup.units:
         sup.units = float(movement.money) / float(sup.price_at_purchase)  # type: ignore
 
+    units_str = f"{float(sup.units):.4g} uds" if sup.units else ""
+    price_str = f"@ {float(sup.price_at_purchase):.2f}€" if sup.price_at_purchase else ""
+    write_log(db, user.id, "purchase", movement_id, "update",
+              f"Compra actualizada: {movement.name} {units_str} {price_str}".strip(),
+              after={"units": float(sup.units) if sup.units else None,
+                     "price_at_purchase": float(sup.price_at_purchase) if sup.price_at_purchase else None})
     await db.commit()
     await db.refresh(sup)
     return _purchase_read(movement, sup)
@@ -249,6 +276,10 @@ async def delete_purchase_supplement(movement_id: int, db: AsyncSession = Depend
     )
     sup = sup_res.scalar_one_or_none()
     if sup:
+        write_log(db, user.id, "purchase", movement_id, "delete",
+                  f"Compra eliminada: {movement.name}",
+                  before={"units": float(sup.units) if sup.units else None,
+                          "price_at_purchase": float(sup.price_at_purchase) if sup.price_at_purchase else None})
         await db.delete(sup)
         await db.commit()
 

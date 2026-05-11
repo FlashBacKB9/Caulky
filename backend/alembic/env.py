@@ -7,7 +7,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.database import Base
-from app.models import Movement, MovementType, IncomeExpenseGroup  # noqa: F401
+from app.models import Movement, MovementType, IncomeExpenseGroup, AuditLog  # noqa: F401
 
 config = context.config
 
