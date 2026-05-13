@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback } from 'react'
+import { useRef, useState, useCallback, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, Link } from 'react-router-dom'
 import { getAccountsSummary, createAccount, updateAccountFull, deleteAccount, reorderAccounts, ACCOUNT_CATEGORIES, type Account, type AccountCategory } from '../api/accounts'
@@ -33,6 +33,43 @@ const PALETTE_COLORS = [
   '#6b7280','#ef4444','#f97316','#eab308','#22c55e',
   '#10b981','#14b8a6','#3b82f6','#6366f1','#8b5cf6','#ec4899',
 ]
+
+function FadingScrollList({ children }: { children: React.ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null)
+  const [overflows, setOverflows] = useState(false)
+  const [atBottom, setAtBottom] = useState(true)
+
+  const check = useCallback(() => {
+    const el = ref.current
+    if (!el) return
+    setOverflows(el.scrollHeight - el.clientHeight > 1)
+    setAtBottom(el.scrollHeight - el.scrollTop - el.clientHeight < 2)
+  }, [])
+
+  useEffect(() => {
+    check()
+    const el = ref.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const ro = new ResizeObserver(check)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [check, children])
+
+  return (
+    <div className="relative border border-gray-100 dark:border-gray-800 rounded-lg overflow-hidden">
+      <div
+        ref={ref}
+        onScroll={check}
+        className="max-h-40 overflow-y-auto p-2 space-y-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        {children}
+      </div>
+      {overflows && !atBottom && (
+        <div className="pointer-events-none absolute bottom-0 left-0 right-0 h-8 bg-gradient-to-t from-white dark:from-gray-900 to-transparent" />
+      )}
+    </div>
+  )
+}
 
 function DeleteMovementsModal({ accountName, movCount, isPending, onDeleteMovements, onConvertToExpense, onCancel }: {
   accountName: string; movCount: number; isPending: boolean
@@ -208,14 +245,14 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
             ))}
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Categoría</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('settings.category')}</span>
             <select
               value={category}
               onChange={e => setCategory(e.target.value as AccountCategory)}
               className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
             >
               {ACCOUNT_CATEGORIES.map(c => (
-                <option key={c.value} value={c.value}>{c.label}</option>
+                <option key={c.value} value={c.value}>{t(c.labelKey)}</option>
               ))}
             </select>
           </div>
@@ -232,12 +269,12 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
               {allTypes.length === 0 ? (
                 <p className="text-xs text-gray-400 dark:text-gray-500 px-1">{t('settings.noSubtypes')}</p>
               ) : (
-                <div className="border border-gray-100 dark:border-gray-800 rounded-lg p-2 max-h-40 overflow-y-auto space-y-0.5">
-                  {allTypes.map(t => {
-                    const isLinkedHere      = linkedIds.has(t.id)
-                    const isLinkedElsewhere = t.linked_account_id != null && t.linked_account_id !== account.id
+                <FadingScrollList>
+                  {allTypes.map(mt => {
+                    const isLinkedHere      = linkedIds.has(mt.id)
+                    const isLinkedElsewhere = mt.linked_account_id != null && mt.linked_account_id !== account.id
                     return (
-                      <label key={t.id}
+                      <label key={mt.id}
                         className={`flex items-center gap-2 px-1 py-1 rounded transition-colors ${
                           isLinkedElsewhere
                             ? 'opacity-40 cursor-not-allowed'
@@ -250,20 +287,20 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
                           disabled={isLinkedElsewhere}
                           onChange={e => {
                             const next = new Set(linkedIds)
-                            e.target.checked ? next.add(t.id) : next.delete(t.id)
+                            e.target.checked ? next.add(mt.id) : next.delete(mt.id)
                             setLinkedIds(next)
                           }}
                           className="w-3.5 h-3.5 rounded accent-blue-500"
                         />
-                        <span className="text-xs text-gray-700 dark:text-gray-200 flex-1">{t.name}</span>
-                        <span className="text-xs text-gray-400 dark:text-gray-500">{t.category}</span>
+                        <span className="text-xs text-gray-700 dark:text-gray-200 flex-1">{mt.name}</span>
+                        <span className="text-xs text-gray-400 dark:text-gray-500">{mt.category}</span>
                         {isLinkedElsewhere && (
-                          <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">otra cuenta</span>
+                          <span className="text-xs text-gray-400 dark:text-gray-500 shrink-0">{t('settings.otherAccount')}</span>
                         )}
                       </label>
                     )
                   })}
-                </div>
+                </FadingScrollList>
               )}
             </div>
           )}
@@ -310,12 +347,15 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
         <div className="flex items-center gap-3 px-4 py-3">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 cursor-grab active:cursor-grabbing"
             style={{ backgroundColor: account.color + '20' }}
-            title="Arrastra para reordenar">
+            title={t('settings.dragToReorder')}>
             <AppIcon name={account.icon} className="w-4 h-4" style={{ color: account.color }} strokeWidth={1.5} />
           </div>
           <span className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200">{account.name}</span>
           <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
-            {ACCOUNT_CATEGORIES.find(c => c.value === account.category)?.label ?? account.category}
+            {(() => {
+              const c = ACCOUNT_CATEGORIES.find(c => c.value === account.category)
+              return c ? t(c.labelKey) : account.category
+            })()}
           </span>
           <span className="text-sm font-mono text-gray-400 dark:text-gray-500">{fmt(account.initial_balance)}</span>
           <div className="flex items-center">
@@ -979,14 +1019,14 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
               ))}
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Categoría</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('settings.category')}</span>
               <select
                 value={newCategory}
                 onChange={e => setNewCategory(e.target.value as AccountCategory)}
                 className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
               >
                 {ACCOUNT_CATEGORIES.map(c => (
-                  <option key={c.value} value={c.value}>{c.label}</option>
+                  <option key={c.value} value={c.value}>{t(c.labelKey)}</option>
                 ))}
               </select>
             </div>
@@ -1683,32 +1723,32 @@ function LogsSection() {
     <div className="space-y-2">
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-gray-400 dark:text-gray-500">
-          {isLoading ? '…' : `${entries.length} entradas`}
+          {isLoading ? '…' : `${entries.length} ${t('settings.entries')}`}
         </span>
         <div className="flex items-center gap-3">
           <button onClick={() => refetch()} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-            Actualizar
+            {t('settings.refresh')}
           </button>
           {entries.length > 0 && (
             <button onClick={download} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-              Descargar
+              {t('settings.download')}
             </button>
           )}
           {entries.length > 0 && (
             <button
-              onClick={() => { if (confirm('¿Borrar todo el historial?')) clearMut.mutate() }}
+              onClick={() => { if (confirm(t('settings.clearActivityConfirm'))) clearMut.mutate() }}
               className="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
             >
-              Borrar
+              {t('settings.clearAll')}
             </button>
           )}
         </div>
       </div>
       <div className="font-mono text-xs bg-gray-950 text-gray-300 rounded-xl p-3 overflow-y-auto max-h-72 leading-5">
         {isLoading
-          ? <span className="text-gray-500">Cargando…</span>
+          ? <span className="text-gray-500">{t('common.loading')}</span>
           : entries.length === 0
-            ? <span className="text-gray-500">Sin actividad registrada.</span>
+            ? <span className="text-gray-500">{t('settings.noActivity')}</span>
             : entries.map(e => (
               <div key={e.id}>
                 <span className="text-gray-500">{fmtTs(e.created_at)}</span>
@@ -1927,7 +1967,7 @@ export default function Settings() {
             <PluginsSection />
           </Section>
 
-          <CollapsibleSection title="Historial de actividad">
+          <CollapsibleSection title={t('settings.activityLog')}>
             <LogsSection />
           </CollapsibleSection>
 

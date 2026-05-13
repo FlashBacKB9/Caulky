@@ -523,13 +523,13 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                   const mainAcc = corrientes.find(a => a.is_main)
                   return (
                     <div>
-                      <label className={LBL}>Cuenta afectada</label>
+                      <label className={LBL}>{t('settings.affectedAccount')}</label>
                       <select
                         value={form.account_id}
                         onChange={e => set('account_id', e.target.value)}
                         className={INP}
                       >
-                        <option value="">{mainAcc ? `${mainAcc.name} (predeterminada)` : 'Cuenta principal'}</option>
+                        <option value="">{mainAcc ? `${mainAcc.name} ${t('settings.defaultSuffix')}` : t('settings.mainAccount')}</option>
                         {corrientes.filter(a => !a.is_main).map(a => (
                           <option key={a.id} value={a.id}>{a.name}</option>
                         ))}

@@ -43,10 +43,10 @@ export const deleteAccount = (id: number, opts: { deleteMovements?: boolean; con
     },
   })
 
-export const ACCOUNT_CATEGORIES: { value: AccountCategory; label: string }[] = [
-  { value: 'corriente', label: 'Corriente' },
-  { value: 'ahorro',    label: 'Ahorro' },
-  { value: 'inversion', label: 'Inversión' },
-  { value: 'etf',       label: 'ETFs' },
-  { value: 'deposito',  label: 'Depósito' },
+export const ACCOUNT_CATEGORIES: { value: AccountCategory; labelKey: string }[] = [
+  { value: 'corriente', labelKey: 'account.category.corriente' },
+  { value: 'ahorro',    labelKey: 'account.category.ahorro' },
+  { value: 'inversion', labelKey: 'account.category.inversion' },
+  { value: 'etf',       labelKey: 'account.category.etf' },
+  { value: 'deposito',  labelKey: 'account.category.deposito' },
 ]

@@ -235,7 +235,7 @@ export default function AccountsPage() {
         return (
           <div key={cat.value} className="space-y-3">
             <div className="flex items-baseline justify-between px-1">
-              <h2 className={TITLE}>{cat.label}</h2>
+              <h2 className={TITLE}>{t(cat.labelKey)}</h2>
               <div className="flex items-baseline gap-3">
                 <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-white">{fmt(catTotal)}</span>
                 <span className={`text-xs font-medium ${catChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>

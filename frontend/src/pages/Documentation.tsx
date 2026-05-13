@@ -827,6 +827,9 @@ export default function Documentation() {
           <H3>{t('docs.cpt.accountsTitle')}</H3>
           <P>{t('docs.cpt.accountsP')}</P>
 
+          <H3>{t('docs.cpt.accountCategoriesTitle')}</H3>
+          <P>{t('docs.cpt.accountCategoriesP')}</P>
+
           <H3>{t('docs.cpt.budgetsTitle')}</H3>
           <P>{t('docs.cpt.budgetsP')}</P>
 
