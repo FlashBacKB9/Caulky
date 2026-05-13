@@ -14,6 +14,7 @@ export interface DraftRow {
   date: string
   bank_date: string
   movement_type_id: string
+  account_id: string
   paid: boolean
   no_count: boolean
   notes: string
@@ -30,6 +31,7 @@ export function toDraft(mv: Movement): DraftRow {
     date: mv.date,
     bank_date: mv.bank_date ?? '',
     movement_type_id: String(mv.movement_type_id ?? ''),
+    account_id: String(mv.account_id ?? ''),
     paid: mv.paid,
     no_count: mv.no_count,
     notes: mv.notes ?? '',
@@ -48,6 +50,7 @@ export function draftPayload(d: DraftRow, original: Movement) {
     date: d.date,
     bank_date: d.bank_date || null,
     movement_type_id: d.movement_type_id ? parseInt(d.movement_type_id) : null,
+    account_id: d.account_id ? parseInt(d.account_id) : null,
     paid: d.paid,
     no_count: d.no_count,
     notes: d.notes || null,
@@ -189,6 +192,27 @@ export default function MovementDetailModal({ movement, types, onClose }: {
               <input type="date" className={IN} value={draft.bank_date} onChange={e => setField('bank_date', e.target.value)} />
             </div>
           </div>
+
+          {(() => {
+            const corrientes = accounts.filter(a => a.category === 'corriente')
+            if (corrientes.length <= 1) return null
+            const mainAcc = corrientes.find(a => a.is_main)
+            return (
+              <div>
+                <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Cuenta afectada</label>
+                <select
+                  className={IN}
+                  value={draft.account_id}
+                  onChange={e => setField('account_id', e.target.value)}
+                >
+                  <option value="">{mainAcc ? `${mainAcc.name} (predeterminada)` : 'Cuenta principal'}</option>
+                  {corrientes.filter(a => !a.is_main).map(a => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+              </div>
+            )
+          })()}
 
           {/* Pagado / No contar / Compartido */}
           <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>

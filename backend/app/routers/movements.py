@@ -17,21 +17,35 @@ from app.models.user import User
 router = APIRouter(prefix="/movements", tags=["movements"])
 
 
-async def _main_balance(db: AsyncSession, user_id) -> tuple[str | None, float | None]:
-    acc_res = await db.execute(
-        select(Account).where(Account.user_id == user_id, Account.is_main == True)
-    )
-    acc = acc_res.scalar_one_or_none()
-    if not acc:
-        return None, None
+async def _balance_for(db: AsyncSession, user_id, account_id: int | None) -> tuple[str | None, float | None]:
+    """Balance of the corriente account affected by a movement.
+    If account_id is given, use that account. Otherwise use the main one.
+    """
+    if account_id is not None:
+        acc = await db.get(Account, account_id)
+        if not acc or acc.user_id != user_id:
+            return None, None
+    else:
+        res = await db.execute(
+            select(Account).where(Account.user_id == user_id, Account.is_main == True)
+        )
+        acc = res.scalar_one_or_none()
+        if not acc:
+            return None, None
+
     dinero_expr = sa_case(
         (Movement.money < 0, func.abs(Movement.money)),
         (IncomeExpenseGroup.name == 'Ingreso', func.abs(Movement.money)),
         else_=-func.abs(Movement.money),
     )
+    if acc.is_main:
+        # main gets dinero from NULL account_id movements
+        cond = (Movement.account_id.is_(None))
+    else:
+        cond = (Movement.account_id == acc.id)
     total_res = await db.execute(
         select(func.coalesce(func.sum(dinero_expr), 0))
-        .where(Movement.user_id == user_id, Movement.no_count == False)
+        .where(Movement.user_id == user_id, Movement.no_count == False, cond)
         .outerjoin(MovementType, Movement.movement_type_id == MovementType.id)
         .outerjoin(IncomeExpenseGroup, MovementType.income_expense_group_id == IncomeExpenseGroup.id)
     )
@@ -105,7 +119,7 @@ async def list_movements(
 
 @router.post("", response_model=MovementRead, status_code=201)
 async def create_movement(body: MovementCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
-    acc_name, bal_before = await _main_balance(db, user.id)
+    acc_name, bal_before = await _balance_for(db, user.id, body.account_id)
     mv = Movement(**body.model_dump(), user_id=user.id)
     db.add(mv)
     await db.flush()
@@ -172,7 +186,7 @@ async def delete_movement(movement_id: int, db: AsyncSession = Depends(get_db), 
     before = _mv_snap(mv)
     summary = f"Movimiento eliminado: {mv.name} {float(mv.money):.2f}€ ({mv.date})"
     if not mv.no_count:
-        acc_name, bal_before = await _main_balance(db, user.id)
+        acc_name, bal_before = await _balance_for(db, user.id, mv.account_id)
         if acc_name and bal_before is not None:
             dinero = await _mv_dinero(db, mv)
             summary += f" | {acc_name}: {bal_before:.2f} → {bal_before - dinero:.2f}"

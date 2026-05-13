@@ -1,7 +1,7 @@
 import { useRef, useState, useCallback } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, Link } from 'react-router-dom'
-import { getAccountsSummary, createAccount, updateAccountFull, deleteAccount, type Account } from '../api/accounts'
+import { getAccountsSummary, createAccount, updateAccountFull, deleteAccount, reorderAccounts, ACCOUNT_CATEGORIES, type Account, type AccountCategory } from '../api/accounts'
 import { getGroups, createGroup, updateGroup, deleteGroup, type Group } from '../api/groups'
 import {
   getMovementTypes, createMovementType, updateMovementType, deleteMovementType,
@@ -88,8 +88,9 @@ function DeleteMovementsModal({ accountName, movCount, isPending, onDeleteMoveme
   )
 }
 
-function AccountCard({ account, allTypes, fmt, onDeleted }: {
+function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, canMoveUp, canMoveDown }: {
   account: Account; allTypes: MovementType[]; fmt: (v: number) => string; onDeleted: () => void
+  onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean
 }) {
   const qc = useQueryClient()
   const colorRef = useRef<HTMLInputElement>(null)
@@ -97,6 +98,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
   const [name, setName]             = useState(account.name)
   const [color, setColor]           = useState(account.color)
   const [icon, setIcon]             = useState(account.icon)
+  const [category, setCategory]     = useState<AccountCategory>(account.category)
   const [balance, setBalance]       = useState(String(account.initial_balance))
   const [confirming, setConfirming] = useState(false)
   const [movCount, setMovCount]     = useState(0)
@@ -112,7 +114,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
     mutationFn: async () => {
       await updateAccountFull(account.id, {
         name: name.trim() || account.name,
-        color, icon,
+        color, icon, category,
         initial_balance: isNaN(parseFloat(balance.replace(',', '.'))) ? account.initial_balance : parseFloat(balance.replace(',', '.')),
       })
       if (!account.is_main) {
@@ -157,6 +159,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
   const cancelEdit = () => {
     setName(account.name); setColor(account.color)
     setIcon(account.icon); setBalance(String(account.initial_balance))
+    setCategory(account.category)
     setLinkedIds(new Set(allTypes.filter(t => t.linked_account_id === account.id).map(t => t.id)))
     setEditing(false)
   }
@@ -194,6 +197,18 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
                 <AppIcon name={k} className="w-4 h-4" style={{ color: icon === k ? color : undefined }} strokeWidth={1.5} />
               </button>
             ))}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Categoría</span>
+            <select
+              value={category}
+              onChange={e => setCategory(e.target.value as AccountCategory)}
+              className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            >
+              {ACCOUNT_CATEGORIES.map(c => (
+                <option key={c.value} value={c.value}>{c.label}</option>
+              ))}
+            </select>
           </div>
           <div className="flex items-center gap-2">
             <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('settings.initialBalance')}</span>
@@ -277,7 +292,20 @@ function AccountCard({ account, allTypes, fmt, onDeleted }: {
             <AppIcon name={account.icon} className="w-4 h-4" style={{ color: account.color }} strokeWidth={1.5} />
           </div>
           <span className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200">{account.name}</span>
+          <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+            {ACCOUNT_CATEGORIES.find(c => c.value === account.category)?.label ?? account.category}
+          </span>
           <span className="text-sm font-mono text-gray-400 dark:text-gray-500">{fmt(account.initial_balance)}</span>
+          <div className="flex items-center">
+            <button onClick={onMoveUp} disabled={!canMoveUp}
+              className="p-1 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-300 disabled:opacity-20 disabled:hover:text-gray-300 dark:disabled:hover:text-gray-600 rounded transition-colors">
+              <ChevronUp className="w-3.5 h-3.5" />
+            </button>
+            <button onClick={onMoveDown} disabled={!canMoveDown}
+              className="p-1 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-300 disabled:opacity-20 disabled:hover:text-gray-300 dark:disabled:hover:text-gray-600 rounded transition-colors">
+              <ChevronDown className="w-3.5 h-3.5" />
+            </button>
+          </div>
           <button onClick={() => setEditing(true)}
             className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-300 rounded transition-colors">
             <Pencil className="w-3.5 h-3.5" />
@@ -820,11 +848,12 @@ function NavSection({ entries, onChange }: { entries: NavEntry[]; onChange: (e: 
 function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: number) => string }) {
   const qc = useQueryClient()
   const colorRef = useRef<HTMLInputElement>(null)
-  const [adding, setAdding]     = useState(false)
-  const [newName, setNewName]   = useState('')
-  const [newColor, setNewColor] = useState('#3b82f6')
-  const [newIcon, setNewIcon]   = useState('wallet')
-  const [newBal, setNewBal]     = useState('0')
+  const [adding, setAdding]         = useState(false)
+  const [newName, setNewName]       = useState('')
+  const [newColor, setNewColor]     = useState('#3b82f6')
+  const [newIcon, setNewIcon]       = useState('wallet')
+  const [newBal, setNewBal]         = useState('0')
+  const [newCategory, setNewCategory] = useState<AccountCategory>('corriente')
 
   const { data: allTypes = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
 
@@ -835,18 +864,40 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
       name: newName.trim(),
       color: newColor,
       icon: newIcon,
+      category: newCategory,
       initial_balance: isNaN(parseFloat(newBal.replace(',', '.'))) ? 0 : parseFloat(newBal.replace(',', '.')),
     }),
     onSuccess: () => {
       invalidate()
-      setAdding(false); setNewName(''); setNewColor('#3b82f6'); setNewIcon('wallet'); setNewBal('0')
+      setAdding(false); setNewName(''); setNewColor('#3b82f6'); setNewIcon('wallet'); setNewBal('0'); setNewCategory('corriente')
     },
   })
 
+  const mutReorder = useMutation({
+    mutationFn: (ids: number[]) => reorderAccounts(ids),
+    onSuccess: invalidate,
+  })
+
+  const move = (id: number, dir: -1 | 1) => {
+    const ids = accounts.map(a => a.id)
+    const i = ids.indexOf(id)
+    if (i < 0 || i + dir < 0 || i + dir >= ids.length) return
+    const next = [...ids]
+    ;[next[i], next[i + dir]] = [next[i + dir], next[i]]
+    mutReorder.mutate(next)
+  }
+
   return (
     <div className="space-y-2">
-      {accounts.map(account => (
-        <AccountCard key={account.id} account={account} allTypes={allTypes} fmt={fmt} onDeleted={invalidate} />
+      {accounts.map((account, idx) => (
+        <AccountCard
+          key={account.id} account={account} allTypes={allTypes} fmt={fmt}
+          onDeleted={invalidate}
+          onMoveUp={() => move(account.id, -1)}
+          onMoveDown={() => move(account.id, 1)}
+          canMoveUp={idx > 0}
+          canMoveDown={idx < accounts.length - 1}
+        />
       ))}
 
       {adding ? (
@@ -880,6 +931,18 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
                   <AppIcon name={k} className="w-4 h-4" style={{ color: newIcon === k ? newColor : undefined }} strokeWidth={1.5} />
                 </button>
               ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">Categoría</span>
+              <select
+                value={newCategory}
+                onChange={e => setNewCategory(e.target.value as AccountCategory)}
+                className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              >
+                {ACCOUNT_CATEGORIES.map(c => (
+                  <option key={c.value} value={c.value}>{c.label}</option>
+                ))}
+              </select>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('settings.initialBalance')}</span>

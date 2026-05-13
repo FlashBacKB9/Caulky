@@ -16,6 +16,7 @@ class Account(Base):
     initial_balance: Mapped[float] = mapped_column(Numeric(12, 2), nullable=False, default=0)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_main: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    category: Mapped[str] = mapped_column(String(20), nullable=False, default="corriente")
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )

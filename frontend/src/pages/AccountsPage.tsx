@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getAccountsSummary, type Account } from '../api/accounts'
+import { getAccountsSummary, ACCOUNT_CATEGORIES, type Account } from '../api/accounts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { useCurrency } from '../hooks/useCurrency'
@@ -226,30 +226,52 @@ export default function AccountsPage() {
         </div>
       </div>
 
-      {/* ── Account cards ──────────────────────────────────────────── */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-        {accounts.map(acc => {
-          const change = acc.balance - acc.initial_balance
-          return (
-            <div key={acc.id} className={`${PANEL} p-4 relative overflow-hidden`}>
-              <div className="absolute inset-y-0 left-0 w-1 rounded-l-2xl" style={{ background: acc.color }} />
-              <div className="pl-2">
-                <div className="flex items-center gap-1.5 mb-3">
-                  <AppIcon name={acc.icon} className="w-3.5 h-3.5 shrink-0" style={{ color: acc.color }} />
-                  <p className={`${TITLE} truncate`}>{acc.name}</p>
-                </div>
-                <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white mb-1">
-                  {fmt(acc.balance)}
-                </p>
-                <div className={`flex items-center gap-1 text-xs font-medium ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                  <span>{change >= 0 ? '+' : ''}{fmt(change)}</span>
-                </div>
+      {/* ── Account cards grouped by category ──────────────────────── */}
+      {ACCOUNT_CATEGORIES.map(cat => {
+        const catAccounts = accounts.filter(a => a.category === cat.value)
+        if (catAccounts.length === 0) return null
+        const catTotal = catAccounts.reduce((s, a) => s + a.balance, 0)
+        const catChange = catTotal - catAccounts.reduce((s, a) => s + a.initial_balance, 0)
+        return (
+          <div key={cat.value} className="space-y-3">
+            <div className="flex items-baseline justify-between px-1">
+              <h2 className={TITLE}>{cat.label}</h2>
+              <div className="flex items-baseline gap-3">
+                <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-white">{fmt(catTotal)}</span>
+                <span className={`text-xs font-medium ${catChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                  {catChange >= 0 ? '+' : ''}{fmt(catChange)}
+                </span>
               </div>
             </div>
-          )
-        })}
-      </div>
+            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+              {catAccounts.map(acc => {
+                const change = acc.balance - acc.initial_balance
+                return (
+                  <div key={acc.id} className={`${PANEL} p-4 relative overflow-hidden`}>
+                    <div className="absolute inset-y-0 left-0 w-1 rounded-l-2xl" style={{ background: acc.color }} />
+                    <div className="pl-2">
+                      <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: acc.color + '20' }}>
+                          <AppIcon name={acc.icon} className="w-3.5 h-3.5" style={{ color: acc.color }} strokeWidth={1.5} />
+                        </div>
+                        <p className={`${TITLE} truncate`}>{acc.name}</p>
+                      </div>
+                      <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white mb-1">
+                        {fmt(acc.balance)}
+                      </p>
+                      <div className={`flex items-center gap-1 text-xs font-medium ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                        {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                        <span>{change >= 0 ? '+' : ''}{fmt(change)}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )
+      })}
 
       {/* ── Evolution chart ────────────────────────────────────────── */}
       <div className={`${PANEL} p-5`}>

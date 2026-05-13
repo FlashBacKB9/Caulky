@@ -175,7 +175,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
   const startDate = initialDate ?? today
   const [form, setForm] = useState({
     name: '', money: '', date: startDate, bank_date: startDate,
-    movement_type_id: '', paid: true, no_count: false, notes: '',
+    movement_type_id: '', account_id: '', paid: true, no_count: false, notes: '',
     is_shared: false, shared_between: '2', my_share: '',
   })
   const set = (field: string, value: unknown) => setForm(f => ({ ...f, [field]: value }))
@@ -223,6 +223,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
         name: form.name, money: parseFloat(form.money), date: form.date,
         bank_date: form.bank_date || undefined,
         movement_type_id: form.movement_type_id ? parseInt(form.movement_type_id) : undefined,
+        account_id: form.account_id ? parseInt(form.account_id) : undefined,
         paid: form.paid, no_count: form.no_count, notes: form.notes || undefined,
         is_shared: form.is_shared, shared_between, my_share,
       })
@@ -279,6 +280,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
       date: prev.date || (tpl.dateMode === 'today' ? today : ''),
       bank_date: prev.bank_date || ((tpl.bankDateMode ?? 'manual') === 'today' ? today : ''),
       movement_type_id: tpl.movement_type_id,
+      account_id: prev.account_id,
       paid: tpl.paid, no_count: tpl.no_count, notes: tpl.notes,
       is_shared: false, shared_between: '2', my_share: '',
     }))
@@ -380,6 +382,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
           date: dateStr,
           bank_date: form.bank_date ? dateStr : undefined,
           movement_type_id: form.movement_type_id ? parseInt(form.movement_type_id) : undefined,
+          account_id: form.account_id ? parseInt(form.account_id) : undefined,
           paid: form.paid,
           no_count: form.no_count,
           notes: form.notes || undefined,
@@ -514,6 +517,26 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                     <input type="date" value={form.bank_date} onChange={e => set('bank_date', e.target.value)} className={INP} />
                   </div>
                 </div>
+                {(() => {
+                  const corrientes = accounts.filter(a => a.category === 'corriente')
+                  if (corrientes.length <= 1) return null
+                  const mainAcc = corrientes.find(a => a.is_main)
+                  return (
+                    <div>
+                      <label className={LBL}>Cuenta afectada</label>
+                      <select
+                        value={form.account_id}
+                        onChange={e => set('account_id', e.target.value)}
+                        className={INP}
+                      >
+                        <option value="">{mainAcc ? `${mainAcc.name} (predeterminada)` : 'Cuenta principal'}</option>
+                        {corrientes.filter(a => !a.is_main).map(a => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                })()}
                 <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
                   {sharedEnabled && (
                     <div>

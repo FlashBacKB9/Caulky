@@ -7,7 +7,7 @@ from app.models.account import Account
 from app.models.movement import Movement
 from app.models.movement_type import MovementType
 from app.models.income_expense_group import IncomeExpenseGroup
-from app.schemas.account import AccountRead, AccountCreate, AccountPatch
+from app.schemas.account import AccountRead, AccountCreate, AccountPatch, AccountsReorder
 from app.services.audit import write_log
 from app.auth.setup import current_active_user
 from app.models.user import User
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 
 def _acc_snap(a: Account) -> dict:
-    return {"name": a.name, "color": a.color, "icon": a.icon, "initial_balance": float(a.initial_balance)}
+    return {"name": a.name, "color": a.color, "icon": a.icon, "initial_balance": float(a.initial_balance), "category": a.category}
 
 
 async def _compute_balances(db: AsyncSession, user_id: uuid.UUID) -> dict[int, float]:
@@ -25,10 +25,7 @@ async def _compute_balances(db: AsyncSession, user_id: uuid.UUID) -> dict[int, f
     )
     accounts = accounts_res.scalars().all()
     balances: dict[int, float] = {a.id: 0.0 for a in accounts}
-    main_ids = [a.id for a in accounts if a.is_main]
-
-    if not main_ids:
-        return balances
+    main_id = next((a.id for a in accounts if a.is_main), None)
 
     dinero_expr = case(
         (Movement.money < 0, func.abs(Movement.money)),
@@ -36,16 +33,29 @@ async def _compute_balances(db: AsyncSession, user_id: uuid.UUID) -> dict[int, f
         else_=-func.abs(Movement.money),
     )
 
-    main_res = await db.execute(
-        select(func.coalesce(func.sum(dinero_expr), 0))
-        .where(Movement.user_id == user_id, Movement.no_count == False)
+    # Dinero of movements with explicit account_id → that account
+    per_acc_res = await db.execute(
+        select(Movement.account_id, func.sum(dinero_expr))
+        .where(Movement.user_id == user_id, Movement.no_count == False, Movement.account_id.is_not(None))
         .outerjoin(MovementType, Movement.movement_type_id == MovementType.id)
         .outerjoin(IncomeExpenseGroup, MovementType.income_expense_group_id == IncomeExpenseGroup.id)
+        .group_by(Movement.account_id)
     )
-    main_sum = float(main_res.scalar())
-    for mid in main_ids:
-        balances[mid] = main_sum
+    for aid, total in per_acc_res.all():
+        if aid in balances:
+            balances[aid] += float(total)
 
+    # Dinero of movements without account_id → main account
+    if main_id is not None:
+        null_res = await db.execute(
+            select(func.coalesce(func.sum(dinero_expr), 0))
+            .where(Movement.user_id == user_id, Movement.no_count == False, Movement.account_id.is_(None))
+            .outerjoin(MovementType, Movement.movement_type_id == MovementType.id)
+            .outerjoin(IncomeExpenseGroup, MovementType.income_expense_group_id == IncomeExpenseGroup.id)
+        )
+        balances[main_id] += float(null_res.scalar())
+
+    # Linked accounts (savings) via MovementType.linked_account_id
     savings_res = await db.execute(
         select(MovementType.linked_account_id, func.sum(Movement.money))
         .join(Movement, Movement.movement_type_id == MovementType.id)
@@ -94,7 +104,7 @@ async def create_account(body: AccountCreate, db: AsyncSession = Depends(get_db)
     account = Account(
         name=body.name, color=body.color, icon=body.icon,
         initial_balance=body.initial_balance, sort_order=max_order + 1,
-        is_main=False, user_id=user.id,
+        is_main=False, user_id=user.id, category=body.category,
     )
     db.add(account)
     await db.flush()
@@ -125,6 +135,21 @@ async def update_account(account_id: int, body: AccountPatch, db: AsyncSession =
     data = AccountRead.model_validate(account)
     data.balance = float(account.initial_balance) + balances.get(account.id, 0.0)
     return data
+
+
+@router.post("/reorder", status_code=204)
+async def reorder_accounts(
+    body: AccountsReorder,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    res = await db.execute(select(Account).where(Account.user_id == user.id))
+    accounts = {a.id: a for a in res.scalars().all()}
+    for index, account_id in enumerate(body.ids):
+        a = accounts.get(account_id)
+        if a is not None:
+            a.sort_order = index
+    await db.commit()
 
 
 @router.delete("/{account_id}", status_code=204)

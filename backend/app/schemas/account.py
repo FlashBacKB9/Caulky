@@ -11,6 +11,7 @@ class AccountRead(BaseModel):
     balance: float = 0.0
     sort_order: int
     is_main: bool = False
+    category: str = "corriente"
 
     model_config = {"from_attributes": True}
 
@@ -20,12 +21,20 @@ class AccountCreate(BaseModel):
     color: str = "#6b7280"
     icon: str = "wallet"
     initial_balance: float = 0.0
+    category: str = "corriente"
+
 
 class AccountPatch(BaseModel):
     name: str | None = None
     color: str | None = None
     icon: str | None = None
     initial_balance: float | None = None
+    category: str | None = None
+
 
 class AccountUpdate(BaseModel):
     initial_balance: float
+
+
+class AccountsReorder(BaseModel):
+    ids: list[int]
