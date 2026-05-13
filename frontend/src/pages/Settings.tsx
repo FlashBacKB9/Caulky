@@ -88,9 +88,18 @@ function DeleteMovementsModal({ accountName, movCount, isPending, onDeleteMoveme
   )
 }
 
-function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, canMoveUp, canMoveDown }: {
+function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, canMoveUp, canMoveDown, dragHandlers, isDragging, isDropTarget }: {
   account: Account; allTypes: MovementType[]; fmt: (v: number) => string; onDeleted: () => void
   onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean
+  dragHandlers: {
+    onDragStart: (e: React.DragEvent) => void
+    onDragEnd: (e: React.DragEvent) => void
+    onDragOver: (e: React.DragEvent) => void
+    onDragLeave: (e: React.DragEvent) => void
+    onDrop: (e: React.DragEvent) => void
+  }
+  isDragging: boolean
+  isDropTarget: boolean
 }) {
   const qc = useQueryClient()
   const colorRef = useRef<HTMLInputElement>(null)
@@ -192,9 +201,9 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
           <div className="flex flex-wrap gap-1.5">
             {ICON_KEYS.map(k => (
               <button key={k} onClick={() => setIcon(k)}
-                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${icon === k ? 'ring-2' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${icon === k ? 'ring-2' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
                 style={icon === k ? { backgroundColor: color + '20' } : {}}>
-                <AppIcon name={k} className="w-4 h-4" style={{ color: icon === k ? color : undefined }} strokeWidth={1.5} />
+                <AppIcon name={k} className="w-4 h-4" style={icon === k ? { color } : undefined} strokeWidth={1.5} />
               </button>
             ))}
           </div>
@@ -284,11 +293,24 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
           onCancel={() => setShowModal(false)}
         />
       )}
-      <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden"
-        style={{ borderLeftColor: account.color, borderLeftWidth: 3 }}>
+      <div
+        draggable={true}
+        onDragStart={dragHandlers.onDragStart}
+        onDragEnd={dragHandlers.onDragEnd}
+        onDragOver={dragHandlers.onDragOver}
+        onDragLeave={dragHandlers.onDragLeave}
+        onDrop={dragHandlers.onDrop}
+        className={`bg-white dark:bg-gray-900 rounded-xl border overflow-hidden transition-all ${
+          isDropTarget
+            ? 'border-blue-400 dark:border-blue-500 ring-2 ring-blue-200 dark:ring-blue-900/50'
+            : 'border-gray-100 dark:border-gray-800'
+        } ${isDragging ? 'opacity-40' : ''}`}
+        style={{ borderLeftColor: account.color, borderLeftWidth: 3 }}
+      >
         <div className="flex items-center gap-3 px-4 py-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-            style={{ backgroundColor: account.color + '20' }}>
+          <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 cursor-grab active:cursor-grabbing"
+            style={{ backgroundColor: account.color + '20' }}
+            title="Arrastra para reordenar">
             <AppIcon name={account.icon} className="w-4 h-4" style={{ color: account.color }} strokeWidth={1.5} />
           </div>
           <span className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200">{account.name}</span>
@@ -887,6 +909,21 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
     mutReorder.mutate(next)
   }
 
+  const [dragId, setDragId] = useState<number | null>(null)
+  const [dropTargetId, setDropTargetId] = useState<number | null>(null)
+
+  const reorderByDrop = (targetId: number) => {
+    if (dragId == null || dragId === targetId) return
+    const ids = accounts.map(a => a.id)
+    const fromIdx = ids.indexOf(dragId)
+    const toIdx   = ids.indexOf(targetId)
+    if (fromIdx < 0 || toIdx < 0) return
+    const next = [...ids]
+    next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, dragId)
+    mutReorder.mutate(next)
+  }
+
   return (
     <div className="space-y-2">
       {accounts.map((account, idx) => (
@@ -897,6 +934,15 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
           onMoveDown={() => move(account.id, 1)}
           canMoveUp={idx > 0}
           canMoveDown={idx < accounts.length - 1}
+          isDragging={dragId === account.id}
+          isDropTarget={dropTargetId === account.id && dragId !== account.id}
+          dragHandlers={{
+            onDragStart: (e) => { setDragId(account.id); e.dataTransfer.effectAllowed = 'move' },
+            onDragEnd:   ()  => { setDragId(null); setDropTargetId(null) },
+            onDragOver:  (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dropTargetId !== account.id) setDropTargetId(account.id) },
+            onDragLeave: ()  => { if (dropTargetId === account.id) setDropTargetId(null) },
+            onDrop:      (e) => { e.preventDefault(); reorderByDrop(account.id); setDragId(null); setDropTargetId(null) },
+          }}
         />
       ))}
 
@@ -926,9 +972,9 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
             <div className="flex flex-wrap gap-1.5">
               {ICON_KEYS.map(k => (
                 <button key={k} onClick={() => setNewIcon(k)}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${newIcon === k ? 'ring-2' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${newIcon === k ? 'ring-2' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
                   style={newIcon === k ? { backgroundColor: newColor + '20' } : {}}>
-                  <AppIcon name={k} className="w-4 h-4" style={{ color: newIcon === k ? newColor : undefined }} strokeWidth={1.5} />
+                  <AppIcon name={k} className="w-4 h-4" style={newIcon === k ? { color: newColor } : undefined} strokeWidth={1.5} />
                 </button>
               ))}
             </div>
