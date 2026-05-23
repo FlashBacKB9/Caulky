@@ -314,10 +314,19 @@ function CalendarView({ movements, types, selectedYear }: {
                   isToday ? 'bg-blue-50/60 dark:bg-blue-950/20' :
                   !cell.current ? 'bg-gray-50/50 dark:bg-gray-800/30' : 'cursor-pointer'
                 }`}>
-                <div className={`text-xs font-medium text-right mb-1 ${
-                  isToday ? 'text-blue-600 dark:text-blue-400 font-bold'
-                    : cell.current ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'
-                }`}>{cell.day}</div>
+                <div className="flex items-center justify-between mb-1">
+                  {mvs.length > 0 ? (
+                    <span className={`text-[10px] font-mono font-semibold leading-tight ${
+                      mvs.reduce((s, mv) => s + mv.dinero, 0) >= 0
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-red-500 dark:text-red-400'
+                    }`}>{fmtCal(mvs.reduce((s, mv) => s + mv.dinero, 0))}</span>
+                  ) : <span />}
+                  <span className={`text-xs font-medium ${
+                    isToday ? 'text-blue-600 dark:text-blue-400 font-bold'
+                      : cell.current ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'
+                  }`}>{cell.day}</span>
+                </div>
                 {(expandedDays.has(cell.dateStr) ? mvs : mvs.slice(0, MAX)).map(mv => {
                   const typ = typeMap[mv.movement_type_id ?? 0]
                   return (
