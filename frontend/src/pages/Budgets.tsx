@@ -148,6 +148,7 @@ function BudgetCard({ budget, movements, onClick, onEdit, onDelete }: {
   const currentAmount = budget.versions.length ? budget.versions[budget.versions.length - 1].amount : 0
   const spent = useMemo(() => calcSpending(movements, typeIds, start, end), [movements, typeIds, start, end])
   const pct = currentAmount > 0 ? Math.round((spent / currentAmount) * 100) : 0
+  const remaining = currentAmount - spent
   const colors = pctColors(pct)
 
   return (
@@ -176,7 +177,12 @@ function BudgetCard({ budget, movements, onClick, onEdit, onDelete }: {
             <span className="font-semibold text-gray-700 dark:text-gray-200">{fmt(spent)}</span>
             {' / '}{fmt(currentAmount)}
           </span>
-          <span className={`text-xs font-bold tabular-nums ${colors.text}`}>{pct}%</span>
+          <div className="text-right shrink-0">
+            <div className={`text-xs font-bold tabular-nums ${colors.text}`}>{pct}%</div>
+            <div className="text-[11px] tabular-nums text-gray-400 dark:text-gray-500">
+              {remaining >= 0 ? `Resta ${fmt(remaining)}` : `+${fmt(-remaining)}`}
+            </div>
+          </div>
         </div>
         <div className="h-2 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
           <div className={`h-full rounded-full transition-all ${colors.bar}`} style={{ width: `${Math.min(pct, 100)}%` }}/>

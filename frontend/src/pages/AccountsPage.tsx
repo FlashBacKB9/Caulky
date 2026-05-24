@@ -127,6 +127,22 @@ export default function AccountsPage() {
     [histories, selectedYear],
   )
 
+  const periodChange = useMemo(() => {
+    const map: Record<number, number> = {}
+    for (const { acc, rows } of histories) {
+      if (!selectedYear) {
+        map[acc.id] = acc.balance - acc.initial_balance
+      } else {
+        const prevRows = rows.filter(r => r.year === selectedYear - 1)
+        const startBal = prevRows.length > 0 ? prevRows[prevRows.length - 1].balance : acc.initial_balance
+        const yearRows = rows.filter(r => r.year === selectedYear)
+        const endBal = yearRows.length > 0 ? yearRows[yearRows.length - 1].balance : acc.balance
+        map[acc.id] = Math.round((endBal - startBal) * 100) / 100
+      }
+    }
+    return map
+  }, [histories, selectedYear])
+
   const evolutionData = useMemo(() => {
     if (filteredHistories.length === 0 || filteredHistories[0].rows.length === 0) return []
     return filteredHistories[0].rows.map((refRow, i) => {
@@ -156,7 +172,7 @@ export default function AccountsPage() {
   )
 
   const totalBalance = accounts.reduce((s, a) => s + a.balance, 0)
-  const totalChange  = totalBalance - accounts.reduce((s, a) => s + a.initial_balance, 0)
+  const totalChange  = accounts.reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
 
   if (loadingAccounts || loadingMovements) {
     return (
@@ -231,7 +247,7 @@ export default function AccountsPage() {
         const catAccounts = accounts.filter(a => a.category === cat.value)
         if (catAccounts.length === 0) return null
         const catTotal = catAccounts.reduce((s, a) => s + a.balance, 0)
-        const catChange = catTotal - catAccounts.reduce((s, a) => s + a.initial_balance, 0)
+        const catChange = catAccounts.reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
         return (
           <div key={cat.value} className="space-y-3">
             <div className="flex items-baseline justify-between px-1">
@@ -245,7 +261,7 @@ export default function AccountsPage() {
             </div>
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {catAccounts.map(acc => {
-                const change = acc.balance - acc.initial_balance
+                const change = periodChange[acc.id] ?? 0
                 return (
                   <div key={acc.id} className={`${PANEL} p-4 relative overflow-hidden`}>
                     <div className="absolute inset-y-0 left-0 w-1 rounded-l-2xl" style={{ background: acc.color }} />
