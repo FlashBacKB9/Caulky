@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { t, getMonthNames } from '../utils/i18n'
 import { syncPref } from '../utils/prefSync'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Edit2, Trash2, X, ChevronLeft, History, ChartCandlestick, Table2, TrendingUp } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, ChevronLeft, ChevronDown, ChevronRight, History, ChartCandlestick, Table2, TrendingUp } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
@@ -36,9 +36,10 @@ interface Budget {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function genId() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
-function todayStr() { return new Date().toISOString().slice(0, 10) }
+function todayStr() { return new Date().toLocaleDateString('en-CA') }
+function localDateStr(d: Date) { return d.toLocaleDateString('en-CA') }
 function addDays(d: string, n: number) {
-  const dt = new Date(d); dt.setDate(dt.getDate() + n); return dt.toISOString().slice(0, 10)
+  const dt = new Date(d + 'T00:00:00'); dt.setDate(dt.getDate() + n); return localDateStr(dt)
 }
 
 const MONTHS = getMonthNames('short')
@@ -62,23 +63,20 @@ function getCurrentPeriod(
     if (now.getDate() < d) { m -= 1; if (m < 0) { m = 11; y -= 1 } }
     const daysInMonth = new Date(y, m + 1, 0).getDate()
     const clamp = Math.min(d, daysInMonth)
-    const start = new Date(y, m, clamp)
-    const end   = new Date(y, m + 1, clamp - 1)
-    return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) }
+    return { start: localDateStr(new Date(y, m, clamp)), end: localDateStr(new Date(y, m + 1, clamp - 1)) }
   }
 
   if (period === 'annual') {
     const sd = annualStartDate ?? '01-01'
     const y = now.getFullYear()
     const thisStart = `${y}-${sd}`
+    const [mm, dd] = sd.split('-').map(Number)
     if (todayStr() >= thisStart) {
-      const [mm, dd] = sd.split('-').map(Number)
       const endDt = new Date(y + 1, mm - 1, dd); endDt.setDate(endDt.getDate() - 1)
-      return { start: thisStart, end: endDt.toISOString().slice(0, 10) }
+      return { start: thisStart, end: localDateStr(endDt) }
     } else {
-      const [mm, dd] = sd.split('-').map(Number)
       const endDt = new Date(y, mm - 1, dd); endDt.setDate(endDt.getDate() - 1)
-      return { start: `${y - 1}-${sd}`, end: endDt.toISOString().slice(0, 10) }
+      return { start: `${y - 1}-${sd}`, end: localDateStr(endDt) }
     }
   }
 
@@ -87,7 +85,7 @@ function getCurrentPeriod(
     const diff = (now.getDay() - jsWD + 7) % 7
     const start = new Date(now); start.setDate(now.getDate() - diff)
     const end   = new Date(start); end.setDate(start.getDate() + 6)
-    return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) }
+    return { start: localDateStr(start), end: localDateStr(end) }
   }
 
   return { start: customFrom ?? todayStr(), end: customTo ?? todayStr() }
@@ -122,7 +120,7 @@ function generatePeriods(
     while (`${y}-${sd}` <= today) {
       const startStr = `${y}-${sd}`
       const endDt = new Date(y + 1, mm - 1, dd); endDt.setDate(endDt.getDate() - 1)
-      const endStr = endDt.toISOString().slice(0, 10)
+      const endStr = localDateStr(endDt)
       const label  = sd === '01-01' ? `${y}` : `${startStr.slice(5)} → ${endStr.slice(5)}`
       periods.push({ key: `${y}`, label, start: startStr, end: endStr })
       y++
@@ -138,8 +136,8 @@ function generatePeriods(
       const y = cur.getFullYear(), m = cur.getMonth()
       const daysInM = new Date(y, m + 1, 0).getDate()
       const clamp   = Math.min(d, daysInM)
-      const start   = new Date(y, m, clamp).toISOString().slice(0, 10)
-      const endM    = new Date(y, m + 1, clamp - 1).toISOString().slice(0, 10)
+      const start   = localDateStr(new Date(y, m, clamp))
+      const endM    = localDateStr(new Date(y, m + 1, clamp - 1))
       periods.push({ key: `${y}-${String(m + 1).padStart(2, '0')}-${String(clamp).padStart(2, '0')}`, label: `${MONTHS[m]} ${y}`, start, end: endM })
       cur = new Date(y, m + 1, 1)
     }
@@ -151,9 +149,9 @@ function generatePeriods(
     d.setDate(d.getDate() - diff0)
     const todayD = new Date(today)
     while (d <= todayD) {
-      const startStr = d.toISOString().slice(0, 10)
+      const startStr = localDateStr(d)
       const end = new Date(d); end.setDate(d.getDate() + 6)
-      const endStr = end.toISOString().slice(0, 10)
+      const endStr = localDateStr(end)
       periods.push({ key: startStr, label: `${startStr.slice(5)} → ${endStr.slice(5)}`, start: startStr, end: endStr })
       d.setDate(d.getDate() + 7)
     }
@@ -473,8 +471,17 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
     return dates[0] ?? addDays(todayStr(), -365)
   }, [movements, typeIds])
 
-  const [viewFrom, setViewFrom] = useState(budget.trackingStart ?? '')
-  const [view,     setView]     = useState<'table' | 'chart'>('table')
+  const [viewFrom,      setViewFrom]      = useState(budget.trackingStart ?? '')
+  const [view,          setView]          = useState<'table' | 'chart'>('table')
+  const [expandedRows,  setExpandedRows]  = useState<Set<string>>(new Set())
+
+  function toggleRow(key: string) {
+    setExpandedRows(prev => {
+      const next = new Set(prev)
+      next.has(key) ? next.delete(key) : next.add(key)
+      return next
+    })
+  }
 
   const resolvedFrom = viewFrom || budget.trackingStart || earliestDate
 
@@ -621,31 +628,70 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
+                  <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide w-6"></th>
                   <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide">{t('budgets.periodLabel')}</th>
                   <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">{t('budgets.limit')}</th>
                   <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">{t('budgets.spent')}</th>
                   <th className="px-4 py-3 text-right text-[11px] font-medium text-gray-400 uppercase tracking-wide">%</th>
-                  <th className="px-4 py-3 w-24"></th>
+                  <th className="px-4 py-3 w-20"></th>
                 </tr>
               </thead>
               <tbody>
                 {rows.length === 0 && (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-sm text-gray-400">{t('budgets.noData')}</td></tr>
+                  <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-gray-400">{t('budgets.noData')}</td></tr>
                 )}
                 {rows.map(row => {
                   const colors = pctColors(row.pct)
+                  const expanded = expandedRows.has(row.key)
+                  const rowMovements = movements.filter(mv =>
+                    mv.movement_type_id != null && typeIds.has(mv.movement_type_id) &&
+                    mv.date >= row.start && mv.date <= row.end
+                  ).sort((a, b) => b.date.localeCompare(a.date))
                   return (
-                    <tr key={row.key} className="border-b border-gray-50 dark:border-gray-800/50 last:border-0 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors">
-                      <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300 font-medium">{row.label}</td>
-                      <td className="px-4 py-2.5 text-xs text-gray-400 dark:text-gray-500 text-right font-mono">{fmt(row.amount)}</td>
-                      <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-200 text-right font-mono">{fmt(row.spent)}</td>
-                      <td className={`px-4 py-2.5 text-xs font-bold text-right tabular-nums ${colors.text}`}>{row.pct}%</td>
-                      <td className="px-4 py-2.5">
-                        <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
-                          <div className={`h-full rounded-full ${colors.bar}`} style={{ width: `${Math.min(row.pct, 100)}%` }}/>
-                        </div>
-                      </td>
-                    </tr>
+                    <>
+                      <tr key={row.key}
+                        onClick={() => toggleRow(row.key)}
+                        className="border-b border-gray-50 dark:border-gray-800/50 last:border-0 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors cursor-pointer">
+                        <td className="pl-3 py-2.5">
+                          {expanded
+                            ? <ChevronDown className="w-3.5 h-3.5 text-gray-400"/>
+                            : <ChevronRight className="w-3.5 h-3.5 text-gray-400"/>}
+                        </td>
+                        <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300 font-medium">{row.label}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-400 dark:text-gray-500 text-right font-mono">{fmt(row.amount)}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-200 text-right font-mono">{fmt(row.spent)}</td>
+                        <td className={`px-4 py-2.5 text-xs font-bold text-right tabular-nums ${colors.text}`}>{row.pct}%</td>
+                        <td className="px-4 py-2.5">
+                          <div className="h-1.5 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                            <div className={`h-full rounded-full ${colors.bar}`} style={{ width: `${Math.min(row.pct, 100)}%` }}/>
+                          </div>
+                        </td>
+                      </tr>
+                      {expanded && (
+                        <tr key={row.key + '-exp'} className="border-b border-gray-50 dark:border-gray-800/50">
+                          <td colSpan={6} className="px-4 pb-2 pt-0">
+                            {rowMovements.length === 0 ? (
+                              <p className="text-xs text-gray-400 py-2 pl-4">{t('budgets.noData')}</p>
+                            ) : (
+                              <div className="ml-4 divide-y divide-gray-50 dark:divide-gray-800/60">
+                                {rowMovements.map(mv => (
+                                  <div key={mv.id} className="flex items-center justify-between py-1.5 gap-3">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: mv.color }}/>
+                                      <span className="text-xs text-gray-600 dark:text-gray-300 truncate">{mv.name}</span>
+                                    </div>
+                                    <div className="flex items-center gap-3 shrink-0">
+                                      <span className="text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">{mv.date}</span>
+                                      <span className="text-xs font-mono font-medium text-gray-700 dark:text-gray-200 tabular-nums">{fmt(Math.abs(mv.dinero))}</span>
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </td>
+                        </tr>
+                      )}
+                    </>
                   )
                 })}
               </tbody>
@@ -667,7 +713,7 @@ export default function Budgets() {
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null)
   const [detailId,      setDetailId]      = useState<string | null>(null)
 
-  const { data: movements = [] } = useQuery({ queryKey: ['movements', null], queryFn: () => getMovements() })
+  const { data: movements = [] } = useQuery({ queryKey: ['movements'], queryFn: () => getMovements() })
   const { data: types  = [] }   = useQuery({ queryKey: ['movement-types'],  queryFn: getMovementTypes })
   const { data: groups = [] }   = useQuery({ queryKey: ['groups'],          queryFn: getGroups })
 
