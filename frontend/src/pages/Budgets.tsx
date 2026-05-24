@@ -548,6 +548,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
             <div>
               <p className="text-[11px] font-medium text-gray-400 uppercase tracking-wide">{PERIOD_LABELS[budget.period]} {t('budgets.currentPeriod')}</p>
               <p className="text-lg font-bold text-gray-800 dark:text-white mt-0.5">{budget.name}</p>
+              <p className="text-[11px] text-gray-400 mt-0.5 tabular-nums">{start} → {end}</p>
             </div>
             <span className={`text-2xl font-bold tabular-nums ${currentColors.text}`}>{currentPct}%</span>
           </div>
@@ -643,6 +644,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
                 {rows.map(row => {
                   const colors = pctColors(row.pct)
                   const expanded = expandedRows.has(row.key)
+                  const isCurrent = row.start === start && row.end === end
                   const rowMovements = movements.filter(mv =>
                     mv.movement_type_id != null && typeIds.has(mv.movement_type_id) &&
                     mv.date >= row.start && mv.date <= row.end
@@ -651,13 +653,16 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
                     <>
                       <tr key={row.key}
                         onClick={() => toggleRow(row.key)}
-                        className="border-b border-gray-50 dark:border-gray-800/50 last:border-0 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors cursor-pointer">
+                        className={`border-b border-gray-50 dark:border-gray-800/50 last:border-0 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors cursor-pointer ${isCurrent ? 'bg-blue-50/40 dark:bg-blue-900/10' : ''}`}>
                         <td className="pl-3 py-2.5">
                           {expanded
                             ? <ChevronDown className="w-3.5 h-3.5 text-gray-400"/>
                             : <ChevronRight className="w-3.5 h-3.5 text-gray-400"/>}
                         </td>
-                        <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300 font-medium">{row.label}</td>
+                        <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-300 font-medium">
+                          <span>{row.label}</span>
+                          {isCurrent && <span className="ml-1.5 text-[10px] font-semibold text-blue-500 dark:text-blue-400">← actual</span>}
+                        </td>
                         <td className="px-4 py-2.5 text-xs text-gray-400 dark:text-gray-500 text-right font-mono">{fmt(row.amount)}</td>
                         <td className="px-4 py-2.5 text-xs text-gray-700 dark:text-gray-200 text-right font-mono">{fmt(row.spent)}</td>
                         <td className={`px-4 py-2.5 text-xs font-bold text-right tabular-nums ${colors.text}`}>{row.pct}%</td>
