@@ -26,6 +26,9 @@ interface Budget {
   period: BudgetPeriodType
   customFrom?: string
   customTo?: string
+  monthlyStartDay?: number   // 1–31, default 1
+  weeklyStartDay?: number    // 0=Lun … 6=Dom, default 0
+  annualStartDate?: string   // "MM-DD", default "01-01"
   trackingStart: string | null // null = infinite past
   versions: BudgetVersion[] // sorted asc by effectiveFrom
 }
@@ -43,24 +46,50 @@ const PERIOD_LABELS: Record<BudgetPeriodType, string> = {
   monthly: t('budgets.periodMonthly'), weekly: t('budgets.periodWeekly'), annual: t('budgets.periodAnnual'), custom: t('budgets.periodCustom'),
 }
 
-function getCurrentPeriod(period: BudgetPeriodType, customFrom?: string, customTo?: string): { start: string; end: string } {
+function getCurrentPeriod(
+  period: BudgetPeriodType,
+  customFrom?: string,
+  customTo?: string,
+  monthlyStartDay?: number,
+  weeklyStartDay?: number,
+  annualStartDate?: string,
+): { start: string; end: string } {
   const now = new Date()
+
   if (period === 'monthly') {
-    return {
-      start: new Date(now.getFullYear(), now.getMonth(), 1).toISOString().slice(0, 10),
-      end:   new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().slice(0, 10),
+    const d = monthlyStartDay ?? 1
+    let y = now.getFullYear(), m = now.getMonth()
+    if (now.getDate() < d) { m -= 1; if (m < 0) { m = 11; y -= 1 } }
+    const daysInMonth = new Date(y, m + 1, 0).getDate()
+    const clamp = Math.min(d, daysInMonth)
+    const start = new Date(y, m, clamp)
+    const end   = new Date(y, m + 1, clamp - 1)
+    return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) }
+  }
+
+  if (period === 'annual') {
+    const sd = annualStartDate ?? '01-01'
+    const y = now.getFullYear()
+    const thisStart = `${y}-${sd}`
+    if (todayStr() >= thisStart) {
+      const [mm, dd] = sd.split('-').map(Number)
+      const endDt = new Date(y + 1, mm - 1, dd); endDt.setDate(endDt.getDate() - 1)
+      return { start: thisStart, end: endDt.toISOString().slice(0, 10) }
+    } else {
+      const [mm, dd] = sd.split('-').map(Number)
+      const endDt = new Date(y, mm - 1, dd); endDt.setDate(endDt.getDate() - 1)
+      return { start: `${y - 1}-${sd}`, end: endDt.toISOString().slice(0, 10) }
     }
   }
-  if (period === 'annual') {
-    return { start: `${now.getFullYear()}-01-01`, end: `${now.getFullYear()}-12-31` }
-  }
+
   if (period === 'weekly') {
-    const day = now.getDay()
-    const diff = day === 0 ? -6 : 1 - day
-    const mon = new Date(now); mon.setDate(now.getDate() + diff)
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
-    return { start: mon.toISOString().slice(0, 10), end: sun.toISOString().slice(0, 10) }
+    const jsWD = ((weeklyStartDay ?? 0) + 1) % 7  // 0=Mon→1, 6=Sun→0
+    const diff = (now.getDay() - jsWD + 7) % 7
+    const start = new Date(now); start.setDate(now.getDate() - diff)
+    const end   = new Date(start); end.setDate(start.getDate() + 6)
+    return { start: start.toISOString().slice(0, 10), end: end.toISOString().slice(0, 10) }
   }
+
   return { start: customFrom ?? todayStr(), end: customTo ?? todayStr() }
 }
 
@@ -70,6 +99,9 @@ function generatePeriods(
   fromDate: string,
   customFrom?: string,
   customTo?: string,
+  monthlyStartDay?: number,
+  weeklyStartDay?: number,
+  annualStartDate?: string,
 ): Array<{ key: string; label: string; start: string; end: string }> {
   const today = todayStr()
 
@@ -82,29 +114,47 @@ function generatePeriods(
   const periods: Array<{ key: string; label: string; start: string; end: string }> = []
 
   if (period === 'annual') {
-    const sy = +fromDate.slice(0, 4), ey = +today.slice(0, 4)
-    for (let y = sy; y <= ey; y++)
-      periods.push({ key: `${y}`, label: `${y}`, start: `${y}-01-01`, end: `${y}-12-31` })
+    const sd  = annualStartDate ?? '01-01'
+    const [mm, dd] = sd.split('-').map(Number)
+    // Find first fiscal year that starts on or before fromDate
+    let y = +fromDate.slice(0, 4)
+    if (fromDate < `${y}-${sd}`) y -= 1
+    while (`${y}-${sd}` <= today) {
+      const startStr = `${y}-${sd}`
+      const endDt = new Date(y + 1, mm - 1, dd); endDt.setDate(endDt.getDate() - 1)
+      const endStr = endDt.toISOString().slice(0, 10)
+      const label  = sd === '01-01' ? `${y}` : `${startStr.slice(5)} → ${endStr.slice(5)}`
+      periods.push({ key: `${y}`, label, start: startStr, end: endStr })
+      y++
+    }
   } else if (period === 'monthly') {
-    let cur = new Date(fromDate.slice(0, 7) + '-01')
-    const end = new Date(today.slice(0, 7) + '-01')
-    while (cur <= end) {
+    const d = monthlyStartDay ?? 1
+    // Start from the period that contains fromDate
+    let fy = +fromDate.slice(0, 4), fm = +fromDate.slice(5, 7) - 1
+    if (+fromDate.slice(8, 10) < d) { fm -= 1; if (fm < 0) { fm = 11; fy -= 1 } }
+    let cur = new Date(fy, fm, 1)
+    const endRef = new Date(today)
+    while (cur <= endRef) {
       const y = cur.getFullYear(), m = cur.getMonth()
-      const start = new Date(y, m, 1).toISOString().slice(0, 10)
-      const endM  = new Date(y, m + 1, 0).toISOString().slice(0, 10)
-      periods.push({ key: start.slice(0, 7), label: `${MONTHS[m]} ${y}`, start, end: endM })
+      const daysInM = new Date(y, m + 1, 0).getDate()
+      const clamp   = Math.min(d, daysInM)
+      const start   = new Date(y, m, clamp).toISOString().slice(0, 10)
+      const endM    = new Date(y, m + 1, clamp - 1).toISOString().slice(0, 10)
+      periods.push({ key: `${y}-${String(m + 1).padStart(2, '0')}-${String(clamp).padStart(2, '0')}`, label: `${MONTHS[m]} ${y}`, start, end: endM })
       cur = new Date(y, m + 1, 1)
     }
   } else {
-    // weekly: start from the Monday of the fromDate's week
+    // weekly
+    const jsWD = ((weeklyStartDay ?? 0) + 1) % 7
     const d = new Date(fromDate)
-    const day = d.getDay(); d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day))
+    const diff0 = (d.getDay() - jsWD + 7) % 7
+    d.setDate(d.getDate() - diff0)
     const todayD = new Date(today)
     while (d <= todayD) {
-      const mon = d.toISOString().slice(0, 10)
-      const sun = new Date(d); sun.setDate(d.getDate() + 6)
-      const sunStr = sun.toISOString().slice(0, 10)
-      periods.push({ key: mon, label: `${mon.slice(5)} → ${sunStr.slice(5)}`, start: mon, end: sunStr })
+      const startStr = d.toISOString().slice(0, 10)
+      const end = new Date(d); end.setDate(d.getDate() + 6)
+      const endStr = end.toISOString().slice(0, 10)
+      periods.push({ key: startStr, label: `${startStr.slice(5)} → ${endStr.slice(5)}`, start: startStr, end: endStr })
       d.setDate(d.getDate() + 7)
     }
   }
@@ -144,7 +194,7 @@ function BudgetCard({ budget, movements, onClick, onEdit, onDelete }: {
 }) {
   const { fmt } = useCurrency()
   const typeIds = useMemo(() => new Set(budget.typeIds), [budget.typeIds])
-  const { start, end } = useMemo(() => getCurrentPeriod(budget.period, budget.customFrom, budget.customTo), [budget])
+  const { start, end } = useMemo(() => getCurrentPeriod(budget.period, budget.customFrom, budget.customTo, budget.monthlyStartDay, budget.weeklyStartDay, budget.annualStartDate), [budget])
   const currentAmount = budget.versions.length ? budget.versions[budget.versions.length - 1].amount : 0
   const spent = useMemo(() => calcSpending(movements, typeIds, start, end), [movements, typeIds, start, end])
   const pct = currentAmount > 0 ? Math.round((spent / currentAmount) * 100) : 0
@@ -201,13 +251,23 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
   const today = todayStr()
   const currentAmount = initial?.versions[initial.versions.length - 1]?.amount
 
-  const [name,           setName]          = useState(initial?.name ?? '')
-  const [period,         setPeriod]        = useState<BudgetPeriodType>(initial?.period ?? 'monthly')
-  const [customFrom,     setCustomFrom]    = useState(initial?.customFrom ?? today)
-  const [customTo,       setCustomTo]      = useState(initial?.customTo ?? today)
-  const [selectedIds,    setSelectedIds]   = useState<Set<number>>(new Set(initial?.typeIds ?? []))
-  const [amount,         setAmount]        = useState(currentAmount?.toString() ?? '')
-  const [trackingStart,  setTrackingStart] = useState(initial?.trackingStart ?? '')
+  const [name,             setName]            = useState(initial?.name ?? '')
+  const [period,           setPeriod]          = useState<BudgetPeriodType>(initial?.period ?? 'monthly')
+  const [customFrom,       setCustomFrom]      = useState(initial?.customFrom ?? today)
+  const [customTo,         setCustomTo]        = useState(initial?.customTo ?? today)
+  const [monthlyStartDay,  setMonthlyStartDay] = useState(initial?.monthlyStartDay ?? 1)
+  const [weeklyStartDay,   setWeeklyStartDay]  = useState(initial?.weeklyStartDay ?? 0)
+  const [annualStartMonth, setAnnualStartMonth] = useState(() => {
+    const sd = initial?.annualStartDate ?? '01-01'
+    return parseInt(sd.slice(0, 2), 10)
+  })
+  const [annualStartDay,   setAnnualStartDay]  = useState(() => {
+    const sd = initial?.annualStartDate ?? '01-01'
+    return parseInt(sd.slice(3, 5), 10)
+  })
+  const [selectedIds,      setSelectedIds]     = useState<Set<number>>(new Set(initial?.typeIds ?? []))
+  const [amount,           setAmount]          = useState(currentAmount?.toString() ?? '')
+  const [trackingStart,    setTrackingStart]   = useState(initial?.trackingStart ?? '')
 
   const groupById    = useMemo(() => Object.fromEntries(groups.map(g => [g.id, g])), [groups])
   const typesByGroup = useMemo(() => {
@@ -246,8 +306,11 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
       name: name.trim(),
       typeIds: [...selectedIds],
       period,
-      customFrom: period === 'custom' ? customFrom : undefined,
-      customTo:   period === 'custom' ? customTo   : undefined,
+      customFrom:        period === 'custom'   ? customFrom : undefined,
+      customTo:          period === 'custom'   ? customTo   : undefined,
+      monthlyStartDay:   period === 'monthly'  ? monthlyStartDay  : undefined,
+      weeklyStartDay:    period === 'weekly'   ? weeklyStartDay   : undefined,
+      annualStartDate:   period === 'annual'   ? `${String(annualStartMonth).padStart(2,'0')}-${String(annualStartDay).padStart(2,'0')}` : undefined,
       trackingStart: trackingStart || null,
       versions,
     })
@@ -297,6 +360,39 @@ function BudgetForm({ initial, types, groups, onSave, onCancel }: {
                 </button>
               ))}
             </div>
+            {period === 'monthly' && (
+              <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <span>Empieza el día</span>
+                <select value={monthlyStartDay} onChange={e => setMonthlyStartDay(Number(e.target.value))}
+                  className={dateInputCls + ' w-16'}>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <span>de cada mes</span>
+              </div>
+            )}
+            {period === 'weekly' && (
+              <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <span>Empieza el</span>
+                <select value={weeklyStartDay} onChange={e => setWeeklyStartDay(Number(e.target.value))}
+                  className={dateInputCls}>
+                  {['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map((d, i) => <option key={i} value={i}>{d}</option>)}
+                </select>
+              </div>
+            )}
+            {period === 'annual' && (
+              <div className="flex items-center gap-2 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                <span>Empieza el</span>
+                <select value={annualStartDay} onChange={e => setAnnualStartDay(Number(e.target.value))}
+                  className={dateInputCls + ' w-16'}>
+                  {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+                <span>de</span>
+                <select value={annualStartMonth} onChange={e => setAnnualStartMonth(Number(e.target.value))}
+                  className={dateInputCls}>
+                  {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+                </select>
+              </div>
+            )}
             {period === 'custom' && (
               <div className="flex items-center gap-2 mt-2">
                 <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)} className={dateInputCls}/>
@@ -383,8 +479,8 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
   const resolvedFrom = viewFrom || budget.trackingStart || earliestDate
 
   const periods = useMemo(
-    () => generatePeriods(budget.period, resolvedFrom, budget.customFrom, budget.customTo),
-    [budget.period, resolvedFrom, budget.customFrom, budget.customTo]
+    () => generatePeriods(budget.period, resolvedFrom, budget.customFrom, budget.customTo, budget.monthlyStartDay, budget.weeklyStartDay, budget.annualStartDate),
+    [budget.period, resolvedFrom, budget.customFrom, budget.customTo, budget.monthlyStartDay, budget.weeklyStartDay, budget.annualStartDate]
   )
 
   const rows = useMemo(() => periods.map(p => {
@@ -402,7 +498,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
     [budget.typeIds, typeMap]
   )
 
-  const { start, end } = getCurrentPeriod(budget.period, budget.customFrom, budget.customTo)
+  const { start, end } = getCurrentPeriod(budget.period, budget.customFrom, budget.customTo, budget.monthlyStartDay, budget.weeklyStartDay, budget.annualStartDate)
   const currentAmount  = budget.versions[budget.versions.length - 1]?.amount ?? 0
   const currentSpent   = useMemo(() => calcSpending(movements, typeIds, start, end), [movements, typeIds, start, end])
   const currentPct     = currentAmount > 0 ? Math.round((currentSpent / currentAmount) * 100) : 0

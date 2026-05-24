@@ -502,6 +502,9 @@ interface StoredBudget {
   id: string; name: string; typeIds: number[]
   period: 'monthly' | 'weekly' | 'annual' | 'custom'
   customFrom?: string; customTo?: string; trackingStart?: string | null
+  monthlyStartDay?: number   // 1–31, default 1
+  weeklyStartDay?: number    // 0=Lun … 6=Dom, default 0
+  annualStartDate?: string   // "MM-DD", default "01-01"
   versions: BudgetVersion[]
 }
 
@@ -510,19 +513,37 @@ function todayStr() { return new Date().toLocaleDateString('en-CA') }
 
 function getBudgetPeriod(b: StoredBudget, ref: Date = new Date()): { start: string; end: string } {
   if (b.period === 'monthly') {
-    const y = ref.getFullYear(), m = ref.getMonth()
+    const d = b.monthlyStartDay ?? 1
+    let y = ref.getFullYear(), m = ref.getMonth()
+    if (ref.getDate() < d) { m -= 1; if (m < 0) { m = 11; y -= 1 } }
+    const daysInM = new Date(y, m + 1, 0).getDate()
+    const clamp   = Math.min(d, daysInM)
     return {
-      start: new Date(y, m, 1).toLocaleDateString('en-CA'),
-      end:   new Date(y, m + 1, 0).toLocaleDateString('en-CA'),
+      start: new Date(y, m, clamp).toLocaleDateString('en-CA'),
+      end:   new Date(y, m + 1, clamp - 1).toLocaleDateString('en-CA'),
     }
   }
-  if (b.period === 'annual') return { start: `${ref.getFullYear()}-01-01`, end: `${ref.getFullYear()}-12-31` }
+  if (b.period === 'annual') {
+    const sd = b.annualStartDate ?? '01-01'
+    const y  = ref.getFullYear()
+    const refStr = ref.toLocaleDateString('en-CA')
+    const thisStart = `${y}-${sd}`
+    if (refStr >= thisStart) {
+      const [mm, dd] = sd.split('-').map(Number)
+      const endDt = new Date(y + 1, mm - 1, dd); endDt.setDate(endDt.getDate() - 1)
+      return { start: thisStart, end: endDt.toLocaleDateString('en-CA') }
+    } else {
+      const [mm, dd] = sd.split('-').map(Number)
+      const endDt = new Date(y, mm - 1, dd); endDt.setDate(endDt.getDate() - 1)
+      return { start: `${y - 1}-${sd}`, end: endDt.toLocaleDateString('en-CA') }
+    }
+  }
   if (b.period === 'weekly') {
-    const now = new Date()
-    const day = now.getDay(), diff = day === 0 ? -6 : 1 - day
-    const mon = new Date(now); mon.setDate(now.getDate() + diff)
-    const sun = new Date(mon); sun.setDate(mon.getDate() + 6)
-    return { start: mon.toLocaleDateString('en-CA'), end: sun.toLocaleDateString('en-CA') }
+    const jsWD = ((b.weeklyStartDay ?? 0) + 1) % 7
+    const diff = (ref.getDay() - jsWD + 7) % 7
+    const start = new Date(ref); start.setDate(ref.getDate() - diff)
+    const end   = new Date(start); end.setDate(start.getDate() + 6)
+    return { start: start.toLocaleDateString('en-CA'), end: end.toLocaleDateString('en-CA') }
   }
   const today = todayStr()
   return { start: b.customFrom ?? today, end: b.customTo ?? today }
@@ -1037,10 +1058,16 @@ function NewBudgetForm({ types, onSave, onCancel }: {
   onSave: (b: StoredBudget) => void
   onCancel: () => void
 }) {
-  const [name,   setName]   = useState('')
-  const [amount, setAmount] = useState('')
-  const [period, setPeriod] = useState<StoredBudget['period']>('monthly')
-  const [selIds, setSelIds] = useState<Set<number>>(new Set())
+  const [name,             setName]            = useState('')
+  const [amount,           setAmount]          = useState('')
+  const [period,           setPeriod]          = useState<StoredBudget['period']>('monthly')
+  const [monthlyStartDay,  setMonthlyStartDay] = useState(1)
+  const [weeklyStartDay,   setWeeklyStartDay]  = useState(0)
+  const [annualStartMonth, setAnnualStartMonth] = useState(1)
+  const [annualStartDay,   setAnnualStartDay]  = useState(1)
+  const [selIds,           setSelIds]          = useState<Set<number>>(new Set())
+
+  const selCls = 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-lg px-2 py-1 text-xs focus:outline-none'
 
   const typesByGroup = useMemo(() => {
     const map = new Map<string, MovementType[]>()
@@ -1055,6 +1082,9 @@ function NewBudgetForm({ types, onSave, onCancel }: {
     if (!name.trim() || isNaN(parsed) || parsed <= 0 || selIds.size === 0) return
     const b: StoredBudget = {
       id: genId(), name: name.trim(), typeIds: [...selIds], period,
+      monthlyStartDay:  period === 'monthly' ? monthlyStartDay  : undefined,
+      weeklyStartDay:   period === 'weekly'  ? weeklyStartDay   : undefined,
+      annualStartDate:  period === 'annual'  ? `${String(annualStartMonth).padStart(2,'0')}-${String(annualStartDay).padStart(2,'0')}` : undefined,
       versions: [{ id: genId(), amount: parsed, effectiveFrom: todayStr() }],
       trackingStart: null,
     }
@@ -1082,6 +1112,35 @@ function NewBudgetForm({ types, onSave, onCancel }: {
           <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-xs">€</span>
         </div>
       </div>
+      {period === 'monthly' && (
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <span>Empieza el día</span>
+          <select value={monthlyStartDay} onChange={e => setMonthlyStartDay(Number(e.target.value))} className={selCls + ' w-16'}>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <span>de cada mes</span>
+        </div>
+      )}
+      {period === 'weekly' && (
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <span>Empieza el</span>
+          <select value={weeklyStartDay} onChange={e => setWeeklyStartDay(Number(e.target.value))} className={selCls}>
+            {['Lunes','Martes','Miércoles','Jueves','Viernes','Sábado','Domingo'].map((d, i) => <option key={i} value={i}>{d}</option>)}
+          </select>
+        </div>
+      )}
+      {period === 'annual' && (
+        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
+          <span>Empieza el</span>
+          <select value={annualStartDay} onChange={e => setAnnualStartDay(Number(e.target.value))} className={selCls + ' w-16'}>
+            {Array.from({ length: 31 }, (_, i) => i + 1).map(d => <option key={d} value={d}>{d}</option>)}
+          </select>
+          <span>de</span>
+          <select value={annualStartMonth} onChange={e => setAnnualStartMonth(Number(e.target.value))} className={selCls}>
+            {['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'].map((m, i) => <option key={i + 1} value={i + 1}>{m}</option>)}
+          </select>
+        </div>
+      )}
       <div>
         <p className="text-xs text-gray-400 dark:text-gray-500 mb-1.5">{t('dashboard.categories')}</p>
         <div className="space-y-0.5 max-h-44 overflow-y-auto border border-gray-100 dark:border-gray-800 rounded-lg p-1">
@@ -1712,7 +1771,12 @@ export default function Dashboard() {
                 <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-1.5">
                   <div className={`h-1.5 rounded-full transition-all ${colors.bar}`} style={{ width: `${pct}%` }} />
                 </div>
-                <p className={`text-[10px] text-right font-medium tabular-nums ${colors.text}`}>{pct}%</p>
+                <div className="flex items-center justify-between">
+                  <span className={`text-[10px] font-medium tabular-nums ${colors.text}`}>{pct}%</span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500 tabular-nums">
+                    {limit - spent >= 0 ? `Resta ${fmt(Math.round((limit - spent) * 100) / 100)}` : `+${fmt(Math.round((spent - limit) * 100) / 100)}`}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
@@ -1752,7 +1816,12 @@ export default function Dashboard() {
         <div className="w-full bg-gray-100 dark:bg-gray-800 rounded-full h-2">
           <div className={`h-2 rounded-full transition-all ${colors.bar}`} style={{ width: `${pct}%` }} />
         </div>
-        <p className={`text-xs mt-1.5 text-right font-medium tabular-nums ${colors.text}`}>{pct}%</p>
+        <div className="flex items-center justify-between mt-1.5">
+          <span className={`text-xs font-medium tabular-nums ${colors.text}`}>{pct}%</span>
+          <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">
+            {limit - spent >= 0 ? `Resta ${fmt(Math.round((limit - spent) * 100) / 100)}` : `+${fmt(Math.round((spent - limit) * 100) / 100)}`}
+          </span>
+        </div>
       </div>
     )
   }
