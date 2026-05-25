@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare, Pencil, Eye, Settings } from 'lucide-react'
+import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare, Pencil, Eye, Settings, Upload } from 'lucide-react'
 import api from '../api/client'
 import { syncPref } from '../utils/prefSync'
 
@@ -124,10 +124,12 @@ export default function AiConsultant() {
   const [editingId, setEditingId] = useState('')
   const editingIdRef = useRef('')   // ref so activateTab RAF can read latest value
 
-  const [files,        setFiles]        = useState<WorkspaceFile[]>([])
-  const [filesLoading, setFilesLoading] = useState(false)
-  const [writePerms,   setWritePerms]   = useState<WritePerms>(loadWritePerms)
-  const [showPerms,    setShowPerms]    = useState(false)
+  const [files,          setFiles]          = useState<WorkspaceFile[]>([])
+  const [filesLoading,   setFilesLoading]   = useState(false)
+  const [uploading,      setUploading]      = useState(false)
+  const [writePerms,     setWritePerms]     = useState<WritePerms>(loadWritePerms)
+  const [showPerms,      setShowPerms]      = useState(false)
+  const uploadInputRef = useRef<HTMLInputElement>(null)
 
   // ── File browser ─────────────────────────────────────────────────────────────
   const refreshFiles = useCallback(async () => {
@@ -137,6 +139,16 @@ export default function AiConsultant() {
       setFiles(data.files)
     } catch { /**/ } finally { setFilesLoading(false) }
   }, [])
+
+  const uploadContextFile = useCallback(async (file: File) => {
+    setUploading(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      await api.post('/ai/workspace/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+      await refreshFiles()
+    } catch { /**/ } finally { setUploading(false) }
+  }, [refreshFiles])
 
   const downloadFile = useCallback((path: string) => {
     const a = document.createElement('a')
@@ -422,14 +434,31 @@ export default function AiConsultant() {
             <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
               Archivos
             </span>
-            <button
-              onClick={refreshFiles}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              title="Actualizar"
-            >
-              <RefreshCw className={`w-3 h-3 ${filesLoading ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => uploadInputRef.current?.click()}
+                disabled={uploading}
+                className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors disabled:opacity-40"
+                title="Subir documento de contexto"
+              >
+                <Upload className={`w-3 h-3 ${uploading ? 'animate-pulse' : ''}`} />
+              </button>
+              <button
+                onClick={refreshFiles}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                title="Actualizar"
+              >
+                <RefreshCw className={`w-3 h-3 ${filesLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept=".txt,.md,.pdf,.docx,.doc,.xlsx,.xls,.csv,.json,.html,.htm,.py,.js,.ts"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) uploadContextFile(f); e.target.value = '' }}
+          />
 
           <div className="overflow-y-auto pb-1 min-h-0">
             {files.length === 0 ? (

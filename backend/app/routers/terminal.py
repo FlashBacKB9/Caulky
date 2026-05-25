@@ -2,13 +2,15 @@ import asyncio
 import json
 import mimetypes
 import os
+import re
 import secrets
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.websockets import WebSocketState
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,23 +21,33 @@ from app.models.user_preference import UserPreference
 
 router = APIRouter(prefix="/ai", tags=["ai-consultant"])
 
-# Single-use WebSocket tickets: token → (user_id, expiry_timestamp, write_perms_json)
-_tickets: dict[str, tuple[str, float, str]] = {}
+# Single-use WebSocket tickets: token → (user_id, expiry, write_perms_json, session_id)
+_tickets: dict[str, tuple[str, float, str, str]] = {}
 _TICKET_TTL = 30  # seconds
+
+
+class TicketRequest(BaseModel):
+    session_id: str = ""
+
+
+def _sanitize_session_id(raw: str) -> str:
+    """Return a filesystem-safe session id."""
+    clean = re.sub(r'[^a-zA-Z0-9_-]', '', raw)[:64]
+    return clean or 'default'
 
 
 @router.post("/terminal/ticket")
 async def create_terminal_ticket(
+    body: TicketRequest = Body(default=TicketRequest()),
     user: User = Depends(current_active_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Issue a 30-second single-use ticket for the terminal WebSocket."""
     now = time.time()
-    expired = [k for k, (_, exp, _p) in _tickets.items() if exp < now]
+    expired = [k for k, (_, exp, _p, _s) in _tickets.items() if exp < now]
     for k in expired:
         _tickets.pop(k, None)
 
-    # Read write-permissions preference for this user
     pref_res = await db.execute(
         select(UserPreference).where(
             UserPreference.user_id == user.id,
@@ -46,18 +58,19 @@ async def create_terminal_ticket(
     write_perms_json = pref.value if pref else '{}'
 
     token = secrets.token_urlsafe(32)
-    _tickets[token] = (str(user.id), now + _TICKET_TTL, write_perms_json)
+    session_id = _sanitize_session_id(body.session_id)
+    _tickets[token] = (str(user.id), now + _TICKET_TTL, write_perms_json, session_id)
     return {"ticket": token}
 
 
-def _consume_ticket(token: str) -> tuple[Optional[str], Optional[str]]:
+def _consume_ticket(token: str) -> tuple[Optional[str], Optional[str], str]:
     entry = _tickets.pop(token, None)
     if entry is None:
-        return None, None
-    user_id, expiry, write_perms_json = entry
+        return None, None, 'default'
+    user_id, expiry, write_perms_json, session_id = entry
     if time.time() > expiry:
-        return None, None
-    return user_id, write_perms_json
+        return None, None, 'default'
+    return user_id, write_perms_json, session_id
 
 
 def _build_claude_md(user_id: str, write_perms: dict) -> str:
@@ -208,7 +221,7 @@ ORDER BY dinero ASC LIMIT 10;
 
 @router.websocket("/terminal/ws")
 async def terminal_ws(websocket: WebSocket, ticket: str):
-    user_id, write_perms_json = _consume_ticket(ticket)
+    user_id, write_perms_json, session_id = _consume_ticket(ticket)
     if user_id is None:
         await websocket.close(code=4401)
         return
@@ -222,7 +235,8 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
 
     write_enabled = any(write_perms.values())
 
-    workspace = f"/app/workspace/{user_id}"
+    # Each session gets its own subdirectory so Claude remembers its conversation
+    workspace = f"/app/workspace/{user_id}/sessions/{session_id}"
     os.makedirs(workspace, exist_ok=True)
 
     with open(os.path.join(workspace, "CLAUDE.md"), "w") as f:
@@ -253,7 +267,7 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
 
     try:
         proc = ptyprocess.PtyProcess.spawn(
-            ["claude"],
+            ["claude", "--continue"],
             cwd=workspace,
             env=env,
             dimensions=(50, 200),
@@ -362,6 +376,39 @@ async def list_workspace_files(user: User = Depends(current_active_user)):
 
     files.sort(key=lambda f: f["modified"], reverse=True)
     return {"files": files}
+
+
+_ALLOWED_UPLOAD_EXTS = {
+    ".txt", ".md", ".pdf", ".docx", ".doc", ".xlsx", ".xls",
+    ".csv", ".json", ".html", ".htm", ".py", ".js", ".ts",
+}
+
+_MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+
+
+@router.post("/workspace/upload")
+async def upload_context_file(
+    file: UploadFile = File(...),
+    user: User = Depends(current_active_user),
+):
+    raw_name = os.path.basename(file.filename or "file")
+    name, ext = os.path.splitext(raw_name)
+    if ext.lower() not in _ALLOWED_UPLOAD_EXTS:
+        raise HTTPException(status_code=400, detail=f"Extensión no permitida: {ext}")
+
+    safe_name = re.sub(r'[^\w\-.]', '_', raw_name)
+    context_dir = f"/app/workspace/{user.id}/context"
+    os.makedirs(context_dir, exist_ok=True)
+    dest = os.path.join(context_dir, safe_name)
+
+    content = await file.read(_MAX_UPLOAD_BYTES + 1)
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (máx 20 MB)")
+
+    with open(dest, "wb") as f:
+        f.write(content)
+
+    return {"path": f"context/{safe_name}", "name": safe_name}
 
 
 @router.get("/workspace/file")

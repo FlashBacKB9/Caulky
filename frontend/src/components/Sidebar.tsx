@@ -1,11 +1,110 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Wallet, Settings, Info, X, ExternalLink, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Wallet, Settings, Info, X, ExternalLink, LogOut, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
 import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 import { logout } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
 import { t } from '../utils/i18n'
+
+// ── Changelog data ────────────────────────────────────────────────────────────
+
+interface ChangelogEntry { version: string; date: string; items: { type: 'feat' | 'fix' | 'improve'; text: string }[] }
+
+const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: 'v1.5.0', date: 'Mayo 2026',
+    items: [
+      { type: 'feat',    text: 'Cuentas: categoría "Vehículo" con depreciación lineal configurable y opción de depreciación inmediata para coches nuevos (−15%)' },
+      { type: 'feat',    text: 'Patrimonio Total: suma valor real de inversiones (precio de mercado) más bienes (inmuebles y vehículos con valor actual)' },
+      { type: 'feat',    text: 'Cuentas: barra de composición segmentada (Líquido / Inversiones / Bienes) y desglose de ganancia de inversión con estimación IRPF' },
+      { type: 'feat',    text: 'Bienes: botón ojo por tarjeta para incluir/excluir del patrimonio total individualmente' },
+      { type: 'feat',    text: 'Click en cualquier tarjeta de cuenta navega a la vista de movimientos filtrada por esa cuenta' },
+      { type: 'feat',    text: 'Movimientos: ordenación multi-columna con panel avanzado (prioridades, reordenar, dirección)' },
+      { type: 'improve', text: 'Etiquetas de orden contextuales: numérico (1→9), fecha (Antiguo/Reciente), booleano (Sí/No), texto (A→Z)' },
+    ],
+  },
+  {
+    version: 'v1.4.0', date: 'Febrero 2026',
+    items: [
+      { type: 'feat',    text: 'Presupuestos: día de inicio de periodo configurable (mensual: día 1–31; semanal: día de la semana)' },
+      { type: 'feat',    text: 'Presupuestos: fila del periodo actual resaltada y rango de fechas visible en la tabla' },
+      { type: 'feat',    text: 'Dashboard: widget de presupuestos muestra importe restante' },
+      { type: 'feat',    text: 'Cuentas: delta de variación anual tiene en cuenta el año seleccionado' },
+      { type: 'feat',    text: 'Calendario: suma total diaria visible a la izquierda del número de día' },
+      { type: 'improve', text: 'Inversiones: estimación de IRPF sobre ganancias con tramos españoles (19%–28%)' },
+    ],
+  },
+  {
+    version: 'v1.3.0', date: 'Noviembre 2025',
+    items: [
+      { type: 'feat',    text: 'Consultor IA integrado: chat con modelos de lenguaje con acceso a contexto de la app y sesiones persistentes' },
+      { type: 'feat',    text: 'Módulo de Inversiones: seguimiento de fondos con precios Yahoo Finance, ganancia bruta y porcentual' },
+      { type: 'feat',    text: 'Historial de auditoría de movimientos con saldo de cuenta antes/después' },
+      { type: 'feat',    text: 'Búsqueda rápida por nombre en la vista tabla de movimientos' },
+      { type: 'improve', text: 'Filtros favoritos guardados por nombre para reutilizar en cualquier sesión' },
+    ],
+  },
+  {
+    version: 'v1.2.1', date: 'Septiembre 2025',
+    items: [
+      { type: 'fix', text: 'Corrección de zona horaria en cálculo de fechas de periodo de presupuestos' },
+      { type: 'fix', text: 'Enlace de navegación interna en el Consultor IA reparado' },
+      { type: 'fix', text: 'Símbolo de moneda sin espacio entre número y símbolo' },
+    ],
+  },
+  {
+    version: 'v1.2.0', date: 'Agosto 2025',
+    items: [
+      { type: 'feat',    text: 'Vista Kanban de movimientos agrupada por tipo con columnas colapsables' },
+      { type: 'feat',    text: 'Gráficos personalizables: editor visual con combinaciones de dimensiones, tipos y series' },
+      { type: 'feat',    text: 'Comparaciones: comparar dos años con barras, líneas o tabla por categoría' },
+      { type: 'feat',    text: 'Exportación CSV de movimientos seleccionados con campos configurables' },
+      { type: 'feat',    text: 'Gastos compartidos: campo para dividir un gasto entre varias personas' },
+      { type: 'improve', text: 'Menú lateral completamente configurable: orden, visibilidad por página' },
+    ],
+  },
+  {
+    version: 'v1.0', date: 'Julio 2025',
+    items: [
+      { type: 'feat', text: 'Lanzamiento inicial de Caulky' },
+      { type: 'feat', text: 'Movimientos: CRUD completo, vista tabla con filtros avanzados y vista calendario mensual' },
+      { type: 'feat', text: 'Cuentas bancarias con saldo inicial y evolución histórica' },
+      { type: 'feat', text: 'Tipos y grupos de movimiento con colores personalizados' },
+      { type: 'feat', text: 'Plantillas con recurrencias: diaria, semanal, mensual por día o día de semana' },
+      { type: 'feat', text: 'Presupuestos por tipo con periodos y versiones de importe' },
+      { type: 'feat', text: 'Dashboard configurable con widgets drag-and-drop' },
+      { type: 'feat', text: 'Importación de movimientos desde Excel (.xlsx)' },
+      { type: 'feat', text: 'Internacionalización: ES, EN, FR, DE, IT + sistema de plugins de idioma' },
+      { type: 'feat', text: 'Builds standalone para Windows, Linux y macOS vía GitHub Actions' },
+    ],
+  },
+]
+
+const BADGE = {
+  feat:    'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+  fix:     'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+  improve: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+}
+const BADGE_LABEL = { feat: 'Nueva', fix: 'Fix', improve: 'Mejora' }
+
+// ── Accordion section inside InfoModal ────────────────────────────────────────
+
+function InfoSection({ title, children }: { title: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-t border-gray-100 dark:border-gray-800 first:border-t-0">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between py-2.5 text-left group"
+      >
+        <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 group-hover:text-gray-600 dark:group-hover:text-gray-300 transition-colors">{title}</p>
+        <ChevronDown className={`w-3.5 h-3.5 text-gray-400 dark:text-gray-500 shrink-0 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="pb-3">{children}</div>}
+    </div>
+  )
+}
 
 function InfoModal({ onClose }: { onClose: () => void }) {
   return (
@@ -14,15 +113,16 @@ function InfoModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-white">{t('about.title')}</h2>
-            <span className="text-xs text-gray-400 dark:text-gray-500">v1.3</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">v1.5.0</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <div className="px-5 py-4 space-y-5 text-sm">
-          <div>
+        <div className="px-5 py-4 space-y-0 text-sm">
+          {/* Desarrollado por — always visible */}
+          <div className="pb-3">
             <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">{t('about.developedBy')}</p>
             <a
               href="https://github.com/FlashBacKB9"
@@ -34,8 +134,8 @@ function InfoModal({ onClose }: { onClose: () => void }) {
             </a>
           </div>
 
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">{t('about.externalApis')}</p>
+          {/* APIs externas */}
+          <InfoSection title={t('about.externalApis')}>
             <div className="space-y-1.5">
               <div className="px-3 py-2.5 rounded-xl bg-gray-50 dark:bg-gray-800">
                 <p className="font-medium text-gray-800 dark:text-gray-100">Yahoo Finance</p>
@@ -48,10 +148,10 @@ function InfoModal({ onClose }: { onClose: () => void }) {
                 <p className="text-xs text-gray-400 dark:text-gray-500 font-mono mt-0.5">fonts.googleapis.com</p>
               </div>
             </div>
-          </div>
+          </InfoSection>
 
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">{t('about.frontend')}</p>
+          {/* Frontend */}
+          <InfoSection title={t('about.frontend')}>
             <div className="space-y-1.5">
               {[
                 { name: 'React + TypeScript', desc: t('about.reactDesc') },
@@ -68,10 +168,10 @@ function InfoModal({ onClose }: { onClose: () => void }) {
                 </div>
               ))}
             </div>
-          </div>
+          </InfoSection>
 
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">{t('about.backend')}</p>
+          {/* Backend */}
+          <InfoSection title={t('about.backend')}>
             <div className="space-y-1.5">
               {[
                 { name: 'FastAPI', desc: t('about.fastapiDesc') },
@@ -87,10 +187,10 @@ function InfoModal({ onClose }: { onClose: () => void }) {
                 </div>
               ))}
             </div>
-          </div>
+          </InfoSection>
 
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">{t('about.extensibility')}</p>
+          {/* Extensibilidad */}
+          <InfoSection title={t('about.extensibility')}>
             <div className="space-y-1.5">
               {[
                 { name: 'Plugins', desc: t('about.pluginsDesc') },
@@ -103,7 +203,31 @@ function InfoModal({ onClose }: { onClose: () => void }) {
                 </div>
               ))}
             </div>
-          </div>
+          </InfoSection>
+
+          {/* Historial de versiones */}
+          <InfoSection title="Historial de versiones">
+            <div className="space-y-5">
+              {CHANGELOG.map(entry => (
+                <div key={entry.version}>
+                  <div className="flex items-baseline gap-2 mb-2">
+                    <span className="text-sm font-bold text-gray-900 dark:text-white">{entry.version}</span>
+                    <span className="text-xs text-gray-400 dark:text-gray-500">{entry.date}</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {entry.items.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2 text-xs text-gray-600 dark:text-gray-400">
+                        <span className={`mt-0.5 shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold ${BADGE[item.type]}`}>
+                          {BADGE_LABEL[item.type]}
+                        </span>
+                        {item.text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </InfoSection>
         </div>
       </div>
     </div>
