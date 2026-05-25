@@ -52,4 +52,4 @@ export const ACCOUNT_CATEGORIES: { value: AccountCategory; labelKey: string }[] 
   { value: 'inmueble',  labelKey: 'account.category.inmueble' },
 ]
 
-export const LIQUID_CATEGORIES: AccountCategory[] = ['corriente', 'ahorro', 'inversion', 'etf', 'deposito']
+export const LIQUID_CATEGORIES: AccountCategory[] = ['corriente', 'ahorro']
