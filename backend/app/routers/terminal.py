@@ -345,10 +345,33 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
             except (WebSocketDisconnect, Exception):
                 break
 
-    pty_task = asyncio.create_task(pty_to_ws())
-    ws_task = asyncio.create_task(ws_to_pty())
+    pty_task  = asyncio.create_task(pty_to_ws())
+    ws_task   = asyncio.create_task(ws_to_pty())
+
+    # For new sessions, auto-send the greeting after Claude has loaded
+    if not has_prior_conversation:
+        _INITIAL_GREETING = (
+            "Hola, preséntate brevemente y ofrece 2 o 3 sugerencias concretas "
+            "de análisis que puedas hacer ahora mismo con mis datos financieros.\n"
+        )
+
+        async def auto_greet():
+            await asyncio.sleep(4)   # wait for Claude to show its prompt
+            try:
+                if proc.isalive():
+                    proc.write(_INITIAL_GREETING.encode("utf-8"))
+            except Exception:
+                pass
+
+        greet_task = asyncio.create_task(auto_greet())
+    else:
+        greet_task = None
 
     await asyncio.wait([pty_task, ws_task], return_when=asyncio.FIRST_COMPLETED)
+
+    if greet_task:
+        greet_task.cancel()
+        await asyncio.gather(greet_task, return_exceptions=True)
 
     for task in (pty_task, ws_task):
         task.cancel()
