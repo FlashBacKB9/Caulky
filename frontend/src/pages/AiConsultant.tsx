@@ -88,10 +88,38 @@ export default function AiConsultant() {
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
     term.open(containerRef.current)
-    fitAddon.fit()
+    // requestAnimationFrame ensures the container has its final layout dimensions
+    // before fitting, which fixes the mouse-click offset issue
+    requestAnimationFrame(() => fitAddon.fit())
 
     termRef.current = term
     fitRef.current = fitAddon
+
+    // Ctrl+Shift+C → copy selection
+    term.attachCustomKeyEventHandler((e) => {
+      if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && e.code === 'KeyC') {
+        const sel = term.getSelection()
+        if (sel) navigator.clipboard.writeText(sel).catch(() => {})
+        return false
+      }
+      return true
+    })
+
+    // Right-click: copy if there's a selection, otherwise paste
+    const el = containerRef.current!
+    const handleContextMenu = (e: MouseEvent) => {
+      e.preventDefault()
+      const sel = term.getSelection()
+      if (sel) {
+        navigator.clipboard.writeText(sel).catch(() => {})
+        term.clearSelection()
+      } else {
+        navigator.clipboard.readText().then(text => {
+          wsRef.current?.send(text)
+        }).catch(() => {})
+      }
+    }
+    el.addEventListener('contextmenu', handleContextMenu)
 
     term.onData((data) => {
       wsRef.current?.send(data)
@@ -109,6 +137,7 @@ export default function AiConsultant() {
     connectWs()
 
     return () => {
+      el.removeEventListener('contextmenu', handleContextMenu)
       ro.disconnect()
       wsRef.current?.close()
       term.dispose()
