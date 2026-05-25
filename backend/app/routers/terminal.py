@@ -74,13 +74,10 @@ def _consume_ticket(token: str) -> tuple[Optional[str], Optional[str], str]:
     return user_id, write_perms_json, session_id
 
 
-_WELCOME_BANNER = (
-    "\r\n"
-    "\x1b[1;34m┌─────────────────────────────────────────────────┐\x1b[0m\r\n"
-    "\x1b[1;34m│\x1b[0m  \x1b[1;37mConsultor Financiero — Caulky\x1b[0m              \x1b[1;34m│\x1b[0m\r\n"
-    "\x1b[1;34m│\x1b[0m  \x1b[90mEscribe «hola» y el asistente se presentará.\x1b[0m  \x1b[1;34m│\x1b[0m\r\n"
-    "\x1b[1;34m│\x1b[0m  \x1b[90mPuedes subir documentos desde el panel.\x1b[0m       \x1b[1;34m│\x1b[0m\r\n"
-    "\x1b[1;34m└─────────────────────────────────────────────────┘\x1b[0m\r\n"
+_HEADER_BANNER = (
+    "\x1b[2J\x1b[H"  # clear screen + cursor home
+    "\x1b[1;34m Consultor Financiero · Caulky\x1b[0m\r\n"
+    "\x1b[90m ─────────────────────────────\x1b[0m\r\n"
     "\r\n"
 )
 
@@ -274,7 +271,7 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
     claude_cmd = ["claude", "--continue"] if has_prior_conversation else ["claude"]
     if not has_prior_conversation:
         open(session_marker, "w").close()
-        await websocket.send_text(_WELCOME_BANNER)
+        pass  # banner shown after startup via auto_greet
 
     env = os.environ.copy()
     env.update({
@@ -357,9 +354,12 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
         )
 
         async def auto_greet():
-            await asyncio.sleep(4)   # wait for Claude to show its prompt
+            await asyncio.sleep(3)   # wait for Claude to show its prompt
             try:
                 if proc.isalive():
+                    # Clear Claude's startup screen and show our minimal header
+                    await websocket.send_text(_HEADER_BANNER)
+                    await asyncio.sleep(0.15)
                     proc.write(_INITIAL_GREETING.encode("utf-8"))
             except Exception:
                 pass
