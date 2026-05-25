@@ -27,6 +27,8 @@ class MovementBase(BaseModel):
     paid: bool = True
     no_count: bool = False
     notes: Optional[str] = None
+    is_transfer: bool = False
+    from_account_id: Optional[int] = None
     is_shared: bool = False
     shared_between: Optional[int] = None
     my_share: Optional[float] = None
@@ -44,6 +46,8 @@ class MovementUpdate(BaseModel):
     bank_date: Optional[_Date] = None
     movement_type_id: Optional[int] = None
     account_id: Optional[int] = None
+    is_transfer: Optional[bool] = None
+    from_account_id: Optional[int] = None
     paid: Optional[bool] = None
     no_count: Optional[bool] = None
     notes: Optional[str] = None
@@ -58,5 +62,6 @@ class MovementRead(MovementBase):
     label: str = "Gasto"
     color: str = "#6b7280"
     files: list[MovementFileRead] = []
+    from_account_id: Optional[int] = None
 
     model_config = {"from_attributes": True}

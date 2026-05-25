@@ -175,7 +175,8 @@ export default function MovementForm({ onClose, initialDate }: Props) {
   const startDate = initialDate ?? today
   const [form, setForm] = useState({
     name: '', money: '', date: startDate, bank_date: startDate,
-    movement_type_id: '', account_id: '', paid: true, no_count: false, notes: '',
+    movement_type_id: '', account_id: '', is_transfer: false, from_account_id: '',
+    paid: true, no_count: false, notes: '',
     is_shared: false, shared_between: '2', my_share: '',
   })
   const set = (field: string, value: unknown) => setForm(f => ({ ...f, [field]: value }))
@@ -222,8 +223,10 @@ export default function MovementForm({ onClose, initialDate }: Props) {
       const mv = await createMovement({
         name: form.name, money: parseFloat(form.money), date: form.date,
         bank_date: form.bank_date || undefined,
-        movement_type_id: form.movement_type_id ? parseInt(form.movement_type_id) : undefined,
+        movement_type_id: !form.is_transfer && form.movement_type_id ? parseInt(form.movement_type_id) : undefined,
         account_id: form.account_id ? parseInt(form.account_id) : undefined,
+        is_transfer: form.is_transfer,
+        from_account_id: form.is_transfer && form.from_account_id ? parseInt(form.from_account_id) : undefined,
         paid: form.paid, no_count: form.no_count, notes: form.notes || undefined,
         is_shared: form.is_shared, shared_between, my_share,
       })
@@ -281,6 +284,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
       bank_date: prev.bank_date || ((tpl.bankDateMode ?? 'manual') === 'today' ? today : ''),
       movement_type_id: tpl.movement_type_id,
       account_id: prev.account_id,
+      is_transfer: false, from_account_id: '',
       paid: tpl.paid, no_count: tpl.no_count, notes: tpl.notes,
       is_shared: false, shared_between: '2', my_share: '',
     }))
@@ -508,8 +512,11 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                   <div>
                     <label className={LBL}>{t('movement.type')}</label>
                     <div className="space-y-1.5">
-                      <TypeSelect value={form.movement_type_id} onChange={v => set('movement_type_id', v)} types={types} byCategory={byCategory} />
-                      <SavingsHint typeId={form.movement_type_id} money={form.money} />
+                      {form.is_transfer
+                        ? <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1">Sin tipo — es una transferencia</p>
+                        : <><TypeSelect value={form.movement_type_id} onChange={v => set('movement_type_id', v)} types={types} byCategory={byCategory} />
+                          <SavingsHint typeId={form.movement_type_id} money={form.money} /></>
+                      }
                     </div>
                   </div>
                   <div>
@@ -518,17 +525,35 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                   </div>
                 </div>
                 {(() => {
-                  const corrientes = accounts.filter(a => a.category === 'corriente')
+                  const allAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro')
+                  if (allAccounts.length === 0) return null
+                  if (form.is_transfer) {
+                    return (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={LBL}>Cuenta origen</label>
+                          <select value={form.from_account_id} onChange={e => set('from_account_id', e.target.value)} className={INP}>
+                            <option value="">— Selecciona —</option>
+                            {allAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={LBL}>Cuenta destino</label>
+                          <select value={form.account_id} onChange={e => set('account_id', e.target.value)} className={INP}>
+                            <option value="">— Selecciona —</option>
+                            {allAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    )
+                  }
+                  const corrientes = allAccounts.filter(a => a.category === 'corriente')
                   if (corrientes.length <= 1) return null
                   const mainAcc = corrientes.find(a => a.is_main)
                   return (
                     <div>
                       <label className={LBL}>{t('settings.affectedAccount')}</label>
-                      <select
-                        value={form.account_id}
-                        onChange={e => set('account_id', e.target.value)}
-                        className={INP}
-                      >
+                      <select value={form.account_id} onChange={e => set('account_id', e.target.value)} className={INP}>
                         <option value="">{mainAcc ? `${mainAcc.name} ${t('settings.defaultSuffix')}` : t('settings.mainAccount')}</option>
                         {corrientes.filter(a => !a.is_main).map(a => (
                           <option key={a.id} value={a.id}>{a.name}</option>
@@ -537,7 +562,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                     </div>
                   )
                 })()}
-                <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-4' : 'grid-cols-3'}`}>
                   {sharedEnabled && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('form.shared')}</label>
@@ -548,6 +573,10 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                       />
                     </div>
                   )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Transferencia</label>
+                    <Toggle value={form.is_transfer} onChange={v => setForm(f => ({ ...f, is_transfer: v, movement_type_id: v ? '' : f.movement_type_id, from_account_id: v ? f.from_account_id : '' }))} color="#8b5cf6" />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('form.paid')}</label>
                     <Toggle value={form.paid} onChange={v => set('paid', v)} color="#22c55e" />

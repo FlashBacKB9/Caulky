@@ -89,6 +89,8 @@ def _mv_snap(mv: Movement) -> dict:
         "no_count": mv.no_count,
         "notes": mv.notes,
         "account_id": mv.account_id,
+        "is_transfer": mv.is_transfer,
+        "from_account_id": mv.from_account_id,
         "is_shared": mv.is_shared,
         "shared_between": mv.shared_between,
         "my_share": float(mv.my_share) if mv.my_share is not None else None,

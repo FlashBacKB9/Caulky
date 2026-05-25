@@ -1028,7 +1028,7 @@ export default function Movements() {
   const accountMap = useMemo(() => Object.fromEntries(accounts.map(a => [a.id, a.name])), [accounts])
 
   // Daily balance: shown only when a specific account is filtered.
-  // Calculates the balance of that account at the END of each calendar day.
+  // Combines three sources: direct account_id, type-linked (inverted), and transfers.
   const dailyBalance = useMemo(() => {
     if (accountFilter === null) return new Map<string, number>()
     const acc = accounts.find(a => a.id === accountFilter)
@@ -1036,16 +1036,24 @@ export default function Movements() {
     const linkedTypeIds = acc.is_main
       ? null
       : new Set(types.filter(tp => tp.linked_account_id === accountFilter).map(tp => tp.id))
-    const accountMovements = linkedTypeIds === null
-      ? allMovementsForYears
-      : allMovementsForYears.filter(mv => mv.movement_type_id != null && linkedTypeIds.has(mv.movement_type_id))
-    // Non-main accounts are funded via transfers from uso, so the sign is inverted:
-    // a -100 on uso = +100 arriving in ahorro.
-    const sign = linkedTypeIds === null ? 1 : -1
+
     const byDate = new Map<string, number>()
-    for (const mv of accountMovements) {
-      byDate.set(mv.date, (byDate.get(mv.date) ?? 0) + mv.dinero * sign)
+    const add = (date: string, amount: number) =>
+      byDate.set(date, (byDate.get(date) ?? 0) + amount)
+
+    for (const mv of allMovementsForYears) {
+      if (mv.is_transfer) {
+        if (mv.account_id === accountFilter)      add(mv.date,  Math.abs(mv.money))  // incoming
+        else if (mv.from_account_id === accountFilter) add(mv.date, -Math.abs(mv.money))  // outgoing
+      } else if (mv.account_id === accountFilter) {
+        add(mv.date, mv.dinero)
+      } else if (acc.is_main && !mv.account_id) {
+        add(mv.date, mv.dinero)
+      } else if (linkedTypeIds && mv.movement_type_id != null && linkedTypeIds.has(mv.movement_type_id)) {
+        add(mv.date, -mv.dinero)  // type-linked: inverted (transfer perspective)
+      }
     }
+
     const dates = [...byDate.keys()].sort((a, b) => b.localeCompare(a))
     const map = new Map<string, number>()
     let bal = acc.balance
@@ -1083,9 +1091,16 @@ export default function Movements() {
     const searched = !quickSearch.trim() ? base : base.filter(mv => mv.name.toLowerCase().includes(quickSearch.toLowerCase()))
     if (accountFilter === null) return searched
     const acc = accounts.find(a => a.id === accountFilter)
-    if (acc?.is_main) return searched
-    const linkedTypeIds = new Set(types.filter(tp => tp.linked_account_id === accountFilter).map(tp => tp.id))
-    return searched.filter(mv => mv.movement_type_id != null && linkedTypeIds.has(mv.movement_type_id))
+    const linkedTypeIds = acc?.is_main
+      ? null
+      : new Set(types.filter(tp => tp.linked_account_id === accountFilter).map(tp => tp.id))
+    return searched.filter(mv => {
+      if (mv.is_transfer) return mv.account_id === accountFilter || mv.from_account_id === accountFilter
+      if (mv.account_id === accountFilter) return true
+      if (acc?.is_main && !mv.account_id) return true
+      if (linkedTypeIds && mv.movement_type_id != null && linkedTypeIds.has(mv.movement_type_id)) return true
+      return false
+    })
   }, [sortedMovements, advFilter, typeToGroupMap, quickSearch, accountFilter, accounts, types])
 
   // Dates that have more than one movement in the current view (eligible for drag reorder)
