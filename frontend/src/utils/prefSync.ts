@@ -32,6 +32,7 @@ export const PREF_KEYS = new Set([
   'app-custom-languages',
   'caulky_plugins',
   'app-skins',
+  'ai-tab-names',
 ])
 
 const _timers: Record<string, ReturnType<typeof setTimeout>> = {}

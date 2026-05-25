@@ -278,7 +278,7 @@ async def list_workspace_files(user: User = Depends(current_active_user)):
 
 
 @router.get("/workspace/file")
-async def download_workspace_file(path: str, user: User = Depends(current_active_user)):
+async def download_workspace_file(path: str, inline: bool = False, user: User = Depends(current_active_user)):
     workspace = f"/app/workspace/{user.id}"
     safe = os.path.normpath(os.path.join(workspace, path))
     if not safe.startswith(os.path.join(workspace, "")):
@@ -286,4 +286,7 @@ async def download_workspace_file(path: str, user: User = Depends(current_active
     if not os.path.isfile(safe):
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
     media_type = mimetypes.guess_type(safe)[0] or "application/octet-stream"
+    if inline:
+        # No Content-Disposition header → browser renders inline (needed for iframe)
+        return FileResponse(safe, media_type=media_type)
     return FileResponse(safe, filename=os.path.basename(safe), media_type=media_type)

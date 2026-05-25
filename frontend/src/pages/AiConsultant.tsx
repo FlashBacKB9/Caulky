@@ -2,8 +2,9 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare, TerminalSquare } from 'lucide-react'
+import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare, TerminalSquare, Pencil } from 'lucide-react'
 import api from '../api/client'
+import { syncPref } from '../utils/prefSync'
 
 function useDisableHtmlZoom() {
   useEffect(() => {
@@ -92,7 +93,7 @@ function loadSavedNames(): string[] {
 
 function saveTabs(tabs: Tab[]) {
   const names = tabs.filter(t => t.kind === 'term').map(t => t.label)
-  if (names.length > 0) localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(names))
+  if (names.length > 0) syncPref(TABS_STORAGE_KEY, JSON.stringify(names))
 }
 
 export default function AiConsultant() {
@@ -105,6 +106,7 @@ export default function AiConsultant() {
   const [tabs,      setTabs]      = useState<Tab[]>([])
   const [activeId,  setActiveId]  = useState('')
   const [editingId, setEditingId] = useState('')
+  const editingIdRef = useRef('')   // ref so activateTab RAF can read latest value
 
   const [files,        setFiles]        = useState<WorkspaceFile[]>([])
   const [filesLoading, setFilesLoading] = useState(false)
@@ -134,7 +136,8 @@ export default function AiConsultant() {
     }
     setActiveId(id)
     const s = sessionsRef.current.get(id)
-    if (s) requestAnimationFrame(() => { s.fit.fit(); s.term.focus() })
+    // Only steal focus if user is not renaming a tab
+    if (s) requestAnimationFrame(() => { s.fit.fit(); if (!editingIdRef.current) s.term.focus() })
   }, [])
 
   const connectSession = useCallback(async (sess: SessionData) => {
@@ -224,7 +227,7 @@ export default function AiConsultant() {
   }, [activateTab, connectSession])
 
   const openHtmlViewer = useCallback((file: WorkspaceFile) => {
-    const src = `/api/ai/workspace/file?path=${encodeURIComponent(file.path)}`
+    const src = `/api/ai/workspace/file?path=${encodeURIComponent(file.path)}&inline=true`
     setTabs(prev => {
       const existing = prev.find(t => t.kind === 'html' && (t as Extract<Tab, {kind:'html'}>).src === src)
       if (existing) {
@@ -268,9 +271,12 @@ export default function AiConsultant() {
   }, [])
 
   // ── Effects ───────────────────────────────────────────────────────────────────
+  // Keep ref in sync with state so RAF callbacks can read it without stale closure
+  useEffect(() => { editingIdRef.current = editingId }, [editingId])
+
   useEffect(() => {
     const fn = () => {
-      if (document.visibilityState === 'visible' && activeId) {
+      if (document.visibilityState === 'visible' && activeId && !editingIdRef.current) {
         sessionsRef.current.get(activeId)?.term.focus()
       }
     }
@@ -348,28 +354,36 @@ export default function AiConsultant() {
                   <input
                     autoFocus
                     value={tab.label}
+                    onFocus={e => e.target.select()}
                     onChange={e => renameTab(tab.id, e.target.value)}
-                    onBlur={() => setEditingId('')}
-                    onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditingId('') }}
+                    onBlur={() => { editingIdRef.current = ''; setEditingId('') }}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') { editingIdRef.current = ''; setEditingId('') } }}
                     onClick={e => e.stopPropagation()}
                     className="flex-1 min-w-0 text-xs bg-transparent border-b border-current outline-none"
                   />
                 ) : (
-                  <span
-                    className="flex-1 truncate"
-                    onDoubleClick={e => { e.stopPropagation(); setEditingId(tab.id) }}
-                  >
-                    {tab.label}
-                  </span>
+                  <span className="flex-1 truncate" title={tab.label}>{tab.label}</span>
                 )}
-                {tabs.length > 1 && (
-                  <button
-                    onClick={e => { e.stopPropagation(); closeTab(tab.id) }}
-                    className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity ml-auto shrink-0"
-                  >
-                    <X className="w-3 h-3" />
-                  </button>
-                )}
+                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-0.5 transition-opacity ml-auto shrink-0">
+                  {editingId !== tab.id && (
+                    <button
+                      onClick={e => { e.stopPropagation(); editingIdRef.current = tab.id; setEditingId(tab.id) }}
+                      className="hover:text-blue-400 transition-colors"
+                      title="Renombrar"
+                    >
+                      <Pencil className="w-2.5 h-2.5" />
+                    </button>
+                  )}
+                  {tabs.length > 1 && (
+                    <button
+                      onClick={e => { e.stopPropagation(); closeTab(tab.id) }}
+                      className="hover:text-red-500 transition-colors"
+                      title="Cerrar"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
               </div>
             )
           })}
