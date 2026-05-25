@@ -141,7 +141,9 @@ export default function AiConsultant() {
   const createSession = useCallback(() => {
     if (!stackRef.current) return
     counterRef.current++
-    const id = crypto.randomUUID()
+    const id = typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
     const label = `Sesión ${counterRef.current}`
 
     const container = document.createElement('div')
