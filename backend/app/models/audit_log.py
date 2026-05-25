@@ -20,3 +20,4 @@ class AuditLog(Base):
     summary: Mapped[str] = mapped_column(String(500), nullable=False)
     before: Mapped[str | None] = mapped_column(Text, nullable=True)
     after: Mapped[str | None] = mapped_column(Text, nullable=True)
+    source: Mapped[str] = mapped_column(String(20), nullable=False, server_default='user')

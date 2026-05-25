@@ -19,6 +19,7 @@ async def write_log(
     summary: str,
     before: dict | None = None,
     after: dict | None = None,
+    source: str = 'user',
 ) -> None:
     """Write an audit log entry using its own DB session. Never raises."""
     try:
@@ -32,6 +33,7 @@ async def write_log(
                 summary=summary,
                 before=_dumps(before),
                 after=_dumps(after),
+                source=source,
             ))
             await db.commit()
     except Exception as e:

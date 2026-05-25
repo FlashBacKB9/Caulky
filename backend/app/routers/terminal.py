@@ -1,4 +1,5 @@
 import asyncio
+import json
 import mimetypes
 import os
 import secrets
@@ -8,42 +9,102 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.websockets import WebSocketState
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.setup import current_active_user
+from app.database import get_db
 from app.models.user import User
+from app.models.user_preference import UserPreference
 
 router = APIRouter(prefix="/ai", tags=["ai-consultant"])
 
-# Single-use WebSocket tickets: token → (user_id, expiry_timestamp)
-_tickets: dict[str, tuple[str, float]] = {}
+# Single-use WebSocket tickets: token → (user_id, expiry_timestamp, write_perms_json)
+_tickets: dict[str, tuple[str, float, str]] = {}
 _TICKET_TTL = 30  # seconds
 
 
 @router.post("/terminal/ticket")
-async def create_terminal_ticket(user: User = Depends(current_active_user)):
+async def create_terminal_ticket(
+    user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
     """Issue a 30-second single-use ticket for the terminal WebSocket."""
     now = time.time()
-    # Purge expired entries
-    expired = [k for k, (_, exp) in _tickets.items() if exp < now]
+    expired = [k for k, (_, exp, _p) in _tickets.items() if exp < now]
     for k in expired:
         _tickets.pop(k, None)
 
+    # Read write-permissions preference for this user
+    pref_res = await db.execute(
+        select(UserPreference).where(
+            UserPreference.user_id == user.id,
+            UserPreference.key == 'ai-write-perms',
+        )
+    )
+    pref = pref_res.scalar_one_or_none()
+    write_perms_json = pref.value if pref else '{}'
+
     token = secrets.token_urlsafe(32)
-    _tickets[token] = (str(user.id), now + _TICKET_TTL)
+    _tickets[token] = (str(user.id), now + _TICKET_TTL, write_perms_json)
     return {"ticket": token}
 
 
-def _consume_ticket(token: str) -> Optional[str]:
+def _consume_ticket(token: str) -> tuple[Optional[str], Optional[str]]:
     entry = _tickets.pop(token, None)
     if entry is None:
-        return None
-    user_id, expiry = entry
+        return None, None
+    user_id, expiry, write_perms_json = entry
     if time.time() > expiry:
-        return None
-    return user_id
+        return None, None
+    return user_id, write_perms_json
 
 
-def _build_claude_md(user_id: str) -> str:
+def _build_claude_md(user_id: str, write_perms: dict) -> str:
+    # Build the list of enabled write ops for the header note
+    op_labels = {'create': 'Crear', 'edit': 'Editar', 'delete': 'Borrar'}
+    enabled_ops = [op_labels[k] for k in ('create', 'edit', 'delete') if write_perms.get(k)]
+    write_enabled = bool(enabled_ops)
+
+    write_section = ''
+    if write_enabled:
+        examples = []
+        if write_perms.get('create'):
+            examples.append(
+                f"# Crear un movimiento\n"
+                f"spendly-write \"INSERT INTO movements (name, dinero, date, user_id, paid, no_count) "
+                f"VALUES ('Nombre', -50.00, CURRENT_DATE, '{user_id}', true, false)\""
+            )
+        if write_perms.get('edit'):
+            examples.append(
+                f"# Editar un movimiento\n"
+                f"spendly-write \"UPDATE movements SET name = 'Nuevo nombre' "
+                f"WHERE id = 123 AND user_id = '{user_id}'\""
+            )
+        if write_perms.get('delete'):
+            examples.append(
+                f"# Borrar un movimiento\n"
+                f"spendly-write \"DELETE FROM movements WHERE id = 123 AND user_id = '{user_id}'\""
+            )
+
+        ops_str = ', '.join(enabled_ops)
+        write_section = f"""
+
+## Modificar la base de datos
+
+Usa el comando `spendly-write` para realizar escrituras. Operaciones habilitadas: **{ops_str}**.
+
+```bash
+{"chr(10).join(examples)}
+```
+
+**Reglas de seguridad obligatorias:**
+- Incluye siempre `user_id = '{user_id}'` en todas las sentencias.
+- Para UPDATE y DELETE, verifica primero con `spendly-query` que el registro existe y pertenece al usuario.
+- Pide confirmación explícita al usuario antes de ejecutar borrados o ediciones masivas.
+- Nunca modifiques registros sin condición WHERE que incluya `user_id`.
+"""
+
     return f"""\
 # Spendly — Consultor IA
 
@@ -51,7 +112,7 @@ Eres un asistente financiero personal con acceso directo a la base de datos Spen
 
 ## Usuario actual
 - **user_id:** `{user_id}`
-- Filtra **siempre** por `user_id = '{user_id}'` en todas las consultas.
+- Filtra **siempre** por `user_id = '{user_id}'` en todas las consultas y escrituras.
 
 ## Consultar la base de datos
 
@@ -136,7 +197,7 @@ FROM movements
 WHERE user_id = '{user_id}' AND dinero < 0
 ORDER BY dinero ASC LIMIT 10;
 ```
-
+{write_section}
 ## Idioma y estilo
 - Responde siempre en **español**.
 - Sé conciso y directo.
@@ -147,25 +208,38 @@ ORDER BY dinero ASC LIMIT 10;
 
 @router.websocket("/terminal/ws")
 async def terminal_ws(websocket: WebSocket, ticket: str):
-    user_id = _consume_ticket(ticket)
+    user_id, write_perms_json = _consume_ticket(ticket)
     if user_id is None:
         await websocket.close(code=4401)
         return
 
     await websocket.accept()
 
+    try:
+        write_perms = json.loads(write_perms_json or '{}')
+    except Exception:
+        write_perms = {}
+
+    write_enabled = any(write_perms.values())
+
     workspace = f"/app/workspace/{user_id}"
     os.makedirs(workspace, exist_ok=True)
 
     with open(os.path.join(workspace, "CLAUDE.md"), "w") as f:
-        f.write(_build_claude_md(user_id))
+        f.write(_build_claude_md(user_id, write_perms))
+
+    claude_home = "/var/claude-home"
+    os.makedirs(claude_home, exist_ok=True)
 
     env = os.environ.copy()
     env.update({
         "TERM": "xterm-256color",
         "COLUMNS": "200",
         "LINES": "50",
-        "HOME": "/root",
+        "HOME": claude_home,
+        "AI_USER_ID": user_id,
+        "AI_WRITE_ENABLED": "true" if write_enabled else "false",
+        "AI_WRITE_PERMS": json.dumps(write_perms),
     })
 
     try:
@@ -263,8 +337,6 @@ async def view_workspace_file(path: str, user: User = Depends(current_active_use
     return FileResponse(safe, media_type=media_type)
 
 
-
-
 _SKIP_FILES = {"CLAUDE.md"}
 
 
@@ -302,6 +374,5 @@ async def download_workspace_file(path: str, inline: bool = False, user: User = 
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
     media_type = mimetypes.guess_type(safe)[0] or "application/octet-stream"
     if inline:
-        # No Content-Disposition header → browser renders inline (needed for iframe)
         return FileResponse(safe, media_type=media_type)
     return FileResponse(safe, filename=os.path.basename(safe), media_type=media_type)

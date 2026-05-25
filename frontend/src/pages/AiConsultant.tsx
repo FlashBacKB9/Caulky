@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare, Pencil, Eye } from 'lucide-react'
+import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare, Pencil, Eye, Settings } from 'lucide-react'
 import api from '../api/client'
 import { syncPref } from '../utils/prefSync'
 
@@ -85,10 +85,21 @@ type Tab =
 
 type WorkspaceFile = { path: string; name: string; size: number; modified: number }
 
-const TABS_STORAGE_KEY = 'ai-tab-names'
+const TABS_STORAGE_KEY  = 'ai-tab-names'
+const WRITE_PERMS_KEY   = 'ai-write-perms'
+
+type WritePerms = { create: boolean; edit: boolean; delete: boolean }
 
 function loadSavedNames(): string[] {
   try { return JSON.parse(localStorage.getItem(TABS_STORAGE_KEY) ?? '[]') } catch { return [] }
+}
+
+function loadWritePerms(): WritePerms {
+  try {
+    const raw = localStorage.getItem(WRITE_PERMS_KEY)
+    if (!raw) return { create: false, edit: false, delete: false }
+    return { create: false, edit: false, delete: false, ...JSON.parse(raw) }
+  } catch { return { create: false, edit: false, delete: false } }
 }
 
 function saveTabs(tabs: Tab[]) {
@@ -110,6 +121,8 @@ export default function AiConsultant() {
 
   const [files,        setFiles]        = useState<WorkspaceFile[]>([])
   const [filesLoading, setFilesLoading] = useState(false)
+  const [writePerms,   setWritePerms]   = useState<WritePerms>(loadWritePerms)
+  const [showPerms,    setShowPerms]    = useState(false)
 
   // ── File browser ─────────────────────────────────────────────────────────────
   const refreshFiles = useCallback(async () => {
@@ -127,6 +140,14 @@ export default function AiConsultant() {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
+  }, [])
+
+  const toggleWritePerm = useCallback((key: keyof WritePerms) => {
+    setWritePerms(prev => {
+      const next = { ...prev, [key]: !prev[key] }
+      syncPref(WRITE_PERMS_KEY, JSON.stringify(next))
+      return next
+    })
   }, [])
 
   // ── Tab/session management ────────────────────────────────────────────────────
@@ -445,6 +466,41 @@ export default function AiConsultant() {
               })
             )}
           </div>
+        </div>
+
+        {/* Write permissions */}
+        <div className="border-t border-gray-200 dark:border-gray-800 shrink-0">
+          <button
+            onClick={() => setShowPerms(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <span>Permisos IA</span>
+            <Settings className={`w-3 h-3 transition-transform ${showPerms ? 'rotate-45' : ''}`} />
+          </button>
+          {showPerms && (
+            <div className="px-3 pb-3 space-y-2">
+              {(['create', 'edit', 'delete'] as const).map(key => {
+                const labels = { create: 'Crear', edit: 'Editar', delete: 'Borrar' }
+                const on = writePerms[key]
+                return (
+                  <label key={key} className="flex items-center justify-between gap-2 cursor-pointer select-none">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">{labels[key]}</span>
+                    <button
+                      role="switch"
+                      aria-checked={on}
+                      onClick={() => toggleWritePerm(key)}
+                      className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${on ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    >
+                      <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${on ? 'left-4' : 'left-0.5'}`} />
+                    </button>
+                  </label>
+                )
+              })}
+              <p className="text-[10px] text-gray-400 dark:text-gray-600 leading-tight pt-0.5">
+                Aplica en nuevas sesiones. El log registra acciones de IA por separado.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

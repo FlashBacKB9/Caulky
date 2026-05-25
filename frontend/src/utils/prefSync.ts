@@ -33,6 +33,7 @@ export const PREF_KEYS = new Set([
   'caulky_plugins',
   'app-skins',
   'ai-tab-names',
+  'ai-write-perms',
 ])
 
 const _timers: Record<string, ReturnType<typeof setTimeout>> = {}
