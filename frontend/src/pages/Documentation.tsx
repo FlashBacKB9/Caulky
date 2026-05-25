@@ -1,4 +1,5 @@
-import { Download } from 'lucide-react'
+import { useState } from 'react'
+import { Download, ChevronDown } from 'lucide-react'
 import { t } from '../utils/i18n'
 
 // ── Markdown content for download ─────────────────────────────────────────────
@@ -80,9 +81,26 @@ Se usan en: vista Finanzas del Año, desglose en Gráficos, vista Kanban, y Comp
 
 ### Cuentas
 
-Cuentas bancarias o bolsillos. Campos: nombre, color, icono, saldo inicial.
+Cuentas bancarias o bolsillos. Campos: nombre, color, icono, saldo inicial, categoría.
+
+Categorías disponibles: **corriente**, **ahorro**, **inversión**, **ETF**, **depósito**, **inmueble**, **vehículo**.
+
 **Saldo actual = Saldo inicial + suma de movimientos pagados asociados a esa cuenta.**
 La cuenta puede ser "cuenta principal" (is_main) — en ese caso todos los movimientos con dinero positivo o negativo la afectan, no solo los de un tipo vinculado.
+
+#### Vehículos e Inmuebles (Bienes)
+Las cuentas de tipo **vehículo** e **inmueble** forman el grupo "Bienes" en la página de Cuentas. Para vehículos se puede configurar:
+- **Tasa de depreciación anual** (en %): valor actual = valor_compra × (1 − tasa × años)
+- **Fecha de valor inicial**: a partir de cuándo cuenta la depreciación
+- **Vehículo nuevo**: aplica un 15% de depreciación inmediata adicional (pérdida de valor al salir del concesionario)
+
+Cada tarjeta de Bienes tiene un botón de ojo (👁) para incluirla o excluirla del Patrimonio Total sin eliminar la cuenta.
+
+#### Patrimonio Total
+La cabecera de la página de Cuentas muestra:
+- **Patrimonio Total** = Líquido + Valor actual inversiones + Bienes incluidos
+- **Barra de composición** segmentada (azul = líquido, morado = inversiones, naranja = bienes)
+- **Desglose de ganancias de inversión**: bruto, estimación IRPF y neto
 
 ### Presupuestos
 
@@ -117,6 +135,14 @@ Requisitos para que una compra aparezca en Inversiones: Pagado = sí, No contar 
 ---
 
 ## 3. Flujos de trabajo paso a paso
+
+### 3.0 Vistas de la tabla de movimientos
+
+La vista tabla ofrece:
+- **Filtros avanzados** (botón "Filtros"): condiciones combinadas por cualquier campo
+- **Ordenación multi-columna** (botón "Orden"): panel donde puedes añadir varios criterios de orden con prioridad. Al hacer clic en una cabecera de columna también se activa/desactiva la ordenación por esa columna (desc → asc → sin orden). Las etiquetas se adaptan al tipo de dato: A→Z para texto, 1→9 para números, Antiguo/Reciente para fechas.
+- **Búsqueda rápida** por nombre
+- **Filtro por cuenta**: al hacer clic en una tarjeta de cuenta desde la página Cuentas, la lista de movimientos se pre-filtra mostrando solo los movimientos asociados a esa cuenta
 
 ### 3.1 Añadir un movimiento
 
@@ -534,6 +560,11 @@ Los plugins se guardan en localStorage y se reejecutan en cada carga de página.
 
 ## 14. Atajos y trucos
 
+- Clic en cualquier tarjeta de cuenta en la página Cuentas → lista de movimientos filtrada por esa cuenta
+- Botón "Orden" en Movimientos → panel multi-columna para combinar criterios de ordenación
+- Clic en cabecera de columna en Movimientos → ordenar por esa columna (3 estados: desc → asc → sin orden)
+- Cuentas de tipo Vehículo: configura depreciación anual y marca "Vehículo nuevo" para el 15% inmediato
+- Botón ojo en tarjetas de Bienes → incluir/excluir del Patrimonio Total sin tocar la cuenta
 - Clic derecho en cualquier movimiento → menú rápido: Duplicar, Eliminar
 - Arrastrar en el calendario → cambia la fecha del movimiento sin abrir el modal
 - Clic en el nombre en la tabla → modal de detalle completo con todos los campos
@@ -595,17 +626,10 @@ R: Configuración → Plugins → "Instalar plugin (.js)" → seleccionar el arc
 
 // ── Section IDs for TOC ────────────────────────────────────────────────────────
 
-const SECTION_IDS = ['ia','intro','conceptos','movimientos','plantillas','graficos','cuentas','comparaciones','annual','dashboard','inversiones','presupuestos','importar','config','plugins','trucos'] as const
+const SECTION_IDS = ['changelog','ia','intro','conceptos','movimientos','plantillas','graficos','cuentas','comparaciones','annual','dashboard','inversiones','presupuestos','importar','config','plugins','trucos'] as const
 
 // ── Typography helpers ─────────────────────────────────────────────────────────
 
-function H2({ id, children }: { id: string; children: React.ReactNode }) {
-  return (
-    <h2 id={id} className="text-2xl font-bold text-gray-900 dark:text-white mt-14 mb-5 first:mt-0 scroll-mt-8">
-      {children}
-    </h2>
-  )
-}
 function H3({ children }: { children: React.ReactNode }) {
   return <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-8 mb-3">{children}</h3>
 }
@@ -635,10 +659,6 @@ function Tip({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
-function Divider() {
-  return <hr className="border-gray-100 dark:border-gray-800 my-8" />
-}
-
 function Steps({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden mb-6">
@@ -703,6 +723,106 @@ function FieldTable({ rows }: { rows: [string, string][] }) {
   )
 }
 
+// ── Accordion section ─────────────────────────────────────────────────────────
+
+function Section({ id, title, children }: { id: string; title: React.ReactNode; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div id={id} className="scroll-mt-8">
+      <button
+        onClick={() => setOpen(v => !v)}
+        className="w-full flex items-center justify-between py-4 mt-10 first:mt-0 border-b border-gray-200 dark:border-gray-700 text-left group"
+      >
+        <span className="text-2xl font-bold text-gray-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">{title}</span>
+        <ChevronDown className={`w-5 h-5 shrink-0 text-gray-400 dark:text-gray-500 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="pt-4 pb-2">{children}</div>}
+    </div>
+  )
+}
+
+// ── Changelog data ────────────────────────────────────────────────────────────
+
+interface ChangelogEntry { version: string; date: string; items: { type: 'feat' | 'fix' | 'improve'; text: string }[] }
+
+const CHANGELOG: ChangelogEntry[] = [
+  {
+    version: 'v1.5.0', date: 'Mayo 2026',
+    items: [
+      { type: 'feat',    text: 'Cuentas: categoría "Vehículo" con depreciación lineal configurable y opción de depreciación inmediata para coches nuevos (−15%)' },
+      { type: 'feat',    text: 'Patrimonio Total: suma valor real de inversiones (precio de mercado) más bienes (inmuebles y vehículos con valor actual)' },
+      { type: 'feat',    text: 'Cuentas: barra de composición segmentada (Líquido / Inversiones / Bienes) y desglose de ganancia de inversión con estimación IRPF' },
+      { type: 'feat',    text: 'Bienes: botón ojo por tarjeta para incluir/excluir del patrimonio total individualmente' },
+      { type: 'feat',    text: 'Click en cualquier tarjeta de cuenta navega a la vista de movimientos filtrada por esa cuenta' },
+      { type: 'feat',    text: 'Movimientos: ordenación multi-columna con panel avanzado (prioridades, reordenar, dirección)' },
+      { type: 'improve', text: 'Etiquetas de orden contextuales: numérico (1→9), fecha (Antiguo/Reciente), booleano (Sí/No), texto (A→Z)' },
+      { type: 'improve', text: 'Documentación: secciones en acordeón + nueva sección de historial de versiones' },
+    ],
+  },
+  {
+    version: 'v1.4.0', date: 'Febrero 2026',
+    items: [
+      { type: 'feat',    text: 'Presupuestos: día de inicio de periodo configurable (mensual: día 1–31; semanal: día de la semana)' },
+      { type: 'feat',    text: 'Presupuestos: fila del periodo actual resaltada y rango de fechas visible en la tabla' },
+      { type: 'feat',    text: 'Dashboard: widget de presupuestos muestra importe restante' },
+      { type: 'feat',    text: 'Cuentas: delta de variación anual tiene en cuenta el año seleccionado' },
+      { type: 'feat',    text: 'Calendario: suma total diaria visible a la izquierda del número de día' },
+      { type: 'improve', text: 'Inversiones: estimación de IRPF sobre ganancias con tramos españoles (19%–28%)' },
+    ],
+  },
+  {
+    version: 'v1.3.0', date: 'Noviembre 2025',
+    items: [
+      { type: 'feat',    text: 'Consultor IA integrado: chat con modelos de lenguaje con acceso a contexto de la app y sesiones persistentes' },
+      { type: 'feat',    text: 'Módulo de Inversiones: seguimiento de fondos con precios Yahoo Finance, ganancia bruta y porcentual' },
+      { type: 'feat',    text: 'Historial de auditoría de movimientos con saldo de cuenta antes/después' },
+      { type: 'feat',    text: 'Búsqueda rápida por nombre en la vista tabla de movimientos' },
+      { type: 'improve', text: 'Filtros favoritos guardados por nombre para reutilizar en cualquier sesión' },
+    ],
+  },
+  {
+    version: 'v1.2.1', date: 'Septiembre 2025',
+    items: [
+      { type: 'fix',     text: 'Corrección de zona horaria en cálculo de fechas de periodo de presupuestos' },
+      { type: 'fix',     text: 'Enlace de navegación interna en el Consultor IA reparado' },
+      { type: 'fix',     text: 'Símbolo de moneda sin espacio entre número y símbolo' },
+    ],
+  },
+  {
+    version: 'v1.2.0', date: 'Agosto 2025',
+    items: [
+      { type: 'feat',    text: 'Vista Kanban de movimientos agrupada por tipo con columnas colapsables' },
+      { type: 'feat',    text: 'Gráficos personalizables: editor visual con combinaciones de dimensiones, tipos y series' },
+      { type: 'feat',    text: 'Comparaciones: comparar dos años con barras, líneas o tabla por categoría' },
+      { type: 'feat',    text: 'Exportación CSV de movimientos seleccionados con campos configurables' },
+      { type: 'feat',    text: 'Gastos compartidos: campo para dividir un gasto entre varias personas' },
+      { type: 'improve', text: 'Menú lateral completamente configurable: orden, visibilidad por página' },
+    ],
+  },
+  {
+    version: 'v1.0', date: 'Julio 2025',
+    items: [
+      { type: 'feat', text: 'Lanzamiento inicial de Caulky' },
+      { type: 'feat', text: 'Movimientos: CRUD completo, vista tabla con filtros avanzados y vista calendario mensual' },
+      { type: 'feat', text: 'Cuentas bancarias con saldo inicial y evolución histórica' },
+      { type: 'feat', text: 'Tipos y grupos de movimiento con colores personalizados' },
+      { type: 'feat', text: 'Plantillas con recurrencias: diaria, semanal, mensual por día o día de semana' },
+      { type: 'feat', text: 'Presupuestos por tipo con periodos y versiones de importe' },
+      { type: 'feat', text: 'Dashboard configurable con widgets drag-and-drop' },
+      { type: 'feat', text: 'Importación de movimientos desde Excel (.xlsx)' },
+      { type: 'feat', text: 'Internacionalización: ES, EN, FR, DE, IT + sistema de plugins de idioma' },
+      { type: 'feat', text: 'Builds standalone para Windows, Linux y macOS vía GitHub Actions' },
+    ],
+  },
+]
+
+const BADGE = {
+  feat:    'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
+  fix:     'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+  improve: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
+}
+const BADGE_LABEL = { feat: 'Nueva', fix: 'Fix', improve: 'Mejora' }
+
 // ── Download helper ────────────────────────────────────────────────────────────
 
 function downloadMd() {
@@ -750,35 +870,58 @@ export default function Documentation() {
             <p className="text-base text-gray-500 dark:text-gray-400 mt-2">{t('docs.subtitle')}</p>
           </div>
 
+          {/* ── Changelog ──────────────────────────────────────────────── */}
+          <Section id="changelog" title={t('docs.toc.changelog')}>
+            <div className="space-y-6">
+              {CHANGELOG.map(entry => (
+                <div key={entry.version}>
+                  <div className="flex items-baseline gap-3 mb-3">
+                    <span className="text-lg font-bold text-gray-900 dark:text-white">{entry.version}</span>
+                    <span className="text-sm text-gray-400 dark:text-gray-500">{entry.date}</span>
+                  </div>
+                  <ul className="space-y-1.5">
+                    {entry.items.map((item, i) => (
+                      <li key={i} className="flex items-start gap-2.5 text-sm text-gray-600 dark:text-gray-400">
+                        <span className={`mt-0.5 shrink-0 px-1.5 py-0.5 rounded text-[10px] font-semibold ${BADGE[item.type]}`}>
+                          {BADGE_LABEL[item.type]}
+                        </span>
+                        {item.text}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          </Section>
+
           {/* ── 0. Usar con IA ─────────────────────────────────────────── */}
-          <H2 id="ia">{t('docs.useWithAI')}</H2>
-          <P>{t('docs.useWithAIDesc')}</P>
+          <Section id="ia" title={t('docs.useWithAI')}>
+            <P>{t('docs.useWithAIDesc')}</P>
 
-          <div className="my-6">
-            <button
-              onClick={downloadMd}
-              className="inline-flex items-center gap-2.5 px-5 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-base font-semibold rounded-xl hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors"
-            >
-              <Download className="w-5 h-5" />
-              {t('docs.download')}
-            </button>
-          </div>
+            <div className="my-6">
+              <button
+                onClick={downloadMd}
+                className="inline-flex items-center gap-2.5 px-5 py-3 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-base font-semibold rounded-xl hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors"
+              >
+                <Download className="w-5 h-5" />
+                {t('docs.download')}
+              </button>
+            </div>
 
-          <P>{t('docs.withFileAsk')}</P>
-          <UL>
-            <LI>{t('docs.q1')}</LI>
-            <LI>{t('docs.q2')}</LI>
-            <LI>{t('docs.q3')}</LI>
-            <LI>{t('docs.q4')}</LI>
-            <LI>{t('docs.q5')}</LI>
-            <LI>{t('docs.q6')}</LI>
-          </UL>
-          <Tip>{t('docs.useWithAITip')}</Tip>
-
-          <Divider />
+            <P>{t('docs.withFileAsk')}</P>
+            <UL>
+              <LI>{t('docs.q1')}</LI>
+              <LI>{t('docs.q2')}</LI>
+              <LI>{t('docs.q3')}</LI>
+              <LI>{t('docs.q4')}</LI>
+              <LI>{t('docs.q5')}</LI>
+              <LI>{t('docs.q6')}</LI>
+            </UL>
+            <Tip>{t('docs.useWithAITip')}</Tip>
+          </Section>
 
           {/* ── 1. Introducción ────────────────────────────────────────── */}
-          <H2 id="intro">{t('docs.intro.h2')}</H2>
+          <Section id="intro" title={t('docs.intro.h2')}>
           <P>{t('docs.intro.p1')}</P>
           <UL>
             <LI>{t('docs.intro.li1')}</LI>
@@ -793,11 +936,10 @@ export default function Documentation() {
             <LI>{t('docs.intro.li10')}</LI>
             <LI>{t('docs.intro.li11')}</LI>
           </UL>
-
-          <Divider />
+          </Section>
 
           {/* ── 2. Conceptos clave ─────────────────────────────────────── */}
-          <H2 id="conceptos">{t('docs.cpt.h2')}</H2>
+          <Section id="conceptos" title={t('docs.cpt.h2')}>
 
           <H3>{t('docs.cpt.movTitle')}</H3>
           <P>{t('docs.cpt.movP')}</P>
@@ -844,11 +986,10 @@ export default function Documentation() {
 
           <H3>{t('docs.cpt.fundsTitle')}</H3>
           <P>{t('docs.cpt.fundsP')}</P>
-
-          <Divider />
+          </Section>
 
           {/* ── 3. Movimientos ─────────────────────────────────────────── */}
-          <H2 id="movimientos">{t('docs.mov.h2')}</H2>
+          <Section id="movimientos" title={t('docs.mov.h2')}>
           <P>{t('docs.mov.p1')}</P>
 
           <H3>{t('docs.mov.addTitle')}</H3>
@@ -915,11 +1056,10 @@ export default function Documentation() {
 
           <H3>{t('docs.mov.kanbanTitle')}</H3>
           <P>{t('docs.mov.kanbanP')}</P>
-
-          <Divider />
+          </Section>
 
           {/* ── 4. Plantillas y recurrencias ───────────────────────────── */}
-          <H2 id="plantillas">{t('docs.tpl.h2')}</H2>
+          <Section id="plantillas" title={t('docs.tpl.h2')}>
 
           <H3>{t('docs.tpl.createTitle')}</H3>
           <Steps>
@@ -959,11 +1099,10 @@ export default function Documentation() {
           <Example label={t('docs.tpl.ex3Label')}>{t('docs.tpl.ex3')}</Example>
 
           <Note>{t('docs.tpl.note')}</Note>
-
-          <Divider />
+          </Section>
 
           {/* ── 5. Gráficos ────────────────────────────────────────────── */}
-          <H2 id="graficos">{t('docs.grf.h2')}</H2>
+          <Section id="graficos" title={t('docs.grf.h2')}>
           <P>{t('docs.grf.p1')}</P>
 
           <H3>{t('docs.grf.createTitle')}</H3>
@@ -980,11 +1119,10 @@ export default function Documentation() {
           <Example label={t('docs.grf.ex1Label')}>{t('docs.grf.ex1')}</Example>
           <Example label={t('docs.grf.ex2Label')}>{t('docs.grf.ex2')}</Example>
           <Example label={t('docs.grf.ex3Label')}>{t('docs.grf.ex3')}</Example>
-
-          <Divider />
+          </Section>
 
           {/* ── 6. Cuentas ─────────────────────────────────────────────── */}
-          <H2 id="cuentas">{t('docs.act.h2')}</H2>
+          <Section id="cuentas" title={t('docs.act.h2')}>
           <P>{t('docs.act.p1')}</P>
 
           <H3>{t('docs.act.summaryTitle')}</H3>
@@ -1006,11 +1144,10 @@ export default function Documentation() {
           <P>{t('docs.act.distP')}</P>
 
           <Tip>{t('docs.act.tip')}</Tip>
-
-          <Divider />
+          </Section>
 
           {/* ── 7. Comparaciones ───────────────────────────────────────── */}
-          <H2 id="comparaciones">{t('docs.cmp.h2')}</H2>
+          <Section id="comparaciones" title={t('docs.cmp.h2')}>
           <P>{t('docs.cmp.p1')}</P>
 
           <H3>{t('docs.cmp.controlsTitle')}</H3>
@@ -1042,11 +1179,10 @@ export default function Documentation() {
 
           <Example label={t('docs.cmp.ex1Label')}>{t('docs.cmp.ex1')}</Example>
           <Example label={t('docs.cmp.ex2Label')}>{t('docs.cmp.ex2')}</Example>
-
-          <Divider />
+          </Section>
 
           {/* ── 8. Finanzas del Año ────────────────────────────────────── */}
-          <H2 id="annual">{t('docs.ann.h2')}</H2>
+          <Section id="annual" title={t('docs.ann.h2')}>
           <P>{t('docs.ann.p1')}</P>
           <UL>
             <LI>{t('docs.ann.li1')}</LI>
@@ -1055,11 +1191,10 @@ export default function Documentation() {
             <LI>{t('docs.ann.li4')}</LI>
           </UL>
           <Tip>{t('docs.ann.tip')}</Tip>
-
-          <Divider />
+          </Section>
 
           {/* ── 9. Dashboard ───────────────────────────────────────────── */}
-          <H2 id="dashboard">{t('docs.dsh.h2')}</H2>
+          <Section id="dashboard" title={t('docs.dsh.h2')}>
           <P>{t('docs.dsh.p1')}</P>
 
           <H3>{t('docs.dsh.selectorTitle')}</H3>
@@ -1089,11 +1224,10 @@ export default function Documentation() {
             <LI>{t('docs.dsh.bLi1')}</LI>
             <LI>{t('docs.dsh.bLi2')}</LI>
           </UL>
-
-          <Divider />
+          </Section>
 
           {/* ── 10. Inversiones ────────────────────────────────────────── */}
-          <H2 id="inversiones">{t('docs.inv.h2')}</H2>
+          <Section id="inversiones" title={t('docs.inv.h2')}>
           <Note>{t('docs.inv.note1')}</Note>
           <Note>{t('docs.inv.note2')}</Note>
 
@@ -1118,11 +1252,10 @@ export default function Documentation() {
             <LI>{t('docs.inv.cLi6')}</LI>
           </UL>
           <P>{t('docs.inv.colsP')}</P>
-
-          <Divider />
+          </Section>
 
           {/* ── 11. Presupuestos ───────────────────────────────────────── */}
-          <H2 id="presupuestos">{t('docs.bgt.h2')}</H2>
+          <Section id="presupuestos" title={t('docs.bgt.h2')}>
 
           <H3>{t('docs.bgt.createTitle')}</H3>
           <Steps>
@@ -1147,11 +1280,10 @@ export default function Documentation() {
             <LI>{t('docs.bgt.vLi2')}</LI>
             <LI>{t('docs.bgt.vLi3')}</LI>
           </UL>
-
-          <Divider />
+          </Section>
 
           {/* ── 12. Importar Excel ─────────────────────────────────────── */}
-          <H2 id="importar">{t('docs.imp.h2')}</H2>
+          <Section id="importar" title={t('docs.imp.h2')}>
           <P>{t('docs.imp.p1')}</P>
           <Steps>
             <Step n={1}>{t('docs.imp.s1')}</Step>
@@ -1159,11 +1291,10 @@ export default function Documentation() {
             <Step n={3}>{t('docs.imp.s3')}</Step>
             <Step n={4}>{t('docs.imp.s4')}</Step>
           </Steps>
-
-          <Divider />
+          </Section>
 
           {/* ── 13. Configuración ──────────────────────────────────────── */}
-          <H2 id="config">{t('docs.cfg.h2')}</H2>
+          <Section id="config" title={t('docs.cfg.h2')}>
 
           <H3>{t('docs.cfg.appearTitle')}</H3>
           <UL>
@@ -1207,11 +1338,10 @@ export default function Documentation() {
 
           <H3>{t('docs.cfg.dangerTitle')}</H3>
           <P>{t('docs.cfg.dangerP')}</P>
-
-          <Divider />
+          </Section>
 
           {/* ── 14. Plugins ────────────────────────────────────────────── */}
-          <H2 id="plugins">{t('docs.plg.h2')}</H2>
+          <Section id="plugins" title={t('docs.plg.h2')}>
           <P>{t('docs.plg.p1')}</P>
 
           <H3>{t('docs.plg.installTitle')}</H3>
@@ -1235,11 +1365,10 @@ export default function Documentation() {
           </UL>
 
           <Tip>{t('docs.plg.tip')}</Tip>
-
-          <Divider />
+          </Section>
 
           {/* ── 15. Atajos y trucos ────────────────────────────────────── */}
-          <H2 id="trucos">{t('docs.trk.h2')}</H2>
+          <Section id="trucos" title={t('docs.trk.h2')}>
           <UL>
             <LI>{t('docs.trk.li1')}</LI>
             <LI>{t('docs.trk.li2')}</LI>
@@ -1267,6 +1396,7 @@ export default function Documentation() {
           <QA q={t('docs.faq.q11')}>{t('docs.faq.a11')}</QA>
           <QA q={t('docs.faq.q12')}>{t('docs.faq.a12')}</QA>
           <QA q={t('docs.faq.q13')}>{t('docs.faq.a13')}</QA>
+          </Section>
 
           <div className="pb-12" />
         </div>

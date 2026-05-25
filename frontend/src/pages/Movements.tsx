@@ -10,7 +10,7 @@ import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePay
 import { runAutoRecurring, computeDates, applyFormula } from '../utils/recurringTemplates'
 import { getTemplates, updateTemplate } from '../api/templates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
-import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search } from 'lucide-react'
+import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search, ArrowUpDown } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
 import { t, getDayNames, getMonthNames } from '../utils/i18n'
@@ -113,6 +113,13 @@ function compareBySort(
     case 'notes':    return d * ((a.notes ?? '').localeCompare(b.notes ?? '', 'es'))
     default: return 0
   }
+}
+
+function sortDirLabel(key: ColKey, dir: 'asc' | 'desc'): string {
+  if (key === 'amount') return dir === 'asc' ? t('movements.sortAscNum') : t('movements.sortDescNum')
+  if (key === 'date' || key === 'bank_date') return dir === 'asc' ? t('movements.sortAscDate') : t('movements.sortDescDate')
+  if (key === 'paid' || key === 'no_count') return dir === 'asc' ? t('movements.sortAscBool') : t('movements.sortDescBool')
+  return dir === 'asc' ? t('movements.sortAsc') : t('movements.sortDesc')
 }
 
 // ── Shared input className ───────────────────────────────────────────────────
@@ -1259,7 +1266,7 @@ export default function Movements() {
                 ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 border-transparent'
                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}>
-            <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} />
+            <ArrowUpDown className="w-3.5 h-3.5" strokeWidth={1.5} />
             {t('movements.sortBtn')}
             {sorts.length > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-violet-500 text-white text-[10px] flex items-center justify-center font-bold">{sorts.length}</span>
@@ -1305,7 +1312,8 @@ export default function Movements() {
               <span className="w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
               <span className="flex-1 text-sm text-gray-700 dark:text-gray-200">{COLS.find(c => c.key === s.key)?.label}</span>
               <button onClick={() => toggleSortDir(i)} className="flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
-                {s.dir === 'desc' ? <><ChevronDown className="w-3 h-3" />{t('movements.sortDesc')}</> : <><ChevronUp className="w-3 h-3" />{t('movements.sortAsc')}</>}
+                {s.dir === 'desc' ? <ChevronDown className="w-3 h-3" /> : <ChevronUp className="w-3 h-3" />}
+                {sortDirLabel(s.key, s.dir)}
               </button>
               <button onClick={() => removeSort(i)} className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors">
                 <X className="w-3.5 h-3.5" />
