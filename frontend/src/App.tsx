@@ -94,6 +94,10 @@ function SidebarLayout() {
     })
   }
 
+  useEffect(() => {
+    document.body.classList.toggle('sidebar-collapsed', sidebarCollapsed)
+  }, [sidebarCollapsed])
+
   return (
     <div className="flex h-full overflow-hidden bg-gray-50 dark:bg-gray-950">
       {sidebarOpen && (

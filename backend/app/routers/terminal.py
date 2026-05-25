@@ -4,6 +4,7 @@ import mimetypes
 import os
 import re
 import secrets
+import shutil
 import time
 from typing import Optional
 
@@ -405,17 +406,23 @@ async def view_workspace_file(path: str, user: User = Depends(current_active_use
 
 
 _SKIP_FILES = {"CLAUDE.md", ".has_conversation"}
+_SKIP_DIRS  = {"sessions", "claude-home"}
 
 
 @router.get("/workspace/files")
 async def list_workspace_files(user: User = Depends(current_active_user)):
     workspace = f"/app/workspace/{user.id}"
     if not os.path.exists(workspace):
-        return {"files": []}
+        return {"files": [], "dirs": []}
 
     files = []
     for root, dirs, filenames in os.walk(workspace):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        rel_root = os.path.relpath(root, workspace).replace("\\", "/")
+        if rel_root == ".":
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in _SKIP_DIRS]
+        else:
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+
         for fname in filenames:
             if fname in _SKIP_FILES:
                 continue
@@ -428,7 +435,30 @@ async def list_workspace_files(user: User = Depends(current_active_user)):
                 continue
 
     files.sort(key=lambda f: f["modified"], reverse=True)
-    return {"files": files}
+
+    top_dirs = sorted([
+        d for d in os.listdir(workspace)
+        if os.path.isdir(os.path.join(workspace, d))
+        and not d.startswith(".")
+        and d not in _SKIP_DIRS
+    ])
+
+    return {"files": files, "dirs": top_dirs}
+
+
+@router.delete("/workspace/file")
+async def delete_workspace_item(path: str, user: User = Depends(current_active_user)):
+    workspace = f"/app/workspace/{user.id}"
+    safe = os.path.normpath(os.path.join(workspace, path))
+    if not safe.startswith(os.path.join(workspace, "")):
+        raise HTTPException(status_code=400, detail="Ruta no válida")
+    if not os.path.exists(safe):
+        raise HTTPException(status_code=404, detail="No encontrado")
+    if os.path.isfile(safe):
+        os.remove(safe)
+    else:
+        shutil.rmtree(safe)
+    return {"deleted": path}
 
 
 _ALLOWED_UPLOAD_EXTS = {
@@ -528,8 +558,8 @@ async def move_workspace_file(body: dict, user: User = Depends(current_active_us
     if not safe_from.startswith(os.path.join(workspace, "")) or \
        not safe_to.startswith(os.path.join(workspace, "")):
         raise HTTPException(status_code=400, detail="Ruta no válida")
-    if not os.path.isfile(safe_from):
-        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    if not os.path.exists(safe_from):
+        raise HTTPException(status_code=404, detail="No encontrado")
     os.makedirs(os.path.dirname(safe_to), exist_ok=True)
     os.rename(safe_from, safe_to)
     return {"from": from_path, "to": to_path}
