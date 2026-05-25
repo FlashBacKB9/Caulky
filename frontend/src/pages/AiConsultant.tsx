@@ -304,8 +304,6 @@ export default function AiConsultant() {
   }, [])
 
   // ── Render ────────────────────────────────────────────────────────────────────
-  const activeTab = tabs.find(t => t.id === activeId)
-
   return (
     <div className="absolute inset-0 flex overflow-hidden">
 
