@@ -95,7 +95,7 @@ def _build_claude_md(user_id: str, write_perms: dict) -> str:
 Usa el comando `spendly-write` para realizar escrituras. Operaciones habilitadas: **{ops_str}**.
 
 ```bash
-{"chr(10).join(examples)}
+{chr(10).join(examples)}
 ```
 
 **Reglas de seguridad obligatorias:**
