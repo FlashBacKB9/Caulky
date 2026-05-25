@@ -248,7 +248,22 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
             pass
 
 
-# ── Workspace file browser ────────────────────────────────────────────────────
+# ── Workspace file browser ───────────────────────────────────────────────────
+
+@router.get("/workspace/view/{path:path}")
+async def view_workspace_file(path: str, user: User = Depends(current_active_user)):
+    """Serve a workspace file inline with path-based routing so relative links work."""
+    workspace = f"/app/workspace/{user.id}"
+    safe = os.path.normpath(os.path.join(workspace, path))
+    if not safe.startswith(os.path.join(workspace, "")):
+        raise HTTPException(status_code=400, detail="Ruta no válida")
+    if not os.path.isfile(safe):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    media_type = mimetypes.guess_type(safe)[0] or "application/octet-stream"
+    return FileResponse(safe, media_type=media_type)
+
+
+
 
 _SKIP_FILES = {"CLAUDE.md"}
 

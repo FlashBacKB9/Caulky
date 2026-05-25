@@ -2,7 +2,7 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare, TerminalSquare, Pencil } from 'lucide-react'
+import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare, Pencil, Eye } from 'lucide-react'
 import api from '../api/client'
 import { syncPref } from '../utils/prefSync'
 
@@ -227,7 +227,8 @@ export default function AiConsultant() {
   }, [activateTab, connectSession])
 
   const openHtmlViewer = useCallback((file: WorkspaceFile) => {
-    const src = `/api/ai/workspace/file?path=${encodeURIComponent(file.path)}&inline=true`
+    // Use path-based URL so relative links inside the HTML resolve correctly
+    const src = `/api/ai/workspace/view/${file.path}`
     setTabs(prev => {
       const existing = prev.find(t => t.kind === 'html' && (t as Extract<Tab, {kind:'html'}>).src === src)
       if (existing) {
@@ -413,20 +414,33 @@ export default function AiConsultant() {
               files.map(f => {
                 const isHtml = /\.html?$/i.test(f.name)
                 return (
-                  <button
+                  <div
                     key={f.path}
-                    onClick={() => isHtml ? openHtmlViewer(f) : downloadFile(f.path)}
-                    title={isHtml ? `Ver ${f.name}` : `${f.path}  ·  ${fmtSize(f.size)}`}
-                    className="group w-full flex items-center gap-1.5 px-2 py-1 mx-0.5 rounded text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                    title={`${f.path}  ·  ${fmtSize(f.size)}`}
+                    className="flex items-center gap-1 px-2 py-1 mx-0.5 rounded text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                     style={{ maxWidth: 'calc(100% - 4px)' }}
                   >
                     <FileIcon name={f.name} />
-                    <span className="flex-1 truncate">{f.name}</span>
-                    {isHtml
-                      ? <TerminalSquare className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />
-                      : <Download className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500" />
-                    }
-                  </button>
+                    <span className="flex-1 truncate min-w-0">{f.name}</span>
+                    <div className="flex items-center gap-0.5 shrink-0">
+                      {isHtml && (
+                        <button
+                          onClick={() => openHtmlViewer(f)}
+                          title={`Ver ${f.name}`}
+                          className="p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400 transition-colors"
+                        >
+                          <Eye className="w-3 h-3" />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => downloadFile(f.path)}
+                        title={`Descargar ${f.name}`}
+                        className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
+                      >
+                        <Download className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
                 )
               })
             )}
@@ -446,8 +460,9 @@ export default function AiConsultant() {
             <iframe
               key={tab.id}
               src={(tab as Extract<Tab, { kind: 'html' }>).src}
-              className="absolute inset-0 w-full h-full border-0 bg-white"
-              style={{ visibility: tab.id === activeId ? 'visible' : 'hidden' }}
+              className="absolute inset-0 w-full h-full border-0"
+              style={{ visibility: tab.id === activeId ? 'visible' : 'hidden', background: 'white' }}
+              sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
             />
           ) : null
         )}
