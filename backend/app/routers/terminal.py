@@ -74,10 +74,18 @@ def _consume_ticket(token: str) -> tuple[Optional[str], Optional[str], str]:
     return user_id, write_perms_json, session_id
 
 
-_HEADER_BANNER = (
-    "\x1b[2J\x1b[H"  # clear screen + cursor home
-    "\x1b[1;34m Consultor Financiero · Caulky\x1b[0m\r\n"
-    "\x1b[90m ─────────────────────────────\x1b[0m\r\n"
+_WELCOME_BANNER = (
+    "\r\n"
+    "\x1b[1;34m┌────────────────────────────────────────────────────────┐\x1b[0m\r\n"
+    "\x1b[1;34m│\x1b[0m  \x1b[1;37mCaulkAI · Tu consultor financiero personal\x1b[0m      \x1b[1;34m│\x1b[0m\r\n"
+    "\x1b[1;34m│\x1b[0m                                                        \x1b[1;34m│\x1b[0m\r\n"
+    "\x1b[1;34m│\x1b[0m  \x1b[90mAnalizo tus gastos, ingresos e inversiones. Puedo\x1b[0m  \x1b[1;34m│\x1b[0m\r\n"
+    "\x1b[1;34m│\x1b[0m  \x1b[90mcrear informes, detectar patrones y responder\x1b[0m      \x1b[1;34m│\x1b[0m\r\n"
+    "\x1b[1;34m│\x1b[0m  \x1b[90mcualquier pregunta sobre tus finanzas.\x1b[0m            \x1b[1;34m│\x1b[0m\r\n"
+    "\x1b[1;34m│\x1b[0m                                                        \x1b[1;34m│\x1b[0m\r\n"
+    "\x1b[1;34m│\x1b[0m  \x1b[90mSube documentos de contexto desde el panel lateral.\x1b[0m \x1b[1;34m│\x1b[0m\r\n"
+    "\x1b[1;34m│\x1b[0m  \x1b[90mControla mis permisos de escritura abajo a la izq.\x1b[0m  \x1b[1;34m│\x1b[0m\r\n"
+    "\x1b[1;34m└────────────────────────────────────────────────────────┘\x1b[0m\r\n"
     "\r\n"
 )
 
@@ -271,7 +279,7 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
     claude_cmd = ["claude", "--continue"] if has_prior_conversation else ["claude"]
     if not has_prior_conversation:
         open(session_marker, "w").close()
-        pass  # banner shown after startup via auto_greet
+        await websocket.send_text(_WELCOME_BANNER)
 
     env = os.environ.copy()
     env.update({
@@ -346,33 +354,7 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
     pty_task  = asyncio.create_task(pty_to_ws())
     ws_task   = asyncio.create_task(ws_to_pty())
 
-    # For new sessions, auto-send the greeting after Claude has loaded
-    if not has_prior_conversation:
-        _INITIAL_GREETING = (
-            "Hola, preséntate brevemente y ofrece 2 o 3 sugerencias concretas "
-            "de análisis que puedas hacer ahora mismo con mis datos financieros.\n"
-        )
-
-        async def auto_greet():
-            await asyncio.sleep(3)   # wait for Claude to show its prompt
-            try:
-                if proc.isalive():
-                    # Clear Claude's startup screen and show our minimal header
-                    await websocket.send_text(_HEADER_BANNER)
-                    await asyncio.sleep(0.15)
-                    proc.write(_INITIAL_GREETING.encode("utf-8"))
-            except Exception:
-                pass
-
-        greet_task = asyncio.create_task(auto_greet())
-    else:
-        greet_task = None
-
     await asyncio.wait([pty_task, ws_task], return_when=asyncio.FIRST_COMPLETED)
-
-    if greet_task:
-        greet_task.cancel()
-        await asyncio.gather(greet_task, return_exceptions=True)
 
     for task in (pty_task, ws_task):
         task.cancel()
