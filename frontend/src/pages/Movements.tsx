@@ -1027,24 +1027,31 @@ export default function Movements() {
   const accounts = accountsSummary?.accounts ?? []
   const accountMap = useMemo(() => Object.fromEntries(accounts.map(a => [a.id, a.name])), [accounts])
 
-  // Daily balance: balance of the main account at the END of each calendar day.
-  // All movements on the same date show the same value — avoids same-day ordering issues.
+  // Daily balance: shown only when a specific account is filtered.
+  // Calculates the balance of that account at the END of each calendar day.
   const dailyBalance = useMemo(() => {
-    const main = accounts.find(a => a.is_main)
-    if (!main) return new Map<string, number>()
+    if (accountFilter === null) return new Map<string, number>()
+    const acc = accounts.find(a => a.id === accountFilter)
+    if (!acc) return new Map<string, number>()
+    const linkedTypeIds = acc.is_main
+      ? null
+      : new Set(types.filter(tp => tp.linked_account_id === accountFilter).map(tp => tp.id))
+    const accountMovements = linkedTypeIds === null
+      ? allMovementsForYears
+      : allMovementsForYears.filter(mv => mv.movement_type_id != null && linkedTypeIds.has(mv.movement_type_id))
     const byDate = new Map<string, number>()
-    for (const mv of allMovementsForYears) {
+    for (const mv of accountMovements) {
       byDate.set(mv.date, (byDate.get(mv.date) ?? 0) + mv.dinero)
     }
-    const dates = [...byDate.keys()].sort((a, b) => b.localeCompare(a)) // newest first
+    const dates = [...byDate.keys()].sort((a, b) => b.localeCompare(a))
     const map = new Map<string, number>()
-    let bal = main.balance
+    let bal = acc.balance
     for (const date of dates) {
-      map.set(date, bal)        // balance after all movements of this day
-      bal -= byDate.get(date)!  // step back before this day
+      map.set(date, bal)
+      bal -= byDate.get(date)!
     }
     return map
-  }, [allMovementsForYears, accounts])
+  }, [allMovementsForYears, accounts, accountFilter, types])
 
   const sortedMovements = useMemo(() => {
     if (sorts.length === 0) {
@@ -1157,7 +1164,7 @@ export default function Movements() {
     `py-3 text-${align} text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 relative select-none overflow-hidden`
 
   // Balance column only makes sense when rows are in date order
-  const showBalance = sorts.length === 0 || sorts[0]?.key === 'date'
+  const showBalance = (sorts.length === 0 || sorts[0]?.key === 'date') && accountFilter !== null
 
   return (
     <div className="p-3 md:p-6 space-y-4">
