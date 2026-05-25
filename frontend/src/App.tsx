@@ -1,4 +1,4 @@
-import { useState, useLayoutEffect, useEffect } from 'react'
+import { useState, useLayoutEffect, useEffect, Component, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Menu, Wallet } from 'lucide-react'
@@ -26,6 +26,23 @@ import { useDarkMode } from './hooks/useDarkMode'
 import { useUiZoom } from './hooks/useUiZoom'
 import { usePluginLoader } from './hooks/usePlugins'
 import { getActiveSkin, applySkinCSS } from './utils/skins'
+
+class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
+  state = { error: null }
+  static getDerivedStateFromError(error: Error) { return { error } }
+  render() {
+    if (this.state.error) {
+      const err = this.state.error as Error
+      return (
+        <div className="p-6 text-red-600 bg-red-50 dark:bg-red-950 dark:text-red-400 rounded-lg m-4">
+          <p className="font-bold mb-2">Error en Consultor IA</p>
+          <pre className="text-xs whitespace-pre-wrap">{err.message}{'\n'}{err.stack}</pre>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
 
 // Apply active skin CSS before first paint
 const _skin = getActiveSkin()
@@ -56,7 +73,7 @@ function PageRoutes() {
       <Route path="/comparaciones" element={<Comparaciones />} />
       <Route path="/proyeccion" element={<Projection />} />
       <Route path="/analisis" element={<Analysis />} />
-      <Route path="/consultor-ia" element={<AiConsultant />} />
+      <Route path="/consultor-ia" element={<ErrorBoundary><AiConsultant /></ErrorBoundary>} />
     </Routes>
   )
 }
@@ -103,7 +120,7 @@ function SidebarLayout() {
           <span className="font-bold text-gray-800 dark:text-white">Caulky</span>
         </header>
         {fullscreen
-          ? <div className="flex-1 min-h-0 flex flex-col overflow-hidden"><PageRoutes /></div>
+          ? <div className="flex-1 min-h-0 relative overflow-hidden"><PageRoutes /></div>
           : <main className="flex-1 overflow-y-auto"><PageRoutes /></main>
         }
       </div>
