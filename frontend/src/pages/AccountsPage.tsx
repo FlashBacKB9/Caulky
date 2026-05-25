@@ -281,51 +281,48 @@ export default function AccountsPage() {
 
       {/* ── Total card ─────────────────────────────────────────────── */}
       <div className={`${PANEL} p-5`}>
-        <div className="flex items-center gap-6">
-          <div className="flex-1">
+        <div className="flex items-start gap-4">
+          {/* Left: total amount */}
+          <div className="flex-1 min-w-0">
             <p className={`${TITLE} mb-2`}>{t('accounts.totalWealth')}</p>
             <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">
               {fmt(totalBalance)}
             </p>
+            <div className={`flex items-center gap-1.5 mt-1 text-sm font-semibold ${totalChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {totalChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+              <span>{totalChange >= 0 ? '+' : ''}{fmt(totalChange)} {t('accounts.fromStart')}</span>
+            </div>
           </div>
-          <div className={`flex items-center gap-1.5 text-sm font-semibold ${totalChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-            {totalChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-            <span>{totalChange >= 0 ? '+' : ''}{fmt(totalChange)} {t('accounts.fromStart')}</span>
-          </div>
-        </div>
-        {hasNonLiquid && (
-          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-2">
-            <div className="flex items-center gap-6">
-              <div className="flex-1">
-                <p className={`${TITLE} mb-1`}>{t('accounts.liquidBalance')}</p>
-                <p className="text-xl font-semibold tabular-nums text-gray-900 dark:text-white">{fmt(liquidBalance)}</p>
+
+          {/* Right: investment gain breakdown */}
+          {hasInvestGain && (
+            <div className="shrink-0 text-right space-y-0.5 border-l border-gray-100 dark:border-gray-800 pl-4">
+              <p className={`${TITLE} mb-1.5`}>{t('accounts.investBreakdown')}</p>
+              <div className={`text-sm font-semibold tabular-nums ${investGainBruto! >= 0 ? 'text-green-500 dark:text-green-400' : 'text-red-500'}`}>
+                {investGainBruto! >= 0 ? '+' : ''}{fmt(investGainBruto!)}
+                <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">{t('accounts.investGain')}</span>
               </div>
-              <div className={`text-sm font-medium ${liquidChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                {liquidChange >= 0 ? '+' : ''}{fmt(liquidChange)} {t('accounts.fromStart')}
+              <div className="text-sm font-semibold tabular-nums text-amber-500 dark:text-amber-400">
+                -{fmt(investTax!)}
+                <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">{t('accounts.investTax')}</span>
+              </div>
+              <div className={`text-sm font-semibold tabular-nums ${investNetGain! >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                {investNetGain! >= 0 ? '+' : ''}{fmt(investNetGain!)}
+                <span className="text-xs font-normal text-gray-400 dark:text-gray-500 ml-1">{t('accounts.investNet')}</span>
               </div>
             </div>
-            {hasInvestGain && (
-              <div className="pt-2 border-t border-gray-50 dark:border-gray-800/60">
-                <p className={`${TITLE} mb-2`}>{t('accounts.investBreakdown')}</p>
-                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs">
-                  <span className="text-gray-500 dark:text-gray-400">
-                    {t('invest.invested')}: <span className="font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{fmt(investedBalance)}</span>
-                  </span>
-                  <span className="text-gray-500 dark:text-gray-400">
-                    {t('invest.currentValue')}: <span className="font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{fmt(investCurrentVal!)}</span>
-                  </span>
-                  <span className={`${investGainBruto! >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
-                    {t('accounts.investGain')}: <span className="font-semibold tabular-nums">{investGainBruto! >= 0 ? '+' : ''}{fmt(investGainBruto!)}</span>
-                  </span>
-                  <span className="text-amber-600 dark:text-amber-400">
-                    {t('accounts.investTax')}: <span className="font-semibold tabular-nums">-{fmt(investTax!)}</span>
-                  </span>
-                  <span className={`${investNetGain! >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
-                    {t('accounts.investNet')}: <span className="font-semibold tabular-nums">{investNetGain! >= 0 ? '+' : ''}{fmt(investNetGain!)}</span>
-                  </span>
-                </div>
-              </div>
-            )}
+          )}
+        </div>
+
+        {hasNonLiquid && (
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center gap-6">
+            <div className="flex-1">
+              <p className={`${TITLE} mb-1`}>{t('accounts.liquidBalance')}</p>
+              <p className="text-xl font-semibold tabular-nums text-gray-900 dark:text-white">{fmt(liquidBalance)}</p>
+            </div>
+            <div className={`text-sm font-medium ${liquidChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {liquidChange >= 0 ? '+' : ''}{fmt(liquidChange)} {t('accounts.fromStart')}
+            </div>
           </div>
         )}
       </div>
@@ -400,6 +397,11 @@ export default function AccountsPage() {
                             {acc.initial_balance !== currentVal && (
                               <div className="text-red-400">{t('invest.invested')}: {fmt(acc.initial_balance)}</div>
                             )}
+                          </div>
+                        ) : isInvestCat && investCurrentVal != null ? (
+                          <div className="space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
+                            <div>{t('invest.invested')}: <span className="font-semibold text-gray-600 dark:text-gray-300 tabular-nums">{fmt(acc.balance)}</span></div>
+                            <div>{t('invest.currentValue')}: <span className="font-semibold text-gray-600 dark:text-gray-300 tabular-nums">{fmt(investCurrentVal)}</span></div>
                           </div>
                         ) : (
                           <div className={`flex items-center gap-1 text-xs font-medium ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
