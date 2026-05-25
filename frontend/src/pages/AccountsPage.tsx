@@ -1,8 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getAccountsSummary, ACCOUNT_CATEGORIES, LIQUID_CATEGORIES, type Account } from '../api/accounts'
+import { getAccountsSummary, ACCOUNT_CATEGORIES, LIQUID_CATEGORIES, INVESTMENT_CATEGORIES, type Account } from '../api/accounts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
+import { getSummary as getInvestSummary } from '../api/investments'
 import { useCurrency } from '../hooks/useCurrency'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import AppIcon from '../components/AppIcon'
@@ -17,6 +18,30 @@ import {
 import { t, getMonthNames } from '../utils/i18n'
 
 const MONTHS_SHORT = getMonthNames('short')
+
+function calcSpanishTax(gain: number): number {
+  if (gain <= 0) return 0
+  let remaining = gain
+  let tax = 0
+  const brackets = [[300000, 0.28], [200000, 0.27], [50000, 0.23], [6000, 0.21], [0, 0.19]] as const
+  for (const [threshold, rate] of brackets) {
+    if (remaining > threshold) {
+      tax += (remaining - threshold) * rate
+      remaining = threshold
+    }
+  }
+  tax += remaining * 0.19
+  return Math.round(tax * 100) / 100
+}
+
+function vehicleCurrentValue(acc: Account): number {
+  if (acc.category !== 'vehiculo' || acc.depreciation_rate == null || acc.value_date == null) {
+    return acc.balance
+  }
+  const yearsElapsed = (Date.now() - new Date(acc.value_date + 'T00:00:00').getTime()) / (365.25 * 24 * 3600 * 1000)
+  const factor = Math.max(0, 1 - (acc.depreciation_rate / 100) * yearsElapsed)
+  return Math.round(acc.initial_balance * factor * 100) / 100
+}
 
 function buildAccountHistory(
   acc: Account,
@@ -91,6 +116,10 @@ export default function AccountsPage() {
   const { data: movementTypes = [] } = useQuery({
     queryKey: ['movement-types'],
     queryFn: getMovementTypes,
+  })
+  const { data: investSummary } = useQuery({
+    queryKey: ['investment-summary'],
+    queryFn: getInvestSummary,
   })
 
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear())
@@ -171,11 +200,31 @@ export default function AccountsPage() {
     [accounts],
   )
 
-  const totalBalance   = accounts.reduce((s, a) => s + a.balance, 0)
-  const totalChange    = accounts.reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
-  const hasRealEstate  = accounts.some(a => a.category === 'inmueble')
-  const liquidBalance  = accounts.filter(a => LIQUID_CATEGORIES.includes(a.category as typeof LIQUID_CATEGORIES[number])).reduce((s, a) => s + a.balance, 0)
-  const liquidChange   = accounts.filter(a => LIQUID_CATEGORIES.includes(a.category as typeof LIQUID_CATEGORIES[number])).reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
+  // Investment breakdown
+  const investAccounts    = accounts.filter(a => INVESTMENT_CATEGORIES.includes(a.category as typeof INVESTMENT_CATEGORIES[number]))
+  const investedBalance   = investAccounts.reduce((s, a) => s + a.balance, 0)
+  const investCurrentVal  = investSummary?.total_current_value ?? null
+  const investGainBruto   = investCurrentVal != null ? investCurrentVal - investedBalance : null
+  const investTax         = investGainBruto != null ? calcSpanishTax(investGainBruto) : null
+  const investNetGain     = investGainBruto != null && investTax != null ? investGainBruto - investTax : null
+  const hasInvestGain     = investGainBruto != null && investGainBruto !== 0
+
+  // Vehicle effective values (depreciated)
+  const vehicleEffective  = accounts
+    .filter(a => a.category === 'vehiculo')
+    .reduce((s, a) => s + vehicleCurrentValue(a), 0)
+  const vehicleBooked     = accounts.filter(a => a.category === 'vehiculo').reduce((s, a) => s + a.balance, 0)
+
+  // Total patrimony uses investment current value (if known) and vehicle depreciated value
+  const nonInvestNonVeh   = accounts
+    .filter(a => !INVESTMENT_CATEGORIES.includes(a.category as typeof INVESTMENT_CATEGORIES[number]) && a.category !== 'vehiculo')
+    .reduce((s, a) => s + a.balance, 0)
+  const totalBalance      = nonInvestNonVeh + (investCurrentVal ?? investedBalance) + vehicleEffective
+  const totalChange       = accounts.reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
+
+  const hasNonLiquid      = accounts.some(a => a.category === 'inmueble' || a.category === 'vehiculo' || INVESTMENT_CATEGORIES.includes(a.category as typeof INVESTMENT_CATEGORIES[number]))
+  const liquidBalance     = accounts.filter(a => LIQUID_CATEGORIES.includes(a.category as typeof LIQUID_CATEGORIES[number])).reduce((s, a) => s + a.balance, 0)
+  const liquidChange      = accounts.filter(a => LIQUID_CATEGORIES.includes(a.category as typeof LIQUID_CATEGORIES[number])).reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
 
   if (loadingAccounts || loadingMovements) {
     return (
@@ -245,15 +294,39 @@ export default function AccountsPage() {
             <span>{totalChange >= 0 ? '+' : ''}{fmt(totalChange)} {t('accounts.fromStart')}</span>
           </div>
         </div>
-        {hasRealEstate && (
-          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center gap-6">
-            <div className="flex-1">
-              <p className={`${TITLE} mb-1`}>{t('accounts.liquidBalance')}</p>
-              <p className="text-xl font-semibold tabular-nums text-gray-900 dark:text-white">{fmt(liquidBalance)}</p>
+        {hasNonLiquid && (
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 space-y-2">
+            <div className="flex items-center gap-6">
+              <div className="flex-1">
+                <p className={`${TITLE} mb-1`}>{t('accounts.liquidBalance')}</p>
+                <p className="text-xl font-semibold tabular-nums text-gray-900 dark:text-white">{fmt(liquidBalance)}</p>
+              </div>
+              <div className={`text-sm font-medium ${liquidChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                {liquidChange >= 0 ? '+' : ''}{fmt(liquidChange)} {t('accounts.fromStart')}
+              </div>
             </div>
-            <div className={`text-sm font-medium ${liquidChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-              {liquidChange >= 0 ? '+' : ''}{fmt(liquidChange)} {t('accounts.fromStart')}
-            </div>
+            {hasInvestGain && (
+              <div className="pt-2 border-t border-gray-50 dark:border-gray-800/60">
+                <p className={`${TITLE} mb-2`}>{t('accounts.investBreakdown')}</p>
+                <div className="flex flex-wrap gap-x-6 gap-y-1 text-xs">
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {t('invest.invested')}: <span className="font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{fmt(investedBalance)}</span>
+                  </span>
+                  <span className="text-gray-500 dark:text-gray-400">
+                    {t('invest.currentValue')}: <span className="font-semibold text-gray-700 dark:text-gray-200 tabular-nums">{fmt(investCurrentVal!)}</span>
+                  </span>
+                  <span className={`${investGainBruto! >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                    {t('accounts.investGain')}: <span className="font-semibold tabular-nums">{investGainBruto! >= 0 ? '+' : ''}{fmt(investGainBruto!)}</span>
+                  </span>
+                  <span className="text-amber-600 dark:text-amber-400">
+                    {t('accounts.investTax')}: <span className="font-semibold tabular-nums">-{fmt(investTax!)}</span>
+                  </span>
+                  <span className={`${investNetGain! >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+                    {t('accounts.investNet')}: <span className="font-semibold tabular-nums">{investNetGain! >= 0 ? '+' : ''}{fmt(investNetGain!)}</span>
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>
@@ -262,7 +335,12 @@ export default function AccountsPage() {
       {ACCOUNT_CATEGORIES.map(cat => {
         const catAccounts = accounts.filter(a => a.category === cat.value)
         if (catAccounts.length === 0) return null
-        const catTotal = catAccounts.reduce((s, a) => s + a.balance, 0)
+        const isInvestCat = INVESTMENT_CATEGORIES.includes(cat.value as typeof INVESTMENT_CATEGORIES[number])
+        const catTotal = isInvestCat
+          ? (investCurrentVal ?? catAccounts.reduce((s, a) => s + a.balance, 0))
+          : cat.value === 'vehiculo'
+            ? catAccounts.reduce((s, a) => s + vehicleCurrentValue(a), 0)
+            : catAccounts.reduce((s, a) => s + a.balance, 0)
         const catChange = catAccounts.reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
         return (
           <div key={cat.value} className="space-y-3">
@@ -270,14 +348,22 @@ export default function AccountsPage() {
               <h2 className={TITLE}>{t(cat.labelKey)}</h2>
               <div className="flex items-baseline gap-3">
                 <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-white">{fmt(catTotal)}</span>
-                <span className={`text-xs font-medium ${catChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                  {catChange >= 0 ? '+' : ''}{fmt(catChange)}
-                </span>
+                {isInvestCat && investGainBruto != null ? (
+                  <span className={`text-xs font-medium ${investGainBruto >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {investGainBruto >= 0 ? '+' : ''}{fmt(investGainBruto)}
+                  </span>
+                ) : (
+                  <span className={`text-xs font-medium ${catChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                    {catChange >= 0 ? '+' : ''}{fmt(catChange)}
+                  </span>
+                )}
               </div>
             </div>
             <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {catAccounts.map(acc => {
                 const change = periodChange[acc.id] ?? 0
+                const isVehicle = acc.category === 'vehiculo'
+                const currentVal = isVehicle ? vehicleCurrentValue(acc) : acc.balance
                 return (
                   <div key={acc.id} className={`${PANEL} p-4 relative overflow-hidden`}>
                     <div className="absolute inset-y-0 left-0 w-1 rounded-l-2xl" style={{ background: acc.color }} />
@@ -290,12 +376,22 @@ export default function AccountsPage() {
                         <p className={`${TITLE} truncate`}>{acc.name}</p>
                       </div>
                       <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white mb-1">
-                        {fmt(acc.balance)}
+                        {fmt(currentVal)}
                       </p>
-                      <div className={`flex items-center gap-1 text-xs font-medium ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                        {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                        <span>{change >= 0 ? '+' : ''}{fmt(change)}</span>
-                      </div>
+                      {isVehicle && acc.depreciation_rate != null ? (
+                        <div className="space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
+                          <div>{t('accounts.vehicleCurrentVal')}</div>
+                          <div>{t('accounts.deprecPerYear')}: <span className="font-semibold">{acc.depreciation_rate}%</span></div>
+                          {acc.initial_balance !== currentVal && (
+                            <div className="text-red-400">{t('invest.invested')}: {fmt(acc.initial_balance)}</div>
+                          )}
+                        </div>
+                      ) : (
+                        <div className={`flex items-center gap-1 text-xs font-medium ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                          {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                          <span>{change >= 0 ? '+' : ''}{fmt(change)}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )

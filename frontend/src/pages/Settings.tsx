@@ -146,6 +146,8 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
   const [icon, setIcon]             = useState(account.icon)
   const [category, setCategory]     = useState<AccountCategory>(account.category)
   const [balance, setBalance]       = useState(String(account.initial_balance))
+  const [deprRate, setDeprRate]     = useState(String(account.depreciation_rate ?? ''))
+  const [valueDate, setValueDate]   = useState(account.value_date ?? '')
   const [confirming, setConfirming] = useState(false)
   const [movCount, setMovCount]     = useState(0)
   const [showModal, setShowModal]   = useState(false)
@@ -162,6 +164,8 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
         name: name.trim() || account.name,
         color, icon, category,
         initial_balance: isNaN(parseFloat(balance.replace(',', '.'))) ? account.initial_balance : parseFloat(balance.replace(',', '.')),
+        depreciation_rate: category === 'vehiculo' && deprRate !== '' ? parseFloat(deprRate) : null,
+        value_date: category === 'vehiculo' && valueDate !== '' ? valueDate : null,
       })
       if (!account.is_main) {
         const prevLinked = new Set(allTypes.filter(t => t.linked_account_id === account.id).map(t => t.id))
@@ -206,6 +210,8 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
     setName(account.name); setColor(account.color)
     setIcon(account.icon); setBalance(String(account.initial_balance))
     setCategory(account.category)
+    setDeprRate(String(account.depreciation_rate ?? ''))
+    setValueDate(account.value_date ?? '')
     setLinkedIds(new Set(allTypes.filter(t => t.linked_account_id === account.id).map(t => t.id)))
     setEditing(false)
   }
@@ -263,6 +269,25 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
               className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
             />
           </div>
+          {category === 'vehiculo' && (
+            <>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.vehicleValueDate')}</span>
+                <input
+                  type="date" value={valueDate} onChange={e => setValueDate(e.target.value)}
+                  className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.vehicleDepRate')}</span>
+                <input
+                  type="number" step="0.1" min="0" max="100" value={deprRate} onChange={e => setDeprRate(e.target.value)}
+                  placeholder="ej. 15"
+                  className="w-24 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+              </div>
+            </>
+          )}
           {!account.is_main && (
             <div className="space-y-1.5">
               <span className="text-xs text-gray-500 dark:text-gray-400">{t('settings.subtypesFeeding')}</span>
@@ -916,6 +941,8 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
   const [newIcon, setNewIcon]       = useState('wallet')
   const [newBal, setNewBal]         = useState('0')
   const [newCategory, setNewCategory] = useState<AccountCategory>('corriente')
+  const [newDeprRate, setNewDeprRate] = useState('')
+  const [newValueDate, setNewValueDate] = useState('')
 
   const { data: allTypes = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
 
@@ -928,10 +955,13 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
       icon: newIcon,
       category: newCategory,
       initial_balance: isNaN(parseFloat(newBal.replace(',', '.'))) ? 0 : parseFloat(newBal.replace(',', '.')),
+      depreciation_rate: newCategory === 'vehiculo' && newDeprRate !== '' ? parseFloat(newDeprRate) : null,
+      value_date: newCategory === 'vehiculo' && newValueDate !== '' ? newValueDate : null,
     }),
     onSuccess: () => {
       invalidate()
       setAdding(false); setNewName(''); setNewColor('#3b82f6'); setNewIcon('wallet'); setNewBal('0'); setNewCategory('corriente')
+      setNewDeprRate(''); setNewValueDate('')
     },
   })
 
@@ -1037,6 +1067,25 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
                 className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
+            {newCategory === 'vehiculo' && (
+              <>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.vehicleValueDate')}</span>
+                  <input
+                    type="date" value={newValueDate} onChange={e => setNewValueDate(e.target.value)}
+                    className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.vehicleDepRate')}</span>
+                  <input
+                    type="number" step="0.1" min="0" max="100" value={newDeprRate} onChange={e => setNewDeprRate(e.target.value)}
+                    placeholder="ej. 15"
+                    className="w-24 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  />
+                </div>
+              </>
+            )}
             <div className="flex justify-end gap-2">
               <button onClick={() => setAdding(false)} className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
                 {t('common.cancel')}
