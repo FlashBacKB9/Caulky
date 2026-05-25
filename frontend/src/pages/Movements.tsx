@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { syncPref } from '../utils/prefSync'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMovements, updateMovement, deleteMovement, createMovement, type Movement } from '../api/movements'
@@ -675,6 +676,11 @@ export default function Movements() {
   const { fmtDate } = useDateFormat()
   const currentYear = new Date().getFullYear()
   const qcOuter = useQueryClient()
+  const [searchParams] = useSearchParams()
+  const [accountFilter, setAccountFilter] = useState<number | null>(() => {
+    const v = searchParams.get('account')
+    return v ? (parseInt(v) || null) : null
+  })
 
   useEffect(() => {
     let cancelled = false
@@ -698,7 +704,10 @@ export default function Movements() {
     return () => { cancelled = true }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const [year, setYear] = useState<number | null>(currentYear)
+  const [year, setYear] = useState<number | null>(() => {
+    const v = searchParams.get('account')
+    return v ? null : currentYear
+  })
   const [showForm, setShowForm] = useState(false)
   const [selectedMv, setSelectedMv] = useState<Movement | null>(null)
   const [ctxMenu, setCtxMenu] = useState<CtxMenu | null>(null)
@@ -888,7 +897,11 @@ export default function Movements() {
     }
   }
   const toggleSort = (key: ColKey) =>
-    setSort(prev => prev?.key === key ? { key, dir: prev.dir === 'asc' ? 'desc' : 'asc' } : { key, dir: 'asc' })
+    setSort(prev => {
+      if (prev?.key !== key) return { key, dir: 'desc' }
+      if (prev.dir === 'desc') return { key, dir: 'asc' }
+      return null
+    })
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -1022,10 +1035,12 @@ export default function Movements() {
 
   const filteredMovements = useMemo(() => {
     const base = applyAdvancedFilter(sortedMovements, advFilter, typeToGroupMap)
-    if (!quickSearch.trim()) return base
-    const q = quickSearch.toLowerCase()
-    return base.filter(mv => mv.name.toLowerCase().includes(q))
-  }, [sortedMovements, advFilter, typeToGroupMap, quickSearch])
+    const searched = !quickSearch.trim() ? base : base.filter(mv => mv.name.toLowerCase().includes(quickSearch.toLowerCase()))
+    if (accountFilter === null) return searched
+    const acc = accounts.find(a => a.id === accountFilter)
+    if (acc?.is_main) return searched
+    return searched.filter(mv => mv.account_id === accountFilter)
+  }, [sortedMovements, advFilter, typeToGroupMap, quickSearch, accountFilter, accounts])
 
   // Dates that have more than one movement in the current view (eligible for drag reorder)
   const sameDayDates = useMemo(() => {
@@ -1208,6 +1223,19 @@ export default function Movements() {
             <Search className="w-3.5 h-3.5" />
           </button>
 
+          {/* Sort indicator */}
+          {sort && (
+            <button
+              onClick={() => setSort(null)}
+              title={t('movements.clearSort')}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm rounded-lg transition-colors"
+            >
+              {sort.dir === 'desc' ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
+              <span>{COLS.find(c => c.key === sort.key)?.label}</span>
+              <X className="w-3 h-3 text-gray-400" />
+            </button>
+          )}
+
           {/* Filtros */}
           <button onClick={() => setShowFilters(v => !v)}
             className={`relative flex items-center gap-1.5 px-3 py-1.5 border text-sm font-medium rounded-lg transition-colors ${
@@ -1248,6 +1276,17 @@ export default function Movements() {
             </div>
           )}
           <FilterPanel filter={advFilter} onChange={f => { setAdvFilter(f); setActiveFavId(null) }} types={types} groups={groups} />
+        </div>
+      )}
+
+      {accountFilter !== null && (
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg text-sm text-blue-700 dark:text-blue-300">
+            <span className="font-medium">{accounts.find(a => a.id === accountFilter)?.name ?? `#${accountFilter}`}</span>
+            <button onClick={() => setAccountFilter(null)} className="text-blue-400 hover:text-blue-600 dark:hover:text-blue-200 ml-0.5">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       )}
 

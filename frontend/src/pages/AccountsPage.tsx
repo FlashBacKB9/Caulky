@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getAccountsSummary, ACCOUNT_CATEGORIES, LIQUID_CATEGORIES, INVESTMENT_CATEGORIES, type Account } from '../api/accounts'
 import { getMovements, type Movement } from '../api/movements'
@@ -108,6 +109,7 @@ function CT({ active, payload, label }: {
 
 export default function AccountsPage() {
   const { fmt, fmtK } = useCurrency()
+  const navigate = useNavigate()
 
   const { data: summary, isLoading: loadingAccounts } = useQuery({
     queryKey: ['accounts-summary'],
@@ -431,11 +433,11 @@ export default function AccountsPage() {
                   const currentVal = isVehicle ? vehicleCurrentValue(acc) : acc.balance
                   const isBienExcluded = isBienes && excludedBienes.has(acc.id)
                   return (
-                    <div key={acc.id} className={`${PANEL} p-4 relative overflow-hidden transition-opacity ${isBienExcluded ? 'opacity-50' : ''}`}>
+                    <div key={acc.id} onClick={() => navigate(`/movements?account=${acc.id}`)} className={`${PANEL} p-4 relative overflow-hidden transition-opacity cursor-pointer hover:ring-1 hover:ring-gray-200 dark:hover:ring-gray-700 ${isBienExcluded ? 'opacity-50' : ''}`}>
                       <div className="absolute inset-y-0 left-0 w-1 rounded-l-2xl" style={{ background: acc.color }} />
                       {isBienes && (
                         <button
-                          onClick={() => toggleBienAccount(acc.id)}
+                          onClick={e => { e.stopPropagation(); toggleBienAccount(acc.id) }}
                           title={isBienExcluded ? t('accounts.bienesExcluded') : t('accounts.bienesGroup')}
                           className="absolute top-2.5 right-2.5 p-1 rounded-md text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors z-10"
                         >
