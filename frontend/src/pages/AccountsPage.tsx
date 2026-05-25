@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getAccountsSummary, ACCOUNT_CATEGORIES, type Account } from '../api/accounts'
+import { getAccountsSummary, ACCOUNT_CATEGORIES, LIQUID_CATEGORIES, type Account } from '../api/accounts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { useCurrency } from '../hooks/useCurrency'
@@ -171,8 +171,11 @@ export default function AccountsPage() {
     [accounts],
   )
 
-  const totalBalance = accounts.reduce((s, a) => s + a.balance, 0)
-  const totalChange  = accounts.reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
+  const totalBalance   = accounts.reduce((s, a) => s + a.balance, 0)
+  const totalChange    = accounts.reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
+  const hasRealEstate  = accounts.some(a => a.category === 'inmueble')
+  const liquidBalance  = accounts.filter(a => LIQUID_CATEGORIES.includes(a.category as typeof LIQUID_CATEGORIES[number])).reduce((s, a) => s + a.balance, 0)
+  const liquidChange   = accounts.filter(a => LIQUID_CATEGORIES.includes(a.category as typeof LIQUID_CATEGORIES[number])).reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
 
   if (loadingAccounts || loadingMovements) {
     return (
@@ -229,17 +232,30 @@ export default function AccountsPage() {
       </div>
 
       {/* ── Total card ─────────────────────────────────────────────── */}
-      <div className={`${PANEL} p-5 flex items-center gap-6`}>
-        <div className="flex-1">
-          <p className={`${TITLE} mb-2`}>{t('accounts.totalWealth')}</p>
-          <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">
-            {fmt(totalBalance)}
-          </p>
+      <div className={`${PANEL} p-5`}>
+        <div className="flex items-center gap-6">
+          <div className="flex-1">
+            <p className={`${TITLE} mb-2`}>{t('accounts.totalWealth')}</p>
+            <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">
+              {fmt(totalBalance)}
+            </p>
+          </div>
+          <div className={`flex items-center gap-1.5 text-sm font-semibold ${totalChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {totalChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
+            <span>{totalChange >= 0 ? '+' : ''}{fmt(totalChange)} {t('accounts.fromStart')}</span>
+          </div>
         </div>
-        <div className={`flex items-center gap-1.5 text-sm font-semibold ${totalChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-          {totalChange >= 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-          <span>{totalChange >= 0 ? '+' : ''}{fmt(totalChange)} {t('accounts.fromStart')}</span>
-        </div>
+        {hasRealEstate && (
+          <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-800 flex items-center gap-6">
+            <div className="flex-1">
+              <p className={`${TITLE} mb-1`}>{t('accounts.liquidBalance')}</p>
+              <p className="text-xl font-semibold tabular-nums text-gray-900 dark:text-white">{fmt(liquidBalance)}</p>
+            </div>
+            <div className={`text-sm font-medium ${liquidChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+              {liquidChange >= 0 ? '+' : ''}{fmt(liquidChange)} {t('accounts.fromStart')}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── Account cards grouped by category ──────────────────────── */}

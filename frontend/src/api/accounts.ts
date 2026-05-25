@@ -1,6 +1,6 @@
 import api from './client'
 
-export type AccountCategory = 'corriente' | 'ahorro' | 'inversion' | 'etf' | 'deposito'
+export type AccountCategory = 'corriente' | 'ahorro' | 'inversion' | 'etf' | 'deposito' | 'inmueble'
 
 export interface Account {
   id: number
@@ -49,4 +49,7 @@ export const ACCOUNT_CATEGORIES: { value: AccountCategory; labelKey: string }[] 
   { value: 'inversion', labelKey: 'account.category.inversion' },
   { value: 'etf',       labelKey: 'account.category.etf' },
   { value: 'deposito',  labelKey: 'account.category.deposito' },
+  { value: 'inmueble',  labelKey: 'account.category.inmueble' },
 ]
+
+export const LIQUID_CATEGORIES: AccountCategory[] = ['corriente', 'ahorro', 'inversion', 'etf', 'deposito']
