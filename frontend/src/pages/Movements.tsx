@@ -81,6 +81,40 @@ function loadColOrder(): ColKey[] {
   return all
 }
 
+// ── Sort types ───────────────────────────────────────────────────────────────
+
+type SortEntry = { key: ColKey; dir: 'asc' | 'desc' }
+
+function compareBySort(
+  a: Movement, b: Movement,
+  s: SortEntry,
+  typeMap: Record<number, { name: string; color: string }>,
+  dayOrder: Record<string, number[]>,
+): number {
+  const d = s.dir === 'asc' ? 1 : -1
+  switch (s.key) {
+    case 'date': {
+      const dc = a.date.localeCompare(b.date)
+      if (dc !== 0) return d * dc
+      const order = dayOrder[a.date]
+      if (order) { const pa = order.indexOf(a.id), pb = order.indexOf(b.id); if (pa !== -1 && pb !== -1) return pa - pb }
+      return a.id - b.id
+    }
+    case 'bank_date': return d * ((a.bank_date ?? '').localeCompare(b.bank_date ?? ''))
+    case 'name':      return d * a.name.localeCompare(b.name, 'es')
+    case 'amount':    return d * (a.dinero - b.dinero)
+    case 'type': {
+      const na = typeMap[a.movement_type_id ?? 0]?.name ?? ''
+      const nb = typeMap[b.movement_type_id ?? 0]?.name ?? ''
+      return d * na.localeCompare(nb, 'es')
+    }
+    case 'paid':     return d * (Number(a.paid) - Number(b.paid))
+    case 'no_count': return d * (Number(a.no_count) - Number(b.no_count))
+    case 'notes':    return d * ((a.notes ?? '').localeCompare(b.notes ?? '', 'es'))
+    default: return 0
+  }
+}
+
 // ── Shared input className ───────────────────────────────────────────────────
 
 const INPUT = 'w-full bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-800 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-gray-400'
@@ -718,7 +752,8 @@ export default function Movements() {
   const [showColPicker, setShowColPicker] = useState(false)
   const [dragCol, setDragCol] = useState<ColKey | null>(null)
   const [dragOver, setDragOver] = useState<{ col: ColKey; side: 'left' | 'right' } | null>(null)
-  const [sort, setSort] = useState<{ key: ColKey; dir: 'asc' | 'desc' } | null>(null)
+  const [sorts, setSorts] = useState<SortEntry[]>([])
+  const [showSortPanel, setShowSortPanel] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
   const [advFilter, setAdvFilter] = useState<AdvancedFilter>(EMPTY_FILTER)
   const [favorites, setFavorites] = useState<FilterFavorite[]>(loadFavorites)
@@ -897,11 +932,25 @@ export default function Movements() {
     }
   }
   const toggleSort = (key: ColKey) =>
-    setSort(prev => {
-      if (prev?.key !== key) return { key, dir: 'desc' }
-      if (prev.dir === 'desc') return { key, dir: 'asc' }
-      return null
+    setSorts(prev => {
+      const idx = prev.findIndex(s => s.key === key)
+      if (idx === -1) return [...prev, { key, dir: 'desc' }]
+      if (prev[idx].dir === 'desc') return prev.map((s, i) => i === idx ? { ...s, dir: 'asc' } : s)
+      return prev.filter((_, i) => i !== idx)
     })
+
+  const moveSortUp = (i: number) =>
+    setSorts(prev => { const next = [...prev]; [next[i - 1], next[i]] = [next[i], next[i - 1]]; return next })
+
+  const moveSortDown = (i: number) =>
+    setSorts(prev => { const next = [...prev]; [next[i], next[i + 1]] = [next[i + 1], next[i]]; return next })
+
+  const toggleSortDir = (i: number) =>
+    setSorts(prev => prev.map((s, idx) => idx === i ? { ...s, dir: s.dir === 'asc' ? 'desc' : 'asc' } : s))
+
+  const removeSort = (i: number) => setSorts(prev => prev.filter((_, idx) => idx !== i))
+
+  const addSortCriterion = (key: ColKey) => setSorts(prev => [...prev, { key, dir: 'desc' }])
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -991,8 +1040,7 @@ export default function Movements() {
   }, [allMovementsForYears, accounts])
 
   const sortedMovements = useMemo(() => {
-    if (!sort) {
-      // When no explicit sort, apply dayOrder overrides within same-day groups only
+    if (sorts.length === 0) {
       if (Object.keys(dayOrder).length === 0) return movements
       const apiPos = new Map(movements.map((mv, i) => [mv.id, i]))
       return [...movements].sort((a, b) => {
@@ -1005,33 +1053,13 @@ export default function Movements() {
       })
     }
     return [...movements].sort((a, b) => {
-      const d = sort.dir === 'asc' ? 1 : -1
-      switch (sort.key) {
-        case 'date': {
-          const dc = a.date.localeCompare(b.date)
-          if (dc !== 0) return d * dc
-          const order = dayOrder[a.date]
-          if (order) {
-            const pa = order.indexOf(a.id), pb = order.indexOf(b.id)
-            if (pa !== -1 && pb !== -1) return pa - pb
-          }
-          return a.id - b.id
-        }
-        case 'bank_date': return d * ((a.bank_date ?? '').localeCompare(b.bank_date ?? ''))
-        case 'name':      return d * a.name.localeCompare(b.name, 'es')
-        case 'amount':    return d * (a.dinero - b.dinero)
-        case 'type': {
-          const na = typeMap[a.movement_type_id ?? 0]?.name ?? ''
-          const nb = typeMap[b.movement_type_id ?? 0]?.name ?? ''
-          return d * na.localeCompare(nb, 'es')
-        }
-        case 'paid':     return d * (Number(a.paid) - Number(b.paid))
-        case 'no_count': return d * (Number(a.no_count) - Number(b.no_count))
-        case 'notes':    return d * ((a.notes ?? '').localeCompare(b.notes ?? '', 'es'))
-        default: return 0
+      for (const s of sorts) {
+        const cmp = compareBySort(a, b, s, typeMap, dayOrder)
+        if (cmp !== 0) return cmp
       }
+      return 0
     })
-  }, [movements, sort, typeMap, dayOrder])
+  }, [movements, sorts, typeMap, dayOrder])
 
   const filteredMovements = useMemo(() => {
     const base = applyAdvancedFilter(sortedMovements, advFilter, typeToGroupMap)
@@ -1039,8 +1067,9 @@ export default function Movements() {
     if (accountFilter === null) return searched
     const acc = accounts.find(a => a.id === accountFilter)
     if (acc?.is_main) return searched
-    return searched.filter(mv => mv.account_id === accountFilter)
-  }, [sortedMovements, advFilter, typeToGroupMap, quickSearch, accountFilter, accounts])
+    const linkedTypeIds = new Set(types.filter(tp => tp.linked_account_id === accountFilter).map(tp => tp.id))
+    return searched.filter(mv => mv.movement_type_id != null && linkedTypeIds.has(mv.movement_type_id))
+  }, [sortedMovements, advFilter, typeToGroupMap, quickSearch, accountFilter, accounts, types])
 
   // Dates that have more than one movement in the current view (eligible for drag reorder)
   const sameDayDates = useMemo(() => {
@@ -1052,7 +1081,7 @@ export default function Movements() {
   // For date-grouped view: maps the first movement's id in each day → rowspan count.
   // Movements that are NOT first in their day are absent from this map (their balance cell is skipped).
   const daySpans = useMemo(() => {
-    const grouped = !sort || sort.key === 'date'
+    const grouped = sorts.length === 0 || sorts[0]?.key === 'date'
     if (!grouped) return new Map<number, number>()
     const firstId = new Map<string, number>()
     const count = new Map<string, number>()
@@ -1063,7 +1092,7 @@ export default function Movements() {
     const result = new Map<number, number>()
     for (const [date, id] of firstId.entries()) result.set(id, count.get(date)!)
     return result
-  }, [filteredMovements, sort])
+  }, [filteredMovements, sorts])
 
   function reorderDay(date: string, fromId: number, toId: number) {
     const dayMvIds = filteredMovements.filter(mv => mv.date === date).map(mv => mv.id)
@@ -1121,7 +1150,7 @@ export default function Movements() {
     `py-3 text-${align} text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400 relative select-none overflow-hidden`
 
   // Balance column only makes sense when rows are in date order
-  const showBalance = !sort || sort.key === 'date'
+  const showBalance = sorts.length === 0 || sorts[0]?.key === 'date'
 
   return (
     <div className="p-3 md:p-6 space-y-4">
@@ -1223,18 +1252,19 @@ export default function Movements() {
             <Search className="w-3.5 h-3.5" />
           </button>
 
-          {/* Sort indicator */}
-          {sort && (
-            <button
-              onClick={() => setSort(null)}
-              title={t('movements.clearSort')}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 text-sm rounded-lg transition-colors"
-            >
-              {sort.dir === 'desc' ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronUp className="w-3.5 h-3.5" />}
-              <span>{COLS.find(c => c.key === sort.key)?.label}</span>
-              <X className="w-3 h-3 text-gray-400" />
-            </button>
-          )}
+          {/* Orden */}
+          <button onClick={() => setShowSortPanel(v => !v)}
+            className={`relative flex items-center gap-1.5 px-3 py-1.5 border text-sm font-medium rounded-lg transition-colors ${
+              showSortPanel || sorts.length > 0
+                ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 border-transparent'
+                : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+            }`}>
+            <ChevronDown className="w-3.5 h-3.5" strokeWidth={1.5} />
+            {t('movements.sortBtn')}
+            {sorts.length > 0 && (
+              <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-violet-500 text-white text-[10px] flex items-center justify-center font-bold">{sorts.length}</span>
+            )}
+          </button>
 
           {/* Filtros */}
           <button onClick={() => setShowFilters(v => !v)}
@@ -1256,6 +1286,53 @@ export default function Movements() {
           </button>
         </div>
       </div>
+
+      {showSortPanel && (
+        <div className="rounded-xl border border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 p-3 space-y-2">
+          {sorts.length === 0 && (
+            <p className="text-xs text-gray-400 dark:text-gray-500 px-1">{t('movements.sortPanelEmpty')}</p>
+          )}
+          {sorts.map((s, i) => (
+            <div key={s.key} className="flex items-center gap-2">
+              <div className="flex flex-col gap-0.5">
+                <button disabled={i === 0} onClick={() => moveSortUp(i)} className="p-0.5 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-20 disabled:cursor-not-allowed">
+                  <ChevronUp className="w-3 h-3" />
+                </button>
+                <button disabled={i === sorts.length - 1} onClick={() => moveSortDown(i)} className="p-0.5 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 disabled:opacity-20 disabled:cursor-not-allowed">
+                  <ChevronDown className="w-3 h-3" />
+                </button>
+              </div>
+              <span className="w-5 h-5 rounded-full bg-violet-100 dark:bg-violet-900/40 text-violet-600 dark:text-violet-400 text-[10px] font-bold flex items-center justify-center shrink-0">{i + 1}</span>
+              <span className="flex-1 text-sm text-gray-700 dark:text-gray-200">{COLS.find(c => c.key === s.key)?.label}</span>
+              <button onClick={() => toggleSortDir(i)} className="flex items-center gap-1 px-2 py-1 rounded-md border border-gray-200 dark:border-gray-700 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                {s.dir === 'desc' ? <><ChevronDown className="w-3 h-3" />{t('movements.sortDesc')}</> : <><ChevronUp className="w-3 h-3" />{t('movements.sortAsc')}</>}
+              </button>
+              <button onClick={() => removeSort(i)} className="p-1 text-gray-300 dark:text-gray-600 hover:text-red-400 transition-colors">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ))}
+          {sorts.length < COLS.length && (
+            <div className="pt-1 border-t border-gray-100 dark:border-gray-800">
+              <select
+                value=""
+                onChange={e => { if (e.target.value) addSortCriterion(e.target.value as ColKey) }}
+                className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-sm rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-violet-400"
+              >
+                <option value="">{t('movements.sortAdd')}</option>
+                {COLS.filter(c => !sorts.find(s => s.key === c.key)).map(c => (
+                  <option key={c.key} value={c.key}>{c.label}</option>
+                ))}
+              </select>
+              {sorts.length > 0 && (
+                <button onClick={() => setSorts([])} className="ml-2 text-xs text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 transition-colors">
+                  {t('movements.clearSort')}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {showFilters && (
         <div className="space-y-2">
@@ -1464,11 +1541,16 @@ export default function Movements() {
                   >
                     <span className="inline-flex items-center gap-1">
                       {col.label}
-                      {sort?.key === col.key && (
-                        sort.dir === 'asc'
-                          ? <ChevronUp className="w-3 h-3" />
-                          : <ChevronDown className="w-3 h-3" />
-                      )}
+                      {(() => {
+                        const idx = sorts.findIndex(s => s.key === col.key)
+                        if (idx === -1) return null
+                        return (
+                          <span className="inline-flex items-center gap-0.5 text-violet-500 dark:text-violet-400">
+                            {sorts.length > 1 && <span className="text-[10px] font-bold leading-none">{idx + 1}</span>}
+                            {sorts[idx].dir === 'asc' ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                          </span>
+                        )
+                      })()}
                     </span>
                     <div
                       draggable={false}
