@@ -5,7 +5,7 @@ import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getSummary as getInvestSummary } from '../api/investments'
 import { useCurrency } from '../hooks/useCurrency'
-import { TrendingUp, TrendingDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, Eye, EyeOff } from 'lucide-react'
 import AppIcon from '../components/AppIcon'
 import {
   ResponsiveContainer,
@@ -124,6 +124,7 @@ export default function AccountsPage() {
 
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear())
   const [viewMode, setViewMode] = useState<'lines' | 'stacked'>('lines')
+  const [includeBienes, setIncludeBienes] = useState(() => localStorage.getItem('accounts-include-bienes') !== 'false')
 
   const accounts = useMemo(() => summary?.accounts ?? [], [summary])
 
@@ -209,19 +210,18 @@ export default function AccountsPage() {
   const investNetGain     = investGainBruto != null && investTax != null ? investGainBruto - investTax : null
   const hasInvestGain     = investGainBruto != null && investGainBruto !== 0
 
-  // Vehicle effective values (depreciated)
-  const vehicleEffective  = accounts
-    .filter(a => a.category === 'vehiculo')
-    .reduce((s, a) => s + vehicleCurrentValue(a), 0)
-
   // Total patrimony uses investment current value (if known) and vehicle depreciated value
+  const bienesAccounts    = accounts.filter(a => a.category === 'inmueble' || a.category === 'vehiculo')
+  const bienesTotal       = bienesAccounts.reduce((s, a) => s + (a.category === 'vehiculo' ? vehicleCurrentValue(a) : a.balance), 0)
   const nonInvestNonVeh   = accounts
-    .filter(a => !INVESTMENT_CATEGORIES.includes(a.category as typeof INVESTMENT_CATEGORIES[number]) && a.category !== 'vehiculo')
+    .filter(a => !INVESTMENT_CATEGORIES.includes(a.category as typeof INVESTMENT_CATEGORIES[number]) && a.category !== 'vehiculo' && a.category !== 'inmueble')
     .reduce((s, a) => s + a.balance, 0)
-  const totalBalance      = nonInvestNonVeh + (investCurrentVal ?? investedBalance) + vehicleEffective
+  const investPart        = investCurrentVal ?? investedBalance
+  const totalBalance      = nonInvestNonVeh + investPart + (includeBienes ? bienesTotal : 0)
   const totalChange       = accounts.reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
 
-  const hasNonLiquid      = accounts.some(a => a.category === 'inmueble' || a.category === 'vehiculo' || INVESTMENT_CATEGORIES.includes(a.category as typeof INVESTMENT_CATEGORIES[number]))
+  const hasBienes         = bienesAccounts.length > 0
+  const hasNonLiquid      = hasBienes || investAccounts.length > 0
   const liquidBalance     = accounts.filter(a => LIQUID_CATEGORIES.includes(a.category as typeof LIQUID_CATEGORIES[number])).reduce((s, a) => s + a.balance, 0)
   const liquidChange      = accounts.filter(a => LIQUID_CATEGORIES.includes(a.category as typeof LIQUID_CATEGORIES[number])).reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
 
@@ -281,9 +281,10 @@ export default function AccountsPage() {
 
       {/* ── Total card ─────────────────────────────────────────────── */}
       <div className={`${PANEL} p-5`}>
-        <div className="flex items-start gap-4">
-          {/* Left: total amount */}
-          <div className="flex-1 min-w-0">
+        <div className="flex items-start gap-6">
+
+          {/* Col 1: total amount + change */}
+          <div className="shrink-0">
             <p className={`${TITLE} mb-2`}>{t('accounts.totalWealth')}</p>
             <p className="text-3xl font-bold tabular-nums text-gray-900 dark:text-white">
               {fmt(totalBalance)}
@@ -294,9 +295,64 @@ export default function AccountsPage() {
             </div>
           </div>
 
-          {/* Right: investment gain breakdown */}
+          {/* Col 2: composition breakdown */}
+          {hasNonLiquid && (
+            <div className="flex-1 border-l border-gray-100 dark:border-gray-800 pl-6">
+              <p className={`${TITLE} mb-2`}>{t('accounts.composition')}</p>
+              {(() => {
+                const rows = [
+                  { label: t('accounts.liquidBalance'), value: liquidBalance, color: '#3b82f6', always: true, toggle: null },
+                  ...(investAccounts.length > 0 ? [{ label: t('accounts.investBreakdown'), value: investPart, color: '#8b5cf6', always: true, toggle: null }] : []),
+                  ...(hasBienes ? [{ label: t('accounts.bienesGroup'), value: bienesTotal, color: '#f97316', always: false, toggle: includeBienes }] : []),
+                ]
+                const visibleTotal = rows.reduce((s, r) => s + (r.toggle === false ? 0 : r.value), 0)
+                return (
+                  <div className="space-y-2">
+                    {rows.map(row => {
+                      const pct = visibleTotal > 0 ? Math.round((row.value / visibleTotal) * 100) : 0
+                      const excluded = row.toggle === false
+                      return (
+                        <div key={row.label} className={`transition-opacity ${excluded ? 'opacity-40' : ''}`}>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <div className="flex items-center gap-1.5">
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: row.color }} />
+                              <span className="text-xs text-gray-500 dark:text-gray-400">{row.label}</span>
+                              {row.toggle !== null && (
+                                <button
+                                  onClick={() => {
+                                    const next = !includeBienes
+                                    setIncludeBienes(next)
+                                    localStorage.setItem('accounts-include-bienes', String(next))
+                                  }}
+                                  title={excluded ? t('accounts.bienesExcluded') : t('accounts.bienesGroup')}
+                                  className="ml-0.5 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 transition-colors"
+                                >
+                                  {excluded ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                                </button>
+                              )}
+                            </div>
+                            <span className={`text-xs font-semibold tabular-nums ${excluded ? 'text-gray-400 dark:text-gray-600' : 'text-gray-700 dark:text-gray-200'}`}>
+                              {fmt(row.value)}
+                            </span>
+                          </div>
+                          <div className="h-1 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
+                            <div
+                              className="h-full rounded-full transition-all duration-300"
+                              style={{ width: excluded ? '0%' : `${pct}%`, background: row.color, opacity: 0.7 }}
+                            />
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+            </div>
+          )}
+
+          {/* Col 3: investment gain breakdown */}
           {hasInvestGain && (
-            <div className="shrink-0 text-right space-y-0.5 border-l border-gray-100 dark:border-gray-800 pl-4">
+            <div className="shrink-0 text-right space-y-0.5 border-l border-gray-100 dark:border-gray-800 pl-6">
               <p className={`${TITLE} mb-1.5`}>{t('accounts.investBreakdown')}</p>
               <div className={`text-sm font-semibold tabular-nums ${investGainBruto! >= 0 ? 'text-green-500 dark:text-green-400' : 'text-red-500'}`}>
                 {investGainBruto! >= 0 ? '+' : ''}{fmt(investGainBruto!)}

@@ -319,6 +319,8 @@ const ES: Record<string, string> = {
   'accounts.vehicleCurrentVal': 'Valor actual estimado',
   'accounts.deprecPerYear':    '% deprec./año',
   'accounts.bienesGroup':      'Bienes',
+  'accounts.composition':      'Composición',
+  'accounts.bienesExcluded':   'Bienes excluidos del total',
 
   'annual.title':       'Finanzas',
   'annual.expandAll':   'Desplegar todos',
@@ -1534,6 +1536,8 @@ const EN: Record<string, string> = {
   'accounts.vehicleCurrentVal': 'Estimated current value',
   'accounts.deprecPerYear':    '% deprec./year',
   'accounts.bienesGroup':      'Assets',
+  'accounts.composition':      'Composition',
+  'accounts.bienesExcluded':   'Assets excluded from total',
 
   'annual.title':       'Finances',
   'annual.expandAll':   'Expand all',
@@ -2750,6 +2754,8 @@ const FR: Record<string, string> = {
   'accounts.vehicleCurrentVal': 'Valeur actuelle estimée',
   'accounts.deprecPerYear':    '% amort./an',
   'accounts.bienesGroup':      'Biens',
+  'accounts.composition':      'Composition',
+  'accounts.bienesExcluded':   'Biens exclus du total',
 
   'annual.title':       'Finances',
   'annual.expandAll':   'Tout développer',
@@ -3966,6 +3972,8 @@ const DE: Record<string, string> = {
   'accounts.vehicleCurrentVal': 'Geschätzter aktueller Wert',
   'accounts.deprecPerYear':    '% Abschr./Jahr',
   'accounts.bienesGroup':      'Sachwerte',
+  'accounts.composition':      'Zusammensetzung',
+  'accounts.bienesExcluded':   'Sachwerte nicht im Gesamt',
 
   'annual.title':       'Finanzen',
   'annual.expandAll':   'Alle ausklappen',
@@ -5182,6 +5190,8 @@ const IT: Record<string, string> = {
   'accounts.vehicleCurrentVal': 'Valore attuale stimato',
   'accounts.deprecPerYear':    '% ammort./anno',
   'accounts.bienesGroup':      'Beni',
+  'accounts.composition':      'Composizione',
+  'accounts.bienesExcluded':   'Beni esclusi dal totale',
 
   'annual.title':       'Finanze',
   'annual.expandAll':   'Espandi tutti',
