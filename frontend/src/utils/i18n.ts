@@ -318,6 +318,7 @@ const ES: Record<string, string> = {
   'accounts.investNet':        'Ganancia neta',
   'accounts.vehicleCurrentVal': 'Valor actual estimado',
   'accounts.deprecPerYear':    '% deprec./año',
+  'accounts.bienesGroup':      'Bienes',
 
   'annual.title':       'Finanzas',
   'annual.expandAll':   'Desplegar todos',
@@ -1532,6 +1533,7 @@ const EN: Record<string, string> = {
   'accounts.investNet':        'Net gain',
   'accounts.vehicleCurrentVal': 'Estimated current value',
   'accounts.deprecPerYear':    '% deprec./year',
+  'accounts.bienesGroup':      'Assets',
 
   'annual.title':       'Finances',
   'annual.expandAll':   'Expand all',
@@ -2747,6 +2749,7 @@ const FR: Record<string, string> = {
   'accounts.investNet':        'Gain net',
   'accounts.vehicleCurrentVal': 'Valeur actuelle estimée',
   'accounts.deprecPerYear':    '% amort./an',
+  'accounts.bienesGroup':      'Biens',
 
   'annual.title':       'Finances',
   'annual.expandAll':   'Tout développer',
@@ -3962,6 +3965,7 @@ const DE: Record<string, string> = {
   'accounts.investNet':        'Nettogewinn',
   'accounts.vehicleCurrentVal': 'Geschätzter aktueller Wert',
   'accounts.deprecPerYear':    '% Abschr./Jahr',
+  'accounts.bienesGroup':      'Sachwerte',
 
   'annual.title':       'Finanzen',
   'annual.expandAll':   'Alle ausklappen',
@@ -5177,6 +5181,7 @@ const IT: Record<string, string> = {
   'accounts.investNet':        'Guadagno netto',
   'accounts.vehicleCurrentVal': 'Valore attuale stimato',
   'accounts.deprecPerYear':    '% ammort./anno',
+  'accounts.bienesGroup':      'Beni',
 
   'annual.title':       'Finanze',
   'annual.expandAll':   'Espandi tutti',

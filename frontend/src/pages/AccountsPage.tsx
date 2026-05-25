@@ -213,7 +213,6 @@ export default function AccountsPage() {
   const vehicleEffective  = accounts
     .filter(a => a.category === 'vehiculo')
     .reduce((s, a) => s + vehicleCurrentValue(a), 0)
-  const vehicleBooked     = accounts.filter(a => a.category === 'vehiculo').reduce((s, a) => s + a.balance, 0)
 
   // Total patrimony uses investment current value (if known) and vehicle depreciated value
   const nonInvestNonVeh   = accounts
@@ -332,74 +331,91 @@ export default function AccountsPage() {
       </div>
 
       {/* ── Account cards grouped by category ──────────────────────── */}
-      {ACCOUNT_CATEGORIES.map(cat => {
-        const catAccounts = accounts.filter(a => a.category === cat.value)
-        if (catAccounts.length === 0) return null
-        const isInvestCat = INVESTMENT_CATEGORIES.includes(cat.value as typeof INVESTMENT_CATEGORIES[number])
-        const catTotal = isInvestCat
-          ? (investCurrentVal ?? catAccounts.reduce((s, a) => s + a.balance, 0))
-          : cat.value === 'vehiculo'
-            ? catAccounts.reduce((s, a) => s + vehicleCurrentValue(a), 0)
-            : catAccounts.reduce((s, a) => s + a.balance, 0)
-        const catChange = catAccounts.reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
-        return (
-          <div key={cat.value} className="space-y-3">
-            <div className="flex items-baseline justify-between px-1">
-              <h2 className={TITLE}>{t(cat.labelKey)}</h2>
-              <div className="flex items-baseline gap-3">
-                <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-white">{fmt(catTotal)}</span>
-                {isInvestCat && investGainBruto != null ? (
-                  <span className={`text-xs font-medium ${investGainBruto >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {investGainBruto >= 0 ? '+' : ''}{fmt(investGainBruto)}
-                  </span>
-                ) : (
-                  <span className={`text-xs font-medium ${catChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                    {catChange >= 0 ? '+' : ''}{fmt(catChange)}
-                  </span>
-                )}
+      {(() => {
+        const rendered = new Set<string>()
+        return ACCOUNT_CATEGORIES.flatMap(cat => {
+          if (rendered.has(cat.value)) return []
+
+          // Merge inmueble + vehiculo into one "Bienes" group
+          const isBienes = cat.value === 'inmueble' || cat.value === 'vehiculo'
+          const groupValues = isBienes ? ['inmueble', 'vehiculo'] : [cat.value]
+          const catAccounts = accounts.filter(a => groupValues.includes(a.category))
+          if (catAccounts.length === 0) return []
+          groupValues.forEach(v => rendered.add(v))
+
+          const isInvestCat = INVESTMENT_CATEGORIES.includes(cat.value as typeof INVESTMENT_CATEGORIES[number])
+          const catTotal = isInvestCat
+            ? (investCurrentVal ?? catAccounts.reduce((s, a) => s + a.balance, 0))
+            : catAccounts.reduce((s, a) => s + (a.category === 'vehiculo' ? vehicleCurrentValue(a) : a.balance), 0)
+          const catChange = catAccounts.reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
+          const groupLabel = isBienes ? t('accounts.bienesGroup') : t(cat.labelKey)
+
+          return [(
+            <div key={isBienes ? 'bienes' : cat.value} className="space-y-3">
+              <div className="flex items-baseline justify-between px-1">
+                <h2 className={TITLE}>{groupLabel}</h2>
+                <div className="flex items-baseline gap-3">
+                  <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-white">{fmt(catTotal)}</span>
+                  {isInvestCat && investGainBruto != null ? (
+                    <span className={`text-xs font-medium ${investGainBruto >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {investGainBruto >= 0 ? '+' : ''}{fmt(investGainBruto)}
+                    </span>
+                  ) : (
+                    <span className={`text-xs font-medium ${catChange >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                      {catChange >= 0 ? '+' : ''}{fmt(catChange)}
+                    </span>
+                  )}
+                </div>
+              </div>
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                {catAccounts.map(acc => {
+                  const change = periodChange[acc.id] ?? 0
+                  const isVehicle = acc.category === 'vehiculo'
+                  const currentVal = isVehicle ? vehicleCurrentValue(acc) : acc.balance
+                  return (
+                    <div key={acc.id} className={`${PANEL} p-4 relative overflow-hidden`}>
+                      <div className="absolute inset-y-0 left-0 w-1 rounded-l-2xl" style={{ background: acc.color }} />
+                      <div className="pl-2">
+                        <div className="flex items-center gap-2 mb-3">
+                          <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                            style={{ backgroundColor: acc.color + '20' }}>
+                            <AppIcon name={acc.icon} className="w-3.5 h-3.5" style={{ color: acc.color }} strokeWidth={1.5} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`${TITLE} truncate`}>{acc.name}</p>
+                            {isBienes && (
+                              <p className="text-xs text-gray-300 dark:text-gray-600 truncate">
+                                {acc.category === 'vehiculo' ? t('account.category.vehiculo') : t('account.category.inmueble')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white mb-1">
+                          {fmt(currentVal)}
+                        </p>
+                        {isVehicle && acc.depreciation_rate != null ? (
+                          <div className="space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
+                            <div>{t('accounts.vehicleCurrentVal')}</div>
+                            <div>{t('accounts.deprecPerYear')}: <span className="font-semibold">{acc.depreciation_rate}%</span></div>
+                            {acc.initial_balance !== currentVal && (
+                              <div className="text-red-400">{t('invest.invested')}: {fmt(acc.initial_balance)}</div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className={`flex items-center gap-1 text-xs font-medium ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                            {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                            <span>{change >= 0 ? '+' : ''}{fmt(change)}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
             </div>
-            <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-              {catAccounts.map(acc => {
-                const change = periodChange[acc.id] ?? 0
-                const isVehicle = acc.category === 'vehiculo'
-                const currentVal = isVehicle ? vehicleCurrentValue(acc) : acc.balance
-                return (
-                  <div key={acc.id} className={`${PANEL} p-4 relative overflow-hidden`}>
-                    <div className="absolute inset-y-0 left-0 w-1 rounded-l-2xl" style={{ background: acc.color }} />
-                    <div className="pl-2">
-                      <div className="flex items-center gap-2 mb-3">
-                        <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
-                          style={{ backgroundColor: acc.color + '20' }}>
-                          <AppIcon name={acc.icon} className="w-3.5 h-3.5" style={{ color: acc.color }} strokeWidth={1.5} />
-                        </div>
-                        <p className={`${TITLE} truncate`}>{acc.name}</p>
-                      </div>
-                      <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white mb-1">
-                        {fmt(currentVal)}
-                      </p>
-                      {isVehicle && acc.depreciation_rate != null ? (
-                        <div className="space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
-                          <div>{t('accounts.vehicleCurrentVal')}</div>
-                          <div>{t('accounts.deprecPerYear')}: <span className="font-semibold">{acc.depreciation_rate}%</span></div>
-                          {acc.initial_balance !== currentVal && (
-                            <div className="text-red-400">{t('invest.invested')}: {fmt(acc.initial_balance)}</div>
-                          )}
-                        </div>
-                      ) : (
-                        <div className={`flex items-center gap-1 text-xs font-medium ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                          {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                          <span>{change >= 0 ? '+' : ''}{fmt(change)}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )
-      })}
+          )]
+        })
+      })()}
 
       {/* ── Evolution chart ────────────────────────────────────────── */}
       <div className={`${PANEL} p-5`}>
