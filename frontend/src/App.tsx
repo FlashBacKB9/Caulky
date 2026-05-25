@@ -17,6 +17,7 @@ import Comparaciones from './pages/Comparaciones'
 import AccountsPage from './pages/AccountsPage'
 import Projection from './pages/Projection'
 import Analysis from './pages/Analysis'
+import AiConsultant from './pages/AiConsultant'
 import QuickAdd from './pages/QuickAdd'
 import LoginPage from './pages/LoginPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -55,6 +56,7 @@ function PageRoutes() {
       <Route path="/comparaciones" element={<Comparaciones />} />
       <Route path="/proyeccion" element={<Projection />} />
       <Route path="/analisis" element={<Analysis />} />
+      <Route path="/consultor-ia" element={<AiConsultant />} />
     </Routes>
   )
 }

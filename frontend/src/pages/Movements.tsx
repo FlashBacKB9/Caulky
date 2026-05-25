@@ -180,6 +180,8 @@ function CalendarView({ movements, types, selectedYear }: {
   }, [movements, dateField])
 
   const { data: templates = [] } = useQuery({ queryKey: ['templates'], queryFn: getTemplates })
+  const { data: groups = [] } = useQuery({ queryKey: ['groups'], queryFn: getGroups })
+  const ingresoGroupId = useMemo(() => groups.find(g => g.name === 'Ingreso')?.id, [groups])
 
   const previewByDate = useMemo(() => {
     if (dateField !== 'date') return {}
@@ -194,15 +196,20 @@ function CalendarView({ movements, types, selectedYear }: {
         if (dd <= now || dd > previewEnd) continue
         const dateStr = `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, '0')}-${String(dd.getDate()).padStart(2, '0')}`
         if (!map[dateStr]) map[dateStr] = []
+        const typeId = tpl.movement_type_id ? parseInt(tpl.movement_type_id) : undefined
+        const type = typeId != null ? types.find(t => t.id === typeId) : undefined
+        const isIngreso = type?.income_expense_group_id === ingresoGroupId
+        const rawMoney = parseFloat(tpl.money) || 0
+        const money = rawMoney < 0 ? Math.abs(rawMoney) : (isIngreso ? Math.abs(rawMoney) : -Math.abs(rawMoney))
         map[dateStr].push({
           name: applyFormula(tpl.name || tpl.label, dd),
-          money: parseFloat(tpl.money) || 0,
-          movement_type_id: tpl.movement_type_id ? parseInt(tpl.movement_type_id) : undefined,
+          money,
+          movement_type_id: typeId,
         })
       }
     }
     return map
-  }, [templates, dateField])
+  }, [templates, dateField, types, ingresoGroupId])
 
   const firstDow = (new Date(calYear, calMonth, 1).getDay() + 6) % 7
   const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate()

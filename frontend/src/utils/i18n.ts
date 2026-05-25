@@ -17,6 +17,7 @@ const ES: Record<string, string> = {
   'nav.projection':   'Proyección',
   'nav.analysis':     'Análisis',
   'nav.docs':         'Documentación',
+  'nav.ai':           'Consultor IA',
 
   'common.save':        'Guardar',
   'common.cancel':      'Cancelar',
@@ -1216,6 +1217,7 @@ const EN: Record<string, string> = {
   'nav.projection':   'Projection',
   'nav.analysis':     'Analysis',
   'nav.docs':         'Documentation',
+  'nav.ai':           'AI Consultant',
 
   'common.save':        'Save',
   'common.cancel':      'Cancel',
@@ -2416,6 +2418,7 @@ const FR: Record<string, string> = {
   'nav.projection':   'Projection',
   'nav.analysis':     'Analyse',
   'nav.docs':         'Documentation',
+  'nav.ai':           'Consultant IA',
 
   'common.save':        'Enregistrer',
   'common.cancel':      'Annuler',
@@ -3616,6 +3619,7 @@ const DE: Record<string, string> = {
   'nav.projection':   'Prognose',
   'nav.analysis':     'Analyse',
   'nav.docs':         'Dokumentation',
+  'nav.ai':           'KI-Berater',
 
   'common.save':        'Speichern',
   'common.cancel':      'Abbrechen',
@@ -4816,6 +4820,7 @@ const IT: Record<string, string> = {
   'nav.projection':   'Proiezione',
   'nav.analysis':     'Analisi',
   'nav.docs':         'Documentazione',
+  'nav.ai':           'Consulente IA',
 
   'common.save':        'Salva',
   'common.cancel':      'Annulla',

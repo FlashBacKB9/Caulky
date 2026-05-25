@@ -26,6 +26,8 @@ services:
         condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
+      - workspace_data:/app/workspace
+      - claude_data:/root/.claude
     restart: unless-stopped
 
   frontend:
@@ -39,3 +41,5 @@ services:
 volumes:
   postgres_data:
   uploads_data:
+  workspace_data:
+  claude_data:
