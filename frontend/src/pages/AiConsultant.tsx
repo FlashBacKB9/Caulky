@@ -5,7 +5,40 @@ import '@xterm/xterm/css/xterm.css'
 import { RefreshCw } from 'lucide-react'
 import api from '../api/client'
 
+// Chrome bug: document.documentElement CSS zoom causes getBoundingClientRect()
+// to return zoomed coordinates while mouse clientX/Y remain unzoomed, breaking
+// xterm.js hit detection. We remove the zoom while this page is mounted.
+function useDisableHtmlZoom() {
+  useEffect(() => {
+    const html = document.documentElement
+    const saved = html.style.zoom
+    html.style.zoom = ''
+    return () => { html.style.zoom = saved }
+  }, [])
+}
+
+function copyToClipboard(text: string) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(text).catch(() => execCopy(text))
+  } else {
+    execCopy(text)
+  }
+}
+
+function execCopy(text: string) {
+  const ta = document.createElement('textarea')
+  ta.value = text
+  ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0'
+  document.body.appendChild(ta)
+  ta.focus()
+  ta.select()
+  try { document.execCommand('copy') } catch { /* ignore */ }
+  document.body.removeChild(ta)
+}
+
 export default function AiConsultant() {
+  useDisableHtmlZoom()
+
   const containerRef = useRef<HTMLDivElement>(null)
   const termRef = useRef<Terminal | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
@@ -88,8 +121,6 @@ export default function AiConsultant() {
     const fitAddon = new FitAddon()
     term.loadAddon(fitAddon)
     term.open(containerRef.current)
-    // requestAnimationFrame ensures the container has its final layout dimensions
-    // before fitting, which fixes the mouse-click offset issue
     requestAnimationFrame(() => fitAddon.fit())
 
     termRef.current = term
@@ -99,19 +130,26 @@ export default function AiConsultant() {
     term.attachCustomKeyEventHandler((e) => {
       if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && e.code === 'KeyC') {
         const sel = term.getSelection()
-        if (sel) navigator.clipboard.writeText(sel).catch(() => {})
+        if (sel) copyToClipboard(sel)
         return false
       }
       return true
     })
 
-    // Right-click: copy if there's a selection, otherwise paste
+    // Track last selection so right-click can copy it even if mousedown clears it
+    let lastSel = ''
+    term.onSelectionChange(() => {
+      const s = term.getSelection()
+      if (s) lastSel = s
+    })
+
     const el = containerRef.current!
     const handleContextMenu = (e: MouseEvent) => {
       e.preventDefault()
-      const sel = term.getSelection()
+      const sel = term.getSelection() || lastSel
       if (sel) {
-        navigator.clipboard.writeText(sel).catch(() => {})
+        copyToClipboard(sel)
+        lastSel = ''
         term.clearSelection()
       } else {
         navigator.clipboard.readText().then(text => {
@@ -121,17 +159,10 @@ export default function AiConsultant() {
     }
     el.addEventListener('contextmenu', handleContextMenu)
 
-    term.onData((data) => {
-      wsRef.current?.send(data)
-    })
+    term.onData((data) => { wsRef.current?.send(data) })
+    term.onResize(({ cols, rows }) => { wsRef.current?.send(`resize:${cols}:${rows}`) })
 
-    term.onResize(({ cols, rows }) => {
-      wsRef.current?.send(`resize:${cols}:${rows}`)
-    })
-
-    const ro = new ResizeObserver(() => {
-      fitRef.current?.fit()
-    })
+    const ro = new ResizeObserver(() => { fitRef.current?.fit() })
     ro.observe(containerRef.current)
 
     connectWs()
