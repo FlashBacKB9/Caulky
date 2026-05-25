@@ -2,23 +2,10 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare, Pencil, Eye, Settings, Upload } from 'lucide-react'
+import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, ChevronDown, MessageSquare, Pencil, Eye, Settings, Upload, Folder, FolderPlus } from 'lucide-react'
 import api from '../api/client'
 import { syncPref } from '../utils/prefSync'
 
-function useTerminalZoom(): string {
-  // xterm.js mismeasures when html has a CSS zoom, so we clear it for this page.
-  // Return the saved value so callers can re-apply it to non-terminal elements.
-  const [savedZoom, setSavedZoom] = useState('')
-  useEffect(() => {
-    const html = document.documentElement
-    const current = html.style.zoom
-    setSavedZoom(current)
-    html.style.zoom = ''
-    return () => { html.style.zoom = current }
-  }, [])
-  return savedZoom
-}
 
 function copyToClipboard(text: string) {
   if (navigator.clipboard) {
@@ -89,6 +76,20 @@ type Tab =
   | { kind: 'html'; id: string; label: string; src: string }
 
 type WorkspaceFile = { path: string; name: string; size: number; modified: number }
+type FolderNode    = { name: string; path: string; files: WorkspaceFile[] }
+
+function buildTree(files: WorkspaceFile[]): { root: WorkspaceFile[]; folders: FolderNode[] } {
+  const root: WorkspaceFile[] = []
+  const map = new Map<string, FolderNode>()
+  for (const f of files) {
+    const slash = f.path.indexOf('/')
+    if (slash === -1) { root.push(f); continue }
+    const dir = f.path.slice(0, slash)
+    if (!map.has(dir)) map.set(dir, { name: dir, path: dir, files: [] })
+    map.get(dir)!.files.push(f)
+  }
+  return { root, folders: [...map.values()].sort((a, b) => a.name.localeCompare(b.name)) }
+}
 
 const TABS_STORAGE_KEY  = 'ai-tab-names'
 const WRITE_PERMS_KEY   = 'ai-write-perms'
@@ -113,8 +114,6 @@ function saveTabs(tabs: Tab[]) {
 }
 
 export default function AiConsultant() {
-  const panelZoom = useTerminalZoom()
-
   const stackRef    = useRef<HTMLDivElement>(null)
   const sessionsRef = useRef<Map<string, SessionData>>(new Map())
   const counterRef  = useRef(0)
@@ -124,12 +123,18 @@ export default function AiConsultant() {
   const [editingId, setEditingId] = useState('')
   const editingIdRef = useRef('')   // ref so activateTab RAF can read latest value
 
-  const [files,          setFiles]          = useState<WorkspaceFile[]>([])
-  const [filesLoading,   setFilesLoading]   = useState(false)
-  const [uploading,      setUploading]      = useState(false)
-  const [writePerms,     setWritePerms]     = useState<WritePerms>(loadWritePerms)
-  const [showPerms,      setShowPerms]      = useState(false)
-  const uploadInputRef = useRef<HTMLInputElement>(null)
+  const [files,           setFiles]           = useState<WorkspaceFile[]>([])
+  const [filesLoading,    setFilesLoading]    = useState(false)
+  const [uploading,       setUploading]       = useState(false)
+  const [writePerms,      setWritePerms]      = useState<WritePerms>(loadWritePerms)
+  const [showPerms,       setShowPerms]       = useState(false)
+  const [expandedFolders, setExpandedFolders] = useState<Set<string>>(() => new Set(['context']))
+  const [draggingFile,    setDraggingFile]    = useState<WorkspaceFile | null>(null)
+  const [dragOverFolder,  setDragOverFolder]  = useState<string | null>(null)
+  const [showNewFolder,   setShowNewFolder]   = useState(false)
+  const [newFolderName,   setNewFolderName]   = useState('')
+  const uploadInputRef  = useRef<HTMLInputElement>(null)
+  const newFolderInputRef = useRef<HTMLInputElement>(null)
 
   // ── File browser ─────────────────────────────────────────────────────────────
   const refreshFiles = useCallback(async () => {
@@ -148,6 +153,22 @@ export default function AiConsultant() {
       await api.post('/ai/workspace/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })
       await refreshFiles()
     } catch { /**/ } finally { setUploading(false) }
+  }, [refreshFiles])
+
+  const createFolder = useCallback(async (name: string) => {
+    if (!name.trim()) return
+    try { await api.post('/ai/workspace/mkdir', { path: name.trim() }) } catch { /**/ }
+    setShowNewFolder(false)
+    setNewFolderName('')
+    await refreshFiles()
+  }, [refreshFiles])
+
+  const moveFile = useCallback(async (fromPath: string, toFolder: string) => {
+    const fileName = fromPath.split('/').pop() ?? fromPath
+    const toPath = `${toFolder}/${fileName}`
+    if (fromPath === toPath) return
+    try { await api.post('/ai/workspace/move', { from: fromPath, to: toPath }) } catch { /**/ }
+    await refreshFiles()
   }, [refreshFiles])
 
   const downloadFile = useCallback((path: string) => {
@@ -353,7 +374,7 @@ export default function AiConsultant() {
     <div className="absolute inset-0 flex overflow-hidden">
 
       {/* ── Left panel ── */}
-      <div className="w-44 shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden" style={panelZoom ? { zoom: panelZoom } : undefined}>
+      <div className="w-44 shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
 
         {/* Header */}
         <div className="px-3 pt-3 pb-2 shrink-0">
@@ -429,12 +450,19 @@ export default function AiConsultant() {
         </div>
 
         {/* File browser */}
-        <div className="border-t border-gray-200 dark:border-gray-800 flex flex-col shrink-0" style={{ maxHeight: '45%' }}>
+        <div className="border-t border-gray-200 dark:border-gray-800 flex flex-col shrink-0" style={{ maxHeight: '50%' }}>
           <div className="flex items-center justify-between px-3 py-2 shrink-0">
             <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
               Archivos
             </span>
             <div className="flex items-center gap-1">
+              <button
+                onClick={() => { setShowNewFolder(v => !v); setTimeout(() => newFolderInputRef.current?.focus(), 50) }}
+                className="text-gray-400 hover:text-violet-500 dark:hover:text-violet-400 transition-colors"
+                title="Nueva carpeta"
+              >
+                <FolderPlus className="w-3 h-3" />
+              </button>
               <button
                 onClick={() => uploadInputRef.current?.click()}
                 disabled={uploading}
@@ -452,6 +480,24 @@ export default function AiConsultant() {
               </button>
             </div>
           </div>
+
+          {showNewFolder && (
+            <div className="px-2 pb-2 flex items-center gap-1 shrink-0">
+              <input
+                ref={newFolderInputRef}
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') createFolder(newFolderName)
+                  if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName('') }
+                }}
+                placeholder="nombre carpeta"
+                className="flex-1 min-w-0 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 outline-none focus:border-violet-400"
+              />
+              <button onClick={() => createFolder(newFolderName)} className="text-xs text-violet-500 font-medium px-1">✓</button>
+            </div>
+          )}
+
           <input
             ref={uploadInputRef}
             type="file"
@@ -462,43 +508,96 @@ export default function AiConsultant() {
 
           <div className="overflow-y-auto pb-1 min-h-0">
             {files.length === 0 ? (
-              <p className="text-xs text-gray-400 dark:text-gray-600 px-3 py-1 italic">
-                Sin archivos
-              </p>
-            ) : (
-              files.map(f => {
+              <p className="text-xs text-gray-400 dark:text-gray-600 px-3 py-1 italic">Sin archivos</p>
+            ) : (() => {
+              const { root, folders } = buildTree(files)
+
+              const renderFile = (f: WorkspaceFile, indent = false) => {
                 const isHtml = /\.html?$/i.test(f.name)
                 return (
                   <div
                     key={f.path}
+                    draggable
+                    onDragStart={() => setDraggingFile(f)}
+                    onDragEnd={() => setDraggingFile(null)}
                     title={`${f.path}  ·  ${fmtSize(f.size)}`}
-                    className="flex items-center gap-1 px-2 py-1 mx-0.5 rounded text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    style={{ maxWidth: 'calc(100% - 4px)' }}
+                    className="flex items-center gap-1 py-1 mx-0.5 rounded text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-grab active:cursor-grabbing"
+                    style={{ paddingLeft: indent ? '20px' : '8px', paddingRight: '4px' }}
                   >
                     <FileIcon name={f.name} />
                     <span className="flex-1 truncate min-w-0">{f.name}</span>
-                    <div className="flex items-center gap-0.5 shrink-0">
+                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100">
                       {isHtml && (
-                        <button
-                          onClick={() => openHtmlViewer(f)}
-                          title={`Ver ${f.name}`}
-                          className="p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400 transition-colors"
-                        >
+                        <button onClick={() => openHtmlViewer(f)} title={`Ver ${f.name}`}
+                          className="p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400 transition-colors">
                           <Eye className="w-3 h-3" />
                         </button>
                       )}
-                      <button
-                        onClick={() => downloadFile(f.path)}
-                        title={`Descargar ${f.name}`}
-                        className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
-                      >
+                      <button onClick={() => downloadFile(f.path)} title={`Descargar ${f.name}`}
+                        className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors">
                         <Download className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
                 )
-              })
-            )}
+              }
+
+              return (
+                <>
+                  {/* Folders */}
+                  {folders.map(folder => {
+                    const expanded = expandedFolders.has(folder.path)
+                    const isOver = dragOverFolder === folder.path
+                    return (
+                      <div key={folder.path}>
+                        <div
+                          className={`flex items-center gap-1 px-2 py-1 mx-0.5 rounded text-xs font-medium transition-colors cursor-pointer ${
+                            isOver
+                              ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
+                              : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                          }`}
+                          onClick={() => setExpandedFolders(prev => {
+                            const next = new Set(prev)
+                            next.has(folder.path) ? next.delete(folder.path) : next.add(folder.path)
+                            return next
+                          })}
+                          onDragOver={e => { e.preventDefault(); setDragOverFolder(folder.path) }}
+                          onDragLeave={() => setDragOverFolder(null)}
+                          onDrop={e => {
+                            e.preventDefault()
+                            setDragOverFolder(null)
+                            if (draggingFile) moveFile(draggingFile.path, folder.path)
+                          }}
+                        >
+                          <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+                          <Folder className="w-3 h-3 shrink-0 text-amber-400" />
+                          <span className="truncate flex-1">{folder.name}</span>
+                          <span className="text-gray-400 dark:text-gray-600 text-[10px]">{folder.files.length}</span>
+                        </div>
+                        {expanded && (
+                          <div className="group">
+                            {folder.files.map(f => renderFile(f, true))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {/* Root files */}
+                  <div
+                    className="group"
+                    onDragOver={e => { e.preventDefault(); setDragOverFolder('__root__') }}
+                    onDragLeave={() => setDragOverFolder(null)}
+                    onDrop={e => {
+                      e.preventDefault()
+                      setDragOverFolder(null)
+                      // moving to root not supported yet
+                    }}
+                  >
+                    {root.map(f => renderFile(f, false))}
+                  </div>
+                </>
+              )
+            })()}
           </div>
         </div>
 

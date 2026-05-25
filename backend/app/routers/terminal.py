@@ -10,7 +10,7 @@ from typing import Optional
 from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.websockets import WebSocketState
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator  # noqa: F401
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -71,6 +71,17 @@ def _consume_ticket(token: str) -> tuple[Optional[str], Optional[str], str]:
     if time.time() > expiry:
         return None, None, 'default'
     return user_id, write_perms_json, session_id
+
+
+_WELCOME_BANNER = (
+    "\r\n"
+    "\x1b[1;34m┌─────────────────────────────────────────────────┐\x1b[0m\r\n"
+    "\x1b[1;34m│\x1b[0m  \x1b[1;37mConsultor Financiero — Caulky\x1b[0m              \x1b[1;34m│\x1b[0m\r\n"
+    "\x1b[1;34m│\x1b[0m  \x1b[90mEscribe «hola» y el asistente se presentará.\x1b[0m  \x1b[1;34m│\x1b[0m\r\n"
+    "\x1b[1;34m│\x1b[0m  \x1b[90mPuedes subir documentos desde el panel.\x1b[0m       \x1b[1;34m│\x1b[0m\r\n"
+    "\x1b[1;34m└─────────────────────────────────────────────────┘\x1b[0m\r\n"
+    "\r\n"
+)
 
 
 def _build_claude_md(user_id: str, write_perms: dict) -> str:
@@ -211,6 +222,16 @@ WHERE user_id = '{user_id}' AND dinero < 0
 ORDER BY dinero ASC LIMIT 10;
 ```
 {write_section}
+## Comportamiento proactivo
+
+- Al recibir un saludo o inicio de conversación, responde con una bienvenida breve y ofrece **2-3 sugerencias concretas** de análisis que puedes hacer ahora mismo (ej: resumen del mes, top gastos por categoría, comparativa mensual). Máximo 4 líneas.
+- Durante la conversación, si el usuario menciona un período, categoría o pregunta de análisis, **ofrece proactivamente** continuar: "¿Quieres que genere un informe detallado?", "¿Comparo con el mes anterior?", etc.
+- Si generas una tabla grande o gráfico, **guárdalo como archivo HTML** en el directorio de trabajo para que el usuario pueda abrirlo desde el panel de Archivos.
+
+## Archivos de contexto
+
+El directorio `context/` puede contener documentos subidos por el usuario (PDFs, Excel exportados, notas…). Úsalos como referencia adicional cuando el usuario los mencione.
+
 ## Idioma y estilo
 - Responde siempre en **español**.
 - Sé conciso y directo.
@@ -242,15 +263,17 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
     with open(os.path.join(workspace, "CLAUDE.md"), "w") as f:
         f.write(_build_claude_md(user_id, write_perms))
 
+    # Per-user Claude home inside the persistent workspace volume (isolated per user)
+    claude_home = f"/app/workspace/{user_id}/claude-home"
+    os.makedirs(claude_home, exist_ok=True)
+
     # Use --continue only after the first successful run; track this with a marker file
     session_marker = os.path.join(workspace, ".has_conversation")
     has_prior_conversation = os.path.exists(session_marker)
     claude_cmd = ["claude", "--continue"] if has_prior_conversation else ["claude"]
     if not has_prior_conversation:
         open(session_marker, "w").close()
-
-    claude_home = "/var/claude-home"
-    os.makedirs(claude_home, exist_ok=True)
+        await websocket.send_text(_WELCOME_BANNER)
 
     env = os.environ.copy()
     env.update({
@@ -430,3 +453,60 @@ async def download_workspace_file(path: str, inline: bool = False, user: User = 
     if inline:
         return FileResponse(safe, media_type=media_type)
     return FileResponse(safe, filename=os.path.basename(safe), media_type=media_type)
+
+
+class MkdirRequest(BaseModel):
+    path: str
+
+    @field_validator("path")
+    @classmethod
+    def sanitize(cls, v: str) -> str:
+        clean = re.sub(r'[^\w\- ]', '', v.strip()).strip()
+        if not clean:
+            raise ValueError("Nombre de carpeta vacío")
+        return clean
+
+
+@router.post("/workspace/mkdir")
+async def make_workspace_dir(body: MkdirRequest, user: User = Depends(current_active_user)):
+    workspace = f"/app/workspace/{user.id}"
+    target = os.path.normpath(os.path.join(workspace, body.path))
+    if not target.startswith(os.path.join(workspace, "")):
+        raise HTTPException(status_code=400, detail="Ruta no válida")
+    os.makedirs(target, exist_ok=True)
+    return {"path": body.path}
+
+
+class MoveRequest(BaseModel):
+    from_: str
+    to: str
+
+    class Config:
+        populate_by_name = True
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls._validate
+
+    @classmethod
+    def _validate(cls, v):
+        return v
+
+
+@router.post("/workspace/move")
+async def move_workspace_file(body: dict, user: User = Depends(current_active_user)):
+    from_path = body.get("from", "")
+    to_path   = body.get("to", "")
+    if not from_path or not to_path:
+        raise HTTPException(status_code=400, detail="Faltan campos from/to")
+    workspace = f"/app/workspace/{user.id}"
+    safe_from = os.path.normpath(os.path.join(workspace, from_path))
+    safe_to   = os.path.normpath(os.path.join(workspace, to_path))
+    if not safe_from.startswith(os.path.join(workspace, "")) or \
+       not safe_to.startswith(os.path.join(workspace, "")):
+        raise HTTPException(status_code=400, detail="Ruta no válida")
+    if not os.path.isfile(safe_from):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    os.makedirs(os.path.dirname(safe_to), exist_ok=True)
+    os.rename(safe_from, safe_to)
+    return {"from": from_path, "to": to_path}
