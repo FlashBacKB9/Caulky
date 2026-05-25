@@ -6,13 +6,18 @@ import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, Mess
 import api from '../api/client'
 import { syncPref } from '../utils/prefSync'
 
-function useDisableHtmlZoom() {
+function useTerminalZoom(): string {
+  // xterm.js mismeasures when html has a CSS zoom, so we clear it for this page.
+  // Return the saved value so callers can re-apply it to non-terminal elements.
+  const [savedZoom, setSavedZoom] = useState('')
   useEffect(() => {
     const html = document.documentElement
-    const saved = html.style.zoom
+    const current = html.style.zoom
+    setSavedZoom(current)
     html.style.zoom = ''
-    return () => { html.style.zoom = saved }
+    return () => { html.style.zoom = current }
   }, [])
+  return savedZoom
 }
 
 function copyToClipboard(text: string) {
@@ -108,7 +113,7 @@ function saveTabs(tabs: Tab[]) {
 }
 
 export default function AiConsultant() {
-  useDisableHtmlZoom()
+  const panelZoom = useTerminalZoom()
 
   const stackRef    = useRef<HTMLDivElement>(null)
   const sessionsRef = useRef<Map<string, SessionData>>(new Map())
@@ -336,7 +341,7 @@ export default function AiConsultant() {
     <div className="absolute inset-0 flex overflow-hidden">
 
       {/* ── Left panel ── */}
-      <div className="w-44 shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+      <div className="w-44 shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden" style={panelZoom ? { zoom: panelZoom } : undefined}>
 
         {/* Header */}
         <div className="px-3 pt-3 pb-2 shrink-0">
