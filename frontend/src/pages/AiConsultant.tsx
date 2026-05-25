@@ -171,7 +171,7 @@ export default function AiConsultant() {
     sess.ws = null
     sess.term.writeln('\x1b[90mConectando…\x1b[0m')
     try {
-      const { data } = await api.post<{ ticket: string }>('/ai/terminal/ticket')
+      const { data } = await api.post<{ ticket: string }>('/ai/terminal/ticket', { session_id: sess.id })
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
       const ws = new WebSocket(`${proto}://${window.location.host}/api/ai/terminal/ws?ticket=${data.ticket}`)
       ws.binaryType = 'arraybuffer'
