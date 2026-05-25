@@ -126,17 +126,30 @@ export default function AiConsultant() {
     termRef.current = term
     fitRef.current = fitAddon
 
-    // Ctrl+Shift+C → copy selection
+    // Auto-focus terminal when the user returns to this tab (e.g. after OAuth in another tab)
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') term.focus()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+
+    // Ctrl+Shift+C → copy  |  Ctrl+Shift+V → paste
     term.attachCustomKeyEventHandler((e) => {
-      if (e.type === 'keydown' && e.ctrlKey && e.shiftKey && e.code === 'KeyC') {
+      if (e.type !== 'keydown' || !e.ctrlKey || !e.shiftKey) return true
+      if (e.code === 'KeyC') {
         const sel = term.getSelection()
         if (sel) copyToClipboard(sel)
+        return false
+      }
+      if (e.code === 'KeyV') {
+        navigator.clipboard.readText()
+          .then(text => { if (text) term.paste(text) })
+          .catch(() => {})
         return false
       }
       return true
     })
 
-    // Track last selection so right-click can copy it even if mousedown clears it
+    // Track last selection so right-click can copy even if mousedown clears it
     let lastSel = ''
     term.onSelectionChange(() => {
       const s = term.getSelection()
@@ -152,9 +165,23 @@ export default function AiConsultant() {
         lastSel = ''
         term.clearSelection()
       } else {
-        navigator.clipboard.readText().then(text => {
-          wsRef.current?.send(text)
-        }).catch(() => {})
+        // Try clipboard API; if blocked, fall back to a one-shot paste-event trap
+        navigator.clipboard.readText()
+          .then(text => { if (text) term.paste(text) })
+          .catch(() => {
+            const ta = document.createElement('textarea')
+            ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0;width:1px;height:1px'
+            document.body.appendChild(ta)
+            ta.addEventListener('paste', (pe) => {
+              pe.preventDefault()
+              const text = pe.clipboardData?.getData('text/plain') ?? ''
+              document.body.removeChild(ta)
+              if (text) term.paste(text)
+              term.focus()
+            }, { once: true })
+            ta.focus()
+            document.execCommand('paste')
+          })
       }
     }
     el.addEventListener('contextmenu', handleContextMenu)
@@ -165,9 +192,10 @@ export default function AiConsultant() {
     const ro = new ResizeObserver(() => { fitRef.current?.fit() })
     ro.observe(containerRef.current)
 
-    connectWs()
+    connectWs().then(() => term.focus())
 
     return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
       el.removeEventListener('contextmenu', handleContextMenu)
       ro.disconnect()
       wsRef.current?.close()
