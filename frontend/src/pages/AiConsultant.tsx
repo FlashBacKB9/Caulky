@@ -2,11 +2,9 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare } from 'lucide-react'
+import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare, TerminalSquare } from 'lucide-react'
 import api from '../api/client'
 
-// Chrome bug: CSS zoom on <html> breaks xterm.js mouse coordinates.
-// Reset it while this page is mounted and restore on unmount.
 function useDisableHtmlZoom() {
   useEffect(() => {
     const html = document.documentElement
@@ -39,6 +37,12 @@ function fmtSize(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1_048_576) return `${(bytes / 1024).toFixed(0)} KB`
   return `${(bytes / 1_048_576).toFixed(1)} MB`
+}
+
+function generateId(): string {
+  return typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
 }
 
 function FileIcon({ name }: { name: string }) {
@@ -74,22 +78,38 @@ type SessionData = {
   container: HTMLDivElement
 }
 
+type Tab =
+  | { kind: 'term'; id: string; label: string }
+  | { kind: 'html'; id: string; label: string; src: string }
+
 type WorkspaceFile = { path: string; name: string; size: number; modified: number }
+
+const TABS_STORAGE_KEY = 'ai-tab-names'
+
+function loadSavedNames(): string[] {
+  try { return JSON.parse(localStorage.getItem(TABS_STORAGE_KEY) ?? '[]') } catch { return [] }
+}
+
+function saveTabs(tabs: Tab[]) {
+  const names = tabs.filter(t => t.kind === 'term').map(t => t.label)
+  if (names.length > 0) localStorage.setItem(TABS_STORAGE_KEY, JSON.stringify(names))
+}
 
 export default function AiConsultant() {
   useDisableHtmlZoom()
 
-  const stackRef     = useRef<HTMLDivElement>(null)
-  const sessionsRef  = useRef<Map<string, SessionData>>(new Map())
-  const counterRef   = useRef(0)
+  const stackRef    = useRef<HTMLDivElement>(null)
+  const sessionsRef = useRef<Map<string, SessionData>>(new Map())
+  const counterRef  = useRef(0)
 
-  const [sessionIds, setSessionIds] = useState<string[]>([])
-  const [activeId,   setActiveId]   = useState('')
+  const [tabs,      setTabs]      = useState<Tab[]>([])
+  const [activeId,  setActiveId]  = useState('')
+  const [editingId, setEditingId] = useState('')
 
   const [files,        setFiles]        = useState<WorkspaceFile[]>([])
   const [filesLoading, setFilesLoading] = useState(false)
 
-  // ── File browser ───────────────────────────────────────────────────────────
+  // ── File browser ─────────────────────────────────────────────────────────────
   const refreshFiles = useCallback(async () => {
     setFilesLoading(true)
     try {
@@ -107,8 +127,8 @@ export default function AiConsultant() {
     document.body.removeChild(a)
   }, [])
 
-  // ── Session management ─────────────────────────────────────────────────────
-  const activateSession = useCallback((id: string) => {
+  // ── Tab/session management ────────────────────────────────────────────────────
+  const activateTab = useCallback((id: string) => {
     for (const [sid, s] of sessionsRef.current) {
       s.container.style.visibility = sid === id ? 'visible' : 'hidden'
     }
@@ -127,6 +147,11 @@ export default function AiConsultant() {
       const ws = new WebSocket(`${proto}://${window.location.host}/api/ai/terminal/ws?ticket=${data.ticket}`)
       ws.binaryType = 'arraybuffer'
       sess.ws = ws
+      ws.onopen = () => {
+        // Send current terminal size so PTY matches display from the start
+        const { cols, rows } = sess.term
+        if (ws.readyState === WebSocket.OPEN && cols > 0) ws.send(`resize:${cols}:${rows}`)
+      }
       ws.onmessage = (e) => {
         if (e.data instanceof ArrayBuffer) sess.term.write(new Uint8Array(e.data))
         else sess.term.write(e.data as string)
@@ -138,13 +163,11 @@ export default function AiConsultant() {
     }
   }, [])
 
-  const createSession = useCallback(() => {
+  const createSession = useCallback((name?: string) => {
     if (!stackRef.current) return
     counterRef.current++
-    const id = typeof crypto.randomUUID === 'function'
-      ? crypto.randomUUID()
-      : `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`
-    const label = `Sesión ${counterRef.current}`
+    const id    = generateId()
+    const label = name ?? `Sesión ${counterRef.current}`
 
     const container = document.createElement('div')
     container.style.cssText = 'position:absolute;inset:0;visibility:hidden'
@@ -156,18 +179,10 @@ export default function AiConsultant() {
     term.open(container)
     requestAnimationFrame(() => fit.fit())
 
-    // Copy / paste
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown' || !e.ctrlKey || !e.shiftKey) return true
-      if (e.code === 'KeyC') {
-        const sel = term.getSelection()
-        if (sel) copyToClipboard(sel)
-        return false
-      }
-      if (e.code === 'KeyV') {
-        navigator.clipboard.readText().then(t => { if (t) term.paste(t) }).catch(() => {})
-        return false
-      }
+      if (e.code === 'KeyC') { const sel = term.getSelection(); if (sel) copyToClipboard(sel); return false }
+      if (e.code === 'KeyV') { navigator.clipboard.readText().then(t => { if (t) term.paste(t) }).catch(() => {}); return false }
       return true
     })
 
@@ -199,27 +214,60 @@ export default function AiConsultant() {
 
     const sess: SessionData = { id, label, term, fit, ws: null, container }
     sessionsRef.current.set(id, sess)
-    setSessionIds(prev => [...prev, id])
-    activateSession(id)
-    connectSession(sess).then(() => term.focus())
-  }, [activateSession, connectSession])
-
-  const closeSession = useCallback((id: string) => {
-    const sess = sessionsRef.current.get(id)
-    if (!sess) return
-    sess.ws?.close()
-    sess.term.dispose()
-    sess.container.remove()
-    sessionsRef.current.delete(id)
-    setSessionIds(prev => {
-      const next = prev.filter(s => s !== id)
-      if (next.length > 0) activateSession(next[next.length - 1])
-      else setActiveId('')
+    setTabs(prev => {
+      const next = [...prev, { kind: 'term' as const, id, label }]
+      saveTabs(next)
       return next
     })
-  }, [activateSession])
+    activateTab(id)
+    connectSession(sess).then(() => term.focus())
+  }, [activateTab, connectSession])
 
-  // Auto-focus when returning to tab after OAuth
+  const openHtmlViewer = useCallback((file: WorkspaceFile) => {
+    const src = `/api/ai/workspace/file?path=${encodeURIComponent(file.path)}`
+    setTabs(prev => {
+      const existing = prev.find(t => t.kind === 'html' && (t as Extract<Tab, {kind:'html'}>).src === src)
+      if (existing) {
+        // Just activate it
+        for (const [, s] of sessionsRef.current) s.container.style.visibility = 'hidden'
+        setActiveId(existing.id)
+        return prev
+      }
+      const id = generateId()
+      for (const [, s] of sessionsRef.current) s.container.style.visibility = 'hidden'
+      setActiveId(id)
+      return [...prev, { kind: 'html' as const, id, label: file.name, src }]
+    })
+  }, [])
+
+  const closeTab = useCallback((id: string) => {
+    const sess = sessionsRef.current.get(id)
+    if (sess) {
+      sess.ws?.close()
+      sess.term.dispose()
+      sess.container.remove()
+      sessionsRef.current.delete(id)
+    }
+    setTabs(prev => {
+      const next = prev.filter(t => t.id !== id)
+      if (next.length > 0) activateTab(next[next.length - 1].id)
+      else setActiveId('')
+      saveTabs(next)
+      return next
+    })
+  }, [activateTab])
+
+  const renameTab = useCallback((id: string, label: string) => {
+    const sess = sessionsRef.current.get(id)
+    if (sess) sess.label = label
+    setTabs(prev => {
+      const next = prev.map(t => t.id === id ? { ...t, label } : t)
+      saveTabs(next)
+      return next
+    })
+  }, [])
+
+  // ── Effects ───────────────────────────────────────────────────────────────────
   useEffect(() => {
     const fn = () => {
       if (document.visibilityState === 'visible' && activeId) {
@@ -230,7 +278,6 @@ export default function AiConsultant() {
     return () => document.removeEventListener('visibilitychange', fn)
   }, [activeId])
 
-  // Resize observer for active terminal
   useEffect(() => {
     if (!stackRef.current) return
     const ro = new ResizeObserver(() => {
@@ -240,20 +287,25 @@ export default function AiConsultant() {
     return () => ro.disconnect()
   }, [activeId])
 
-  // First session + initial file list
   useEffect(() => {
-    createSession()
+    const saved = loadSavedNames()
+    if (saved.length > 0) {
+      saved.forEach(n => createSession(n))
+    } else {
+      createSession()
+    }
     refreshFiles()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Cleanup all on unmount
   useEffect(() => () => {
     for (const s of sessionsRef.current.values()) { s.ws?.close(); s.term.dispose() }
     sessionsRef.current.clear()
   }, [])
 
-  // ── Render ─────────────────────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────────────────────
+  const activeTab = tabs.find(t => t.id === activeId)
+
   return (
     <div className="absolute inset-0 flex overflow-hidden">
 
@@ -266,7 +318,7 @@ export default function AiConsultant() {
             Consultor IA
           </p>
           <button
-            onClick={createSession}
+            onClick={() => createSession()}
             className="w-full flex items-center justify-center gap-1.5 text-xs px-2 py-1.5 rounded-md bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-100 dark:hover:bg-blue-800/40 transition-colors"
           >
             <Plus className="w-3.5 h-3.5" />
@@ -274,16 +326,14 @@ export default function AiConsultant() {
           </button>
         </div>
 
-        {/* Session tabs */}
+        {/* Tabs */}
         <div className="flex-1 overflow-y-auto min-h-0 py-0.5">
-          {sessionIds.map(id => {
-            const sess = sessionsRef.current.get(id)
-            if (!sess) return null
-            const active = id === activeId
+          {tabs.map(tab => {
+            const active = tab.id === activeId
             return (
               <div
-                key={id}
-                onClick={() => activateSession(id)}
+                key={tab.id}
+                onClick={() => activateTab(tab.id)}
                 className={`group flex items-center gap-1 px-2 py-1.5 mx-1 my-0.5 rounded-md cursor-pointer text-xs transition-colors ${
                   active
                     ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300'
@@ -292,12 +342,31 @@ export default function AiConsultant() {
               >
                 {active
                   ? <ChevronRight className="w-3 h-3 shrink-0" />
-                  : <MessageSquare className="w-3 h-3 shrink-0 opacity-40" />
+                  : tab.kind === 'html'
+                    ? <Globe className="w-3 h-3 shrink-0 opacity-40" />
+                    : <MessageSquare className="w-3 h-3 shrink-0 opacity-40" />
                 }
-                <span className="flex-1 truncate">{sess.label}</span>
-                {sessionIds.length > 1 && (
+                {editingId === tab.id ? (
+                  <input
+                    autoFocus
+                    value={tab.label}
+                    onChange={e => renameTab(tab.id, e.target.value)}
+                    onBlur={() => setEditingId('')}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === 'Escape') setEditingId('') }}
+                    onClick={e => e.stopPropagation()}
+                    className="flex-1 min-w-0 text-xs bg-transparent border-b border-current outline-none"
+                  />
+                ) : (
+                  <span
+                    className="flex-1 truncate"
+                    onDoubleClick={e => { e.stopPropagation(); setEditingId(tab.id) }}
+                  >
+                    {tab.label}
+                  </span>
+                )}
+                {tabs.length > 1 && (
                   <button
-                    onClick={(e) => { e.stopPropagation(); closeSession(id) }}
+                    onClick={e => { e.stopPropagation(); closeTab(tab.id) }}
                     className="opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity ml-auto shrink-0"
                   >
                     <X className="w-3 h-3" />
@@ -329,30 +398,48 @@ export default function AiConsultant() {
                 Sin archivos
               </p>
             ) : (
-              files.map(f => (
-                <button
-                  key={f.path}
-                  onClick={() => downloadFile(f.path)}
-                  title={`${f.path}  ·  ${fmtSize(f.size)}`}
-                  className="group w-full flex items-center gap-1.5 px-2 py-1 mx-0.5 rounded text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
-                  style={{ maxWidth: 'calc(100% - 4px)' }}
-                >
-                  <FileIcon name={f.name} />
-                  <span className="flex-1 truncate">{f.name}</span>
-                  <Download className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500" />
-                </button>
-              ))
+              files.map(f => {
+                const isHtml = /\.html?$/i.test(f.name)
+                return (
+                  <button
+                    key={f.path}
+                    onClick={() => isHtml ? openHtmlViewer(f) : downloadFile(f.path)}
+                    title={isHtml ? `Ver ${f.name}` : `${f.path}  ·  ${fmtSize(f.size)}`}
+                    className="group w-full flex items-center gap-1.5 px-2 py-1 mx-0.5 rounded text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-left"
+                    style={{ maxWidth: 'calc(100% - 4px)' }}
+                  >
+                    <FileIcon name={f.name} />
+                    <span className="flex-1 truncate">{f.name}</span>
+                    {isHtml
+                      ? <TerminalSquare className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-blue-400" />
+                      : <Download className="w-3 h-3 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-gray-500" />
+                    }
+                  </button>
+                )
+              })
             )}
           </div>
         </div>
       </div>
 
-      {/* ── Terminal stack ── */}
+      {/* ── Stack area (terminals + HTML viewers) ── */}
       <div
         ref={stackRef}
-        className="flex-1 relative"
+        className="flex-1 relative overflow-hidden"
         style={{ background: '#0f172a' }}
-      />
+      >
+        {/* HTML viewer iframes — one per html tab, visibility-toggled */}
+        {tabs.map(tab =>
+          tab.kind === 'html' ? (
+            <iframe
+              key={tab.id}
+              src={(tab as Extract<Tab, { kind: 'html' }>).src}
+              className="absolute inset-0 w-full h-full border-0 bg-white"
+              style={{ visibility: tab.id === activeId ? 'visible' : 'hidden' }}
+            />
+          ) : null
+        )}
+      </div>
     </div>
   )
 }
