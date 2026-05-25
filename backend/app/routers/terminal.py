@@ -1,10 +1,12 @@
 import asyncio
+import mimetypes
 import os
 import secrets
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.responses import FileResponse
 from fastapi.websockets import WebSocketState
 
 from app.auth.setup import current_active_user
@@ -244,3 +246,44 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
             await websocket.close()
         except Exception:
             pass
+
+
+# ── Workspace file browser ────────────────────────────────────────────────────
+
+_SKIP_FILES = {"CLAUDE.md"}
+
+
+@router.get("/workspace/files")
+async def list_workspace_files(user: User = Depends(current_active_user)):
+    workspace = f"/app/workspace/{user.id}"
+    if not os.path.exists(workspace):
+        return {"files": []}
+
+    files = []
+    for root, dirs, filenames in os.walk(workspace):
+        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        for fname in filenames:
+            if fname in _SKIP_FILES:
+                continue
+            full = os.path.join(root, fname)
+            rel = os.path.relpath(full, workspace).replace("\\", "/")
+            try:
+                st = os.stat(full)
+                files.append({"path": rel, "name": fname, "size": st.st_size, "modified": st.st_mtime})
+            except OSError:
+                continue
+
+    files.sort(key=lambda f: f["modified"], reverse=True)
+    return {"files": files}
+
+
+@router.get("/workspace/file")
+async def download_workspace_file(path: str, user: User = Depends(current_active_user)):
+    workspace = f"/app/workspace/{user.id}"
+    safe = os.path.normpath(os.path.join(workspace, path))
+    if not safe.startswith(os.path.join(workspace, "")):
+        raise HTTPException(status_code=400, detail="Ruta no válida")
+    if not os.path.isfile(safe):
+        raise HTTPException(status_code=404, detail="Archivo no encontrado")
+    media_type = mimetypes.guess_type(safe)[0] or "application/octet-stream"
+    return FileResponse(safe, filename=os.path.basename(safe), media_type=media_type)
