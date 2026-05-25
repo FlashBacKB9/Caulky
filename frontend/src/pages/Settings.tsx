@@ -148,6 +148,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
   const [balance, setBalance]       = useState(String(account.initial_balance))
   const [deprRate, setDeprRate]     = useState(String(account.depreciation_rate ?? ''))
   const [valueDate, setValueDate]   = useState(account.value_date ?? '')
+  const [newCar, setNewCar]         = useState(account.new_car ?? false)
   const [confirming, setConfirming] = useState(false)
   const [movCount, setMovCount]     = useState(0)
   const [showModal, setShowModal]   = useState(false)
@@ -166,6 +167,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
         initial_balance: isNaN(parseFloat(balance.replace(',', '.'))) ? account.initial_balance : parseFloat(balance.replace(',', '.')),
         depreciation_rate: category === 'vehiculo' && deprRate !== '' ? parseFloat(deprRate) : null,
         value_date: category === 'vehiculo' && valueDate !== '' ? valueDate : null,
+        new_car: category === 'vehiculo' ? newCar : false,
       })
       if (!account.is_main) {
         const prevLinked = new Set(allTypes.filter(t => t.linked_account_id === account.id).map(t => t.id))
@@ -212,6 +214,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
     setCategory(account.category)
     setDeprRate(String(account.depreciation_rate ?? ''))
     setValueDate(account.value_date ?? '')
+    setNewCar(account.new_car ?? false)
     setLinkedIds(new Set(allTypes.filter(t => t.linked_account_id === account.id).map(t => t.id)))
     setEditing(false)
   }
@@ -286,6 +289,11 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
                   className="w-24 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
               </div>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={newCar} onChange={e => setNewCar(e.target.checked)}
+                  className="mt-0.5 w-3.5 h-3.5 rounded accent-blue-500 shrink-0" />
+                <span className="text-xs text-gray-500 dark:text-gray-400">{t('account.newCar')}</span>
+              </label>
             </>
           )}
           {!account.is_main && (
@@ -943,6 +951,7 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
   const [newCategory, setNewCategory] = useState<AccountCategory>('corriente')
   const [newDeprRate, setNewDeprRate] = useState('')
   const [newValueDate, setNewValueDate] = useState('')
+  const [newCarFlag, setNewCarFlag] = useState(false)
 
   const { data: allTypes = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
 
@@ -957,11 +966,12 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
       initial_balance: isNaN(parseFloat(newBal.replace(',', '.'))) ? 0 : parseFloat(newBal.replace(',', '.')),
       depreciation_rate: newCategory === 'vehiculo' && newDeprRate !== '' ? parseFloat(newDeprRate) : null,
       value_date: newCategory === 'vehiculo' && newValueDate !== '' ? newValueDate : null,
+      new_car: newCategory === 'vehiculo' ? newCarFlag : false,
     }),
     onSuccess: () => {
       invalidate()
       setAdding(false); setNewName(''); setNewColor('#3b82f6'); setNewIcon('wallet'); setNewBal('0'); setNewCategory('corriente')
-      setNewDeprRate(''); setNewValueDate('')
+      setNewDeprRate(''); setNewValueDate(''); setNewCarFlag(false)
     },
   })
 
@@ -1084,6 +1094,11 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
                     className="w-24 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
+                <label className="flex items-start gap-2 cursor-pointer">
+                  <input type="checkbox" checked={newCarFlag} onChange={e => setNewCarFlag(e.target.checked)}
+                    className="mt-0.5 w-3.5 h-3.5 rounded accent-blue-500 shrink-0" />
+                  <span className="text-xs text-gray-500 dark:text-gray-400">{t('account.newCar')}</span>
+                </label>
               </>
             )}
             <div className="flex justify-end gap-2">

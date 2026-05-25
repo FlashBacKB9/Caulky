@@ -20,6 +20,7 @@ class Account(Base):
     category: Mapped[str] = mapped_column(String(20), nullable=False, default="corriente")
     depreciation_rate: Mapped[float | None] = mapped_column(Numeric(6, 4), nullable=True)
     value_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    new_car: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )

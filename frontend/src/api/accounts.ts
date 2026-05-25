@@ -15,6 +15,7 @@ export interface Account {
   category: AccountCategory
   depreciation_rate: number | null
   value_date: string | null
+  new_car: boolean
 }
 
 export interface AccountsSummary {
@@ -28,10 +29,10 @@ export const getAccountsSummary = () =>
 export const updateAccount = (id: number, initial_balance: number) =>
   api.put<Account>(`/accounts/${id}`, { initial_balance }).then(r => r.data)
 
-export const updateAccountFull = (id: number, patch: Partial<Pick<Account, 'name' | 'color' | 'icon' | 'initial_balance' | 'category' | 'depreciation_rate' | 'value_date'>>) =>
+export const updateAccountFull = (id: number, patch: Partial<Pick<Account, 'name' | 'color' | 'icon' | 'initial_balance' | 'category' | 'depreciation_rate' | 'value_date' | 'new_car'>>) =>
   api.put<Account>(`/accounts/${id}`, patch).then(r => r.data)
 
-export const createAccount = (body: { name: string; color: string; icon: string; initial_balance: number; category: AccountCategory; depreciation_rate?: number | null; value_date?: string | null }) =>
+export const createAccount = (body: { name: string; color: string; icon: string; initial_balance: number; category: AccountCategory; depreciation_rate?: number | null; value_date?: string | null; new_car?: boolean }) =>
   api.post<Account>('/accounts/', body).then(r => r.data)
 
 export const reorderAccounts = (ids: number[]) =>

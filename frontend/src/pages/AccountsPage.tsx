@@ -38,9 +38,13 @@ function vehicleCurrentValue(acc: Account): number {
   if (acc.category !== 'vehiculo' || acc.depreciation_rate == null || acc.value_date == null) {
     return acc.balance
   }
+  // Use balance (includes purchase movement) as base; fall back to initial_balance if balance is 0
+  const base = acc.balance !== 0 ? acc.balance : acc.initial_balance
+  // Apply immediate 15% depreciation for new vehicles (off-the-lot value drop)
+  const baseAfterImmediate = acc.new_car ? base * 0.85 : base
   const yearsElapsed = (Date.now() - new Date(acc.value_date + 'T00:00:00').getTime()) / (365.25 * 24 * 3600 * 1000)
   const factor = Math.max(0, 1 - (acc.depreciation_rate / 100) * yearsElapsed)
-  return Math.round(acc.initial_balance * factor * 100) / 100
+  return Math.round(baseAfterImmediate * factor * 100) / 100
 }
 
 function buildAccountHistory(
@@ -459,9 +463,12 @@ export default function AccountsPage() {
                         {isVehicle && acc.depreciation_rate != null ? (
                           <div className="space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
                             <div>{t('accounts.vehicleCurrentVal')}</div>
-                            <div>{t('accounts.deprecPerYear')}: <span className="font-semibold">{acc.depreciation_rate}%</span></div>
-                            {acc.initial_balance !== currentVal && (
-                              <div className="text-red-400">{t('invest.invested')}: {fmt(acc.initial_balance)}</div>
+                            <div>
+                              {t('accounts.deprecPerYear')}: <span className="font-semibold">{acc.depreciation_rate}%</span>
+                              {acc.new_car && <span className="ml-1 text-amber-500">+15%</span>}
+                            </div>
+                            {acc.balance !== currentVal && (
+                              <div className="text-gray-500 dark:text-gray-600">{t('invest.invested')}: {fmt(acc.balance !== 0 ? acc.balance : acc.initial_balance)}</div>
                             )}
                           </div>
                         ) : isInvestCat && investCurrentVal != null ? (

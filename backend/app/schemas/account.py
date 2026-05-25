@@ -15,6 +15,7 @@ class AccountRead(BaseModel):
     category: str = "corriente"
     depreciation_rate: float | None = None
     value_date: datetime.date | None = None
+    new_car: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -27,6 +28,7 @@ class AccountCreate(BaseModel):
     category: str = "corriente"
     depreciation_rate: float | None = None
     value_date: datetime.date | None = None
+    new_car: bool = False
 
 
 class AccountPatch(BaseModel):
@@ -37,6 +39,7 @@ class AccountPatch(BaseModel):
     category: str | None = None
     depreciation_rate: float | None = None
     value_date: datetime.date | None = None
+    new_car: bool | None = None
 
 
 class AccountUpdate(BaseModel):
