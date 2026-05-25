@@ -242,6 +242,13 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
     with open(os.path.join(workspace, "CLAUDE.md"), "w") as f:
         f.write(_build_claude_md(user_id, write_perms))
 
+    # Use --continue only after the first successful run; track this with a marker file
+    session_marker = os.path.join(workspace, ".has_conversation")
+    has_prior_conversation = os.path.exists(session_marker)
+    claude_cmd = ["claude", "--continue"] if has_prior_conversation else ["claude"]
+    if not has_prior_conversation:
+        open(session_marker, "w").close()
+
     claude_home = "/var/claude-home"
     os.makedirs(claude_home, exist_ok=True)
 
@@ -267,7 +274,7 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
 
     try:
         proc = ptyprocess.PtyProcess.spawn(
-            ["claude", "--continue"],
+            claude_cmd,
             cwd=workspace,
             env=env,
             dimensions=(50, 200),
@@ -351,7 +358,7 @@ async def view_workspace_file(path: str, user: User = Depends(current_active_use
     return FileResponse(safe, media_type=media_type)
 
 
-_SKIP_FILES = {"CLAUDE.md"}
+_SKIP_FILES = {"CLAUDE.md", ".has_conversation"}
 
 
 @router.get("/workspace/files")
