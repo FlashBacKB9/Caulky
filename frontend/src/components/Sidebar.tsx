@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Wallet, Settings, Info, X, ExternalLink, LogOut } from 'lucide-react'
+import { Wallet, Settings, Info, X, ExternalLink, LogOut, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 import { logout } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
@@ -110,7 +110,17 @@ function InfoModal({ onClose }: { onClose: () => void }) {
   )
 }
 
-export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose?: () => void }) {
+export default function Sidebar({
+  isOpen,
+  onClose,
+  collapsed = false,
+  onToggleCollapse,
+}: {
+  isOpen?: boolean
+  onClose?: () => void
+  collapsed?: boolean
+  onToggleCollapse?: () => void
+}) {
   const navEntries = useNavConfig()
   const [showInfo, setShowInfo] = useState(false)
   const { setUser } = useAuth()
@@ -128,64 +138,92 @@ export default function Sidebar({ isOpen, onClose }: { isOpen?: boolean; onClose
     .map(e => ({ to: e.id, ...PAGE_META[e.id] }))
 
   const linkCls = (isActive: boolean) =>
-    `flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+    `flex items-center ${collapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-1.5'} rounded-lg text-sm font-medium transition-colors ${
       isActive
         ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-white'
         : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200'
     }`
 
+  const actionCls = `flex items-center ${collapsed ? 'justify-center px-0 py-2' : 'gap-3 px-3 py-2'} w-full rounded-lg text-sm font-medium transition-colors`
+
   return (
     <>
       {showInfo && <InfoModal onClose={() => setShowInfo(false)} />}
       <aside className={`
-        fixed inset-y-0 left-0 z-50 w-56 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 overflow-y-auto
-        transition-transform duration-200
+        fixed inset-y-0 left-0 z-50 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 overflow-y-auto flex flex-col
+        transition-all duration-200
         md:relative md:translate-x-0 md:z-auto
+        ${collapsed ? 'w-14' : 'w-56'}
         ${isOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="px-5 py-5 border-b border-gray-100 dark:border-gray-800 flex items-center gap-2.5">
-          <Wallet className="w-5 h-5 text-gray-800 dark:text-white" strokeWidth={1.5} />
-          <span className="font-bold text-lg text-gray-800 dark:text-white">Caulky</span>
+        {/* Header */}
+        <div className={`py-5 border-b border-gray-100 dark:border-gray-800 flex items-center shrink-0 ${collapsed ? 'justify-center px-0' : 'px-5 gap-2.5'}`}>
+          <Wallet className="w-5 h-5 text-gray-800 dark:text-white shrink-0" strokeWidth={1.5} />
+          {!collapsed && <span className="font-bold text-lg text-gray-800 dark:text-white">Caulky</span>}
         </div>
 
-        <nav className="px-3 pt-4 space-y-0.5">
-          {visibleLinks.map(({ to, labelKey, label, Icon }) => (
-            <NavLink
-              key={to}
-              to={to}
-              end={to === '/'}
-              className={({ isActive }) => linkCls(isActive)}
-              onClick={onClose}
-            >
-              <Icon className="w-4 h-4" strokeWidth={1.5} />
-              {t(labelKey) || label}
-            </NavLink>
-          ))}
+        {/* Nav links */}
+        <nav className={`pt-4 space-y-0.5 flex-1 ${collapsed ? 'px-1' : 'px-3'}`}>
+          {visibleLinks.map(({ to, labelKey, label, Icon }) => {
+            const displayLabel = t(labelKey) || label
+            return (
+              <NavLink
+                key={to}
+                to={to}
+                end={to === '/'}
+                title={collapsed ? displayLabel : undefined}
+                className={({ isActive }) => linkCls(isActive)}
+                onClick={onClose}
+              >
+                <Icon className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+                {!collapsed && displayLabel}
+              </NavLink>
+            )
+          })}
         </nav>
 
-        <div className="px-3 pb-4 border-t border-gray-100 dark:border-gray-800 mt-2 pt-2 space-y-0.5">
+        {/* Footer actions */}
+        <div className={`pb-4 border-t border-gray-100 dark:border-gray-800 mt-2 pt-2 space-y-0.5 shrink-0 ${collapsed ? 'px-1' : 'px-3'}`}>
           <NavLink
             to="/settings"
+            title={collapsed ? t('layout.settings') : undefined}
             className={({ isActive }) => linkCls(isActive)}
             onClick={onClose}
           >
-            <Settings className="w-4 h-4" strokeWidth={1.5} />
-            {t('layout.settings')}
+            <Settings className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+            {!collapsed && t('layout.settings')}
           </NavLink>
           <button
             onClick={() => { setShowInfo(true); onClose?.() }}
-            className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+            title={collapsed ? t('layout.about') : undefined}
+            className={`${actionCls} text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300`}
           >
-            <Info className="w-4 h-4" strokeWidth={1.5} />
-            {t('layout.about')}
+            <Info className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+            {!collapsed && t('layout.about')}
           </button>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-3 py-2 rounded-lg text-sm font-medium text-gray-400 dark:text-gray-500 hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-600 dark:hover:text-red-400 transition-colors"
+            title={collapsed ? t('layout.logout') : undefined}
+            className={`${actionCls} text-gray-400 dark:text-gray-500 hover:bg-red-50 dark:hover:bg-red-950 hover:text-red-600 dark:hover:text-red-400`}
           >
-            <LogOut className="w-4 h-4" strokeWidth={1.5} />
-            {t('layout.logout')}
+            <LogOut className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+            {!collapsed && t('layout.logout')}
           </button>
+
+          {/* Collapse toggle — desktop only */}
+          {onToggleCollapse && (
+            <button
+              onClick={onToggleCollapse}
+              title={collapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral'}
+              className={`${actionCls} text-gray-300 dark:text-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-500 dark:hover:text-gray-400 hidden md:flex`}
+            >
+              {collapsed
+                ? <ChevronRight className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+                : <ChevronLeft className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+              }
+              {!collapsed && <span className="text-xs">{t('layout.collapse') || 'Colapsar'}</span>}
+            </button>
+          )}
         </div>
       </aside>
     </>

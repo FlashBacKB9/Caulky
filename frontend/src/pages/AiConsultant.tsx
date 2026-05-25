@@ -253,7 +253,7 @@ export default function AiConsultant() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div className="flex h-full overflow-hidden">
+    <div className="flex flex-1 min-h-0 overflow-hidden">
 
       {/* ── Left panel ── */}
       <div className="w-44 shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">

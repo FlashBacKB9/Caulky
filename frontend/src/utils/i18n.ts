@@ -108,6 +108,7 @@ const ES: Record<string, string> = {
   'layout.settings': 'Configuración',
   'layout.about':    'Acerca de',
   'layout.logout':   'Cerrar sesión',
+  'layout.collapse': 'Colapsar',
 
   'quickadd.title':       'Añadir movimiento',
   'quickadd.templates':   'Plantillas',
@@ -1308,6 +1309,7 @@ const EN: Record<string, string> = {
   'layout.settings': 'Settings',
   'layout.about':    'About',
   'layout.logout':   'Sign out',
+  'layout.collapse': 'Collapse',
 
   'quickadd.title':       'Add transaction',
   'quickadd.templates':   'Templates',
@@ -2509,6 +2511,7 @@ const FR: Record<string, string> = {
   'layout.settings': 'Paramètres',
   'layout.about':    'À propos',
   'layout.logout':   'Se déconnecter',
+  'layout.collapse': 'Réduire',
 
   'quickadd.title':       'Ajouter une transaction',
   'quickadd.templates':   'Modèles',
@@ -3710,6 +3713,7 @@ const DE: Record<string, string> = {
   'layout.settings': 'Einstellungen',
   'layout.about':    'Über',
   'layout.logout':   'Abmelden',
+  'layout.collapse': 'Einklappen',
 
   'quickadd.title':       'Transaktion hinzufügen',
   'quickadd.templates':   'Vorlagen',
@@ -4911,6 +4915,7 @@ const IT: Record<string, string> = {
   'layout.settings': 'Impostazioni',
   'layout.about':    'Informazioni',
   'layout.logout':   'Esci',
+  'layout.collapse': 'Comprimi',
 
   'quickadd.title':       'Aggiungi movimento',
   'quickadd.templates':   'Modelli',

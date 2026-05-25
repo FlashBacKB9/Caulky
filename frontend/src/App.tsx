@@ -1,5 +1,5 @@
 import { useState, useLayoutEffect, useEffect } from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Menu, Wallet } from 'lucide-react'
 import Sidebar from './components/Sidebar'
@@ -63,6 +63,20 @@ function PageRoutes() {
 
 function SidebarLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(
+    () => localStorage.getItem('sidebar-collapsed') === '1'
+  )
+  const { pathname } = useLocation()
+  const fullscreen = pathname === '/consultor-ia'
+
+  const toggleCollapsed = () => {
+    setSidebarCollapsed(v => {
+      const next = !v
+      localStorage.setItem('sidebar-collapsed', next ? '1' : '0')
+      return next
+    })
+  }
+
   return (
     <div className="flex h-full overflow-hidden bg-gray-50 dark:bg-gray-950">
       {sidebarOpen && (
@@ -71,7 +85,12 @@ function SidebarLayout() {
           onClick={() => setSidebarOpen(false)}
         />
       )}
-      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      <Sidebar
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        collapsed={sidebarCollapsed}
+        onToggleCollapse={toggleCollapsed}
+      />
       <div className="flex flex-col flex-1 overflow-hidden">
         <header className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 md:hidden shrink-0">
           <button
@@ -83,9 +102,10 @@ function SidebarLayout() {
           <Wallet className="w-5 h-5 text-gray-800 dark:text-white" strokeWidth={1.5} />
           <span className="font-bold text-gray-800 dark:text-white">Caulky</span>
         </header>
-        <main className="flex-1 overflow-y-auto">
-          <PageRoutes />
-        </main>
+        {fullscreen
+          ? <div className="flex-1 min-h-0 flex flex-col overflow-hidden"><PageRoutes /></div>
+          : <main className="flex-1 overflow-y-auto"><PageRoutes /></main>
+        }
       </div>
     </div>
   )
