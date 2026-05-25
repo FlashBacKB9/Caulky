@@ -1039,9 +1039,12 @@ export default function Movements() {
     const accountMovements = linkedTypeIds === null
       ? allMovementsForYears
       : allMovementsForYears.filter(mv => mv.movement_type_id != null && linkedTypeIds.has(mv.movement_type_id))
+    // Non-main accounts are funded via transfers from uso, so the sign is inverted:
+    // a -100 on uso = +100 arriving in ahorro.
+    const sign = linkedTypeIds === null ? 1 : -1
     const byDate = new Map<string, number>()
     for (const mv of accountMovements) {
-      byDate.set(mv.date, (byDate.get(mv.date) ?? 0) + mv.dinero)
+      byDate.set(mv.date, (byDate.get(mv.date) ?? 0) + mv.dinero * sign)
     }
     const dates = [...byDate.keys()].sort((a, b) => b.localeCompare(a))
     const map = new Map<string, number>()
