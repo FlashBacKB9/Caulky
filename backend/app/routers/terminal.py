@@ -76,16 +76,14 @@ def _consume_ticket(token: str) -> tuple[Optional[str], Optional[str], str]:
 
 _WELCOME_BANNER = (
     "\r\n"
-    "\x1b[1;34m┌────────────────────────────────────────────────────────┐\x1b[0m\r\n"
-    "\x1b[1;34m│\x1b[0m  \x1b[1;37mCaulkAI · Tu consultor financiero personal\x1b[0m      \x1b[1;34m│\x1b[0m\r\n"
-    "\x1b[1;34m│\x1b[0m                                                        \x1b[1;34m│\x1b[0m\r\n"
-    "\x1b[1;34m│\x1b[0m  \x1b[90mAnalizo tus gastos, ingresos e inversiones. Puedo\x1b[0m  \x1b[1;34m│\x1b[0m\r\n"
-    "\x1b[1;34m│\x1b[0m  \x1b[90mcrear informes, detectar patrones y responder\x1b[0m      \x1b[1;34m│\x1b[0m\r\n"
-    "\x1b[1;34m│\x1b[0m  \x1b[90mcualquier pregunta sobre tus finanzas.\x1b[0m            \x1b[1;34m│\x1b[0m\r\n"
-    "\x1b[1;34m│\x1b[0m                                                        \x1b[1;34m│\x1b[0m\r\n"
-    "\x1b[1;34m│\x1b[0m  \x1b[90mSube documentos de contexto desde el panel lateral.\x1b[0m \x1b[1;34m│\x1b[0m\r\n"
-    "\x1b[1;34m│\x1b[0m  \x1b[90mControla mis permisos de escritura abajo a la izq.\x1b[0m  \x1b[1;34m│\x1b[0m\r\n"
-    "\x1b[1;34m└────────────────────────────────────────────────────────┘\x1b[0m\r\n"
+    "\x1b[1;34m  ▌ \x1b[1;37mCaulkAI\x1b[0m  \x1b[90mTu consultor financiero personal\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m  \x1b[90mAnalizo gastos, ingresos e inversiones. Puedo crear\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m  \x1b[90minformes, detectar patrones y tendencias, y responder\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m  \x1b[90mcualquier pregunta sobre tus finanzas.\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m  \x1b[90mSube documentos de contexto desde el panel lateral.\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m  \x1b[90mControla mis permisos de escritura abajo a la izquierda.\x1b[0m\r\n"
     "\r\n"
 )
 
