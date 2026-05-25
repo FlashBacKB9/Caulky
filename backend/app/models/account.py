@@ -25,4 +25,4 @@ class Account(Base):
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
 
-    movements: Mapped[list["Movement"]] = relationship(back_populates="account")
+    movements: Mapped[list["Movement"]] = relationship(back_populates="account", foreign_keys="Movement.account_id")
