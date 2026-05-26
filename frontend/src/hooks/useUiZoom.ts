@@ -15,8 +15,9 @@ export function useUiZoom() {
 
   useLayoutEffect(() => {
     const actual = zoom * ZOOM_SCALE
-    document.documentElement.style.zoom = actual + '%'
-    document.documentElement.style.minHeight = actual < 100 ? `${(100 * 100 / actual).toFixed(2)}%` : ''
+    document.body.style.zoom = actual + '%'
+    document.body.style.minHeight = actual < 100 ? `${(100 * 100 / actual).toFixed(2)}vh` : ''
+    document.documentElement.style.zoom = ''
     syncPref(ZOOM_KEY, String(zoom))
   }, [zoom])
 

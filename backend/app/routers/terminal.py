@@ -1,49 +1,138 @@
 import asyncio
+import json
 import mimetypes
 import os
+import re
 import secrets
+import shutil
 import time
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Body, Depends, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
 from fastapi.websockets import WebSocketState
+from pydantic import BaseModel, field_validator  # noqa: F401
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.setup import current_active_user
+from app.database import get_db
 from app.models.user import User
+from app.models.user_preference import UserPreference
 
 router = APIRouter(prefix="/ai", tags=["ai-consultant"])
 
-# Single-use WebSocket tickets: token → (user_id, expiry_timestamp)
-_tickets: dict[str, tuple[str, float]] = {}
+# Single-use WebSocket tickets: token → (user_id, expiry, write_perms_json, session_id)
+_tickets: dict[str, tuple[str, float, str, str]] = {}
 _TICKET_TTL = 30  # seconds
 
 
+class TicketRequest(BaseModel):
+    session_id: str = ""
+
+
+def _sanitize_session_id(raw: str) -> str:
+    """Return a filesystem-safe session id."""
+    clean = re.sub(r'[^a-zA-Z0-9_-]', '', raw)[:64]
+    return clean or 'default'
+
+
 @router.post("/terminal/ticket")
-async def create_terminal_ticket(user: User = Depends(current_active_user)):
+async def create_terminal_ticket(
+    body: TicketRequest = Body(default=TicketRequest()),
+    user: User = Depends(current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
     """Issue a 30-second single-use ticket for the terminal WebSocket."""
     now = time.time()
-    # Purge expired entries
-    expired = [k for k, (_, exp) in _tickets.items() if exp < now]
+    expired = [k for k, (_, exp, _p, _s) in _tickets.items() if exp < now]
     for k in expired:
         _tickets.pop(k, None)
 
+    pref_res = await db.execute(
+        select(UserPreference).where(
+            UserPreference.user_id == user.id,
+            UserPreference.key == 'ai-write-perms',
+        )
+    )
+    pref = pref_res.scalar_one_or_none()
+    write_perms_json = pref.value if pref else '{}'
+
     token = secrets.token_urlsafe(32)
-    _tickets[token] = (str(user.id), now + _TICKET_TTL)
+    session_id = _sanitize_session_id(body.session_id)
+    _tickets[token] = (str(user.id), now + _TICKET_TTL, write_perms_json, session_id)
     return {"ticket": token}
 
 
-def _consume_ticket(token: str) -> Optional[str]:
+def _consume_ticket(token: str) -> tuple[Optional[str], Optional[str], str]:
     entry = _tickets.pop(token, None)
     if entry is None:
-        return None
-    user_id, expiry = entry
+        return None, None, 'default'
+    user_id, expiry, write_perms_json, session_id = entry
     if time.time() > expiry:
-        return None
-    return user_id
+        return None, None, 'default'
+    return user_id, write_perms_json, session_id
 
 
-def _build_claude_md(user_id: str) -> str:
+_WELCOME_BANNER = (
+    "\r\n"
+    "\x1b[1;34m  ▌ \x1b[1;37mCaulkAI\x1b[0m  \x1b[90mTu consultor financiero personal\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m  \x1b[90mAnalizo gastos, ingresos e inversiones. Puedo crear\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m  \x1b[90minformes, detectar patrones y tendencias, y responder\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m  \x1b[90mcualquier pregunta sobre tus finanzas.\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m  \x1b[90mSube documentos de contexto desde el panel lateral.\x1b[0m\r\n"
+    "\x1b[1;34m  ▌\x1b[0m  \x1b[90mControla mis permisos de escritura abajo a la izquierda.\x1b[0m\r\n"
+    "\r\n"
+)
+
+
+def _build_claude_md(user_id: str, write_perms: dict) -> str:
+    # Build the list of enabled write ops for the header note
+    op_labels = {'create': 'Crear', 'edit': 'Editar', 'delete': 'Borrar'}
+    enabled_ops = [op_labels[k] for k in ('create', 'edit', 'delete') if write_perms.get(k)]
+    write_enabled = bool(enabled_ops)
+
+    write_section = ''
+    if write_enabled:
+        examples = []
+        if write_perms.get('create'):
+            examples.append(
+                f"# Crear un movimiento\n"
+                f"spendly-write \"INSERT INTO movements (name, dinero, date, user_id, paid, no_count) "
+                f"VALUES ('Nombre', -50.00, CURRENT_DATE, '{user_id}', true, false)\""
+            )
+        if write_perms.get('edit'):
+            examples.append(
+                f"# Editar un movimiento\n"
+                f"spendly-write \"UPDATE movements SET name = 'Nuevo nombre' "
+                f"WHERE id = 123 AND user_id = '{user_id}'\""
+            )
+        if write_perms.get('delete'):
+            examples.append(
+                f"# Borrar un movimiento\n"
+                f"spendly-write \"DELETE FROM movements WHERE id = 123 AND user_id = '{user_id}'\""
+            )
+
+        ops_str = ', '.join(enabled_ops)
+        write_section = f"""
+
+## Modificar la base de datos
+
+Usa el comando `spendly-write` para realizar escrituras. Operaciones habilitadas: **{ops_str}**.
+
+```bash
+{chr(10).join(examples)}
+```
+
+**Reglas de seguridad obligatorias:**
+- Incluye siempre `user_id = '{user_id}'` en todas las sentencias.
+- Para UPDATE y DELETE, verifica primero con `spendly-query` que el registro existe y pertenece al usuario.
+- Pide confirmación explícita al usuario antes de ejecutar borrados o ediciones masivas.
+- Nunca modifiques registros sin condición WHERE que incluya `user_id`.
+"""
+
     return f"""\
 # Spendly — Consultor IA
 
@@ -51,7 +140,7 @@ Eres un asistente financiero personal con acceso directo a la base de datos Spen
 
 ## Usuario actual
 - **user_id:** `{user_id}`
-- Filtra **siempre** por `user_id = '{user_id}'` en todas las consultas.
+- Filtra **siempre** por `user_id = '{user_id}'` en todas las consultas y escrituras.
 
 ## Consultar la base de datos
 
@@ -136,6 +225,16 @@ FROM movements
 WHERE user_id = '{user_id}' AND dinero < 0
 ORDER BY dinero ASC LIMIT 10;
 ```
+{write_section}
+## Comportamiento proactivo
+
+- Al recibir un saludo o inicio de conversación, responde con una bienvenida breve y ofrece **2-3 sugerencias concretas** de análisis que puedes hacer ahora mismo (ej: resumen del mes, top gastos por categoría, comparativa mensual). Máximo 4 líneas.
+- Durante la conversación, si el usuario menciona un período, categoría o pregunta de análisis, **ofrece proactivamente** continuar: "¿Quieres que genere un informe detallado?", "¿Comparo con el mes anterior?", etc.
+- Si generas una tabla grande o gráfico, **guárdalo como archivo HTML** en el directorio de trabajo para que el usuario pueda abrirlo desde el panel de Archivos.
+
+## Archivos de contexto
+
+El directorio `context/` puede contener documentos subidos por el usuario (PDFs, Excel exportados, notas…). Úsalos como referencia adicional cuando el usuario los mencione.
 
 ## Idioma y estilo
 - Responde siempre en **español**.
@@ -147,25 +246,48 @@ ORDER BY dinero ASC LIMIT 10;
 
 @router.websocket("/terminal/ws")
 async def terminal_ws(websocket: WebSocket, ticket: str):
-    user_id = _consume_ticket(ticket)
+    user_id, write_perms_json, session_id = _consume_ticket(ticket)
     if user_id is None:
         await websocket.close(code=4401)
         return
 
     await websocket.accept()
 
-    workspace = f"/app/workspace/{user_id}"
+    try:
+        write_perms = json.loads(write_perms_json or '{}')
+    except Exception:
+        write_perms = {}
+
+    write_enabled = any(write_perms.values())
+
+    # Each session gets its own subdirectory so Claude remembers its conversation
+    workspace = f"/app/workspace/{user_id}/sessions/{session_id}"
     os.makedirs(workspace, exist_ok=True)
 
     with open(os.path.join(workspace, "CLAUDE.md"), "w") as f:
-        f.write(_build_claude_md(user_id))
+        f.write(_build_claude_md(user_id, write_perms))
+
+    # Per-user Claude home inside the persistent workspace volume (isolated per user)
+    claude_home = f"/app/workspace/{user_id}/claude-home"
+    os.makedirs(claude_home, exist_ok=True)
+
+    # Use --continue only after the first successful run; track this with a marker file
+    session_marker = os.path.join(workspace, ".has_conversation")
+    has_prior_conversation = os.path.exists(session_marker)
+    claude_cmd = ["claude", "--continue"] if has_prior_conversation else ["claude"]
+    if not has_prior_conversation:
+        open(session_marker, "w").close()
+        await websocket.send_text(_WELCOME_BANNER)
 
     env = os.environ.copy()
     env.update({
         "TERM": "xterm-256color",
         "COLUMNS": "200",
         "LINES": "50",
-        "HOME": "/root",
+        "HOME": claude_home,
+        "AI_USER_ID": user_id,
+        "AI_WRITE_ENABLED": "true" if write_enabled else "false",
+        "AI_WRITE_PERMS": json.dumps(write_perms),
     })
 
     try:
@@ -179,7 +301,7 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
 
     try:
         proc = ptyprocess.PtyProcess.spawn(
-            ["claude"],
+            claude_cmd,
             cwd=workspace,
             env=env,
             dimensions=(50, 200),
@@ -227,8 +349,8 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
             except (WebSocketDisconnect, Exception):
                 break
 
-    pty_task = asyncio.create_task(pty_to_ws())
-    ws_task = asyncio.create_task(ws_to_pty())
+    pty_task  = asyncio.create_task(pty_to_ws())
+    ws_task   = asyncio.create_task(ws_to_pty())
 
     await asyncio.wait([pty_task, ws_task], return_when=asyncio.FIRST_COMPLETED)
 
@@ -263,20 +385,24 @@ async def view_workspace_file(path: str, user: User = Depends(current_active_use
     return FileResponse(safe, media_type=media_type)
 
 
-
-
-_SKIP_FILES = {"CLAUDE.md"}
+_SKIP_FILES = {"CLAUDE.md", ".has_conversation"}
+_SKIP_DIRS  = {"sessions", "claude-home"}
 
 
 @router.get("/workspace/files")
 async def list_workspace_files(user: User = Depends(current_active_user)):
     workspace = f"/app/workspace/{user.id}"
     if not os.path.exists(workspace):
-        return {"files": []}
+        return {"files": [], "dirs": []}
 
     files = []
     for root, dirs, filenames in os.walk(workspace):
-        dirs[:] = [d for d in dirs if not d.startswith(".")]
+        rel_root = os.path.relpath(root, workspace).replace("\\", "/")
+        if rel_root == ".":
+            dirs[:] = [d for d in dirs if not d.startswith(".") and d not in _SKIP_DIRS]
+        else:
+            dirs[:] = [d for d in dirs if not d.startswith(".")]
+
         for fname in filenames:
             if fname in _SKIP_FILES:
                 continue
@@ -289,7 +415,63 @@ async def list_workspace_files(user: User = Depends(current_active_user)):
                 continue
 
     files.sort(key=lambda f: f["modified"], reverse=True)
-    return {"files": files}
+
+    top_dirs = sorted([
+        d for d in os.listdir(workspace)
+        if os.path.isdir(os.path.join(workspace, d))
+        and not d.startswith(".")
+        and d not in _SKIP_DIRS
+    ])
+
+    return {"files": files, "dirs": top_dirs}
+
+
+@router.delete("/workspace/file")
+async def delete_workspace_item(path: str, user: User = Depends(current_active_user)):
+    workspace = f"/app/workspace/{user.id}"
+    safe = os.path.normpath(os.path.join(workspace, path))
+    if not safe.startswith(os.path.join(workspace, "")):
+        raise HTTPException(status_code=400, detail="Ruta no válida")
+    if not os.path.exists(safe):
+        raise HTTPException(status_code=404, detail="No encontrado")
+    if os.path.isfile(safe):
+        os.remove(safe)
+    else:
+        shutil.rmtree(safe)
+    return {"deleted": path}
+
+
+_ALLOWED_UPLOAD_EXTS = {
+    ".txt", ".md", ".pdf", ".docx", ".doc", ".xlsx", ".xls",
+    ".csv", ".json", ".html", ".htm", ".py", ".js", ".ts",
+}
+
+_MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
+
+
+@router.post("/workspace/upload")
+async def upload_context_file(
+    file: UploadFile = File(...),
+    user: User = Depends(current_active_user),
+):
+    raw_name = os.path.basename(file.filename or "file")
+    name, ext = os.path.splitext(raw_name)
+    if ext.lower() not in _ALLOWED_UPLOAD_EXTS:
+        raise HTTPException(status_code=400, detail=f"Extensión no permitida: {ext}")
+
+    safe_name = re.sub(r'[^\w\-.]', '_', raw_name)
+    context_dir = f"/app/workspace/{user.id}/context"
+    os.makedirs(context_dir, exist_ok=True)
+    dest = os.path.join(context_dir, safe_name)
+
+    content = await file.read(_MAX_UPLOAD_BYTES + 1)
+    if len(content) > _MAX_UPLOAD_BYTES:
+        raise HTTPException(status_code=413, detail="Archivo demasiado grande (máx 20 MB)")
+
+    with open(dest, "wb") as f:
+        f.write(content)
+
+    return {"path": f"context/{safe_name}", "name": safe_name}
 
 
 @router.get("/workspace/file")
@@ -302,6 +484,62 @@ async def download_workspace_file(path: str, inline: bool = False, user: User = 
         raise HTTPException(status_code=404, detail="Archivo no encontrado")
     media_type = mimetypes.guess_type(safe)[0] or "application/octet-stream"
     if inline:
-        # No Content-Disposition header → browser renders inline (needed for iframe)
         return FileResponse(safe, media_type=media_type)
     return FileResponse(safe, filename=os.path.basename(safe), media_type=media_type)
+
+
+class MkdirRequest(BaseModel):
+    path: str
+
+    @field_validator("path")
+    @classmethod
+    def sanitize(cls, v: str) -> str:
+        clean = re.sub(r'[^\w\- ]', '', v.strip()).strip()
+        if not clean:
+            raise ValueError("Nombre de carpeta vacío")
+        return clean
+
+
+@router.post("/workspace/mkdir")
+async def make_workspace_dir(body: MkdirRequest, user: User = Depends(current_active_user)):
+    workspace = f"/app/workspace/{user.id}"
+    target = os.path.normpath(os.path.join(workspace, body.path))
+    if not target.startswith(os.path.join(workspace, "")):
+        raise HTTPException(status_code=400, detail="Ruta no válida")
+    os.makedirs(target, exist_ok=True)
+    return {"path": body.path}
+
+
+class MoveRequest(BaseModel):
+    from_: str
+    to: str
+
+    class Config:
+        populate_by_name = True
+
+    @classmethod
+    def __get_validators__(cls):
+        yield cls._validate
+
+    @classmethod
+    def _validate(cls, v):
+        return v
+
+
+@router.post("/workspace/move")
+async def move_workspace_file(body: dict, user: User = Depends(current_active_user)):
+    from_path = body.get("from", "")
+    to_path   = body.get("to", "")
+    if not from_path or not to_path:
+        raise HTTPException(status_code=400, detail="Faltan campos from/to")
+    workspace = f"/app/workspace/{user.id}"
+    safe_from = os.path.normpath(os.path.join(workspace, from_path))
+    safe_to   = os.path.normpath(os.path.join(workspace, to_path))
+    if not safe_from.startswith(os.path.join(workspace, "")) or \
+       not safe_to.startswith(os.path.join(workspace, "")):
+        raise HTTPException(status_code=400, detail="Ruta no válida")
+    if not os.path.exists(safe_from):
+        raise HTTPException(status_code=404, detail="No encontrado")
+    os.makedirs(os.path.dirname(safe_to), exist_ok=True)
+    os.rename(safe_from, safe_to)
+    return {"from": from_path, "to": to_path}

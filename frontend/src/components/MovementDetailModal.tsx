@@ -15,6 +15,8 @@ export interface DraftRow {
   bank_date: string
   movement_type_id: string
   account_id: string
+  is_transfer: boolean
+  from_account_id: string
   paid: boolean
   no_count: boolean
   notes: string
@@ -32,6 +34,8 @@ export function toDraft(mv: Movement): DraftRow {
     bank_date: mv.bank_date ?? '',
     movement_type_id: String(mv.movement_type_id ?? ''),
     account_id: String(mv.account_id ?? ''),
+    is_transfer: mv.is_transfer ?? false,
+    from_account_id: String(mv.from_account_id ?? ''),
     paid: mv.paid,
     no_count: mv.no_count,
     notes: mv.notes ?? '',
@@ -49,8 +53,10 @@ export function draftPayload(d: DraftRow, original: Movement) {
     money: parseFloat(d.money) || original.money,
     date: d.date,
     bank_date: d.bank_date || null,
-    movement_type_id: d.movement_type_id ? parseInt(d.movement_type_id) : null,
+    movement_type_id: !d.is_transfer && d.movement_type_id ? parseInt(d.movement_type_id) : null,
     account_id: d.account_id ? parseInt(d.account_id) : null,
+    is_transfer: d.is_transfer,
+    from_account_id: d.is_transfer && d.from_account_id ? parseInt(d.from_account_id) : null,
     paid: d.paid,
     no_count: d.no_count,
     notes: d.notes || null,
@@ -64,7 +70,8 @@ export function duplicatePayload(mv: Movement) {
   return {
     name: mv.name, money: mv.money, date: mv.date,
     bank_date: mv.bank_date, movement_type_id: mv.movement_type_id,
-    account_id: mv.account_id, paid: mv.paid, no_count: mv.no_count, notes: mv.notes,
+    account_id: mv.account_id, is_transfer: mv.is_transfer,
+    from_account_id: mv.from_account_id, paid: mv.paid, no_count: mv.no_count, notes: mv.notes,
   }
 }
 

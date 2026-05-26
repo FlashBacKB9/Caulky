@@ -23,6 +23,10 @@ class Movement(Base):
     account_id: Mapped[int | None] = mapped_column(
         ForeignKey("accounts.id"), nullable=True
     )
+    is_transfer: Mapped[bool] = mapped_column(Boolean, default=False)
+    from_account_id: Mapped[int | None] = mapped_column(
+        ForeignKey("accounts.id"), nullable=True
+    )
     is_shared: Mapped[bool] = mapped_column(Boolean, default=False)
     shared_between: Mapped[int | None] = mapped_column(Integer, nullable=True)
     my_share: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
@@ -31,7 +35,8 @@ class Movement(Base):
     )
 
     movement_type: Mapped["MovementType | None"] = relationship(back_populates="movements")
-    account: Mapped["Account | None"] = relationship(back_populates="movements")
+    account: Mapped["Account | None"] = relationship(back_populates="movements", foreign_keys=[account_id])
+    from_account: Mapped["Account | None"] = relationship(foreign_keys=[from_account_id])
     files: Mapped[list["MovementFile"]] = relationship(
         back_populates="movement", cascade="all, delete-orphan", lazy="selectin"
     )

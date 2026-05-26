@@ -80,9 +80,26 @@ Se usan en: vista Finanzas del Año, desglose en Gráficos, vista Kanban, y Comp
 
 ### Cuentas
 
-Cuentas bancarias o bolsillos. Campos: nombre, color, icono, saldo inicial.
+Cuentas bancarias o bolsillos. Campos: nombre, color, icono, saldo inicial, categoría.
+
+Categorías disponibles: **corriente**, **ahorro**, **inversión**, **ETF**, **depósito**, **inmueble**, **vehículo**.
+
 **Saldo actual = Saldo inicial + suma de movimientos pagados asociados a esa cuenta.**
 La cuenta puede ser "cuenta principal" (is_main) — en ese caso todos los movimientos con dinero positivo o negativo la afectan, no solo los de un tipo vinculado.
+
+#### Vehículos e Inmuebles (Bienes)
+Las cuentas de tipo **vehículo** e **inmueble** forman el grupo "Bienes" en la página de Cuentas. Para vehículos se puede configurar:
+- **Tasa de depreciación anual** (en %): valor actual = valor_compra × (1 − tasa × años)
+- **Fecha de valor inicial**: a partir de cuándo cuenta la depreciación
+- **Vehículo nuevo**: aplica un 15% de depreciación inmediata adicional (pérdida de valor al salir del concesionario)
+
+Cada tarjeta de Bienes tiene un botón de ojo (👁) para incluirla o excluirla del Patrimonio Total sin eliminar la cuenta.
+
+#### Patrimonio Total
+La cabecera de la página de Cuentas muestra:
+- **Patrimonio Total** = Líquido + Valor actual inversiones + Bienes incluidos
+- **Barra de composición** segmentada (azul = líquido, morado = inversiones, naranja = bienes)
+- **Desglose de ganancias de inversión**: bruto, estimación IRPF y neto
 
 ### Presupuestos
 
@@ -117,6 +134,14 @@ Requisitos para que una compra aparezca en Inversiones: Pagado = sí, No contar 
 ---
 
 ## 3. Flujos de trabajo paso a paso
+
+### 3.0 Vistas de la tabla de movimientos
+
+La vista tabla ofrece:
+- **Filtros avanzados** (botón "Filtros"): condiciones combinadas por cualquier campo
+- **Ordenación multi-columna** (botón "Orden"): panel donde puedes añadir varios criterios de orden con prioridad. Al hacer clic en una cabecera de columna también se activa/desactiva la ordenación por esa columna (desc → asc → sin orden). Las etiquetas se adaptan al tipo de dato: A→Z para texto, 1→9 para números, Antiguo/Reciente para fechas.
+- **Búsqueda rápida** por nombre
+- **Filtro por cuenta**: al hacer clic en una tarjeta de cuenta desde la página Cuentas, la lista de movimientos se pre-filtra mostrando solo los movimientos asociados a esa cuenta
 
 ### 3.1 Añadir un movimiento
 
@@ -534,6 +559,11 @@ Los plugins se guardan en localStorage y se reejecutan en cada carga de página.
 
 ## 14. Atajos y trucos
 
+- Clic en cualquier tarjeta de cuenta en la página Cuentas → lista de movimientos filtrada por esa cuenta
+- Botón "Orden" en Movimientos → panel multi-columna para combinar criterios de ordenación
+- Clic en cabecera de columna en Movimientos → ordenar por esa columna (3 estados: desc → asc → sin orden)
+- Cuentas de tipo Vehículo: configura depreciación anual y marca "Vehículo nuevo" para el 15% inmediato
+- Botón ojo en tarjetas de Bienes → incluir/excluir del Patrimonio Total sin tocar la cuenta
 - Clic derecho en cualquier movimiento → menú rápido: Duplicar, Eliminar
 - Arrastrar en el calendario → cambia la fecha del movimiento sin abrir el modal
 - Clic en el nombre en la tabla → modal de detalle completo con todos los campos
@@ -599,12 +629,11 @@ const SECTION_IDS = ['ia','intro','conceptos','movimientos','plantillas','grafic
 
 // ── Typography helpers ─────────────────────────────────────────────────────────
 
-function H2({ id, children }: { id: string; children: React.ReactNode }) {
-  return (
-    <h2 id={id} className="text-2xl font-bold text-gray-900 dark:text-white mt-14 mb-5 first:mt-0 scroll-mt-8">
-      {children}
-    </h2>
-  )
+function H2({ children }: { children: React.ReactNode }) {
+  return <h2 className="text-2xl font-bold text-gray-900 dark:text-white mt-10 mb-4 first:mt-0 pb-3 border-b border-gray-200 dark:border-gray-700">{children}</h2>
+}
+function Divider() {
+  return <hr className="my-8 border-gray-100 dark:border-gray-800" />
 }
 function H3({ children }: { children: React.ReactNode }) {
   return <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mt-8 mb-3">{children}</h3>
@@ -635,10 +664,6 @@ function Tip({ children }: { children: React.ReactNode }) {
     </div>
   )
 }
-function Divider() {
-  return <hr className="border-gray-100 dark:border-gray-800 my-8" />
-}
-
 function Steps({ title, children }: { title?: string; children: React.ReactNode }) {
   return (
     <div className="border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden mb-6">
@@ -751,7 +776,8 @@ export default function Documentation() {
           </div>
 
           {/* ── 0. Usar con IA ─────────────────────────────────────────── */}
-          <H2 id="ia">{t('docs.useWithAI')}</H2>
+          <div id="ia" className="scroll-mt-8">
+          <H2>{t('docs.useWithAI')}</H2>
           <P>{t('docs.useWithAIDesc')}</P>
 
           <div className="my-6">
@@ -774,11 +800,12 @@ export default function Documentation() {
             <LI>{t('docs.q6')}</LI>
           </UL>
           <Tip>{t('docs.useWithAITip')}</Tip>
-
           <Divider />
+          </div>
 
           {/* ── 1. Introducción ────────────────────────────────────────── */}
-          <H2 id="intro">{t('docs.intro.h2')}</H2>
+          <div id="intro" className="scroll-mt-8">
+          <H2>{t('docs.intro.h2')}</H2>
           <P>{t('docs.intro.p1')}</P>
           <UL>
             <LI>{t('docs.intro.li1')}</LI>
@@ -793,11 +820,12 @@ export default function Documentation() {
             <LI>{t('docs.intro.li10')}</LI>
             <LI>{t('docs.intro.li11')}</LI>
           </UL>
-
           <Divider />
+          </div>
 
           {/* ── 2. Conceptos clave ─────────────────────────────────────── */}
-          <H2 id="conceptos">{t('docs.cpt.h2')}</H2>
+          <div id="conceptos" className="scroll-mt-8">
+          <H2>{t('docs.cpt.h2')}</H2>
 
           <H3>{t('docs.cpt.movTitle')}</H3>
           <P>{t('docs.cpt.movP')}</P>
@@ -844,11 +872,12 @@ export default function Documentation() {
 
           <H3>{t('docs.cpt.fundsTitle')}</H3>
           <P>{t('docs.cpt.fundsP')}</P>
-
           <Divider />
+          </div>
 
           {/* ── 3. Movimientos ─────────────────────────────────────────── */}
-          <H2 id="movimientos">{t('docs.mov.h2')}</H2>
+          <div id="movimientos" className="scroll-mt-8">
+          <H2>{t('docs.mov.h2')}</H2>
           <P>{t('docs.mov.p1')}</P>
 
           <H3>{t('docs.mov.addTitle')}</H3>
@@ -915,11 +944,12 @@ export default function Documentation() {
 
           <H3>{t('docs.mov.kanbanTitle')}</H3>
           <P>{t('docs.mov.kanbanP')}</P>
-
           <Divider />
+          </div>
 
           {/* ── 4. Plantillas y recurrencias ───────────────────────────── */}
-          <H2 id="plantillas">{t('docs.tpl.h2')}</H2>
+          <div id="plantillas" className="scroll-mt-8">
+          <H2>{t('docs.tpl.h2')}</H2>
 
           <H3>{t('docs.tpl.createTitle')}</H3>
           <Steps>
@@ -959,11 +989,12 @@ export default function Documentation() {
           <Example label={t('docs.tpl.ex3Label')}>{t('docs.tpl.ex3')}</Example>
 
           <Note>{t('docs.tpl.note')}</Note>
-
           <Divider />
+          </div>
 
           {/* ── 5. Gráficos ────────────────────────────────────────────── */}
-          <H2 id="graficos">{t('docs.grf.h2')}</H2>
+          <div id="graficos" className="scroll-mt-8">
+          <H2>{t('docs.grf.h2')}</H2>
           <P>{t('docs.grf.p1')}</P>
 
           <H3>{t('docs.grf.createTitle')}</H3>
@@ -980,11 +1011,12 @@ export default function Documentation() {
           <Example label={t('docs.grf.ex1Label')}>{t('docs.grf.ex1')}</Example>
           <Example label={t('docs.grf.ex2Label')}>{t('docs.grf.ex2')}</Example>
           <Example label={t('docs.grf.ex3Label')}>{t('docs.grf.ex3')}</Example>
-
           <Divider />
+          </div>
 
           {/* ── 6. Cuentas ─────────────────────────────────────────────── */}
-          <H2 id="cuentas">{t('docs.act.h2')}</H2>
+          <div id="cuentas" className="scroll-mt-8">
+          <H2>{t('docs.act.h2')}</H2>
           <P>{t('docs.act.p1')}</P>
 
           <H3>{t('docs.act.summaryTitle')}</H3>
@@ -1006,11 +1038,12 @@ export default function Documentation() {
           <P>{t('docs.act.distP')}</P>
 
           <Tip>{t('docs.act.tip')}</Tip>
-
           <Divider />
+          </div>
 
           {/* ── 7. Comparaciones ───────────────────────────────────────── */}
-          <H2 id="comparaciones">{t('docs.cmp.h2')}</H2>
+          <div id="comparaciones" className="scroll-mt-8">
+          <H2>{t('docs.cmp.h2')}</H2>
           <P>{t('docs.cmp.p1')}</P>
 
           <H3>{t('docs.cmp.controlsTitle')}</H3>
@@ -1042,11 +1075,12 @@ export default function Documentation() {
 
           <Example label={t('docs.cmp.ex1Label')}>{t('docs.cmp.ex1')}</Example>
           <Example label={t('docs.cmp.ex2Label')}>{t('docs.cmp.ex2')}</Example>
-
           <Divider />
+          </div>
 
           {/* ── 8. Finanzas del Año ────────────────────────────────────── */}
-          <H2 id="annual">{t('docs.ann.h2')}</H2>
+          <div id="annual" className="scroll-mt-8">
+          <H2>{t('docs.ann.h2')}</H2>
           <P>{t('docs.ann.p1')}</P>
           <UL>
             <LI>{t('docs.ann.li1')}</LI>
@@ -1055,11 +1089,12 @@ export default function Documentation() {
             <LI>{t('docs.ann.li4')}</LI>
           </UL>
           <Tip>{t('docs.ann.tip')}</Tip>
-
           <Divider />
+          </div>
 
           {/* ── 9. Dashboard ───────────────────────────────────────────── */}
-          <H2 id="dashboard">{t('docs.dsh.h2')}</H2>
+          <div id="dashboard" className="scroll-mt-8">
+          <H2>{t('docs.dsh.h2')}</H2>
           <P>{t('docs.dsh.p1')}</P>
 
           <H3>{t('docs.dsh.selectorTitle')}</H3>
@@ -1089,11 +1124,12 @@ export default function Documentation() {
             <LI>{t('docs.dsh.bLi1')}</LI>
             <LI>{t('docs.dsh.bLi2')}</LI>
           </UL>
-
           <Divider />
+          </div>
 
           {/* ── 10. Inversiones ────────────────────────────────────────── */}
-          <H2 id="inversiones">{t('docs.inv.h2')}</H2>
+          <div id="inversiones" className="scroll-mt-8">
+          <H2>{t('docs.inv.h2')}</H2>
           <Note>{t('docs.inv.note1')}</Note>
           <Note>{t('docs.inv.note2')}</Note>
 
@@ -1118,11 +1154,12 @@ export default function Documentation() {
             <LI>{t('docs.inv.cLi6')}</LI>
           </UL>
           <P>{t('docs.inv.colsP')}</P>
-
           <Divider />
+          </div>
 
           {/* ── 11. Presupuestos ───────────────────────────────────────── */}
-          <H2 id="presupuestos">{t('docs.bgt.h2')}</H2>
+          <div id="presupuestos" className="scroll-mt-8">
+          <H2>{t('docs.bgt.h2')}</H2>
 
           <H3>{t('docs.bgt.createTitle')}</H3>
           <Steps>
@@ -1147,11 +1184,12 @@ export default function Documentation() {
             <LI>{t('docs.bgt.vLi2')}</LI>
             <LI>{t('docs.bgt.vLi3')}</LI>
           </UL>
-
           <Divider />
+          </div>
 
           {/* ── 12. Importar Excel ─────────────────────────────────────── */}
-          <H2 id="importar">{t('docs.imp.h2')}</H2>
+          <div id="importar" className="scroll-mt-8">
+          <H2>{t('docs.imp.h2')}</H2>
           <P>{t('docs.imp.p1')}</P>
           <Steps>
             <Step n={1}>{t('docs.imp.s1')}</Step>
@@ -1159,11 +1197,12 @@ export default function Documentation() {
             <Step n={3}>{t('docs.imp.s3')}</Step>
             <Step n={4}>{t('docs.imp.s4')}</Step>
           </Steps>
-
           <Divider />
+          </div>
 
           {/* ── 13. Configuración ──────────────────────────────────────── */}
-          <H2 id="config">{t('docs.cfg.h2')}</H2>
+          <div id="config" className="scroll-mt-8">
+          <H2>{t('docs.cfg.h2')}</H2>
 
           <H3>{t('docs.cfg.appearTitle')}</H3>
           <UL>
@@ -1207,11 +1246,12 @@ export default function Documentation() {
 
           <H3>{t('docs.cfg.dangerTitle')}</H3>
           <P>{t('docs.cfg.dangerP')}</P>
-
           <Divider />
+          </div>
 
           {/* ── 14. Plugins ────────────────────────────────────────────── */}
-          <H2 id="plugins">{t('docs.plg.h2')}</H2>
+          <div id="plugins" className="scroll-mt-8">
+          <H2>{t('docs.plg.h2')}</H2>
           <P>{t('docs.plg.p1')}</P>
 
           <H3>{t('docs.plg.installTitle')}</H3>
@@ -1235,11 +1275,12 @@ export default function Documentation() {
           </UL>
 
           <Tip>{t('docs.plg.tip')}</Tip>
-
           <Divider />
+          </div>
 
           {/* ── 15. Atajos y trucos ────────────────────────────────────── */}
-          <H2 id="trucos">{t('docs.trk.h2')}</H2>
+          <div id="trucos" className="scroll-mt-8">
+          <H2>{t('docs.trk.h2')}</H2>
           <UL>
             <LI>{t('docs.trk.li1')}</LI>
             <LI>{t('docs.trk.li2')}</LI>
@@ -1267,6 +1308,7 @@ export default function Documentation() {
           <QA q={t('docs.faq.q11')}>{t('docs.faq.a11')}</QA>
           <QA q={t('docs.faq.q12')}>{t('docs.faq.a12')}</QA>
           <QA q={t('docs.faq.q13')}>{t('docs.faq.a13')}</QA>
+          </div>
 
           <div className="pb-12" />
         </div>

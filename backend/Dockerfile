@@ -14,8 +14,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# Install the spendly-query helper so Claude can call it by name
-RUN install -m 755 scripts/spendly_query.py /usr/local/bin/spendly-query
+# Install the spendly-query/write helpers so Claude can call them by name
+RUN install -m 755 scripts/spendly_query.py /usr/local/bin/spendly-query && \
+    install -m 755 scripts/spendly_write.py /usr/local/bin/spendly-write
 
 EXPOSE 8000
 

@@ -1,6 +1,6 @@
 import api from './client'
 
-export type AccountCategory = 'corriente' | 'ahorro' | 'inversion' | 'etf' | 'deposito'
+export type AccountCategory = 'corriente' | 'ahorro' | 'inversion' | 'etf' | 'deposito' | 'inmueble' | 'vehiculo'
 
 export interface Account {
   id: number
@@ -13,6 +13,9 @@ export interface Account {
   sort_order: number
   is_main: boolean
   category: AccountCategory
+  depreciation_rate: number | null
+  value_date: string | null
+  new_car: boolean
 }
 
 export interface AccountsSummary {
@@ -26,10 +29,10 @@ export const getAccountsSummary = () =>
 export const updateAccount = (id: number, initial_balance: number) =>
   api.put<Account>(`/accounts/${id}`, { initial_balance }).then(r => r.data)
 
-export const updateAccountFull = (id: number, patch: Partial<Pick<Account, 'name' | 'color' | 'icon' | 'initial_balance' | 'category'>>) =>
+export const updateAccountFull = (id: number, patch: Partial<Pick<Account, 'name' | 'color' | 'icon' | 'initial_balance' | 'category' | 'depreciation_rate' | 'value_date' | 'new_car'>>) =>
   api.put<Account>(`/accounts/${id}`, patch).then(r => r.data)
 
-export const createAccount = (body: { name: string; color: string; icon: string; initial_balance: number; category: AccountCategory }) =>
+export const createAccount = (body: { name: string; color: string; icon: string; initial_balance: number; category: AccountCategory; depreciation_rate?: number | null; value_date?: string | null; new_car?: boolean }) =>
   api.post<Account>('/accounts/', body).then(r => r.data)
 
 export const reorderAccounts = (ids: number[]) =>
@@ -49,4 +52,10 @@ export const ACCOUNT_CATEGORIES: { value: AccountCategory; labelKey: string }[] 
   { value: 'inversion', labelKey: 'account.category.inversion' },
   { value: 'etf',       labelKey: 'account.category.etf' },
   { value: 'deposito',  labelKey: 'account.category.deposito' },
+  { value: 'inmueble',  labelKey: 'account.category.inmueble' },
+  { value: 'vehiculo',  labelKey: 'account.category.vehiculo' },
 ]
+
+export const LIQUID_CATEGORIES: AccountCategory[] = ['corriente', 'ahorro']
+export const INVESTMENT_CATEGORIES: AccountCategory[] = ['inversion', 'etf']
+export const DEPRECIABLE_CATEGORIES: AccountCategory[] = ['vehiculo', 'inmueble']

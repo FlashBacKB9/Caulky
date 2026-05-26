@@ -2,18 +2,10 @@ import { useEffect, useRef, useCallback, useState } from 'react'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
-import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, MessageSquare, Pencil, Eye } from 'lucide-react'
+import { Plus, X, RefreshCw, Download, FileText, Globe, File, ChevronRight, ChevronDown, MessageSquare, Pencil, Eye, Settings, Upload, Folder, FolderPlus, Trash2 } from 'lucide-react'
 import api from '../api/client'
 import { syncPref } from '../utils/prefSync'
 
-function useDisableHtmlZoom() {
-  useEffect(() => {
-    const html = document.documentElement
-    const saved = html.style.zoom
-    html.style.zoom = ''
-    return () => { html.style.zoom = saved }
-  }, [])
-}
 
 function copyToClipboard(text: string) {
   if (navigator.clipboard) {
@@ -84,11 +76,39 @@ type Tab =
   | { kind: 'html'; id: string; label: string; src: string }
 
 type WorkspaceFile = { path: string; name: string; size: number; modified: number }
+type FolderNode    = { name: string; path: string; files: WorkspaceFile[] }
 
-const TABS_STORAGE_KEY = 'ai-tab-names'
+function buildTree(files: WorkspaceFile[], knownDirs: string[] = []): { root: WorkspaceFile[]; folders: FolderNode[] } {
+  const root: WorkspaceFile[] = []
+  const map = new Map<string, FolderNode>()
+  for (const dir of knownDirs) {
+    map.set(dir, { name: dir, path: dir, files: [] })
+  }
+  for (const f of files) {
+    const slash = f.path.indexOf('/')
+    if (slash === -1) { root.push(f); continue }
+    const dir = f.path.slice(0, slash)
+    if (!map.has(dir)) map.set(dir, { name: dir, path: dir, files: [] })
+    map.get(dir)!.files.push(f)
+  }
+  return { root, folders: [...map.values()].sort((a, b) => a.name.localeCompare(b.name)) }
+}
+
+const TABS_STORAGE_KEY  = 'ai-tab-names'
+const WRITE_PERMS_KEY   = 'ai-write-perms'
+
+type WritePerms = { create: boolean; edit: boolean; delete: boolean }
 
 function loadSavedNames(): string[] {
   try { return JSON.parse(localStorage.getItem(TABS_STORAGE_KEY) ?? '[]') } catch { return [] }
+}
+
+function loadWritePerms(): WritePerms {
+  try {
+    const raw = localStorage.getItem(WRITE_PERMS_KEY)
+    if (!raw) return { create: false, edit: false, delete: false }
+    return { create: false, edit: false, delete: false, ...JSON.parse(raw) }
+  } catch { return { create: false, edit: false, delete: false } }
 }
 
 function saveTabs(tabs: Tab[]) {
@@ -97,8 +117,6 @@ function saveTabs(tabs: Tab[]) {
 }
 
 export default function AiConsultant() {
-  useDisableHtmlZoom()
-
   const stackRef    = useRef<HTMLDivElement>(null)
   const sessionsRef = useRef<Map<string, SessionData>>(new Map())
   const counterRef  = useRef(0)
@@ -108,17 +126,72 @@ export default function AiConsultant() {
   const [editingId, setEditingId] = useState('')
   const editingIdRef = useRef('')   // ref so activateTab RAF can read latest value
 
-  const [files,        setFiles]        = useState<WorkspaceFile[]>([])
-  const [filesLoading, setFilesLoading] = useState(false)
+  const [files,             setFiles]             = useState<WorkspaceFile[]>([])
+  const [dirs,              setDirs]              = useState<string[]>([])
+  const [filesLoading,      setFilesLoading]      = useState(false)
+  const [uploading,         setUploading]         = useState(false)
+  const [writePerms,        setWritePerms]        = useState<WritePerms>(loadWritePerms)
+  const [showPerms,         setShowPerms]         = useState(false)
+  const [expandedFolders,   setExpandedFolders]   = useState<Set<string>>(() => new Set(['context']))
+  const [draggingFile,      setDraggingFile]      = useState<WorkspaceFile | null>(null)
+  const [dragOverFolder,    setDragOverFolder]    = useState<string | null>(null)
+  const [showNewFolder,     setShowNewFolder]     = useState(false)
+  const [newFolderName,     setNewFolderName]     = useState('')
+  const [editingFolder,     setEditingFolder]     = useState('')
+  const [editingFolderName, setEditingFolderName] = useState('')
+  const [sidebarCollapsed,  setSidebarCollapsed]  = useState(() => document.body.classList.contains('sidebar-collapsed'))
+  const uploadInputRef    = useRef<HTMLInputElement>(null)
+  const newFolderInputRef = useRef<HTMLInputElement>(null)
 
   // ── File browser ─────────────────────────────────────────────────────────────
   const refreshFiles = useCallback(async () => {
     setFilesLoading(true)
     try {
-      const { data } = await api.get<{ files: WorkspaceFile[] }>('/ai/workspace/files')
+      const { data } = await api.get<{ files: WorkspaceFile[]; dirs: string[] }>('/ai/workspace/files')
       setFiles(data.files)
+      setDirs(data.dirs ?? [])
     } catch { /**/ } finally { setFilesLoading(false) }
   }, [])
+
+  const uploadContextFile = useCallback(async (file: File) => {
+    setUploading(true)
+    try {
+      const form = new FormData()
+      form.append('file', file)
+      await api.post('/ai/workspace/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } })
+      await refreshFiles()
+    } catch { /**/ } finally { setUploading(false) }
+  }, [refreshFiles])
+
+  const createFolder = useCallback(async (name: string) => {
+    if (!name.trim()) return
+    try { await api.post('/ai/workspace/mkdir', { path: name.trim() }) } catch { /**/ }
+    setShowNewFolder(false)
+    setNewFolderName('')
+    await refreshFiles()
+  }, [refreshFiles])
+
+  const moveFile = useCallback(async (fromPath: string, toFolder: string) => {
+    const fileName = fromPath.split('/').pop() ?? fromPath
+    const toPath = `${toFolder}/${fileName}`
+    if (fromPath === toPath) return
+    try { await api.post('/ai/workspace/move', { from: fromPath, to: toPath }) } catch { /**/ }
+    await refreshFiles()
+  }, [refreshFiles])
+
+  const renameFolder = useCallback(async (oldName: string, newName: string) => {
+    const trimmed = newName.trim()
+    if (!trimmed || trimmed === oldName) { setEditingFolder(''); return }
+    try { await api.post('/ai/workspace/move', { from: oldName, to: trimmed }) } catch { /**/ }
+    setEditingFolder('')
+    await refreshFiles()
+  }, [refreshFiles])
+
+  const deleteItem = useCallback(async (path: string) => {
+    if (!confirm(`¿Eliminar "${path.split('/').pop()}"?`)) return
+    try { await api.delete(`/ai/workspace/file?path=${encodeURIComponent(path)}`) } catch { /**/ }
+    await refreshFiles()
+  }, [refreshFiles])
 
   const downloadFile = useCallback((path: string) => {
     const a = document.createElement('a')
@@ -127,6 +200,14 @@ export default function AiConsultant() {
     document.body.appendChild(a)
     a.click()
     document.body.removeChild(a)
+  }, [])
+
+  const toggleWritePerm = useCallback((key: keyof WritePerms) => {
+    setWritePerms(prev => {
+      const next = { ...prev, [key]: !prev[key] }
+      syncPref(WRITE_PERMS_KEY, JSON.stringify(next))
+      return next
+    })
   }, [])
 
   // ── Tab/session management ────────────────────────────────────────────────────
@@ -145,7 +226,7 @@ export default function AiConsultant() {
     sess.ws = null
     sess.term.writeln('\x1b[90mConectando…\x1b[0m')
     try {
-      const { data } = await api.post<{ ticket: string }>('/ai/terminal/ticket')
+      const { data } = await api.post<{ ticket: string }>('/ai/terminal/ticket', { session_id: sess.id })
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
       const ws = new WebSocket(`${proto}://${window.location.host}/api/ai/terminal/ws?ticket=${data.ticket}`)
       ws.binaryType = 'arraybuffer'
@@ -181,6 +262,24 @@ export default function AiConsultant() {
     term.loadAddon(fit)
     term.open(container)
     requestAnimationFrame(() => fit.fit())
+
+    // xterm doesn't account for CSS zoom on the root element when computing mouse positions.
+    // Both e.clientX and getBoundingClientRect are in zoomed pixels, but xterm uses offsetWidth
+    // (CSS layout pixels) for cell-width calculation — causing a mismatch. We correct it here.
+    const zoomFix = (e: MouseEvent) => {
+      const zoom = parseFloat(document.body.style.zoom || '100') / 100
+      if (zoom === 1) return
+      const rect = container.getBoundingClientRect()
+      const cx = rect.left + (e.clientX - rect.left) / zoom
+      const cy = rect.top  + (e.clientY - rect.top)  / zoom
+      try {
+        Object.defineProperty(e, 'clientX', { value: cx, configurable: true, writable: true })
+        Object.defineProperty(e, 'clientY', { value: cy, configurable: true, writable: true })
+      } catch { /**/ }
+    }
+    ;(['mousedown', 'mousemove', 'mouseup', 'click'] as const).forEach(ev =>
+      container.addEventListener(ev, zoomFix, true)
+    )
 
     term.attachCustomKeyEventHandler((e) => {
       if (e.type !== 'keydown' || !e.ctrlKey || !e.shiftKey) return true
@@ -310,12 +409,20 @@ export default function AiConsultant() {
     sessionsRef.current.clear()
   }, [])
 
+  useEffect(() => {
+    const obs = new MutationObserver(() =>
+      setSidebarCollapsed(document.body.classList.contains('sidebar-collapsed'))
+    )
+    obs.observe(document.body, { attributes: true, attributeFilter: ['class'] })
+    return () => obs.disconnect()
+  }, [])
+
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="absolute inset-0 flex overflow-hidden">
 
       {/* ── Left panel ── */}
-      <div className="w-44 shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+      <div className={`${sidebarCollapsed ? 'w-64' : 'w-44'} shrink-0 flex flex-col border-r border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden transition-[width] duration-200`}>
 
         {/* Header */}
         <div className="px-3 pt-3 pb-2 shrink-0">
@@ -391,60 +498,229 @@ export default function AiConsultant() {
         </div>
 
         {/* File browser */}
-        <div className="border-t border-gray-200 dark:border-gray-800 flex flex-col shrink-0" style={{ maxHeight: '45%' }}>
+        <div className="border-t border-gray-200 dark:border-gray-800 flex flex-col shrink-0" style={{ maxHeight: '50%' }}>
           <div className="flex items-center justify-between px-3 py-2 shrink-0">
             <span className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider">
               Archivos
             </span>
-            <button
-              onClick={refreshFiles}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
-              title="Actualizar"
-            >
-              <RefreshCw className={`w-3 h-3 ${filesLoading ? 'animate-spin' : ''}`} />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => { setShowNewFolder(v => !v); setTimeout(() => newFolderInputRef.current?.focus(), 50) }}
+                className="text-gray-400 hover:text-violet-500 dark:hover:text-violet-400 transition-colors"
+                title="Nueva carpeta"
+              >
+                <FolderPlus className="w-3 h-3" />
+              </button>
+              <button
+                onClick={() => uploadInputRef.current?.click()}
+                disabled={uploading}
+                className="text-gray-400 hover:text-blue-500 dark:hover:text-blue-400 transition-colors disabled:opacity-40"
+                title="Subir documento de contexto"
+              >
+                <Upload className={`w-3 h-3 ${uploading ? 'animate-pulse' : ''}`} />
+              </button>
+              <button
+                onClick={refreshFiles}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                title="Actualizar"
+              >
+                <RefreshCw className={`w-3 h-3 ${filesLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
           </div>
 
+          {showNewFolder && (
+            <div className="px-2 pb-2 flex items-center gap-1 shrink-0">
+              <input
+                ref={newFolderInputRef}
+                value={newFolderName}
+                onChange={e => setNewFolderName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') createFolder(newFolderName)
+                  if (e.key === 'Escape') { setShowNewFolder(false); setNewFolderName('') }
+                }}
+                placeholder="nombre carpeta"
+                className="flex-1 min-w-0 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 outline-none focus:border-violet-400"
+              />
+              <button onClick={() => createFolder(newFolderName)} className="text-xs text-violet-500 font-medium px-1">✓</button>
+            </div>
+          )}
+
+          <input
+            ref={uploadInputRef}
+            type="file"
+            accept=".txt,.md,.pdf,.docx,.doc,.xlsx,.xls,.csv,.json,.html,.htm,.py,.js,.ts"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) uploadContextFile(f); e.target.value = '' }}
+          />
+
           <div className="overflow-y-auto pb-1 min-h-0">
-            {files.length === 0 ? (
-              <p className="text-xs text-gray-400 dark:text-gray-600 px-3 py-1 italic">
-                Sin archivos
-              </p>
-            ) : (
-              files.map(f => {
+            {files.length === 0 && dirs.length === 0 ? (
+              <p className="text-xs text-gray-400 dark:text-gray-600 px-3 py-1 italic">Sin archivos</p>
+            ) : (() => {
+              const { root, folders } = buildTree(files, dirs)
+
+              const renderFile = (f: WorkspaceFile, indent = false) => {
                 const isHtml = /\.html?$/i.test(f.name)
                 return (
                   <div
                     key={f.path}
+                    draggable
+                    onDragStart={() => setDraggingFile(f)}
+                    onDragEnd={() => setDraggingFile(null)}
                     title={`${f.path}  ·  ${fmtSize(f.size)}`}
-                    className="flex items-center gap-1 px-2 py-1 mx-0.5 rounded text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                    style={{ maxWidth: 'calc(100% - 4px)' }}
+                    className="group flex items-center gap-1 py-1 mx-0.5 rounded text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors cursor-grab active:cursor-grabbing"
+                    style={{ paddingLeft: indent ? '20px' : '8px', paddingRight: '4px' }}
                   >
                     <FileIcon name={f.name} />
                     <span className="flex-1 truncate min-w-0">{f.name}</span>
-                    <div className="flex items-center gap-0.5 shrink-0">
+                    <div className="flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100">
                       {isHtml && (
-                        <button
-                          onClick={() => openHtmlViewer(f)}
-                          title={`Ver ${f.name}`}
-                          className="p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400 transition-colors"
-                        >
+                        <button onClick={() => openHtmlViewer(f)} title={`Ver ${f.name}`}
+                          className="p-0.5 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 text-blue-500 dark:text-blue-400 transition-colors">
                           <Eye className="w-3 h-3" />
                         </button>
                       )}
-                      <button
-                        onClick={() => downloadFile(f.path)}
-                        title={`Descargar ${f.name}`}
-                        className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors"
-                      >
+                      <button onClick={() => downloadFile(f.path)} title={`Descargar ${f.name}`}
+                        className="p-0.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 text-gray-500 dark:text-gray-400 transition-colors">
                         <Download className="w-3 h-3" />
+                      </button>
+                      <button onClick={() => deleteItem(f.path)} title={`Eliminar ${f.name}`}
+                        className="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-400 transition-colors">
+                        <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
                   </div>
                 )
-              })
-            )}
+              }
+
+              return (
+                <>
+                  {/* Folders */}
+                  {folders.map(folder => {
+                    const expanded = expandedFolders.has(folder.path)
+                    const isOver = dragOverFolder === folder.path
+                    const isEditing = editingFolder === folder.path
+                    return (
+                      <div key={folder.path} className="group/folder">
+                        <div
+                          className={`flex items-center gap-1 px-2 py-1 mx-0.5 rounded text-xs font-medium transition-colors ${
+                            isOver
+                              ? 'bg-violet-100 dark:bg-violet-900/30 text-violet-700 dark:text-violet-300'
+                              : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+                          } ${isEditing ? '' : 'cursor-pointer'}`}
+                          onClick={() => {
+                            if (isEditing) return
+                            setExpandedFolders(prev => {
+                              const next = new Set(prev)
+                              next.has(folder.path) ? next.delete(folder.path) : next.add(folder.path)
+                              return next
+                            })
+                          }}
+                          onDragOver={e => { e.preventDefault(); setDragOverFolder(folder.path) }}
+                          onDragLeave={() => setDragOverFolder(null)}
+                          onDrop={e => {
+                            e.preventDefault()
+                            setDragOverFolder(null)
+                            if (draggingFile) moveFile(draggingFile.path, folder.path)
+                          }}
+                        >
+                          <ChevronDown className={`w-3 h-3 shrink-0 transition-transform ${expanded ? '' : '-rotate-90'}`} />
+                          <Folder className="w-3 h-3 shrink-0 text-amber-400" />
+                          {isEditing ? (
+                            <input
+                              autoFocus
+                              value={editingFolderName}
+                              onChange={e => setEditingFolderName(e.target.value)}
+                              onBlur={() => renameFolder(folder.path, editingFolderName)}
+                              onKeyDown={e => {
+                                if (e.key === 'Enter') renameFolder(folder.path, editingFolderName)
+                                if (e.key === 'Escape') setEditingFolder('')
+                              }}
+                              onClick={e => e.stopPropagation()}
+                              className="flex-1 min-w-0 text-xs bg-transparent border-b border-amber-400 outline-none"
+                            />
+                          ) : (
+                            <span
+                              className="truncate flex-1"
+                              onDoubleClick={e => {
+                                e.stopPropagation()
+                                setEditingFolder(folder.path)
+                                setEditingFolderName(folder.name)
+                              }}
+                            >{folder.name}</span>
+                          )}
+                          {!isEditing && (
+                            <div className="flex items-center gap-0.5 opacity-0 group-hover/folder:opacity-100 transition-opacity shrink-0">
+                              <span className="text-gray-400 dark:text-gray-600 text-[10px]">{folder.files.length}</span>
+                              <button
+                                onClick={e => { e.stopPropagation(); deleteItem(folder.path) }}
+                                title={`Eliminar carpeta ${folder.name}`}
+                                className="p-0.5 rounded hover:bg-red-100 dark:hover:bg-red-900/40 text-red-400 transition-colors ml-0.5"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                        {expanded && (
+                          <div>
+                            {folder.files.map(f => renderFile(f, true))}
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                  {/* Root files */}
+                  <div
+                    onDragOver={e => { e.preventDefault(); setDragOverFolder('__root__') }}
+                    onDragLeave={() => setDragOverFolder(null)}
+                    onDrop={e => {
+                      e.preventDefault()
+                      setDragOverFolder(null)
+                    }}
+                  >
+                    {root.map(f => renderFile(f, false))}
+                  </div>
+                </>
+              )
+            })()}
           </div>
+        </div>
+
+        {/* Write permissions */}
+        <div className="border-t border-gray-200 dark:border-gray-800 shrink-0">
+          <button
+            onClick={() => setShowPerms(v => !v)}
+            className="w-full flex items-center justify-between px-3 py-2 text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+          >
+            <span>Permisos IA</span>
+            <Settings className={`w-3 h-3 transition-transform ${showPerms ? 'rotate-45' : ''}`} />
+          </button>
+          {showPerms && (
+            <div className="px-3 pb-3 space-y-2">
+              {(['create', 'edit', 'delete'] as const).map(key => {
+                const labels = { create: 'Crear', edit: 'Editar', delete: 'Borrar' }
+                const on = writePerms[key]
+                return (
+                  <label key={key} className="flex items-center justify-between gap-2 cursor-pointer select-none">
+                    <span className="text-xs text-gray-600 dark:text-gray-400">{labels[key]}</span>
+                    <button
+                      role="switch"
+                      aria-checked={on}
+                      onClick={() => toggleWritePerm(key)}
+                      className={`relative w-8 h-4 rounded-full transition-colors shrink-0 ${on ? 'bg-amber-500' : 'bg-gray-300 dark:bg-gray-600'}`}
+                    >
+                      <span className={`absolute top-0.5 w-3 h-3 bg-white rounded-full shadow transition-all ${on ? 'left-4' : 'left-0.5'}`} />
+                    </button>
+                  </label>
+                )
+              })}
+              <p className="text-[10px] text-gray-400 dark:text-gray-600 leading-tight pt-0.5">
+                Aplica en nuevas sesiones. El log registra acciones de IA por separado.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

@@ -27,7 +27,7 @@ services:
     volumes:
       - uploads_data:/app/uploads
       - workspace_data:/app/workspace
-      - claude_data:/root/.claude
+      - claude_data:/var/claude-home
     restart: unless-stopped
 
   frontend:

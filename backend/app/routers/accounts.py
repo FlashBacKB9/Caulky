@@ -16,7 +16,7 @@ router = APIRouter(prefix="/accounts", tags=["accounts"])
 
 
 def _acc_snap(a: Account) -> dict:
-    return {"name": a.name, "color": a.color, "icon": a.icon, "initial_balance": float(a.initial_balance), "category": a.category}
+    return {"name": a.name, "color": a.color, "icon": a.icon, "initial_balance": float(a.initial_balance), "category": a.category, "depreciation_rate": float(a.depreciation_rate) if a.depreciation_rate is not None else None, "value_date": str(a.value_date) if a.value_date else None, "new_car": a.new_car}
 
 
 async def _compute_balances(db: AsyncSession, user_id: uuid.UUID) -> dict[int, float]:
@@ -105,6 +105,7 @@ async def create_account(body: AccountCreate, db: AsyncSession = Depends(get_db)
         name=body.name, color=body.color, icon=body.icon,
         initial_balance=body.initial_balance, sort_order=max_order + 1,
         is_main=False, user_id=user.id, category=body.category,
+        depreciation_rate=body.depreciation_rate, value_date=body.value_date, new_car=body.new_car,
     )
     db.add(account)
     await db.flush()

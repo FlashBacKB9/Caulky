@@ -1,8 +1,9 @@
 import uuid
-from sqlalchemy import Boolean, ForeignKey, Numeric, String, Text, Integer
+from sqlalchemy import Boolean, Date, ForeignKey, Numeric, String, Text, Integer
 from sqlalchemy import Uuid
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
+import datetime
 
 
 class Account(Base):
@@ -17,8 +18,11 @@ class Account(Base):
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     is_main: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     category: Mapped[str] = mapped_column(String(20), nullable=False, default="corriente")
+    depreciation_rate: Mapped[float | None] = mapped_column(Numeric(6, 4), nullable=True)
+    value_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
+    new_car: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )
 
-    movements: Mapped[list["Movement"]] = relationship(back_populates="account")
+    movements: Mapped[list["Movement"]] = relationship(back_populates="account", foreign_keys="Movement.account_id")

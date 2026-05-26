@@ -15,6 +15,8 @@ export interface Movement {
   bank_date?: string
   movement_type_id?: number
   account_id?: number
+  is_transfer?: boolean
+  from_account_id?: number
   paid: boolean
   no_count: boolean
   notes?: string

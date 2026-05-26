@@ -14,6 +14,17 @@ import { TrendingUp, TrendingDown, Plus, Pencil, Trash2, X, Check, RefreshCw, Ch
 
 const PALETTE = ['#6366f1','#8b5cf6','#ec4899','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#6b7280']
 
+function calcSpanishTax(gain: number): number {
+  if (gain <= 0) return 0
+  let remaining = gain
+  let tax = 0
+  const brackets = [[300000, 0.28], [200000, 0.27], [50000, 0.23], [6000, 0.21], [0, 0.19]] as const
+  for (const [threshold, rate] of brackets) {
+    if (remaining > threshold) { tax += (remaining - threshold) * rate; remaining = threshold }
+  }
+  return Math.round((tax + remaining * 0.19) * 100) / 100
+}
+
 function GainBadge({ eur, pct }: { eur: number; pct: number }) {
   const pos = eur >= 0
   return (
@@ -415,6 +426,8 @@ export default function Investments() {
   if (isLoading) return <div className="p-8 text-gray-500">{t('common.loading')}</div>
 
   const hasValue = summary?.total_current_value != null
+  const taxEst   = hasValue && summary!.gain_eur != null ? calcSpanishTax(summary!.gain_eur) : null
+  const netGain  = hasValue && summary!.gain_eur != null && taxEst != null ? summary!.gain_eur - taxEst : null
 
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-6">
@@ -426,12 +439,14 @@ export default function Investments() {
       </div>
 
       {summary && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
             { label: t('invest.invested'),     value: fmt(summary.total_invested),                                                                                                color: 'text-gray-700 dark:text-gray-200' },
             { label: t('invest.currentValue'), value: hasValue ? fmt(summary.total_current_value!) : '—',                                                                        color: 'text-gray-700 dark:text-gray-200' },
             { label: t('invest.gainEur'),       value: hasValue ? `${summary.gain_eur! >= 0 ? '+' : ''}${fmt(summary.gain_eur!)}` : '—',                                         color: !hasValue ? 'text-gray-400' : summary.gain_eur! >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' },
             { label: t('invest.yield'),         value: hasValue && summary.gain_pct != null ? `${summary.gain_pct >= 0 ? '+' : ''}${summary.gain_pct.toFixed(2)}%` : '—',        color: !hasValue ? 'text-gray-400' : (summary.gain_pct ?? 0) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' },
+            { label: t('invest.taxEst'),        value: taxEst != null ? `-${fmt(taxEst)}` : '—',                                                                                  color: taxEst != null ? 'text-amber-600 dark:text-amber-400' : 'text-gray-400' },
+            { label: t('invest.netGain'),       value: netGain != null ? `${netGain >= 0 ? '+' : ''}${fmt(netGain)}` : '—',                                                       color: netGain == null ? 'text-gray-400' : netGain >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400' },
           ].map(c => (
             <div key={c.label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
               <p className="text-xs text-gray-400 dark:text-gray-500">{c.label}</p>

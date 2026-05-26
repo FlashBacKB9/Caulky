@@ -1,3 +1,4 @@
+import datetime
 from pydantic import BaseModel
 
 
@@ -12,6 +13,9 @@ class AccountRead(BaseModel):
     sort_order: int
     is_main: bool = False
     category: str = "corriente"
+    depreciation_rate: float | None = None
+    value_date: datetime.date | None = None
+    new_car: bool = False
 
     model_config = {"from_attributes": True}
 
@@ -22,6 +26,9 @@ class AccountCreate(BaseModel):
     icon: str = "wallet"
     initial_balance: float = 0.0
     category: str = "corriente"
+    depreciation_rate: float | None = None
+    value_date: datetime.date | None = None
+    new_car: bool = False
 
 
 class AccountPatch(BaseModel):
@@ -30,6 +37,9 @@ class AccountPatch(BaseModel):
     icon: str | None = None
     initial_balance: float | None = None
     category: str | None = None
+    depreciation_rate: float | None = None
+    value_date: datetime.date | None = None
+    new_car: bool | None = None
 
 
 class AccountUpdate(BaseModel):

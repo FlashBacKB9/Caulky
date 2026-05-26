@@ -8,10 +8,10 @@ import { getAccountsSummary } from '../api/accounts'
 import api from '../api/client'
 import {
   Paperclip, Image as ImageIcon, FileText, X, Plus, ChevronLeft,
-  Pencil, Calendar, Check, AlertTriangle,
+  Pencil, Calendar, Check, AlertTriangle, Repeat,
 } from 'lucide-react'
 import {
-  applyFormula, computeDates,
+  applyFormula, computeDates, shiftWeekend,
   WEEKDAY_NAMES, WEEK_ORD_NAMES, WEEK_ORD_VALUES, describeRule,
   type MovementTemplate, type RecurrenceRule, type TemplateRecurrence,
 } from '../utils/recurringTemplates'
@@ -129,8 +129,8 @@ function RuleEditor({ rule, onChange }: { rule: RecurrenceRule; onChange: (r: Re
       {rule.kind === 'monthly_day' && (
         <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 flex-wrap">
           <span>{t('recurrence.onDay')}</span>
-          <input type="number" min={1} max={28} value={rule.monthDay}
-            onChange={e => set({ monthDay: Math.min(28, Math.max(1, parseInt(e.target.value) || 1)) })}
+          <input type="number" min={1} max={31} value={rule.monthDay}
+            onChange={e => set({ monthDay: Math.min(31, Math.max(1, parseInt(e.target.value) || 1)) })}
             className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-300" />
           <span>{t('recurrence.ofEvery')}</span>
           <input type="number" min={1} value={rule.everyN} onChange={e => set({ everyN: parseInt(e.target.value) || 1 })}
@@ -175,7 +175,8 @@ export default function MovementForm({ onClose, initialDate }: Props) {
   const startDate = initialDate ?? today
   const [form, setForm] = useState({
     name: '', money: '', date: startDate, bank_date: startDate,
-    movement_type_id: '', account_id: '', paid: true, no_count: false, notes: '',
+    movement_type_id: '', account_id: '', is_transfer: false, from_account_id: '',
+    paid: true, no_count: false, notes: '',
     is_shared: false, shared_between: '2', my_share: '',
   })
   const set = (field: string, value: unknown) => setForm(f => ({ ...f, [field]: value }))
@@ -198,6 +199,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
   const [recRule, setRecRule] = useState<RecurrenceRule>(defaultRule)
   const [recStart, setRecStart] = useState(today)
   const [recMode, setRecMode] = useState<'bulk' | 'auto'>('bulk')
+  const [recWeekendFallback, setRecWeekendFallback] = useState<'friday' | 'monday' | null>(null)
   const [recBulkN, setRecBulkN] = useState(3)
   const [recBulkDone, setRecBulkDone] = useState<number | null>(null)
   const [recBulkNumbered, setRecBulkNumbered] = useState(false)
@@ -222,8 +224,10 @@ export default function MovementForm({ onClose, initialDate }: Props) {
       const mv = await createMovement({
         name: form.name, money: parseFloat(form.money), date: form.date,
         bank_date: form.bank_date || undefined,
-        movement_type_id: form.movement_type_id ? parseInt(form.movement_type_id) : undefined,
+        movement_type_id: !form.is_transfer && form.movement_type_id ? parseInt(form.movement_type_id) : undefined,
         account_id: form.account_id ? parseInt(form.account_id) : undefined,
+        is_transfer: form.is_transfer,
+        from_account_id: form.is_transfer && form.from_account_id ? parseInt(form.from_account_id) : undefined,
         paid: form.paid, no_count: form.no_count, notes: form.notes || undefined,
         is_shared: form.is_shared, shared_between, my_share,
       })
@@ -281,6 +285,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
       bank_date: prev.bank_date || ((tpl.bankDateMode ?? 'manual') === 'today' ? today : ''),
       movement_type_id: tpl.movement_type_id,
       account_id: prev.account_id,
+      is_transfer: false, from_account_id: '',
       paid: tpl.paid, no_count: tpl.no_count, notes: tpl.notes,
       is_shared: false, shared_between: '2', my_share: '',
     }))
@@ -307,6 +312,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
     setRecRule(existing?.rule ?? defaultRule())
     setRecStart(existing?.startDate ?? today)
     setRecMode(existing?.autoCreate ? 'auto' : 'bulk')
+    setRecWeekendFallback(existing?.weekendFallback ?? null)
     setRecBulkDone(null)
     setPanel('recurrence')
   }
@@ -344,7 +350,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
   }
 
   const saveRecurrence = () => {
-    const rec: TemplateRecurrence = { rule: recRule, startDate: recStart, autoCreate: recMode === 'auto' }
+    const rec: TemplateRecurrence = { rule: recRule, startDate: recStart, autoCreate: recMode === 'auto', ...(recWeekendFallback ? { weekendFallback: recWeekendFallback } : {}) }
     const tpl = templates.find(t => t.id === recurrenceId)
     if (!tpl) return
     const { id, ...rest } = tpl
@@ -364,6 +370,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
 
   const bulkCreate = () => {
     const dates = computeDates(recRule, new Date(recStart), recBulkN)
+      .map(d => recWeekendFallback ? shiftWeekend(d, recWeekendFallback) : d)
     bulkMut.mutate({ dates, numbered: recBulkNumbered })
   }
 
@@ -405,6 +412,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
 
   // ── Preview dates ────────────────────────────────────────────────────────────
   const previewDates = computeDates(recRule, new Date(recStart), 3)
+    .map(d => recWeekendFallback ? shiftWeekend(d, recWeekendFallback) : d)
   const fmtPreview = (d: Date) => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
 
   // ── Escape key ───────────────────────────────────────────────────────────────
@@ -508,8 +516,11 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                   <div>
                     <label className={LBL}>{t('movement.type')}</label>
                     <div className="space-y-1.5">
-                      <TypeSelect value={form.movement_type_id} onChange={v => set('movement_type_id', v)} types={types} byCategory={byCategory} />
-                      <SavingsHint typeId={form.movement_type_id} money={form.money} />
+                      {form.is_transfer
+                        ? <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1">Sin tipo — es una transferencia</p>
+                        : <><TypeSelect value={form.movement_type_id} onChange={v => set('movement_type_id', v)} types={types} byCategory={byCategory} />
+                          <SavingsHint typeId={form.movement_type_id} money={form.money} /></>
+                      }
                     </div>
                   </div>
                   <div>
@@ -518,26 +529,43 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                   </div>
                 </div>
                 {(() => {
-                  const corrientes = accounts.filter(a => a.category === 'corriente')
-                  if (corrientes.length <= 1) return null
-                  const mainAcc = corrientes.find(a => a.is_main)
+                  const allAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro')
+                  if (allAccounts.length === 0) return null
+                  if (form.is_transfer) {
+                    return (
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className={LBL}>Cuenta origen</label>
+                          <select value={form.from_account_id} onChange={e => set('from_account_id', e.target.value)} className={INP}>
+                            <option value="">— Selecciona —</option>
+                            {allAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </select>
+                        </div>
+                        <div>
+                          <label className={LBL}>Cuenta destino</label>
+                          <select value={form.account_id} onChange={e => set('account_id', e.target.value)} className={INP}>
+                            <option value="">— Selecciona —</option>
+                            {allAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                    )
+                  }
+                  if (allAccounts.length <= 1) return null
+                  const mainAcc = allAccounts.find(a => a.is_main)
                   return (
                     <div>
                       <label className={LBL}>{t('settings.affectedAccount')}</label>
-                      <select
-                        value={form.account_id}
-                        onChange={e => set('account_id', e.target.value)}
-                        className={INP}
-                      >
+                      <select value={form.account_id} onChange={e => set('account_id', e.target.value)} className={INP}>
                         <option value="">{mainAcc ? `${mainAcc.name} ${t('settings.defaultSuffix')}` : t('settings.mainAccount')}</option>
-                        {corrientes.filter(a => !a.is_main).map(a => (
+                        {allAccounts.filter(a => !a.is_main).map(a => (
                           <option key={a.id} value={a.id}>{a.name}</option>
                         ))}
                       </select>
                     </div>
                   )
                 })()}
-                <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-4' : 'grid-cols-3'}`}>
                   {sharedEnabled && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('form.shared')}</label>
@@ -548,6 +576,10 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                       />
                     </div>
                   )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Transferencia</label>
+                    <Toggle value={form.is_transfer} onChange={v => setForm(f => ({ ...f, is_transfer: v, movement_type_id: v ? '' : f.movement_type_id, from_account_id: v ? f.from_account_id : '' }))} color="#8b5cf6" />
+                  </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('form.paid')}</label>
                     <Toggle value={form.paid} onChange={v => set('paid', v)} color="#22c55e" />
@@ -848,6 +880,24 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                     <input type="date" value={recStart} onChange={e => setRecStart(e.target.value)} className={INP} />
                   </div>
 
+                  {/* Weekend fallback */}
+                  <div>
+                    <label className={LBL}>Si cae en fin de semana</label>
+                    <div className="flex gap-2">
+                      {([null, 'friday', 'monday'] as const).map(v => (
+                        <button key={v ?? 'none'} type="button"
+                          onClick={() => setRecWeekendFallback(v)}
+                          className={`flex-1 py-1.5 px-2 text-xs rounded-lg border transition-colors ${
+                            recWeekendFallback === v
+                              ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-transparent'
+                              : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                          }`}>
+                          {v === null ? 'No mover' : v === 'friday' ? '→ Viernes' : '→ Lunes'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Preview */}
                   <div>
                     <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">{t('recurrence.preview')}</p>
@@ -944,7 +994,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
         </div>
 
         {/* ── Right: templates sidebar ─────────────────────────────────────── */}
-        <div className="w-56 border-l border-gray-100 dark:border-gray-800 flex flex-col shrink-0 bg-gray-50/50 dark:bg-gray-800/30">
+        <div className={`w-56 border-l border-gray-100 dark:border-gray-800 flex flex-col shrink-0 bg-gray-50/50 dark:bg-gray-800/30 ${panel === 'template' || panel === 'recurrence' ? 'hidden' : ''}`}>
           <div className="px-4 py-4 border-b border-gray-100 dark:border-gray-800">
             <span className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{t('quickadd.templates')}</span>
           </div>
@@ -963,10 +1013,12 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                     : 'hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
                 onClick={() => applyTemplate(tpl)}>
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm text-gray-700 dark:text-gray-300 truncate block">{tpl.label}</span>
+                <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                  <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{tpl.label}</span>
                   {tpl.recurrence?.autoCreate && (
-                    <span className="text-[10px] text-blue-500 dark:text-blue-400">{describeRule(tpl.recurrence.rule)}</span>
+                    <span title={describeRule(tpl.recurrence.rule)} className="shrink-0">
+                      <Repeat className="w-3 h-3 text-blue-500 dark:text-blue-400" />
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">

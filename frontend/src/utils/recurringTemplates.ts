@@ -16,6 +16,8 @@ export interface TemplateRecurrence {
   startDate: string     // ISO date
   autoCreate: boolean
   lastCreated?: string  // ISO date of last auto-run
+  weekendFallback?: 'friday' | 'monday'
+  preDone?: string[]    // shifted dates manually pre-confirmed from calendar preview
 }
 
 export interface MovementTemplate {
@@ -111,15 +113,17 @@ export function computeDates(rule: RecurrenceRule, startDate: Date, count: numbe
     }
 
   } else if (rule.kind === 'monthly_day') {
-    const day = Math.min(28, Math.max(1, rule.monthDay || 1))
-    const n   = Math.max(1, rule.everyN || 1)
+    const targetDay = Math.max(1, rule.monthDay || 1)
+    const n         = Math.max(1, rule.everyN || 1)
+    const dayFor = (y: number, m: number) =>
+      Math.min(targetDay, new Date(y, m + 1, 0).getDate())
     let y = start.getFullYear(), m = start.getMonth()
-    let cur = new Date(y, m, day, 12)
-    if (cur < start) { m += n; if (m > 11) { y += Math.floor(m/12); m %= 12 }; cur = new Date(y, m, day, 12) }
+    let cur = new Date(y, m, dayFor(y, m), 12)
+    if (cur < start) { m += n; if (m > 11) { y += Math.floor(m/12); m %= 12 }; cur = new Date(y, m, dayFor(y, m), 12) }
     while (dates.length < count) {
       dates.push(new Date(cur))
       m += n; if (m > 11) { y += Math.floor(m/12); m %= 12 }
-      cur = new Date(y, m, day, 12)
+      cur = new Date(y, m, dayFor(y, m), 12)
     }
 
   } else if (rule.kind === 'monthly_weekday') {
@@ -162,12 +166,14 @@ export async function runAutoRecurring(
     if (due.length === 0) continue
 
     for (const date of due) {
-      const dateStr = date.toISOString().split('T')[0]
+      const adjusted = tpl.recurrence.weekendFallback ? shiftWeekend(date, tpl.recurrence.weekendFallback) : date
+      const dateStr = adjusted.toISOString().split('T')[0]
+      if (tpl.recurrence.preDone?.includes(dateStr)) continue
       const bankDateStr = tpl.bankDateMode === 'today' ? dateStr : undefined
       const bankD = bankDateStr ? new Date(bankDateStr) : undefined
       try {
         await createFn({
-          name: applyFormula(tpl.name || tpl.label, date, bankD) || tpl.label,
+          name: applyFormula(tpl.name || tpl.label, adjusted, bankD) || tpl.label,
           money: parseFloat(tpl.money) || 0,
           date: dateStr,
           bank_date: bankDateStr,
@@ -188,6 +194,16 @@ export async function runAutoRecurring(
   }
 
   return totalCreated
+}
+
+// ── Weekend fallback ──────────────────────────────────────────────────────────
+
+export function shiftWeekend(date: Date, fallback: 'friday' | 'monday'): Date {
+  const d = new Date(date)
+  const day = d.getDay() // 0=Sun, 6=Sat
+  if (day === 6) d.setDate(d.getDate() + (fallback === 'monday' ? 2 : -1))
+  else if (day === 0) d.setDate(d.getDate() + (fallback === 'monday' ? 1 : -2))
+  return d
 }
 
 // ── Human-readable description ────────────────────────────────────────────────
