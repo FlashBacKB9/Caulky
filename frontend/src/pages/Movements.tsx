@@ -153,9 +153,11 @@ function MovementContextMenu({ menu, onDuplicate, onDelete, onClose }: {
     }
   }, [onClose])
 
-  // Adjust position to stay within viewport
-  const x = Math.min(menu.x, window.innerWidth - 180)
-  const y = Math.min(menu.y, window.innerHeight - 100)
+  // clientX/Y are in physical CSS pixels but `zoom` on <html> scales the CSS
+  // coordinate space, so we must divide by the zoom factor before positioning.
+  const zf = parseFloat(document.documentElement.style.zoom) / 100 || 1
+  const x = Math.min(menu.x / zf, window.innerWidth / zf - 180)
+  const y = Math.min(menu.y / zf, window.innerHeight / zf - 100)
 
   return (
     <div
