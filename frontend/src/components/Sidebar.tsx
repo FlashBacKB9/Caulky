@@ -13,6 +13,18 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.6.0', date: 'Mayo 2026',
+    items: [
+      { type: 'feat',    text: 'Multi-cuenta: transferencias entre cuentas, balance combinado y filtro por cuenta en movimientos' },
+      { type: 'feat',    text: 'Plantillas: icono de recurrencia inline (filas más compactas), opción "Si cae en fin de semana → Viernes/Lunes"' },
+      { type: 'feat',    text: 'Plantillas: recurrencia mensual permite día 1–31 (antes máx. 28); se ajusta al último día real del mes' },
+      { type: 'feat',    text: 'Calendario: click en una cita fantasma la crea como movimiento real; borrarla restaura el fantasma para auto-generación' },
+      { type: 'fix',     text: 'Menú contextual del calendario desplazado por el zoom CSS — ahora aparece exactamente en el cursor' },
+      { type: 'fix',     text: 'Autocomplete y plugins del navegador (Bitwarden, etc.) ya no aparecen desplazados en el login' },
+      { type: 'improve', text: 'Editor de plantilla/recurrencia ocupa todo el ancho del modal (sin sidebar lateral durante la edición)' },
+    ],
+  },
+  {
     version: 'v1.5.0', date: 'Mayo 2026',
     items: [
       { type: 'feat',    text: 'Cuentas: categoría "Vehículo" con depreciación lineal configurable y opción de depreciación inmediata para coches nuevos (−15%)' },
@@ -113,7 +125,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-white">{t('about.title')}</h2>
-            <span className="text-xs text-gray-400 dark:text-gray-500">v1.5.0</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">v1.6.0</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
