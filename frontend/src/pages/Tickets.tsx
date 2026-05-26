@@ -1,6 +1,6 @@
 import { useRef, useState, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import { Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2 } from 'lucide-react'
 import { analyzeTicket, getTickets, deleteTicket, type Ticket } from '../api/tickets'
 
@@ -157,7 +157,7 @@ function CategoryChart({ tickets }: { tickets: Ticket[] }) {
                 ))}
               </Pie>
               <Tooltip
-                formatter={(v: number) => [`${v.toFixed(2)} €`]}
+                formatter={(v) => [`${Number(v).toFixed(2)} €`]}
                 contentStyle={{ fontSize: 12, borderRadius: 8, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.1)' }}
               />
             </PieChart>
