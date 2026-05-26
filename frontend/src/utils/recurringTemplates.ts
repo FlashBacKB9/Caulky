@@ -17,6 +17,7 @@ export interface TemplateRecurrence {
   autoCreate: boolean
   lastCreated?: string  // ISO date of last auto-run
   weekendFallback?: 'friday' | 'monday'
+  preDone?: string[]    // shifted dates manually pre-confirmed from calendar preview
 }
 
 export interface MovementTemplate {
@@ -167,6 +168,7 @@ export async function runAutoRecurring(
     for (const date of due) {
       const adjusted = tpl.recurrence.weekendFallback ? shiftWeekend(date, tpl.recurrence.weekendFallback) : date
       const dateStr = adjusted.toISOString().split('T')[0]
+      if (tpl.recurrence.preDone?.includes(dateStr)) continue
       const bankDateStr = tpl.bankDateMode === 'today' ? dateStr : undefined
       const bankD = bankDateStr ? new Date(bankDateStr) : undefined
       try {

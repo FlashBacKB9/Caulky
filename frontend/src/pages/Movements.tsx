@@ -7,7 +7,7 @@ import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getGroups } from '../api/groups'
 import MovementForm from '../components/MovementForm'
 import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePayload } from '../components/MovementDetailModal'
-import { runAutoRecurring, computeDates, applyFormula } from '../utils/recurringTemplates'
+import { runAutoRecurring, computeDates, applyFormula, shiftWeekend, type MovementTemplate } from '../utils/recurringTemplates'
 import { getTemplates, updateTemplate } from '../api/templates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
 import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search, ArrowUpDown } from 'lucide-react'
@@ -183,6 +183,16 @@ function MovementContextMenu({ menu, onDuplicate, onDelete, onClose }: {
   )
 }
 
+// ── Calendar preview tracking ─────────────────────────────────────────────────
+
+const PREVIEW_MAP_KEY = 'caulky-preview-movements'
+type PreviewEntry = { id: number; templateId: number; date: string }
+function loadPreviewMap(): PreviewEntry[] {
+  try { const s = localStorage.getItem(PREVIEW_MAP_KEY); if (s) return JSON.parse(s) } catch { /**/ }
+  return []
+}
+function savePreviewMap(map: PreviewEntry[]) { localStorage.setItem(PREVIEW_MAP_KEY, JSON.stringify(map)) }
+
 // ── Calendar view ────────────────────────────────────────────────────────────
 
 function CalendarView({ movements, types, selectedYear }: {
@@ -225,18 +235,21 @@ function CalendarView({ movements, types, selectedYear }: {
   const { data: groups = [] } = useQuery({ queryKey: ['groups'], queryFn: getGroups })
   const ingresoGroupId = useMemo(() => groups.find(g => g.name === 'Ingreso')?.id, [groups])
 
+  type PreviewItem = { name: string; money: number; movement_type_id?: number; templateId: number; date: string }
   const previewByDate = useMemo(() => {
-    if (dateField !== 'date') return {}
-    const map: Record<string, { name: string; money: number; movement_type_id?: number }[]> = {}
+    if (dateField !== 'date') return {} as Record<string, PreviewItem[]>
+    const map: Record<string, PreviewItem[]> = {}
     const now = new Date(); now.setHours(0, 0, 0, 0)
     const previewEnd = new Date(now); previewEnd.setMonth(previewEnd.getMonth() + 6)
     for (const tpl of templates) {
       if (!tpl.recurrence?.rule) continue
       const allDates = computeDates(tpl.recurrence.rule, new Date(tpl.recurrence.startDate), 300)
       for (const d of allDates) {
-        const dd = new Date(d); dd.setHours(0, 0, 0, 0)
+        let dd = new Date(d); dd.setHours(0, 0, 0, 0)
+        if (tpl.recurrence.weekendFallback) { dd = shiftWeekend(dd, tpl.recurrence.weekendFallback); dd.setHours(0, 0, 0, 0) }
         if (dd <= now || dd > previewEnd) continue
         const dateStr = `${dd.getFullYear()}-${String(dd.getMonth() + 1).padStart(2, '0')}-${String(dd.getDate()).padStart(2, '0')}`
+        if (tpl.recurrence.preDone?.includes(dateStr)) continue
         if (!map[dateStr]) map[dateStr] = []
         const typeId = tpl.movement_type_id ? parseInt(tpl.movement_type_id) : undefined
         const type = typeId != null ? types.find(t => t.id === typeId) : undefined
@@ -247,6 +260,8 @@ function CalendarView({ movements, types, selectedYear }: {
           name: applyFormula(tpl.name || tpl.label, dd),
           money,
           movement_type_id: typeId,
+          templateId: tpl.id,
+          date: dateStr,
         })
       }
     }
@@ -294,10 +309,52 @@ function CalendarView({ movements, types, selectedYear }: {
   })
   const calDelMut = useMutation({
     mutationFn: (mv: Movement) => deleteMovement(mv.id),
-    onSuccess: () => {
+    onSuccess: async (_, mv) => {
+      const pm = loadPreviewMap()
+      const entry = pm.find(e => e.id === mv.id)
+      if (entry) {
+        const allTpls = qc.getQueryData<MovementTemplate[]>(['templates']) ?? []
+        const tpl = allTpls.find(t => t.id === entry.templateId)
+        if (tpl?.recurrence?.preDone?.includes(entry.date)) {
+          const newPreDone = tpl.recurrence.preDone.filter(d => d !== entry.date)
+          await updateTemplate(entry.templateId, { ...tpl, recurrence: { ...tpl.recurrence, preDone: newPreDone } })
+          qc.invalidateQueries({ queryKey: ['templates'] })
+        }
+        savePreviewMap(pm.filter(e => e.id !== mv.id))
+      }
       qc.invalidateQueries({ queryKey: ['movements'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['annual'] })
+    },
+  })
+  const previewClickMut = useMutation({
+    mutationFn: async (pv: PreviewItem) => {
+      const allTpls = qc.getQueryData<MovementTemplate[]>(['templates']) ?? []
+      const tpl = allTpls.find(t => t.id === pv.templateId)
+      if (!tpl?.recurrence) return
+      const d = new Date(pv.date + 'T12:00:00')
+      const bankDateStr = (tpl.bankDateMode ?? 'manual') === 'today' ? pv.date : undefined
+      const bankD = bankDateStr ? new Date(bankDateStr + 'T12:00:00') : undefined
+      const mv = await createMovement({
+        name: applyFormula(tpl.name || tpl.label, d, bankD) || tpl.label,
+        money: parseFloat(tpl.money) || 0,
+        date: pv.date,
+        bank_date: bankDateStr,
+        movement_type_id: tpl.movement_type_id ? parseInt(tpl.movement_type_id) : undefined,
+        paid: tpl.paid,
+        no_count: tpl.no_count,
+        notes: tpl.notes || undefined,
+      })
+      const newPreDone = [...(tpl.recurrence.preDone ?? []), pv.date]
+      await updateTemplate(tpl.id, { ...tpl, recurrence: { ...tpl.recurrence, preDone: newPreDone } })
+      const pm = loadPreviewMap(); pm.push({ id: mv.id, templateId: pv.templateId, date: pv.date }); savePreviewMap(pm)
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['movements'] })
+      qc.invalidateQueries({ queryKey: ['templates'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+      qc.invalidateQueries({ queryKey: ['annual'] })
+      qc.invalidateQueries({ queryKey: ['accounts-summary'] })
     },
   })
   const todayStr = today.toISOString().split('T')[0]
@@ -401,7 +458,10 @@ function CalendarView({ movements, types, selectedYear }: {
                 {previews.map((pv, pi) => {
                   const typ = pv.movement_type_id ? typeMap[pv.movement_type_id] : undefined
                   return (
-                    <div key={`preview-${pi}`} className="mb-1 rounded-md border border-dashed border-gray-300 dark:border-gray-600 px-1.5 py-1 opacity-45 pointer-events-none">
+                    <div key={`preview-${pi}`}
+                      onClick={e => { e.stopPropagation(); previewClickMut.mutate(pv) }}
+                      title="Clic para crear ahora"
+                      className="mb-1 rounded-md border border-dashed border-gray-300 dark:border-gray-600 px-1.5 py-1 opacity-45 hover:opacity-80 cursor-pointer transition-opacity">
                       <span className="truncate text-[11px] text-gray-500 dark:text-gray-400 leading-tight block">{pv.name}</span>
                       <span className={`text-[11px] font-mono ${pv.money >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
                         {fmtCal(pv.money)}
