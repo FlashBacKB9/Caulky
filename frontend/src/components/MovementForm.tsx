@@ -1016,7 +1016,9 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                 <div className="flex-1 min-w-0 flex items-center gap-1.5">
                   <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{tpl.label}</span>
                   {tpl.recurrence?.autoCreate && (
-                    <Repeat className="w-3 h-3 text-blue-500 dark:text-blue-400 shrink-0" title={describeRule(tpl.recurrence.rule)} />
+                    <span title={describeRule(tpl.recurrence.rule)} className="shrink-0">
+                      <Repeat className="w-3 h-3 text-blue-500 dark:text-blue-400" />
+                    </span>
                   )}
                 </div>
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
