@@ -193,8 +193,15 @@ export default function Tickets() {
 
   const analyzeMut = useMutation({
     mutationFn: analyzeTicket,
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ['tickets'] }); setUploadError(null) },
-    onError: () => setUploadError('Error al analizar el ticket. Comprueba que Tesseract OCR está instalado en el servidor.'),
+    onSuccess: (ticket) => {
+      qc.invalidateQueries({ queryKey: ['tickets'] })
+      if (ticket.items.length === 0) {
+        setUploadError('Ticket guardado, pero no se detectaron productos. Comprueba que Tesseract OCR está instalado en el servidor o que la imagen tiene suficiente calidad.')
+      } else {
+        setUploadError(null)
+      }
+    },
+    onError: () => setUploadError('Error al subir el ticket. Comprueba la conexión con el servidor.'),
   })
 
   const deleteMut = useMutation({

@@ -274,7 +274,7 @@ async def _extract_text(file_path: str, mime_type: str) -> str:
             import pdfplumber
             with pdfplumber.open(file_path) as pdf:
                 return "\n".join(p.extract_text() or "" for p in pdf.pages)
-        except ImportError:
+        except Exception:
             return ""
     else:
         try:
@@ -282,7 +282,7 @@ async def _extract_text(file_path: str, mime_type: str) -> str:
             from PIL import Image
             img = Image.open(file_path)
             return pytesseract.image_to_string(img, lang="spa+eng")
-        except ImportError:
+        except Exception:
             return ""
 
 
