@@ -267,7 +267,7 @@ export default function AiConsultant() {
     // Both e.clientX and getBoundingClientRect are in zoomed pixels, but xterm uses offsetWidth
     // (CSS layout pixels) for cell-width calculation — causing a mismatch. We correct it here.
     const zoomFix = (e: MouseEvent) => {
-      const zoom = parseFloat(document.documentElement.style.zoom || '100') / 100
+      const zoom = parseFloat(document.body.style.zoom || '100') / 100
       if (zoom === 1) return
       const rect = container.getBoundingClientRect()
       const cx = rect.left + (e.clientX - rect.left) / zoom

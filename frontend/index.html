@@ -17,7 +17,7 @@
       ;(function(){
         var s = localStorage.getItem('ui-zoom-v2')
         var z = s ? Math.max(70, Math.min(130, parseInt(s, 10))) : 100
-        document.documentElement.style.zoom = (z * 1.2) + '%'
+        document.body.style.zoom = (z * 1.2) + '%'
       })()
     </script>
     <div id="root"></div>
