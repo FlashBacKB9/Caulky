@@ -8,10 +8,10 @@ import { getAccountsSummary } from '../api/accounts'
 import api from '../api/client'
 import {
   Paperclip, Image as ImageIcon, FileText, X, Plus, ChevronLeft,
-  Pencil, Calendar, Check, AlertTriangle,
+  Pencil, Calendar, Check, AlertTriangle, Repeat,
 } from 'lucide-react'
 import {
-  applyFormula, computeDates,
+  applyFormula, computeDates, shiftWeekend,
   WEEKDAY_NAMES, WEEK_ORD_NAMES, WEEK_ORD_VALUES, describeRule,
   type MovementTemplate, type RecurrenceRule, type TemplateRecurrence,
 } from '../utils/recurringTemplates'
@@ -199,6 +199,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
   const [recRule, setRecRule] = useState<RecurrenceRule>(defaultRule)
   const [recStart, setRecStart] = useState(today)
   const [recMode, setRecMode] = useState<'bulk' | 'auto'>('bulk')
+  const [recWeekendFallback, setRecWeekendFallback] = useState<'friday' | 'monday' | null>(null)
   const [recBulkN, setRecBulkN] = useState(3)
   const [recBulkDone, setRecBulkDone] = useState<number | null>(null)
   const [recBulkNumbered, setRecBulkNumbered] = useState(false)
@@ -311,6 +312,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
     setRecRule(existing?.rule ?? defaultRule())
     setRecStart(existing?.startDate ?? today)
     setRecMode(existing?.autoCreate ? 'auto' : 'bulk')
+    setRecWeekendFallback(existing?.weekendFallback ?? null)
     setRecBulkDone(null)
     setPanel('recurrence')
   }
@@ -348,7 +350,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
   }
 
   const saveRecurrence = () => {
-    const rec: TemplateRecurrence = { rule: recRule, startDate: recStart, autoCreate: recMode === 'auto' }
+    const rec: TemplateRecurrence = { rule: recRule, startDate: recStart, autoCreate: recMode === 'auto', ...(recWeekendFallback ? { weekendFallback: recWeekendFallback } : {}) }
     const tpl = templates.find(t => t.id === recurrenceId)
     if (!tpl) return
     const { id, ...rest } = tpl
@@ -368,6 +370,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
 
   const bulkCreate = () => {
     const dates = computeDates(recRule, new Date(recStart), recBulkN)
+      .map(d => recWeekendFallback ? shiftWeekend(d, recWeekendFallback) : d)
     bulkMut.mutate({ dates, numbered: recBulkNumbered })
   }
 
@@ -409,6 +412,7 @@ export default function MovementForm({ onClose, initialDate }: Props) {
 
   // ── Preview dates ────────────────────────────────────────────────────────────
   const previewDates = computeDates(recRule, new Date(recStart), 3)
+    .map(d => recWeekendFallback ? shiftWeekend(d, recWeekendFallback) : d)
   const fmtPreview = (d: Date) => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })
 
   // ── Escape key ───────────────────────────────────────────────────────────────
@@ -876,6 +880,24 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                     <input type="date" value={recStart} onChange={e => setRecStart(e.target.value)} className={INP} />
                   </div>
 
+                  {/* Weekend fallback */}
+                  <div>
+                    <label className={LBL}>Si cae en fin de semana</label>
+                    <div className="flex gap-2">
+                      {([null, 'friday', 'monday'] as const).map(v => (
+                        <button key={v ?? 'none'} type="button"
+                          onClick={() => setRecWeekendFallback(v)}
+                          className={`flex-1 py-1.5 px-2 text-xs rounded-lg border transition-colors ${
+                            recWeekendFallback === v
+                              ? 'bg-gray-900 dark:bg-white text-white dark:text-gray-900 border-transparent'
+                              : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+                          }`}>
+                          {v === null ? 'No mover' : v === 'friday' ? '→ Viernes' : '→ Lunes'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Preview */}
                   <div>
                     <p className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wide">{t('recurrence.preview')}</p>
@@ -991,10 +1013,10 @@ export default function MovementForm({ onClose, initialDate }: Props) {
                     : 'hover:bg-gray-100 dark:hover:bg-gray-800'
                 }`}
                 onClick={() => applyTemplate(tpl)}>
-                <div className="flex-1 min-w-0">
-                  <span className="text-sm text-gray-700 dark:text-gray-300 truncate block">{tpl.label}</span>
+                <div className="flex-1 min-w-0 flex items-center gap-1.5">
+                  <span className="text-sm text-gray-700 dark:text-gray-300 truncate">{tpl.label}</span>
                   {tpl.recurrence?.autoCreate && (
-                    <span className="text-[10px] text-blue-500 dark:text-blue-400">{describeRule(tpl.recurrence.rule)}</span>
+                    <Repeat className="w-3 h-3 text-blue-500 dark:text-blue-400 shrink-0" title={describeRule(tpl.recurrence.rule)} />
                   )}
                 </div>
                 <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-all shrink-0">
