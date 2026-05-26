@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { syncPref } from '../utils/prefSync'
 import {
   Home, List, Landmark, BarChart2, LineChart, GitCompare,
-  ChartCandlestick, TrendingUp, Upload, BookOpen, Telescope, Brain, BotMessageSquare,
+  ChartCandlestick, TrendingUp, Upload, BookOpen, Telescope, Brain, BotMessageSquare, Receipt,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -24,6 +24,7 @@ export const PAGE_META: Record<string, NavPageMeta> = {
   '/analisis':      { label: 'Análisis',         labelKey: 'nav.analysis',    Icon: Brain },
   '/docs':          { label: 'Documentación',    labelKey: 'nav.docs',        Icon: BookOpen },
   '/consultor-ia':  { label: 'Consultor IA',     labelKey: 'nav.ai',          Icon: BotMessageSquare },
+  '/tickets':       { label: 'Tickets',          labelKey: 'nav.tickets',     Icon: Receipt },
 }
 
 const DEFAULT_IDS = Object.keys(PAGE_META)

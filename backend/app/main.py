@@ -1,7 +1,7 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin, templates, preferences, audit_log, terminal
+from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin, templates, preferences, audit_log, terminal, tickets
 from app.auth.setup import fastapi_users, auth_backend
 from app.auth.schemas import UserRead, UserCreate, UserUpdate
 from app.config import settings
@@ -58,6 +58,7 @@ app.include_router(templates.router, prefix="/api")
 app.include_router(preferences.router, prefix="/api")
 app.include_router(audit_log.router, prefix="/api")
 app.include_router(terminal.router, prefix="/api")
+app.include_router(tickets.router, prefix="/api")
 
 
 @app.get("/health")
