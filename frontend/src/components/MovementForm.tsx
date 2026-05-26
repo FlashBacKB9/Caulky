@@ -129,8 +129,8 @@ function RuleEditor({ rule, onChange }: { rule: RecurrenceRule; onChange: (r: Re
       {rule.kind === 'monthly_day' && (
         <div className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-300 flex-wrap">
           <span>{t('recurrence.onDay')}</span>
-          <input type="number" min={1} max={28} value={rule.monthDay}
-            onChange={e => set({ monthDay: Math.min(28, Math.max(1, parseInt(e.target.value) || 1)) })}
+          <input type="number" min={1} max={31} value={rule.monthDay}
+            onChange={e => set({ monthDay: Math.min(31, Math.max(1, parseInt(e.target.value) || 1)) })}
             className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 rounded-lg px-2 py-1 text-sm text-center focus:outline-none focus:ring-2 focus:ring-gray-300" />
           <span>{t('recurrence.ofEvery')}</span>
           <input type="number" min={1} value={rule.everyN} onChange={e => set({ everyN: parseInt(e.target.value) || 1 })}

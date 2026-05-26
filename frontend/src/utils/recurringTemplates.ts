@@ -112,15 +112,17 @@ export function computeDates(rule: RecurrenceRule, startDate: Date, count: numbe
     }
 
   } else if (rule.kind === 'monthly_day') {
-    const day = Math.min(28, Math.max(1, rule.monthDay || 1))
-    const n   = Math.max(1, rule.everyN || 1)
+    const targetDay = Math.max(1, rule.monthDay || 1)
+    const n         = Math.max(1, rule.everyN || 1)
+    const dayFor = (y: number, m: number) =>
+      Math.min(targetDay, new Date(y, m + 1, 0).getDate())
     let y = start.getFullYear(), m = start.getMonth()
-    let cur = new Date(y, m, day, 12)
-    if (cur < start) { m += n; if (m > 11) { y += Math.floor(m/12); m %= 12 }; cur = new Date(y, m, day, 12) }
+    let cur = new Date(y, m, dayFor(y, m), 12)
+    if (cur < start) { m += n; if (m > 11) { y += Math.floor(m/12); m %= 12 }; cur = new Date(y, m, dayFor(y, m), 12) }
     while (dates.length < count) {
       dates.push(new Date(cur))
       m += n; if (m > 11) { y += Math.floor(m/12); m %= 12 }
-      cur = new Date(y, m, day, 12)
+      cur = new Date(y, m, dayFor(y, m), 12)
     }
 
   } else if (rule.kind === 'monthly_weekday') {
