@@ -8,7 +8,8 @@ import {
   Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
   Eye, EyeOff, Search, ArrowRightLeft, ExternalLink,
 } from 'lucide-react'
-import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, ticketFileUrl, attachTicketToMovement, type Ticket, type TicketItem } from '../api/tickets'
+import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicketMeta, ticketFileUrl, attachTicketToMovement, type Ticket, type TicketItem } from '../api/tickets'
+import { compressImage } from '../utils/imageCompressor'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import MovementForm from '../components/MovementForm'
 import {
@@ -306,6 +307,56 @@ function UploadArea({ onFile }: { onFile: (f: File) => void }) {
   )
 }
 
+// ── Inline editable metadata field ────────────────────────────────────────────
+
+function TicketMetaField({
+  value, placeholder, type = 'text', className = '', format, onSave,
+}: {
+  value: string
+  placeholder?: string
+  type?: 'text' | 'date'
+  className?: string
+  format?: (v: string) => string
+  onSave: (v: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+
+  const commit = (v: string) => {
+    setEditing(false)
+    if (v !== value) onSave(v)
+  }
+
+  if (editing) {
+    return (
+      <input
+        type={type}
+        autoFocus
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={e => commit(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Enter') { e.currentTarget.blur() }
+          if (e.key === 'Escape') { setEditing(false); setDraft(value) }
+        }}
+        className={`${className} bg-transparent border-b border-blue-400 outline-none w-full`}
+      />
+    )
+  }
+
+  const display = format ? format(value) : (value || placeholder || '')
+  return (
+    <p
+      className={`${className} truncate cursor-text group/meta`}
+      title="Haz clic para editar"
+      onClick={() => { setDraft(value); setEditing(true) }}
+    >
+      {display || <span className="text-gray-300 dark:text-gray-600">{placeholder}</span>}
+      <Pencil className="w-3 h-3 inline ml-1 opacity-0 group-hover/meta:opacity-40 transition-opacity" />
+    </p>
+  )
+}
+
 // ── Ticket card ────────────────────────────────────────────────────────────────
 
 function TicketCard({
@@ -342,9 +393,6 @@ function TicketCard({
     return Array.from(set).sort()
   }, [extraCategories])
 
-  const dateLabel = ticket.ticket_date
-    ? new Date(ticket.ticket_date + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' })
-    : null
 
   const updateMut = useMutation({
     mutationFn: (items: TicketItem[]) => updateTicketItems(ticket.id, items),
@@ -411,12 +459,25 @@ function TicketCard({
       <div className="flex items-center gap-3 px-4 py-3">
         <Receipt className="w-4 h-4 text-gray-400 shrink-0" strokeWidth={1.5} />
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-gray-800 dark:text-white truncate">
-            {ticket.store_name ?? ticket.original_name}
-          </p>
-          <p className="text-xs text-gray-400 dark:text-gray-500">
-            {[dateLabel, ticket.total != null ? `${ticket.total.toFixed(2)} €` : null].filter(Boolean).join(' · ')}
-          </p>
+          <TicketMetaField
+            value={ticket.store_name ?? ticket.original_name}
+            placeholder="Nombre del establecimiento"
+            className="text-sm font-medium text-gray-800 dark:text-white"
+            onSave={v => updateTicketMeta(ticket.id, { store_name: v }).then(() => qc.invalidateQueries({ queryKey: ['tickets'] }))}
+          />
+          <TicketMetaField
+            value={ticket.ticket_date ?? ''}
+            placeholder="Fecha"
+            type="date"
+            className="text-xs text-gray-400 dark:text-gray-500"
+            format={v => {
+              if (!v) return ticket.total != null ? `${ticket.total.toFixed(2)} €` : 'Sin fecha'
+              const parts = [new Date(v + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: 'numeric' })]
+              if (ticket.total != null) parts.push(`${ticket.total.toFixed(2)} €`)
+              return parts.join(' · ')
+            }}
+            onSave={v => updateTicketMeta(ticket.id, { ticket_date: v }).then(() => qc.invalidateQueries({ queryKey: ['tickets'] }))}
+          />
         </div>
         <button
           className={`p-1.5 transition-colors ${viewFile ? 'text-blue-500' : 'text-gray-400 hover:text-blue-500'}`}
@@ -970,7 +1031,7 @@ export default function Tickets() {
       </div>
 
       <div className="relative">
-        <UploadArea onFile={f => { setUploadError(null); analyzeMut.mutate(f) }} />
+        <UploadArea onFile={async f => { setUploadError(null); analyzeMut.mutate(await compressImage(f)) }} />
         {analyzeMut.isPending && (
           <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 rounded-xl flex items-center justify-center gap-2">
             <Loader2 className="w-5 h-5 animate-spin text-blue-500" />

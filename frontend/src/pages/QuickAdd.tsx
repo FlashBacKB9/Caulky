@@ -7,7 +7,8 @@ import { Check, Delete, ChevronDown, X, Upload, Loader2, AlertCircle, Receipt, S
 import { createMovement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getAccountsSummary } from '../api/accounts'
-import { analyzeTicket, attachTicketToMovement, type Ticket } from '../api/tickets'
+import { analyzeTicket, attachTicketToMovement, updateTicketMeta, type Ticket } from '../api/tickets'
+import { compressImage } from '../utils/imageCompressor'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { type MovementTemplate } from '../utils/recurringTemplates'
@@ -210,6 +211,38 @@ function TemplatePicker({ templates, onApply, onClose }: {
   )
 }
 
+// ── Inline editable field for SpeedMode ticket header ─────────────────────────
+
+function SpeedMetaField({ value, placeholder, type = 'text', className = '', format, onSave }: {
+  value: string; placeholder?: string; type?: 'text' | 'date'
+  className?: string; format?: (v: string) => string; onSave: (v: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+
+  const commit = (v: string) => { setEditing(false); if (v !== value) onSave(v) }
+  const display = format ? format(value) : value
+
+  if (editing) {
+    return (
+      <input
+        type={type}
+        autoFocus
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={e => commit(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setEditing(false); setDraft(value) } }}
+        className={`${className} bg-transparent border-b border-blue-400 outline-none w-full`}
+      />
+    )
+  }
+  return (
+    <p className={`${className} cursor-text`} onClick={() => { setDraft(value); setEditing(true) }}>
+      {display || <span className="opacity-40">{placeholder}</span>}
+    </p>
+  )
+}
+
 // ── Ticket tab ────────────────────────────────────────────────────────────────
 
 const SUPPLIES_CATS = new Set([
@@ -253,9 +286,9 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
     },
   })
 
-  const handleFile = (file: File) => {
+  const handleFile = async (file: File) => {
     setTicket(null); setError(null); setDone(new Set())
-    analyzeMut.mutate(file)
+    analyzeMut.mutate(await compressImage(file))
   }
 
   // Per-mode totals
@@ -345,18 +378,26 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
       {ticket && (
         <div className="p-5 space-y-4">
           {/* Header */}
-          <div className="flex items-center justify-between">
-            <div>
-              {ticket.store_name && (
-                <p className="text-base font-semibold text-gray-800 dark:text-white">{ticket.store_name}</p>
-              )}
-              {ticket.ticket_date && (
-                <p className="text-xs text-gray-400">{new Date(ticket.ticket_date + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-              )}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <SpeedMetaField
+                value={ticket.store_name ?? ''}
+                placeholder="Nombre del establecimiento"
+                className="text-base font-semibold text-gray-800 dark:text-white"
+                onSave={v => updateTicketMeta(ticket.id, { store_name: v }).then(t => setTicket(t))}
+              />
+              <SpeedMetaField
+                value={ticket.ticket_date ?? ''}
+                placeholder="Añadir fecha"
+                type="date"
+                className="text-xs text-gray-400"
+                format={v => v ? new Date(v + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+                onSave={v => updateTicketMeta(ticket.id, { ticket_date: v }).then(t => setTicket(t))}
+              />
             </div>
             <button
               onClick={() => { setTicket(null); setError(null) }}
-              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors py-1 px-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors py-1 px-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0"
             >
               <RotateCcw className="w-3.5 h-3.5" /> Nuevo
             </button>

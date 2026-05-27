@@ -55,6 +55,12 @@ export const createMovementFromTicket = (
 
 export const ticketFileUrl = (id: number) => `/api/tickets/${id}/file`
 
+export const updateTicketMeta = (
+  id: number,
+  patch: { store_name?: string; ticket_date?: string },
+): Promise<Ticket> =>
+  api.patch<Ticket>(`/tickets/${id}/meta`, patch).then(r => r.data)
+
 export const attachTicketToMovement = (
   ticketId: number,
   movementId: number,

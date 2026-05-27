@@ -285,19 +285,27 @@ def _extract_total(text: str) -> float | None:
 
 
 def _extract_date(text: str):
-    date_re = re.compile(
-        r'(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})'
-    )
-    m = date_re.search(text)
-    if m:
-        d, mo, y = m.group(1), m.group(2), m.group(3)
-        if len(y) == 2:
-            y = "20" + y
-        try:
-            from datetime import date
-            return date(int(y), int(mo), int(d))
-        except ValueError:
-            pass
+    from datetime import date as _dt
+    patterns = [
+        # ISO: YYYY-MM-DD or YYYY/MM/DD
+        (r'\b(\d{4})\s*[/\-.]\s*(\d{1,2})\s*[/\-.]\s*(\d{1,2})\b', 'ymd'),
+        # DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY (optional spaces around sep)
+        (r'\b(\d{1,2})\s*[/\-.]\s*(\d{1,2})\s*[/\-.]\s*(\d{2,4})\b', 'dmy'),
+    ]
+    for pattern, fmt in patterns:
+        for m in re.finditer(pattern, text):
+            try:
+                if fmt == 'ymd':
+                    y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                else:
+                    d, mo = int(m.group(1)), int(m.group(2))
+                    y = int(m.group(3))
+                    if y < 100:
+                        y += 2000
+                if 1 <= mo <= 12 and 1 <= d <= 31 and 2000 <= y <= 2099:
+                    return _dt(y, mo, d)
+            except ValueError:
+                pass
     return None
 
 
@@ -339,6 +347,11 @@ class TicketItemIn(PydanticModel):
 
 class TicketItemsPatch(PydanticModel):
     items: list[TicketItemIn]
+
+
+class TicketMetaPatch(PydanticModel):
+    store_name: str | None = None   # "" → clear
+    ticket_date: str | None = None  # "YYYY-MM-DD" or "" → clear
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
@@ -432,6 +445,34 @@ async def patch_ticket_items(
 
     t.items = json.dumps(new_items, ensure_ascii=False)
     t.categories = json.dumps(_compute_categories(new_items), ensure_ascii=False)
+    await db.commit()
+    await db.refresh(t)
+    return t
+
+
+@router.patch("/{ticket_id}/meta", response_model=TicketRead)
+async def patch_ticket_meta(
+    ticket_id: int,
+    body: TicketMetaPatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    stmt = select(Ticket).where(Ticket.id == ticket_id, Ticket.user_id == user.id)
+    result = await db.execute(stmt)
+    t = result.scalar_one_or_none()
+    if not t:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if body.store_name is not None:
+        t.store_name = body.store_name.strip() or None
+    if body.ticket_date is not None:
+        if not body.ticket_date:
+            t.ticket_date = None
+        else:
+            try:
+                from datetime import date as _dt
+                t.ticket_date = _dt.fromisoformat(body.ticket_date)
+            except ValueError:
+                pass
     await db.commit()
     await db.refresh(t)
     return t
