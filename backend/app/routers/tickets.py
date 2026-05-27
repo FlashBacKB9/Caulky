@@ -393,32 +393,8 @@ async def _extract_text(file_path: str, mime_type: str) -> str:
     else:
         try:
             import pytesseract
-            from PIL import Image, ImageEnhance, ImageFilter
+            from PIL import Image
             img = Image.open(file_path)
-
-            # ── Preprocessing to improve OCR quality ──────────────────────────
-            # 1. Grayscale – removes colour noise irrelevant for text recognition
-            img = img.convert("L")
-
-            # 2. Upscale if the image is small – Tesseract works best when
-            #    characters are ≥ 20 px tall; phone photos compressed to 2048 px
-            #    have receipt text ~15 px tall.
-            MIN_PX = 3000
-            if img.width < MIN_PX and img.height < MIN_PX:
-                scale = max(MIN_PX / img.width, MIN_PX / img.height)
-                img = img.resize(
-                    (int(img.width * scale), int(img.height * scale)),
-                    Image.LANCZOS,
-                )
-
-            # 3. Contrast boost – helps recover faded text and small punctuation
-            #    (commas, periods) that JPEG compression tends to blur away.
-            img = ImageEnhance.Contrast(img).enhance(2.0)
-
-            # 4. Sharpen – improves edge definition so Tesseract sees "1,19"
-            #    instead of "119".
-            img = img.filter(ImageFilter.SHARPEN)
-
             # PSM 6: uniform block → reads row-by-row, keeps product + price
             # on the same line (PSM 3 splits multi-column receipts by column).
             return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 6")
