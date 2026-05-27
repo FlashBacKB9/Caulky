@@ -3,16 +3,19 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { Leaf, Package, ShoppingCart, Tag } from 'lucide-react'
 import {
   Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
   Eye, EyeOff, Search, ArrowRightLeft, ExternalLink,
-  Droplets, GlassWater, Popcorn, Wheat, Candy, Baby, Wine, Coffee, Beef, Cookie, Sandwich,
-  Snowflake, Archive, Scissors, Sparkles, Pill, Apple, Milk, Home, Palette, Fish, PawPrint,
-  CakeSlice, Pizza, IceCreamCone, Tag, Citrus, Leaf, Package, ShoppingCart,
 } from 'lucide-react'
 import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, ticketFileUrl, attachTicketToMovement, type Ticket, type TicketItem } from '../api/tickets'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import MovementForm from '../components/MovementForm'
+import {
+  type CatIcon, type CatCfgType,
+  catCfg, getVisibleCategories, addCustomCat as registerCustomCat,
+  ICON_NAME_MAP, PRESET_ICONS, PRESET_COLORS,
+} from '../utils/ticketCategories'
 
 // ── Supplies category set (mirrors backend SUPPLIES_CATEGORIES) ───────────────
 const SUPPLIES_CATS = new Set([
@@ -20,51 +23,6 @@ const SUPPLIES_CATS = new Set([
   'Fitoterapia y parafarmacia', 'Limpieza y hogar',
   'Maquillaje', 'Mascotas',
 ])
-
-// ── Category config: icon + color ─────────────────────────────────────────────
-
-type CatIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
-type CatCfgType = { icon: CatIcon; color: string }
-
-const CAT_CFG: Record<string, CatCfgType> = {
-  'Aceites especias y salsas':    { icon: Droplets,    color: '#d97706' },
-  'Agua y refrescos':             { icon: GlassWater,  color: '#3b82f6' },
-  'Aperitivos':                   { icon: Popcorn,     color: '#f97316' },
-  'Arroz legumbres y pasta':      { icon: Wheat,       color: '#ca8a04' },
-  'Azúcar caramelos y chocolate': { icon: Candy,       color: '#7c3aed' },
-  'Bebé':                         { icon: Baby,        color: '#ec4899' },
-  'Bodega':                       { icon: Wine,        color: '#b91c1c' },
-  'Cacao café e infusiones':      { icon: Coffee,      color: '#92400e' },
-  'Carne':                        { icon: Beef,        color: '#ef4444' },
-  'Cereales y galletas':          { icon: Cookie,      color: '#b45309' },
-  'Charcutería y quesos':         { icon: Sandwich,    color: '#f59e0b' },
-  'Congelados':                   { icon: Snowflake,   color: '#0891b2' },
-  'Conservas caldos y cremas':    { icon: Archive,     color: '#65a30d' },
-  'Cuidado del cabello':          { icon: Scissors,    color: '#9333ea' },
-  'Cuidado facial y corporal':    { icon: Sparkles,    color: '#db2777' },
-  'Fitoterapia y parafarmacia':   { icon: Pill,        color: '#059669' },
-  'Fruta y verdura':              { icon: Apple,       color: '#16a34a' },
-  'Huevos leche y mantequilla':   { icon: Milk,        color: '#eab308' },
-  'Limpieza y hogar':             { icon: Home,        color: '#4f46e5' },
-  'Maquillaje':                   { icon: Palette,     color: '#e11d48' },
-  'Marisco y pescado':            { icon: Fish,        color: '#0284c7' },
-  'Mascotas':                     { icon: PawPrint,    color: '#ea580c' },
-  'Panadería y pastelería':       { icon: CakeSlice,   color: '#c2410c' },
-  'Pizzas y platos preparados':   { icon: Pizza,       color: '#dc2626' },
-  'Postres y yogures':            { icon: IceCreamCone,color: '#c026d3' },
-  'Sin categoría':                { icon: Tag,         color: '#6b7280' },
-  'Zumos':                        { icon: Citrus,      color: '#ea580c' },
-}
-
-// ── Icon name → component map (for custom category serialization) ─────────────
-
-const ICON_NAME_MAP: Record<string, CatIcon> = {
-  Droplets, GlassWater, Popcorn, Wheat, Candy, Baby, Wine, Coffee, Beef, Cookie, Sandwich,
-  Snowflake, Archive, Scissors, Sparkles, Pill, Apple, Milk, Home, Palette, Fish, PawPrint,
-  CakeSlice, Pizza, IceCreamCone, Tag, Citrus, Leaf, Package, ShoppingCart, Upload, Receipt,
-}
-
-const KNOWN_CATEGORIES = Object.keys(CAT_CFG)
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 
@@ -74,67 +32,6 @@ const COLORS = [
   '#a855f7','#84cc16','#06b6d4','#fbbf24','#f43f5e','#34d399',
   '#818cf8','#fb923c','#a3e635','#38bdf8','#c084fc','#4ade80',
   '#f472b6','#2dd4bf',
-]
-
-// ── Custom category persistence ───────────────────────────────────────────────
-
-let _customCats: Record<string, { iconName: string; color: string }> = (() => {
-  try { return JSON.parse(localStorage.getItem('caulky_cat_cfg') ?? '{}') } catch { return {} }
-})()
-
-const registerCustomCat = (name: string, cfg: { iconName: string; color: string }) => {
-  _customCats[name] = cfg
-  try { localStorage.setItem('caulky_cat_cfg', JSON.stringify(_customCats)) } catch {}
-}
-
-const catCfg = (cat: string): CatCfgType => {
-  if (CAT_CFG[cat]) return CAT_CFG[cat]
-  const custom = _customCats[cat]
-  if (custom) return { icon: ICON_NAME_MAP[custom.iconName] ?? Tag, color: custom.color }
-  return { icon: Tag, color: '#6b7280' }
-}
-
-// ── Category picker ───────────────────────────────────────────────────────────
-
-const PRESET_COLORS = [
-  '#ef4444','#f97316','#eab308','#22c55e',
-  '#3b82f6','#8b5cf6','#ec4899','#6b7280',
-  '#0891b2','#b91c1c','#92400e','#166534',
-]
-
-const PRESET_ICONS: { name: string; Icon: CatIcon }[] = [
-  { name: 'Apple',       Icon: Apple       },
-  { name: 'Fish',        Icon: Fish        },
-  { name: 'Beef',        Icon: Beef        },
-  { name: 'Milk',        Icon: Milk        },
-  { name: 'Coffee',      Icon: Coffee      },
-  { name: 'Cookie',      Icon: Cookie      },
-  { name: 'Pizza',       Icon: Pizza       },
-  { name: 'Candy',       Icon: Candy       },
-  { name: 'Wine',        Icon: Wine        },
-  { name: 'GlassWater',  Icon: GlassWater  },
-  { name: 'Snowflake',   Icon: Snowflake   },
-  { name: 'Pill',        Icon: Pill        },
-  { name: 'PawPrint',    Icon: PawPrint    },
-  { name: 'Scissors',    Icon: Scissors    },
-  { name: 'Palette',     Icon: Palette     },
-  { name: 'Sparkles',    Icon: Sparkles    },
-  { name: 'Home',        Icon: Home        },
-  { name: 'Package',     Icon: Package     },
-  { name: 'ShoppingCart',Icon: ShoppingCart},
-  { name: 'Leaf',        Icon: Leaf        },
-  { name: 'Wheat',       Icon: Wheat       },
-  { name: 'Archive',     Icon: Archive     },
-  { name: 'Sandwich',    Icon: Sandwich    },
-  { name: 'IceCreamCone',Icon: IceCreamCone},
-  { name: 'Tag',         Icon: Tag         },
-  { name: 'Citrus',      Icon: Citrus      },
-  { name: 'Droplets',    Icon: Droplets    },
-  { name: 'Baby',        Icon: Baby        },
-  { name: 'CakeSlice',   Icon: CakeSlice   },
-  { name: 'Popcorn',     Icon: Popcorn     },
-  { name: 'Receipt',     Icon: Receipt     },
-  { name: 'Upload',      Icon: Upload      },
 ]
 
 function CategoryPicker({
@@ -198,7 +95,7 @@ function CategoryPicker({
   const handleCreate = () => {
     const name = search.trim()
     if (!name) return
-    registerCustomCat(name, { iconName: newIconName, color: newColor })
+    registerCustomCat(name, newIconName, newColor)
     onChange(name)
     setOpen(false); setAdding(false); setSearch('')
   }
@@ -438,7 +335,7 @@ function TicketCard({
   const displayItems = editItems ?? ticket.items
 
   const allCats = useMemo(() => {
-    const set = new Set([...KNOWN_CATEGORIES, ...extraCategories])
+    const set = new Set([...getVisibleCategories(), ...extraCategories])
     return Array.from(set).sort()
   }, [extraCategories])
 

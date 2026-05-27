@@ -18,8 +18,12 @@ import { loadNavConfig, saveNavConfig, PAGE_META, type NavEntry } from '../hooks
 import {
   Pencil, Sun, Moon, Lock, Trash2, Plus, Check, X, ChevronRight, ChevronDown, ChevronUp,
   LayoutDashboard, Download, Upload, AlertTriangle, Puzzle, Palette,
-  Leaf, Package, ShoppingCart,
+  Leaf, Package, ShoppingCart, Eye, EyeOff, RotateCcw, Search,
 } from 'lucide-react'
+import {
+  getAllCategoryInfo, setCatConfig, setCatHidden, deleteCat, addCustomCat, resetCat,
+  type CategoryInfo, PRESET_ICONS, PRESET_COLORS, ICON_NAME_MAP,
+} from '../utils/ticketCategories'
 import { usePlugins, type PluginScanResult } from '../hooks/usePlugins'
 import AppIcon, { ICON_KEYS } from '../components/AppIcon'
 import { loadSkins, saveSkins, applySkinCSS, parseSkinFile, type Skin } from '../utils/skins'
@@ -1350,6 +1354,254 @@ function TicketsSection() {
   )
 }
 
+// ── Ticket categories section ─────────────────────────────────────────────────
+
+function CatIconPicker({ value, onChange }: { value: string; onChange: (n: string) => void }) {
+  return (
+    <div className="grid grid-cols-8 gap-1">
+      {PRESET_ICONS.map(({ name, Icon }) => (
+        <button
+          key={name}
+          type="button"
+          onClick={() => onChange(name)}
+          className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${value === name ? 'bg-blue-100 dark:bg-blue-900/40 ring-1 ring-blue-400 text-blue-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+        >
+          <Icon className="w-4 h-4" />
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function CatColorPicker({ value, onChange }: { value: string; onChange: (c: string) => void }) {
+  return (
+    <div className="flex flex-wrap gap-1.5">
+      {PRESET_COLORS.map(col => (
+        <button
+          key={col}
+          type="button"
+          onClick={() => onChange(col)}
+          className="w-6 h-6 rounded-full transition-transform hover:scale-110 shrink-0"
+          style={{ background: col, outline: value === col ? `2px solid ${col}` : 'none', outlineOffset: 2 }}
+        />
+      ))}
+    </div>
+  )
+}
+
+function EditCatForm({
+  iconName, color, nameEditable, nameValue,
+  onChange, onSave, onCancel,
+}: {
+  iconName: string; color: string; nameEditable?: boolean; nameValue?: string
+  onChange: (f: Partial<{ iconName: string; color: string; name: string }>) => void
+  onSave: () => void; onCancel: () => void
+}) {
+  const PreviewIcon = ICON_NAME_MAP[iconName] ?? ICON_NAME_MAP['Tag']!
+  return (
+    <div className="mt-2 p-3 rounded-xl border border-gray-100 dark:border-gray-800 bg-gray-50/50 dark:bg-gray-800/30 space-y-3">
+      {nameEditable && (
+        <div>
+          <p className="text-[11px] text-gray-400 mb-1">Nombre</p>
+          <input
+            className="w-full text-xs bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 outline-none focus:border-blue-400 text-gray-700 dark:text-gray-300"
+            value={nameValue ?? ''}
+            placeholder="Nombre de la categoría"
+            onChange={e => onChange({ name: e.target.value })}
+          />
+        </div>
+      )}
+      <div>
+        <p className="text-[11px] text-gray-400 mb-1.5">Icono</p>
+        <CatIconPicker value={iconName} onChange={v => onChange({ iconName: v })} />
+      </div>
+      <div>
+        <p className="text-[11px] text-gray-400 mb-1.5">Color</p>
+        <CatColorPicker value={color} onChange={v => onChange({ color: v })} />
+      </div>
+      <div className="flex items-center justify-between pt-1">
+        <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+          style={{ background: color + '22', color, border: `1px solid ${color}55` }}>
+          <PreviewIcon className="w-3.5 h-3.5 shrink-0" />
+          {nameEditable ? (nameValue?.trim() || 'Nueva categoría') : ''}
+        </span>
+        <div className="flex gap-1.5">
+          <button type="button" onClick={onCancel}
+            className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-1">
+            Cancelar
+          </button>
+          <button type="button" onClick={onSave}
+            className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-1 rounded transition-colors">
+            Guardar
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TicketCategoriesSection() {
+  const [rev, setRev] = useState(0)
+  const [search, setSearch] = useState('')
+  const [editing, setEditing] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [editForm, setEditForm] = useState<{ iconName: string; color: string; name?: string }>({ iconName: 'Tag', color: '#6b7280' })
+  const [showHidden, setShowHidden] = useState(false)
+  const refresh = () => setRev(r => r + 1)
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const allCats = getAllCategoryInfo()
+  const visible = allCats.filter(c => !c.hidden && c.name.toLowerCase().includes(search.toLowerCase()))
+  const hiddenCats = allCats.filter(c => c.hidden)
+
+  const startEdit = (cat: CategoryInfo) => {
+    setEditing(cat.name)
+    setEditForm({ iconName: cat.iconName, color: cat.color })
+    setAdding(false)
+  }
+  const saveEdit = (cat: CategoryInfo) => {
+    setCatConfig(cat.name, editForm.iconName, editForm.color)
+    setEditing(null)
+    refresh()
+  }
+  const startAdd = () => {
+    setAdding(true)
+    setEditing(null)
+    setEditForm({ iconName: 'Tag', color: '#6b7280', name: '' })
+  }
+  const saveAdd = () => {
+    const name = (editForm.name ?? '').trim()
+    if (!name) return
+    addCustomCat(name, editForm.iconName, editForm.color)
+    setAdding(false)
+    setEditForm({ iconName: 'Tag', color: '#6b7280', name: '' })
+    refresh()
+  }
+
+  const CatRow = ({ cat }: { cat: CategoryInfo }) => {
+    const Icon = ICON_NAME_MAP[cat.iconName] ?? ICON_NAME_MAP['Tag']!
+    const isEditing = editing === cat.name
+    return (
+      <div className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
+        <div className="flex items-center gap-2.5 px-3 py-2.5 group">
+          <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: cat.color + '22', color: cat.color }}>
+            <Icon className="w-4 h-4" />
+          </span>
+          <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 truncate">{cat.name}</span>
+          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+            {!cat.hidden && (
+              <button type="button" onClick={() => isEditing ? setEditing(null) : startEdit(cat)}
+                className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors" title="Editar">
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+            )}
+            {cat.isBuiltin && !isEditing && (cat.iconName !== (cat.name in {} ? '' : cat.iconName) || true) && (
+              <button type="button" onClick={() => { resetCat(cat.name); refresh() }}
+                className="p-1.5 text-gray-400 hover:text-amber-500 transition-colors" title="Restaurar por defecto">
+                <RotateCcw className="w-3.5 h-3.5" />
+              </button>
+            )}
+            <button type="button"
+              onClick={() => { setCatHidden(cat.name, !cat.hidden); setEditing(null); refresh() }}
+              className={`p-1.5 transition-colors ${cat.hidden ? 'text-gray-400 hover:text-green-500' : 'text-gray-400 hover:text-gray-600'}`}
+              title={cat.hidden ? 'Mostrar' : 'Ocultar'}>
+              {cat.hidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+            </button>
+            {!cat.isBuiltin && (
+              <button type="button" onClick={() => { deleteCat(cat.name); setEditing(null); refresh() }}
+                className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
+        </div>
+        {isEditing && (
+          <div className="px-3 pb-3">
+            <EditCatForm
+              iconName={editForm.iconName}
+              color={editForm.color}
+              onChange={f => setEditForm(prev => ({ ...prev, ...f }))}
+              onSave={() => saveEdit(cat)}
+              onCancel={() => setEditing(null)}
+            />
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
+        Personaliza las categorías que aparecen al analizar tickets. Puedes editar el icono y color, ocultar las que no uses, o añadir las tuyas.
+      </p>
+
+      {/* Search + Add */}
+      <div className="flex gap-2">
+        <div className="flex-1 flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5">
+          <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+          <input
+            className="flex-1 text-xs bg-transparent outline-none text-gray-700 dark:text-gray-300 placeholder-gray-400"
+            placeholder="Buscar categoría…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+        </div>
+        <button type="button" onClick={startAdd}
+          className="flex items-center gap-1 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-1.5 rounded-lg transition-colors shrink-0">
+          <Plus className="w-3.5 h-3.5" />
+          Añadir
+        </button>
+      </div>
+
+      {/* Add form */}
+      {adding && (
+        <div className="rounded-xl border border-gray-100 dark:border-gray-800">
+          <div className="px-3 pt-3">
+            <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Nueva categoría</p>
+          </div>
+          <div className="px-3 pb-3">
+            <EditCatForm
+              nameEditable
+              nameValue={editForm.name}
+              iconName={editForm.iconName}
+              color={editForm.color}
+              onChange={f => setEditForm(prev => ({ ...prev, ...f }))}
+              onSave={saveAdd}
+              onCancel={() => setAdding(false)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Visible categories */}
+      <div className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+        {visible.length === 0 && (
+          <p className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500">No hay categorías que coincidan.</p>
+        )}
+        {visible.map(cat => <CatRow key={cat.name + rev} cat={cat} />)}
+      </div>
+
+      {/* Hidden categories */}
+      {hiddenCats.length > 0 && (
+        <div>
+          <button type="button" onClick={() => setShowHidden(v => !v)}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+            <EyeOff className="w-3.5 h-3.5" />
+            {hiddenCats.length} categoría{hiddenCats.length !== 1 ? 's' : ''} oculta{hiddenCats.length !== 1 ? 's' : ''}
+            {showHidden ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+          {showHidden && (
+            <div className="mt-2 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden opacity-60">
+              {hiddenCats.map(cat => <CatRow key={cat.name + rev} cat={cat} />)}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function PluginsSection() {
   const { plugins, addPlugin, removePlugin, togglePlugin, removeAll } = usePlugins()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -2074,6 +2326,10 @@ export default function Settings() {
 
           <Section title="Tickets">
             <TicketsSection />
+          </Section>
+
+          <Section title="Categorías de tickets">
+            <TicketCategoriesSection />
           </Section>
 
           <Section title={t('settings.plugins')}>
