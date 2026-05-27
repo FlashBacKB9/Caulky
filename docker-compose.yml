@@ -25,6 +25,7 @@ services:
       CORS_ORIGINS: "*"
       SECRET_KEY: ${SECRET_KEY}
       COOKIE_SECURE: "false"
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
