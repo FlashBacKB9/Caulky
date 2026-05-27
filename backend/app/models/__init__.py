@@ -7,3 +7,4 @@ from app.models.investment import InvestmentFund, InvestmentPurchase
 from app.models.template import MovementTemplate
 from app.models.user_preference import UserPreference
 from app.models.audit_log import AuditLog
+from app.models.item_category_rule import ItemCategoryRule

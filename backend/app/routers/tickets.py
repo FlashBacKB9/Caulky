@@ -3,10 +3,13 @@ import re
 import json
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+from pydantic import BaseModel as PydanticModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.ticket import Ticket
+from app.models.item_category_rule import ItemCategoryRule
 from app.schemas.ticket import TicketRead
 from app.auth.setup import current_active_user
 from app.models.user import User
@@ -180,8 +183,9 @@ def _categorize(name: str) -> str:
     return "Sin categoría"
 
 
-def _parse_ticket_lines(text: str) -> list[dict]:
+def _parse_ticket_lines(text: str, custom_rules: dict[str, str] | None = None) -> list[dict]:
     """Extract item lines from raw OCR/PDF text."""
+    rules = custom_rules or {}
     items: list[dict] = []
     # Match lines ending with a price like 1,99 or 1.99 or -1,99
     price_re = re.compile(r'^(.+?)\s+(-?\d{1,4}[,.]\d{2})\s*$')
@@ -207,10 +211,11 @@ def _parse_ticket_lines(text: str) -> list[dict]:
             continue
         if price <= 0:
             continue
+        category = rules.get(low) or _categorize(raw_name)
         items.append({
             "name": raw_name.title(),
             "amount": round(price, 2),
-            "category": _categorize(raw_name),
+            "category": category,
         })
     return items
 
@@ -288,6 +293,20 @@ async def _extract_text(file_path: str, mime_type: str) -> str:
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
+# ── Pydantic schemas for write operations ─────────────────────────────────────
+
+class TicketItemIn(PydanticModel):
+    name: str
+    amount: float
+    category: str
+
+
+class TicketItemsPatch(PydanticModel):
+    items: list[TicketItemIn]
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────────
+
 @router.post("/analyze", response_model=TicketRead, status_code=201)
 async def analyze_ticket(
     file: UploadFile,
@@ -301,8 +320,14 @@ async def analyze_ticket(
     with open(dest, "wb") as f:
         f.write(content)
 
+    # Load user's custom category rules
+    rules_result = await db.execute(
+        select(ItemCategoryRule).where(ItemCategoryRule.user_id == user.id)
+    )
+    custom_rules = {r.item_name: r.category for r in rules_result.scalars().all()}
+
     text = await _extract_text(dest, file.content_type or "")
-    items = _parse_ticket_lines(text)
+    items = _parse_ticket_lines(text, custom_rules)
     categories = _compute_categories(items)
 
     record = Ticket(
@@ -333,6 +358,62 @@ async def list_tickets(
         .order_by(Ticket.created_at.desc())
     )
     return result.scalars().all()
+
+
+@router.patch("/{ticket_id}/items", response_model=TicketRead)
+async def patch_ticket_items(
+    ticket_id: int,
+    body: TicketItemsPatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # Compare old vs new to detect category changes and save rules
+    original_cat = {item["name"].lower(): item["category"] for item in json.loads(t.items)}
+    new_items = [i.model_dump() for i in body.items]
+
+    for item in new_items:
+        norm = item["name"].lower()
+        if original_cat.get(norm) != item["category"]:
+            result = await db.execute(
+                select(ItemCategoryRule).where(
+                    ItemCategoryRule.user_id == user.id,
+                    ItemCategoryRule.item_name == norm,
+                )
+            )
+            rule = result.scalar_one_or_none()
+            if rule:
+                rule.category = item["category"]
+            else:
+                db.add(ItemCategoryRule(
+                    user_id=user.id,
+                    item_name=norm,
+                    category=item["category"],
+                ))
+
+    t.items = json.dumps(new_items, ensure_ascii=False)
+    t.categories = json.dumps(_compute_categories(new_items), ensure_ascii=False)
+    await db.commit()
+    await db.refresh(t)
+    return t
+
+
+@router.get("/{ticket_id}/file")
+async def get_ticket_file(
+    ticket_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    path = os.path.join(UPLOAD_DIR, t.filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path, media_type=t.mime_type, filename=t.original_name)
 
 
 @router.delete("/{ticket_id}", status_code=204)

@@ -18,14 +18,20 @@ export interface Ticket {
   created_at: string
 }
 
-export const analyzeTicket = (file: File): Promise<Ticket> => {
+export const analyzeTicket = async (file: File): Promise<Ticket> => {
   const form = new FormData()
   form.append('file', file)
-  return api.post<Ticket>('/tickets/analyze', form).then(r => r.data)
+  const r = await api.post<Ticket>('/tickets/analyze', form)
+  return r.data
 }
 
 export const getTickets = (): Promise<Ticket[]> =>
   api.get<Ticket[]>('/tickets').then(r => r.data)
 
+export const updateTicketItems = (id: number, items: TicketItem[]): Promise<Ticket> =>
+  api.patch<Ticket>(`/tickets/${id}/items`, { items }).then(r => r.data)
+
 export const deleteTicket = (id: number): Promise<void> =>
   api.delete(`/tickets/${id}`).then(() => undefined)
+
+export const ticketFileUrl = (id: number) => `/api/tickets/${id}/file`
