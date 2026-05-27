@@ -564,7 +564,9 @@ async def _analyze_with_gemini(file_path: str, mime_type: str) -> dict | None:
     """
     api_key = os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
+        print("[Tickets] GEMINI_API_KEY no configurada — usando Tesseract")
         return None
+    print(f"[Tickets] Llamando a Gemini 2.0 Flash para {os.path.basename(file_path)}")
 
     import base64
     import httpx
@@ -635,9 +637,11 @@ async def _analyze_with_gemini(file_path: str, mime_type: str) -> dict | None:
             # Strip accidental markdown fences
             raw = re.sub(r'^```[a-z]*\s*', '', raw)
             raw = re.sub(r'\s*```$', '', raw)
-            return json.loads(raw)
+            result = json.loads(raw)
+            print(f"[Tickets] Gemini OK — tienda={result.get('store_name')} total={result.get('total')} productos={len(result.get('items') or [])}")
+            return result
     except Exception as exc:
-        print(f"Gemini OCR error: {exc}")
+        print(f"[Tickets] Gemini OCR error: {exc}")
         return None
 
 

@@ -16,12 +16,15 @@ services:
 
   backend:
     build: ./backend
+    env_file:
+      - path: ./backend/.env
+        required: false      # no falla si el fichero no existe
     environment:
+      # Las variables de environment: sobreescriben las de env_file:
       DATABASE_URL: postgresql+asyncpg://spendly:spendly@db:5432/spendly
       CORS_ORIGINS: "*"
       SECRET_KEY: ${SECRET_KEY}
       COOKIE_SECURE: "false"
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
     depends_on:
       db:
         condition: service_healthy
