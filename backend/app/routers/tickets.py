@@ -645,6 +645,14 @@ async def _analyze_with_gemini(file_path: str, mime_type: str) -> dict | None:
                 if resp.status_code in (404, 400):
                     print(f"[Tickets] Gemini: modelo {model!r} no disponible ({resp.status_code}), probando siguiente…")
                     continue
+                if resp.status_code == 429:
+                    try:
+                        err = resp.json()
+                        reason = err.get("error", {}).get("message", resp.text[:200])
+                    except Exception:
+                        reason = resp.text[:200]
+                    print(f"[Tickets] Gemini 429 ({model!r}): {reason}")
+                    continue
                 resp.raise_for_status()
                 data = resp.json()
                 raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
