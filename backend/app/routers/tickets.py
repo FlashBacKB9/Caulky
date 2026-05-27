@@ -196,36 +196,80 @@ def _categorize(name: str) -> str:
 
 
 def _parse_ticket_lines(text: str, custom_rules: dict[str, str] | None = None) -> list[dict]:
-    """Extract item lines from raw OCR/PDF text."""
+    """Extract item lines from raw OCR/PDF text.
+
+    Handles supermarket receipts with one or two price columns:
+      - Single-price:  PRODUCT_NAME  1,99
+      - Dual-price:    2 PRODUCT_NAME  1,19  2,38   (unit + total)
+    Always takes the *last* price on the line as the total amount.
+    """
     rules = custom_rules or {}
     items: list[dict] = []
-    # Match lines ending with a price like 1,99 or 1.99 or -1,99
-    price_re = re.compile(r'^(.+?)\s+(-?\d{1,4}[,.]\d{2})\s*$')
+    any_price_re = re.compile(r'-?\d{1,4}[,.]\d{2}')
+
     for line in text.splitlines():
         line = line.strip()
-        if not line or len(line) < 5:
+        if not line or len(line) < 4:
             continue
-        m = price_re.match(line)
-        if not m:
+
+        # Find ALL prices in the line
+        price_spans = [(m.start(), m.end(), m.group()) for m in any_price_re.finditer(line)]
+        if not price_spans:
             continue
-        raw_name = m.group(1).strip()
-        raw_price = m.group(2).replace(",", ".")
-        # Skip obviously non-item lines
+
+        # Use the last price as the total amount
+        last_start, last_end, last_price_str = price_spans[-1]
+        raw_name = line[:last_start].strip()
+
+        if not raw_name or len(raw_name) < 2:
+            continue
+
+        # --- Filters on the raw name ---
         low = raw_name.lower()
+
+        # Skip known non-product headers/footers
         if any(skip in low for skip in SKIP_WORDS):
             continue
-        # Skip lines that start with digits (quantity markers, totals)
-        if re.match(r'^\d+\s*x\s*', raw_name, re.IGNORECASE):
+
+        # Skip IVA/tax percentage lines (e.g. "4%  3,17" or "21%  7,69")
+        if re.match(r'^\d{1,3}\s*%', raw_name):
             continue
+
+        # Skip column headers
+        if re.search(r'descripci[oó]n|precio|importe|unidad', low):
+            continue
+
+        # Strip leading "N x " or "Nx" quantity notation → remove from name
+        clean_name = re.sub(r'^\d+\s*[xX×]\s*', '', raw_name).strip()
+
+        # Strip trailing unit price if there were two price columns
+        # e.g. "2 SOJA NATURAL 1,19" → "2 SOJA NATURAL"
+        if len(price_spans) >= 2:
+            # The second-to-last price may be embedded in the name string
+            clean_name = re.sub(r'\s+\d{1,4}[,.]\d{2}\s*$', '', clean_name).strip()
+
+        # Strip leading quantity number (e.g. "2 SOJA NATURAL" → keep as-is, but
+        # "2 " alone after stripping means the name is just a number → skip)
+        clean_name = re.sub(r'^\d+\s+', lambda m: m.group() if len(raw_name) > len(m.group()) + 1 else '', clean_name).strip()
+
+        if not clean_name or len(clean_name) < 2:
+            continue
+
+        # Skip lines that are only symbols/numbers after cleaning
+        if re.match(r'^[\d\s%.,+\-*/]+$', clean_name):
+            continue
+
         try:
-            price = float(raw_price)
+            price = float(last_price_str.replace(",", "."))
         except ValueError:
             continue
         if price <= 0:
             continue
-        category = rules.get(low) or _categorize(raw_name)
+
+        low_clean = clean_name.lower()
+        category = rules.get(low_clean) or _categorize(clean_name)
         items.append({
-            "name": raw_name.title(),
+            "name": clean_name.title(),
             "amount": round(price, 2),
             "category": category,
         })
@@ -604,6 +648,23 @@ async def attach_ticket_to_movement(
 
     await db.commit()
     return {"ok": True}
+
+
+@router.get("/{ticket_id}/ocr-text")
+async def get_ticket_ocr_text(
+    ticket_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    """Return raw OCR/PDF text for debugging purposes."""
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    path = os.path.join(UPLOAD_DIR, t.filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+    text = await _extract_text(path, t.mime_type)
+    return {"text": text, "lines": text.splitlines()}
 
 
 @router.delete("/{ticket_id}", status_code=204)
