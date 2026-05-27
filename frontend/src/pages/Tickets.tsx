@@ -66,9 +66,13 @@ function CategoryPicker({
     const spaceBelow = window.innerHeight - r.bottom - 8
     const spaceAbove = r.top - 8
     const openBelow = spaceBelow >= 180 || spaceBelow >= spaceAbove
-    const top = openBelow ? r.bottom + 6 : r.top - Math.min(320, spaceAbove) - 6
-    const left = Math.min(r.left, window.innerWidth - w - 8)
-    return { position: 'fixed', top, left, width: w, maxHeight: 320, zIndex: 999 }
+    const left = Math.max(0, Math.min(r.left, window.innerWidth - w - 8))
+    if (openBelow) {
+      return { position: 'fixed', top: r.bottom + 6, left, width: w, maxHeight: Math.min(320, spaceBelow + 8), zIndex: 999 }
+    } else {
+      // Anchor to BOTTOM so the dropdown sits flush against the trigger regardless of content height
+      return { position: 'fixed', bottom: window.innerHeight - r.top + 6, left, width: w, maxHeight: Math.min(320, spaceAbove), zIndex: 999 }
+    }
   }
 
   // ── Scroll fade ──────────────────────────────────────────────────────────────

@@ -1,4 +1,4 @@
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { useRef, useState, useCallback, useEffect, useMemo } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, Link } from 'react-router-dom'
 import { getAccountsSummary, createAccount, updateAccountFull, deleteAccount, reorderAccounts, ACCOUNT_CATEGORIES, type Account, type AccountCategory } from '../api/accounts'
@@ -1356,6 +1356,79 @@ function TicketsSection() {
 
 // ── Ticket categories section ─────────────────────────────────────────────────
 
+// CatRow must live OUTSIDE TicketCategoriesSection so React never unmounts
+// it during a re-render (inner functions create a new component type each time,
+// causing unmount → mount → scroll-to-top).
+interface CatRowProps {
+  cat: CategoryInfo
+  isEditing: boolean
+  editForm: { iconName: string; color: string }
+  onEdit: () => void
+  onCancelEdit: () => void
+  onSave: () => void
+  onHide: (hidden: boolean) => void
+  onReset: () => void
+  onDelete: () => void
+  onFormChange: (f: Partial<{ iconName: string; color: string }>) => void
+}
+function CatRow({ cat, isEditing, editForm, onEdit, onCancelEdit, onSave, onHide, onReset, onDelete, onFormChange }: CatRowProps) {
+  const Icon = ICON_NAME_MAP[cat.iconName] ?? ICON_NAME_MAP['Tag']!
+  const editRef = useRef<HTMLDivElement>(null)
+
+  // Scroll the edit form into view when it opens
+  useEffect(() => {
+    if (isEditing) editRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [isEditing])
+
+  return (
+    <div className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
+      <div className="flex items-center gap-2.5 px-3 py-2.5 group">
+        <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: cat.color + '22', color: cat.color }}>
+          <Icon className="w-4 h-4" />
+        </span>
+        <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 truncate">{cat.name}</span>
+        <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+          {!cat.hidden && (
+            <button type="button" onClick={isEditing ? onCancelEdit : onEdit}
+              className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors" title="Editar">
+              <Pencil className="w-3.5 h-3.5" />
+            </button>
+          )}
+          {cat.isBuiltin && (
+            <button type="button" onClick={onReset}
+              className="p-1.5 text-gray-400 hover:text-amber-500 transition-colors" title="Restaurar por defecto">
+              <RotateCcw className="w-3.5 h-3.5" />
+            </button>
+          )}
+          <button type="button"
+            onClick={() => onHide(!cat.hidden)}
+            className={`p-1.5 transition-colors ${cat.hidden ? 'text-gray-400 hover:text-green-500' : 'text-gray-400 hover:text-gray-600'}`}
+            title={cat.hidden ? 'Mostrar' : 'Ocultar'}>
+            {cat.hidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+          </button>
+          {!cat.isBuiltin && (
+            <button type="button" onClick={onDelete}
+              className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar">
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+      {isEditing && (
+        <div ref={editRef} className="px-3 pb-3">
+          <EditCatForm
+            iconName={editForm.iconName}
+            color={editForm.color}
+            onChange={onFormChange}
+            onSave={onSave}
+            onCancel={onCancelEdit}
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CatIconPicker({ value, onChange }: { value: string; onChange: (n: string) => void }) {
   return (
     <div className="grid grid-cols-8 gap-1">
@@ -1449,18 +1522,17 @@ function TicketCategoriesSection() {
   const [showHidden, setShowHidden] = useState(false)
   const refresh = () => setRev(r => r + 1)
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const allCats = getAllCategoryInfo()
-  const visible = allCats.filter(c => !c.hidden && c.name.toLowerCase().includes(search.toLowerCase()))
-  const hiddenCats = allCats.filter(c => c.hidden)
+  const allCats = useMemo(() => getAllCategoryInfo(), [rev]) // eslint-disable-line react-hooks/exhaustive-deps
+  const visible = useMemo(() => allCats.filter((c: CategoryInfo) => !c.hidden && c.name.toLowerCase().includes(search.toLowerCase())), [allCats, search])
+  const hiddenCats = useMemo(() => allCats.filter((c: CategoryInfo) => c.hidden), [allCats])
 
   const startEdit = (cat: CategoryInfo) => {
     setEditing(cat.name)
     setEditForm({ iconName: cat.iconName, color: cat.color })
     setAdding(false)
   }
-  const saveEdit = (cat: CategoryInfo) => {
-    setCatConfig(cat.name, editForm.iconName, editForm.color)
+  const saveEdit = (name: string) => {
+    setCatConfig(name, editForm.iconName, editForm.color)
     setEditing(null)
     refresh()
   }
@@ -1476,58 +1548,6 @@ function TicketCategoriesSection() {
     setAdding(false)
     setEditForm({ iconName: 'Tag', color: '#6b7280', name: '' })
     refresh()
-  }
-
-  const CatRow = ({ cat }: { cat: CategoryInfo }) => {
-    const Icon = ICON_NAME_MAP[cat.iconName] ?? ICON_NAME_MAP['Tag']!
-    const isEditing = editing === cat.name
-    return (
-      <div className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
-        <div className="flex items-center gap-2.5 px-3 py-2.5 group">
-          <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: cat.color + '22', color: cat.color }}>
-            <Icon className="w-4 h-4" />
-          </span>
-          <span className="flex-1 text-sm text-gray-700 dark:text-gray-300 truncate">{cat.name}</span>
-          <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
-            {!cat.hidden && (
-              <button type="button" onClick={() => isEditing ? setEditing(null) : startEdit(cat)}
-                className="p-1.5 text-gray-400 hover:text-blue-500 transition-colors" title="Editar">
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-            )}
-            {cat.isBuiltin && !isEditing && (cat.iconName !== (cat.name in {} ? '' : cat.iconName) || true) && (
-              <button type="button" onClick={() => { resetCat(cat.name); refresh() }}
-                className="p-1.5 text-gray-400 hover:text-amber-500 transition-colors" title="Restaurar por defecto">
-                <RotateCcw className="w-3.5 h-3.5" />
-              </button>
-            )}
-            <button type="button"
-              onClick={() => { setCatHidden(cat.name, !cat.hidden); setEditing(null); refresh() }}
-              className={`p-1.5 transition-colors ${cat.hidden ? 'text-gray-400 hover:text-green-500' : 'text-gray-400 hover:text-gray-600'}`}
-              title={cat.hidden ? 'Mostrar' : 'Ocultar'}>
-              {cat.hidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
-            </button>
-            {!cat.isBuiltin && (
-              <button type="button" onClick={() => { deleteCat(cat.name); setEditing(null); refresh() }}
-                className="p-1.5 text-gray-400 hover:text-red-500 transition-colors" title="Eliminar">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-            )}
-          </div>
-        </div>
-        {isEditing && (
-          <div className="px-3 pb-3">
-            <EditCatForm
-              iconName={editForm.iconName}
-              color={editForm.color}
-              onChange={f => setEditForm(prev => ({ ...prev, ...f }))}
-              onSave={() => saveEdit(cat)}
-              onCancel={() => setEditing(null)}
-            />
-          </div>
-        )}
-      </div>
-    )
   }
 
   return (
@@ -1574,12 +1594,26 @@ function TicketCategoriesSection() {
         </div>
       )}
 
-      {/* Visible categories */}
-      <div className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+      {/* Visible categories — scrollable to avoid taking over the whole page */}
+      <div className="rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden max-h-[400px] overflow-y-auto">
         {visible.length === 0 && (
           <p className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500">No hay categorías que coincidan.</p>
         )}
-        {visible.map(cat => <CatRow key={cat.name + rev} cat={cat} />)}
+        {visible.map((cat: CategoryInfo) => (
+          <CatRow
+            key={cat.name}
+            cat={cat}
+            isEditing={editing === cat.name}
+            editForm={editForm}
+            onEdit={() => startEdit(cat)}
+            onCancelEdit={() => setEditing(null)}
+            onSave={() => saveEdit(cat.name)}
+            onHide={hidden => { setCatHidden(cat.name, hidden); setEditing(null); refresh() }}
+            onReset={() => { resetCat(cat.name); refresh() }}
+            onDelete={() => { deleteCat(cat.name); setEditing(null); refresh() }}
+            onFormChange={f => setEditForm(prev => ({ ...prev, ...f }))}
+          />
+        ))}
       </div>
 
       {/* Hidden categories */}
@@ -1593,7 +1627,21 @@ function TicketCategoriesSection() {
           </button>
           {showHidden && (
             <div className="mt-2 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden opacity-60">
-              {hiddenCats.map(cat => <CatRow key={cat.name + rev} cat={cat} />)}
+              {hiddenCats.map((cat: CategoryInfo) => (
+                <CatRow
+                  key={cat.name}
+                  cat={cat}
+                  isEditing={editing === cat.name}
+                  editForm={editForm}
+                  onEdit={() => startEdit(cat)}
+                  onCancelEdit={() => setEditing(null)}
+                  onSave={() => saveEdit(cat.name)}
+                  onHide={hidden => { setCatHidden(cat.name, hidden); setEditing(null); refresh() }}
+                  onReset={() => { resetCat(cat.name); refresh() }}
+                  onDelete={() => { deleteCat(cat.name); setEditing(null); refresh() }}
+                  onFormChange={f => setEditForm(prev => ({ ...prev, ...f }))}
+                />
+              ))}
             </div>
           )}
         </div>
@@ -2324,13 +2372,13 @@ export default function Settings() {
             <BackupSection />
           </Section>
 
-          <Section title="Tickets">
+          <CollapsibleSection title="Tickets">
             <TicketsSection />
-          </Section>
+          </CollapsibleSection>
 
-          <Section title="Categorías de tickets">
+          <CollapsibleSection title="Categorías de tickets">
             <TicketCategoriesSection />
-          </Section>
+          </CollapsibleSection>
 
           <Section title={t('settings.plugins')}>
             <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
