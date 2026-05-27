@@ -13,7 +13,6 @@ python-multipart>=0.0.9
 openpyxl>=3.1.2
 fastapi-users[sqlalchemy]>=12.1.0
 ptyprocess>=0.7.0
-opencv-python-headless
-easyocr
+pytesseract>=0.3.10
 Pillow>=10.0.0
 pdfplumber>=0.11.0
