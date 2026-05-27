@@ -5,7 +5,7 @@ WORKDIR /app
 # Install Node.js (required for Claude Code CLI)
 RUN apt-get update && apt-get install -y --no-install-recommends \
         curl ca-certificates \
-        libgl1-mesa-glx libglib2.0-0 libsm6 libxext6 libxrender1 && \
+        libgl1 libglib2.0-0 && \
     curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
     apt-get install -y --no-install-recommends nodejs && \
     npm install -g @anthropic-ai/claude-code && \
