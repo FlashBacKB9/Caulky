@@ -21,9 +21,7 @@ export interface Ticket {
 export const analyzeTicket = (file: File): Promise<Ticket> => {
   const form = new FormData()
   form.append('file', file)
-  return api.post<Ticket>('/tickets/analyze', form, {
-    headers: { 'Content-Type': 'multipart/form-data' },
-  }).then(r => r.data)
+  return api.post<Ticket>('/tickets/analyze', form).then(r => r.data)
 }
 
 export const getTickets = (): Promise<Ticket[]> =>

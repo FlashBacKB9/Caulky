@@ -201,7 +201,10 @@ export default function Tickets() {
         setUploadError(null)
       }
     },
-    onError: () => setUploadError('Error al subir el ticket. Comprueba la conexión con el servidor.'),
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setUploadError(detail ? `Error: ${detail}` : 'Error al subir el ticket. Comprueba la conexión con el servidor.')
+    },
   })
 
   const deleteMut = useMutation({
