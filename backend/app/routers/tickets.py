@@ -278,37 +278,42 @@ def _parse_ticket_lines(text: str, custom_rules: dict[str, str] | None = None) -
 
 def _extract_store_name(text: str) -> str | None:
     known = [
-        "mercadona", "lidl", "aldi", "dia", "carrefour", "eroski",
+        "mercadona", "lidl", "aldi", "dia ", "carrefour", "eroski",
         "alcampo", "hipercor", "el corte ingles", "consum", "ahorramas",
         "supersol", "coviran", "spar", "plus fresc", "bon preu",
         "condis", "sorli", "simply", "family cash", "caprabo", "bonpreu",
         "froiz", "gadis", "lupa", "masymas", "vidal", "suma",
+        "amazon", "zara", "primark", "ikea", "leroy merlin", "decathlon",
+        "mediamarkt", "fnac", "el jamon", "mas y mas",
     ]
     lines = text.splitlines()
-    first_lines_low = "\n".join(lines[:8]).lower()
+    # Search the first 20 lines for known chains (OCR may shift the header down)
+    first_block_low = "\n".join(lines[:20]).lower()
 
     # 1. Try known chains first
     for store in known:
-        if store in first_lines_low:
-            return store.title()
+        if store in first_block_low:
+            return store.strip().title()
 
     # 2. Heuristic fallback: look for a short all-caps or title-case line in the
-    #    first 6 lines that looks like a name (≥3 chars, mostly letters, no digits).
-    for line in lines[:6]:
+    #    first 8 lines that looks like a store name (≥3 chars, mostly letters, no digits).
+    for line in lines[:8]:
         line = line.strip()
         if not line or len(line) < 3 or len(line) > 60:
             continue
-        # Skip lines that look like addresses or numbers
-        if re.search(r'\d{4,}', line):  # long digit run (zip, phone, CIF)
+        # Skip lines that start with a digit (likely a product or quantity line)
+        if line[0].isdigit():
             continue
-        if re.search(r'(calle|avda|av\.|c\/|telf|tel\.|www|http|@)', line, re.IGNORECASE):
+        # Skip lines that look like addresses, phones or CIFs
+        if re.search(r'\d{4,}', line):
+            continue
+        if re.search(r'(calle|avda|av\.|c\/|telf|tel\.|www|http|@|cif|nif)', line, re.IGNORECASE):
             continue
         alpha = sum(c.isalpha() or c.isspace() for c in line)
         if alpha / len(line) < 0.6:
             continue
         # Keep if all-caps or sentence-case (first word capitalised)
         if line.isupper() or (line[0].isupper() and not line[1:].isupper()):
-            # Normalise: title-case the all-caps variant
             return line.title() if line.isupper() else line
 
     return None
@@ -374,7 +379,10 @@ async def _extract_text(file_path: str, mime_type: str) -> str:
             import pytesseract
             from PIL import Image
             img = Image.open(file_path)
-            return pytesseract.image_to_string(img, lang="spa+eng")
+            # PSM 6: treat as a single uniform block of text → reads row-by-row.
+            # This keeps product names and prices on the same line, avoiding the
+            # two-column split that PSM 3 (default) produces on supermarket receipts.
+            return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 6")
         except Exception:
             return ""
 
