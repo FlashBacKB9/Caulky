@@ -1,4 +1,4 @@
-import { useRef, useState, useMemo, useEffect } from 'react'
+import { useRef, useState, useMemo, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
@@ -59,23 +59,37 @@ function CategoryPicker({
     [allCategories, search]
   )
 
-  // ── Position: computed fresh from DOM at render time (no stale state) ────────
-  const getDropStyle = (): React.CSSProperties => {
-    const el = triggerRef.current
-    if (!el) return { display: 'none' }
-    const r = el.getBoundingClientRect()
-    const w = Math.max(r.width, 260)
-    const spaceBelow = window.innerHeight - r.bottom - 8
-    const spaceAbove = r.top - 8
-    const openBelow = spaceBelow >= 180 || spaceBelow >= spaceAbove
-    const left = Math.max(0, Math.min(r.left, window.innerWidth - w - 8))
-    if (openBelow) {
-      return { position: 'fixed', top: r.bottom + 6, left, width: w, maxHeight: Math.min(320, spaceBelow + 8), zIndex: 999 }
-    } else {
-      // Anchor to BOTTOM so the dropdown sits flush against the trigger regardless of content height
-      return { position: 'fixed', bottom: window.innerHeight - r.top + 6, left, width: w, maxHeight: Math.min(320, spaceAbove), zIndex: 999 }
+  // ── Position: computed in useLayoutEffect (after DOM commit, before paint) ───
+  // Inline computation during render can read stale getBoundingClientRect values
+  // when other state changes cause layout shifts before the render is committed.
+  const [dropStyle, setDropStyle] = useState<React.CSSProperties>({ display: 'none' })
+
+  useLayoutEffect(() => {
+    if (!open) return
+    const compute = () => {
+      const el = triggerRef.current
+      if (!el) return
+      const r = el.getBoundingClientRect()
+      const w = Math.max(r.width, 260)
+      const spaceBelow = window.innerHeight - r.bottom - 8
+      const spaceAbove = r.top - 8
+      const openBelow = spaceBelow >= 180 || spaceBelow >= spaceAbove
+      const left = Math.max(0, Math.min(r.left, window.innerWidth - w - 8))
+      if (openBelow) {
+        setDropStyle({ position: 'fixed', top: r.bottom + 6, left, width: w, maxHeight: Math.min(320, spaceBelow + 8), zIndex: 999 })
+      } else {
+        setDropStyle({ position: 'fixed', bottom: window.innerHeight - r.top + 6, left, width: w, maxHeight: Math.min(320, spaceAbove), zIndex: 999 })
+      }
     }
-  }
+    compute()
+    // Reposition if the page scrolls or resizes while the dropdown is open
+    window.addEventListener('scroll', compute, true)
+    window.addEventListener('resize', compute)
+    return () => {
+      window.removeEventListener('scroll', compute, true)
+      window.removeEventListener('resize', compute)
+    }
+  }, [open])
 
   // ── Scroll fade ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -145,7 +159,7 @@ function CategoryPicker({
           <div
             ref={dropdownRef}
             className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl flex flex-col overflow-hidden"
-            style={getDropStyle()}
+            style={dropStyle}
             onMouseDown={e => e.stopPropagation()}
           >
             {/* Search bar */}
@@ -166,8 +180,8 @@ function CategoryPicker({
                 <div
                   ref={listRef}
                   onScroll={handleListScroll}
-                  className="overflow-y-auto h-full [&::-webkit-scrollbar]:hidden"
-                  style={{ scrollbarWidth: 'none' } as React.CSSProperties}
+                  className="overflow-y-auto h-full [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-track]:bg-transparent"
+                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgb(209 213 219) transparent' } as React.CSSProperties}
                 >
                   {filtered.map(cat => {
                     const cc = catCfg(cat)
