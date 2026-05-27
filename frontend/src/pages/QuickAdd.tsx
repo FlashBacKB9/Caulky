@@ -381,7 +381,7 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
           <div className="flex items-center justify-between gap-2">
             <div className="flex-1 min-w-0">
               <SpeedMetaField
-                value={ticket.store_name ?? ''}
+                value={ticket.store_name ?? 'Supermercado'}
                 placeholder="Nombre del establecimiento"
                 className="text-base font-semibold text-gray-800 dark:text-white"
                 onSave={v => updateTicketMeta(ticket.id, { store_name: v }).then(t => setTicket(t))}

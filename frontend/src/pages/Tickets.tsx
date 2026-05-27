@@ -460,7 +460,7 @@ function TicketCard({
         <Receipt className="w-4 h-4 text-gray-400 shrink-0" strokeWidth={1.5} />
         <div className="flex-1 min-w-0">
           <TicketMetaField
-            value={ticket.store_name ?? ticket.original_name}
+            value={ticket.store_name ?? 'Supermercado'}
             placeholder="Nombre del establecimiento"
             className="text-sm font-medium text-gray-800 dark:text-white"
             onSave={v => updateTicketMeta(ticket.id, { store_name: v }).then(() => qc.invalidateQueries({ queryKey: ['tickets'] }))}

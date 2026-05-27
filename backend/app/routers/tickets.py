@@ -471,7 +471,7 @@ async def analyze_ticket(
         original_name=file.filename or filename,
         filename=filename,
         mime_type=file.content_type or "application/octet-stream",
-        store_name=_extract_store_name(text),
+        store_name=_extract_store_name(text) or "Supermercado",
         ticket_date=_extract_date(text),
         total=_extract_total(text),
         items=json.dumps(items, ensure_ascii=False),
