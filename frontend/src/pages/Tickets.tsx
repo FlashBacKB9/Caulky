@@ -12,7 +12,6 @@ import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, ticketFileU
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import MovementForm from '../components/MovementForm'
 import {
-  type CatIcon, type CatCfgType,
   catCfg, getVisibleCategories, addCustomCat as registerCustomCat,
   ICON_NAME_MAP, PRESET_ICONS, PRESET_COLORS,
 } from '../utils/ticketCategories'
