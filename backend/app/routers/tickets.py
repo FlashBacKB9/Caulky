@@ -624,29 +624,42 @@ async def _analyze_with_gemini(file_path: str, mime_type: str) -> dict | None:
         },
     }
 
-    url = (
-        "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-1.5-flash:generateContent?key={api_key}"
-    )
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            resp = await client.post(url, json=payload)
-            resp.raise_for_status()
-            data = resp.json()
-            raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-            # Strip accidental markdown fences
-            raw = re.sub(r'^```[a-z]*\s*', '', raw)
-            raw = re.sub(r'\s*```$', '', raw)
-            result = json.loads(raw)
-            print(f"[Tickets] Gemini OK — tienda={result.get('store_name')} total={result.get('total')} productos={len(result.get('items') or [])}")
-            return result
-    except Exception as exc:
-        # Mask the API key in the error message before logging
-        msg = str(exc)
-        if api_key:
-            msg = msg.replace(api_key, "***")
-        print(f"[Tickets] Gemini OCR error: {msg}")
-        return None
+    # Try models in order — availability varies by account/region.
+    # GEMINI_MODEL env var lets the user pin a specific model.
+    env_model = os.environ.get("GEMINI_MODEL", "").strip()
+    models_to_try = [m for m in [
+        env_model,
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash-8b",
+    ] if m]
+
+    base_url = "https://generativelanguage.googleapis.com/v1beta/models"
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        for model in models_to_try:
+            url = f"{base_url}/{model}:generateContent?key={api_key}"
+            try:
+                resp = await client.post(url, json=payload)
+                if resp.status_code in (404, 400):
+                    print(f"[Tickets] Gemini: modelo {model!r} no disponible ({resp.status_code}), probando siguiente…")
+                    continue
+                resp.raise_for_status()
+                data = resp.json()
+                raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                raw = re.sub(r'^```[a-z]*\s*', '', raw)
+                raw = re.sub(r'\s*```$', '', raw)
+                result = json.loads(raw)
+                print(f"[Tickets] Gemini OK ({model}) — tienda={result.get('store_name')} total={result.get('total')} productos={len(result.get('items') or [])}")
+                return result
+            except Exception as exc:
+                msg = str(exc).replace(api_key, "***")
+                print(f"[Tickets] Gemini error con {model!r}: {msg}")
+                continue
+
+    print("[Tickets] Gemini: ningún modelo disponible, usando Tesseract")
+    return None
 
 
 async def _extract_text_header(file_path: str) -> str:
