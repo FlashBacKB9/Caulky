@@ -370,6 +370,15 @@ def _extract_store_name(text: str) -> str | None:
         if re.search(pattern, full_low):
             return name
 
+    # 1b. Chain-store fingerprints that survive even when the logo/name is not
+    #     OCR-readable (decorative font, cropped, etc.).
+    #
+    #     Mercadona: receipts contain a store-number line like
+    #       "Nº TIENDA 016 CENTRO LUGO" or just "016  CENTRO" in OCR output.
+    #     CIF A-46103834 also uniquely identifies Mercadona.
+    if re.search(r'\bA-?46103834\b', text) or re.search(r'\d{3,4}\s+CENTRO\b', text, re.IGNORECASE):
+        return "Mercadona"
+
     # 2. Exact substring search across the entire text
     #    (PSM 6 may push the header further down due to barcode lines)
     for store in known:
@@ -424,19 +433,38 @@ def _extract_store_name(text: str) -> str | None:
 
 
 def _extract_total(text: str) -> float | None:
-    # Strategy 1: explicit "total" keyword (most reliable)
-    total_re = re.compile(
-        r'(?:total|importe total|a pagar|total a pagar)[^\d]*(\d{1,5}[,.]\d{2})',
+    # Strategy 1a: "total" keyword with amount on the SAME line.
+    # Deliberately use [^\d\n] (no newlines) so that "TOTAL\n…\n3,17" (IVA
+    # detail at the bottom of the receipt) is NOT mistaken for the total.
+    total_same_re = re.compile(
+        r'(?:total|importe total|a pagar|total a pagar)[^\d\n]{0,20}(\d{1,5}[,.]\d{2})',
         re.IGNORECASE,
     )
-    m = total_re.search(text)
+    m = total_same_re.search(text)
     if m:
         try:
             return float(m.group(1).replace(",", "."))
         except ValueError:
             pass
+
+    # Strategy 1b: "total" keyword with amount on the VERY NEXT line.
+    # PSM 3 sometimes puts the label and the amount in separate columns →
+    # "TOTAL\n32,68" instead of "TOTAL  32,68".
+    total_next_re = re.compile(
+        r'(?:total|importe total|a pagar|total a pagar)\s*\n\s*(\d{1,5}[,.]\d{2})',
+        re.IGNORECASE,
+    )
+    m = total_next_re.search(text)
+    if m:
+        try:
+            return float(m.group(1).replace(",", "."))
+        except ValueError:
+            pass
+
     # Strategy 2: payment-method line — TARJETA and BIZUM always equal the
-    # total paid (unlike EFECTIVO where change may inflate the amount).
+    # total paid (unlike EFECTIVO where change may exceed total due to change).
+    # PSM 11 keeps the label + amount on the same reconstructed line, so this
+    # works even when PSM 3 puts them in separate columns.
     tarjeta_re = re.compile(
         r'(?:tarjeta|bizum)[^\d\n]{0,30}(\d{1,5}[,.]\d{2})',
         re.IGNORECASE,
