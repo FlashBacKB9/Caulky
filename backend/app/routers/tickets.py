@@ -222,37 +222,89 @@ def _parse_ticket_lines(text: str, custom_rules: dict[str, str] | None = None) -
             cutoff = i
             break
 
+    # Track a product name that had no price on its line (e.g. BOLLERIA GRANE),
+    # so we can assign the price from the next line (the weight sub-line).
+    pending_name: str | None = None
+
     for line in lines[:cutoff]:
         line = line.strip()
         if not line or len(line) < 4:
             continue
 
-        # Find ALL prices in the line
         price_spans = [(m.start(), m.end(), m.group()) for m in any_price_re.finditer(line)]
+        is_weight = bool(re.search(r'\bkg\b|€/kg|€/ud', line, re.IGNORECASE))
+
+        # ── Pending-name resolution ──────────────────────────────────────────────
+        # A previous line had a product name but no price (e.g. "1 BOLLERIA GRANE").
+        # If this line has a price and no new product name, assign the price here.
+        if pending_name is not None:
+            has_own_product = (
+                bool(re.search(r'\d+\s+[A-ZÁÉÍÓÚÜÑ]', line, re.UNICODE))
+                and bool(price_spans)
+            )
+            if price_spans and not has_own_product:
+                try:
+                    p = float(price_spans[-1][2].replace(',', '.'))
+                    if p > 0:
+                        cat = rules.get(pending_name.lower()) or _categorize(pending_name)
+                        items.append({"name": pending_name.title(), "amount": round(p, 2), "category": cat})
+                except ValueError:
+                    pass
+                pending_name = None
+                if is_weight:
+                    continue   # weight sub-line fully consumed
+            else:
+                pending_name = None
+
+        # ── 3-digit integer fallback ─────────────────────────────────────────────
+        # OCR sometimes drops the decimal: "1,50" → "150", "1,99" → "100".
+        # Treat a lone 3-digit integer as X.XX (divide by 100).
+        fallback_price: float | None = None
         if not price_spans:
+            m_int = re.search(r'(?<!\d)(\d{3})(?!\d)', line)
+            if m_int:
+                try:
+                    val = int(m_int.group(1)) / 100.0
+                    if 0.10 <= val <= 50.0:
+                        fallback_price = val
+                        price_spans = [(m_int.start(), m_int.end(), m_int.group(1))]
+                except ValueError:
+                    pass
+
+        if not price_spans:
+            # No price at all — check if it's a name-only product line whose
+            # price will appear on the very next line (e.g. weight items).
+            m_pname = re.search(r'\d+\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s.]+)', line, re.UNICODE)
+            if m_pname:
+                candidate = m_pname.group(1).strip()
+                # Drop trailing isolated uppercase chars (OCR noise)
+                candidate = re.sub(r'\s+[A-Z]{1,2}$', '', candidate).strip()
+                low_c = candidate.lower()
+                if (len(candidate) >= 3
+                        and not any(skip in low_c for skip in SKIP_WORDS)
+                        and not re.search(r'descripci|precio|importe|unidad', low_c)):
+                    pending_name = candidate
             continue
 
-        # Use the last price as the total amount
+        # ── Normal processing ────────────────────────────────────────────────────
         last_start, _last_end, last_price_str = price_spans[-1]
         raw_name = line[:last_start].strip()
 
         if not raw_name or len(raw_name) < 2:
             continue
 
-        # --- Step 1: strip leading OCR garbage before "N PRODUCT" ---------------
-        # Tesseract sometimes reads margin artifacts as chars before the qty number.
-        # e.g. "Él 1 RIOJA CRIANZAT" → "1 RIOJA CRIANZAT"
+        # Step 1: strip leading OCR garbage before "N PRODUCT"
         m_qty = re.search(r'(\d+\s+[A-ZÁÉÍÓÚÜÑA-Z])', raw_name, re.UNICODE)
         if m_qty:
             clean_name = raw_name[m_qty.start():]
         else:
             clean_name = raw_name
 
-        # --- Step 2: strip trailing unit price (dual-column: "2 PROD 1,19") -----
+        # Step 2: strip trailing unit price (dual-column: "2 PROD 1,19")
         if len(price_spans) >= 2:
-            clean_name = re.sub(r'\s+\d{1,4}[,.]\d{2}\s*$', '', clean_name).strip()
+            clean_name = re.sub(r'\s+\d{1,4}[,.]\d{1,2}\s*$', '', clean_name).strip()
 
-        # --- Step 3: strip leading quantity number ("2 SOJA NATURAL" → "SOJA NAT") -
+        # Step 3: strip leading quantity number
         clean_name = re.sub(r'^\d+\s+', '', clean_name).strip()
 
         if not clean_name or len(clean_name) < 2:
@@ -260,33 +312,24 @@ def _parse_ticket_lines(text: str, custom_rules: dict[str, str] | None = None) -
 
         low = clean_name.lower()
 
-        # --- Filters on the cleaned name ----------------------------------------
-
-        # Skip known non-product words
         if any(skip in low for skip in SKIP_WORDS):
             continue
-
-        # Skip IVA/tax percentage lines (e.g. "4%", "21%")
         if re.match(r'^\d{1,3}\s*%', clean_name):
             continue
-
-        # Skip column headers (Descripción, Precio, Importe, Unidad)
         if re.search(r'descripci[oó]n|precio|importe|unidad', low):
             continue
-
-        # Skip weight/variable-price lines ("0,154 Kg", "7,50 €/Kg")
         if re.search(r'\bkg\b|€/kg|€/ud', low, re.IGNORECASE):
             continue
-
-        # Skip pure symbol/number strings
         if re.match(r'^[\d\s%.,+\-*/()€]+$', clean_name):
             continue
 
-        # --- Parse amount --------------------------------------------------------
-        try:
-            price = float(last_price_str.replace(",", "."))
-        except ValueError:
-            continue
+        if fallback_price is not None:
+            price = fallback_price
+        else:
+            try:
+                price = float(last_price_str.replace(",", "."))
+            except ValueError:
+                continue
         if price <= 0:
             continue
 
