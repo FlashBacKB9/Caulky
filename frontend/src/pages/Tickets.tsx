@@ -50,6 +50,7 @@ function CategoryPicker({
   const [newIconName, setNewIconName] = useState('Tag')
   const [newColor, setNewColor] = useState('#6b7280')
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const dropdownRef = useRef<HTMLDivElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
 
@@ -107,7 +108,13 @@ function CategoryPicker({
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent) => {
-      if (!triggerRef.current?.contains(e.target as Node)) {
+      // Native mousedown propagates to document even when React's stopPropagation
+      // is called inside a portal. Explicitly exclude both the trigger button
+      // and the portal dropdown so clicking inside them never closes the picker.
+      if (
+        !triggerRef.current?.contains(e.target as Node) &&
+        !dropdownRef.current?.contains(e.target as Node)
+      ) {
         setOpen(false); setAdding(false)
       }
     }
@@ -136,6 +143,7 @@ function CategoryPicker({
         <>
           <div className="fixed inset-0 z-[998]" onMouseDown={() => { setOpen(false); setAdding(false) }} />
           <div
+            ref={dropdownRef}
             className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl flex flex-col overflow-hidden"
             style={getDropStyle()}
             onMouseDown={e => e.stopPropagation()}
@@ -735,11 +743,25 @@ function TicketCard({
                       />
                     </div>
                   )}
-                  <div className="flex-1 min-w-0 p-2">
-                    <p className="text-gray-400 mb-1.5 font-medium">Texto detectado</p>
-                    <pre className="text-[10px] font-mono text-gray-700 dark:text-gray-300 overflow-auto max-h-72 leading-tight whitespace-pre-wrap break-all">
-                      {ocrDebug.text || '(sin texto)'}
-                    </pre>
+                  <div className="flex-1 min-w-0 p-2 space-y-3">
+                    <div>
+                      <p className="text-gray-400 mb-1 font-medium">
+                        Productos <span className="font-normal opacity-60">(PSM 11)</span>
+                      </p>
+                      <pre className="text-[10px] font-mono text-gray-700 dark:text-gray-300 overflow-auto max-h-44 leading-tight whitespace-pre-wrap break-all">
+                        {ocrDebug.text || '(sin texto)'}
+                      </pre>
+                    </div>
+                    {ocrDebug.metadata_text != null && (
+                      <div className="border-t border-gray-100 dark:border-gray-800 pt-2">
+                        <p className="text-gray-400 mb-1 font-medium">
+                          Cabecera / metadatos <span className="font-normal opacity-60">(PSM 3)</span>
+                        </p>
+                        <pre className="text-[10px] font-mono text-gray-700 dark:text-gray-300 overflow-auto max-h-44 leading-tight whitespace-pre-wrap break-all">
+                          {ocrDebug.metadata_text || '(sin texto)'}
+                        </pre>
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : null}

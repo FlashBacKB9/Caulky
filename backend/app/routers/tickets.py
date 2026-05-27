@@ -424,6 +424,7 @@ def _extract_store_name(text: str) -> str | None:
 
 
 def _extract_total(text: str) -> float | None:
+    # Strategy 1: explicit "total" keyword (most reliable)
     total_re = re.compile(
         r'(?:total|importe total|a pagar|total a pagar)[^\d]*(\d{1,5}[,.]\d{2})',
         re.IGNORECASE,
@@ -432,6 +433,20 @@ def _extract_total(text: str) -> float | None:
     if m:
         try:
             return float(m.group(1).replace(",", "."))
+        except ValueError:
+            pass
+    # Strategy 2: payment-method line — TARJETA and BIZUM always equal the
+    # total paid (unlike EFECTIVO where change may inflate the amount).
+    tarjeta_re = re.compile(
+        r'(?:tarjeta|bizum)[^\d\n]{0,30}(\d{1,5}[,.]\d{2})',
+        re.IGNORECASE,
+    )
+    m = tarjeta_re.search(text)
+    if m:
+        try:
+            v = float(m.group(1).replace(",", "."))
+            if v > 0:
+                return v
         except ValueError:
             pass
     return None
@@ -490,6 +505,20 @@ def _preprocess_image(img):
     img = ImageOps.autocontrast(img, cutoff=1)    # 2. stretch contrast
     img = ImageOps.expand(img, border=10, fill=255)  # 3. white border
     return img
+
+
+async def _extract_text_psm3(file_path: str) -> str:
+    """PSM 3 (auto page-segmentation) pass — reads structured receipt headers
+    (store name, date, total) better than the sparse-text PSM 11 pass used for
+    products.  Called only for image files; PDF uses pdfplumber directly."""
+    try:
+        import pytesseract
+        from PIL import Image
+        img = Image.open(file_path)
+        img = _preprocess_image(img)
+        return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 3 --oem 1")
+    except Exception:
+        return ""
 
 
 async def _extract_text(file_path: str, mime_type: str) -> str:
@@ -606,14 +635,30 @@ async def analyze_ticket(
     items = _parse_ticket_lines(text, custom_rules)
     categories = _compute_categories(items)
 
+    # For metadata (store, date, total) use a second PSM 3 (auto) pass which
+    # reads structured receipt headers better than the sparse-text PSM 11 pass.
+    # PDFs are already well-structured so no second pass is needed there.
+    is_image = not (
+        (file.content_type or "").startswith("application/pdf")
+        or dest.lower().endswith(".pdf")
+    )
+    if is_image:
+        meta_text = await _extract_text_psm3(dest)
+        if not meta_text.strip():
+            meta_text = text   # PSM 3 failed completely → fall back to PSM 11
+    else:
+        meta_text = text
+
     record = Ticket(
         user_id=user.id,
         original_name=file.filename or filename,
         filename=filename,
         mime_type=file.content_type or "application/octet-stream",
-        store_name=_extract_store_name(text) or "Supermercado",
-        ticket_date=_extract_date(text),
-        total=_extract_total(text),
+        store_name=(_extract_store_name(meta_text)
+                    or _extract_store_name(text)
+                    or "Supermercado"),
+        ticket_date=_extract_date(meta_text) or _extract_date(text),
+        total=_extract_total(meta_text) or _extract_total(text),
         items=json.dumps(items, ensure_ascii=False),
         categories=json.dumps(categories, ensure_ascii=False),
     )
@@ -851,6 +896,7 @@ async def get_ticket_ocr_text(
 
     # Build a base64 PNG preview of the preprocessed image (images only)
     preprocessed_image: str | None = None
+    metadata_text: str | None = None
     is_pdf = t.mime_type == "application/pdf" or path.lower().endswith(".pdf")
     if not is_pdf:
         try:
@@ -862,8 +908,14 @@ async def get_ticket_ocr_text(
             preprocessed_image = base64.b64encode(buf.getvalue()).decode()
         except Exception:
             pass
+        metadata_text = await _extract_text_psm3(path)
 
-    return {"text": text, "lines": text.splitlines(), "preprocessed_image": preprocessed_image}
+    return {
+        "text": text,
+        "metadata_text": metadata_text,
+        "lines": text.splitlines(),
+        "preprocessed_image": preprocessed_image,
+    }
 
 
 @router.delete("/{ticket_id}", status_code=204)
