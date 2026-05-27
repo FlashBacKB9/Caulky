@@ -549,6 +549,98 @@ async def _extract_text_psm3(file_path: str) -> str:
         return ""
 
 
+async def _analyze_with_gemini(file_path: str, mime_type: str) -> dict | None:
+    """Use Gemini 2.0 Flash (free tier) to extract structured data from a receipt.
+
+    Requires the GEMINI_API_KEY environment variable.  Returns a dict with keys:
+      store_name (str | None), date (str | None, YYYY-MM-DD),
+      total (float | None), items (list[{name, amount}])
+    or None if the API key is absent or the request fails (caller falls back to
+    Tesseract in that case).
+
+    Uses httpx (already in requirements) so no new package is needed.
+    Free-tier limits (as of 2025): 15 RPM / 1 500 req-per-day — more than enough
+    for personal use.
+    """
+    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    import base64
+    import httpx
+
+    # Determine the inline MIME type Gemini should use
+    ext = os.path.splitext(file_path)[1].lower()
+    if mime_type and mime_type.startswith("image/"):
+        media_type = mime_type
+    elif mime_type == "application/pdf" or ext == ".pdf":
+        media_type = "application/pdf"
+    elif ext in (".jpg", ".jpeg"):
+        media_type = "image/jpeg"
+    elif ext == ".png":
+        media_type = "image/png"
+    elif ext == ".webp":
+        media_type = "image/webp"
+    else:
+        media_type = "image/jpeg"
+
+    try:
+        with open(file_path, "rb") as fh:
+            file_b64 = base64.b64encode(fh.read()).decode()
+    except Exception as exc:
+        print(f"Gemini: cannot read file: {exc}")
+        return None
+
+    prompt = (
+        "Eres un asistente especializado en analizar tickets de compra españoles. "
+        "Analiza la imagen del ticket y devuelve los datos en este JSON exacto "
+        "(sin texto adicional, sin bloques markdown):\n"
+        '{"store_name":"nombre del supermercado","date":"YYYY-MM-DD",'
+        '"total":0.00,"items":[{"name":"PRODUCTO","amount":0.00}]}\n\n'
+        "Reglas:\n"
+        "- store_name: nombre exacto de la tienda (ej: Mercadona, Lidl, Carrefour). "
+        "null si no se ve claramente.\n"
+        "- date: fecha de compra en YYYY-MM-DD. null si no se ve.\n"
+        "- total: importe total pagado (TOTAL, TOTAL A PAGAR, TARJETA, BIZUM). "
+        "null si no se ve.\n"
+        "- items: TODOS los productos con su precio de línea (precio total, no unitario). "
+        "Incluye descuentos como importes negativos. "
+        "Omite IVA, subtotales, formas de pago y datos del establecimiento.\n"
+        "Responde ÚNICAMENTE con el JSON."
+    )
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"inline_data": {"mime_type": media_type, "data": file_b64}},
+                {"text": prompt},
+            ]
+        }],
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.1,
+        },
+    }
+
+    url = (
+        "https://generativelanguage.googleapis.com/v1beta/models/"
+        f"gemini-2.0-flash:generateContent?key={api_key}"
+    )
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(url, json=payload)
+            resp.raise_for_status()
+            data = resp.json()
+            raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            # Strip accidental markdown fences
+            raw = re.sub(r'^```[a-z]*\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
+            return json.loads(raw)
+    except Exception as exc:
+        print(f"Gemini OCR error: {exc}")
+        return None
+
+
 async def _extract_text_header(file_path: str) -> str:
     """Crop the top ~22 % of the receipt image and run PSM 6 (uniform text block).
 
@@ -690,54 +782,90 @@ async def analyze_ticket(
     )
     custom_rules = {r.item_name: r.category for r in rules_result.scalars().all()}
 
-    text = await _extract_text(dest, file.content_type or "")
-    items = _parse_ticket_lines(text, custom_rules)
-    categories = _compute_categories(items)
+    # ── Primary: Gemini 2.0 Flash (free tier, set GEMINI_API_KEY) ────────────
+    gemini = await _analyze_with_gemini(dest, file.content_type or "")
 
-    # For metadata (store, date, total) use a second PSM 3 (auto) pass which
-    # reads structured receipt headers better than the sparse-text PSM 11 pass.
-    # PDFs are already well-structured so no second pass is needed there.
-    is_image = not (
-        (file.content_type or "").startswith("application/pdf")
-        or dest.lower().endswith(".pdf")
-    )
-    if is_image:
-        # Three-pass metadata strategy for images:
-        #   header_text  — top-22 % crop + PSM 6: best for store name / date
-        #                  (large bold logo text that PSM 11/3 tend to skip)
-        #   meta_text    — full image + PSM 3: best for TOTAL keyword + TARJETA
-        #   text         — full image + PSM 11: products + TARJETA fallback
-        header_text = await _extract_text_header(dest)
-        meta_text   = await _extract_text_psm3(dest)
-        if not meta_text.strip():
-            meta_text = text   # PSM 3 failed completely → fall back to PSM 11
+    if gemini:
+        # Apply our category engine to Gemini-extracted item names
+        raw_items = gemini.get("items") or []
+        items: list[dict] = []
+        for it in raw_items:
+            name = str(it.get("name") or "").strip()
+            if not name:
+                continue
+            try:
+                amount = float(it.get("amount") or 0)
+            except (TypeError, ValueError):
+                continue
+            if amount == 0:
+                continue
+            low = name.lower()
+            cat = custom_rules.get(low) or _categorize(name)
+            items.append({"name": name.title(), "amount": round(amount, 2), "category": cat})
+
+        categories = _compute_categories(items)
+
+        # Parse date
+        ticket_date = None
+        raw_date = gemini.get("date")
+        if raw_date:
+            try:
+                from datetime import date as _dt2
+                ticket_date = _dt2.fromisoformat(str(raw_date))
+            except ValueError:
+                ticket_date = _extract_date(str(raw_date))
+
+        # Parse total
+        total = None
+        try:
+            v = float(gemini.get("total") or 0)
+            if v:
+                total = v
+        except (TypeError, ValueError):
+            pass
+
+        store_name = str(gemini.get("store_name") or "").strip() or "Supermercado"
+
     else:
-        header_text = ""
-        meta_text   = text
+        # ── Fallback: Tesseract three-pass strategy ───────────────────────────
+        text = await _extract_text(dest, file.content_type or "")
+        items = _parse_ticket_lines(text, custom_rules)
+        categories = _compute_categories(items)
+
+        is_image = not (
+            (file.content_type or "").startswith("application/pdf")
+            or dest.lower().endswith(".pdf")
+        )
+        if is_image:
+            header_text = await _extract_text_header(dest)
+            meta_text   = await _extract_text_psm3(dest)
+            if not meta_text.strip():
+                meta_text = text
+        else:
+            header_text = ""
+            meta_text   = text
+
+        store_name = (
+            _extract_store_name(header_text)
+            or _extract_store_name(meta_text)
+            or _extract_store_name(text)
+            or "Supermercado"
+        )
+        ticket_date = (
+            _extract_date(header_text)
+            or _extract_date(meta_text)
+            or _extract_date(text)
+        )
+        total = _extract_total(meta_text) or _extract_total(text)
 
     record = Ticket(
         user_id=user.id,
         original_name=file.filename or filename,
         filename=filename,
         mime_type=file.content_type or "application/octet-stream",
-        # Store name: header crop first (most likely to find logo text),
-        # then PSM 3, then PSM 11, then hard fallback.
-        store_name=(
-            _extract_store_name(header_text)
-            or _extract_store_name(meta_text)
-            or _extract_store_name(text)
-            or "Supermercado"
-        ),
-        # Date: header crop first (date is usually printed near the logo),
-        # then PSM 3, then PSM 11.
-        ticket_date=(
-            _extract_date(header_text)
-            or _extract_date(meta_text)
-            or _extract_date(text)
-        ),
-        # Total: PSM 3 full image first (TOTAL keyword), then PSM 11
-        # (TARJETA … 32,68 on one reconstructed line).
-        total=_extract_total(meta_text) or _extract_total(text),
+        store_name=store_name,
+        ticket_date=ticket_date,
+        total=total,
         items=json.dumps(items, ensure_ascii=False),
         categories=json.dumps(categories, ensure_ascii=False),
     )

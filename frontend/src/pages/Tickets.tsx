@@ -69,16 +69,25 @@ function CategoryPicker({
     const compute = () => {
       const el = triggerRef.current
       if (!el) return
+      // document.body has `zoom` applied by useUiZoom (e.g. "120%").
+      // getBoundingClientRect() returns coordinates in the ZOOMED (visual) space,
+      // while `position: fixed` uses the unzoomed CSS-pixel viewport coordinate.
+      // Divide by the zoom factor to reconcile the two spaces.
+      const zoom = parseFloat(document.body.style.zoom || '100') / 100 || 1
       const r = el.getBoundingClientRect()
-      const w = Math.max(r.width, 260)
-      const spaceBelow = window.innerHeight - r.bottom - 8
-      const spaceAbove = r.top - 8
+      const rTop    = r.top    / zoom
+      const rBottom = r.bottom / zoom
+      const rLeft   = r.left   / zoom
+      const rWidth  = r.width  / zoom
+      const w = Math.max(rWidth, 260)
+      const spaceBelow = window.innerHeight - rBottom - 8
+      const spaceAbove = rTop - 8
       const openBelow = spaceBelow >= 180 || spaceBelow >= spaceAbove
-      const left = Math.max(0, Math.min(r.left, window.innerWidth - w - 8))
+      const left = Math.max(0, Math.min(rLeft, window.innerWidth - w - 8))
       if (openBelow) {
-        setDropStyle({ position: 'fixed', top: r.bottom + 6, left, width: w, maxHeight: Math.min(320, spaceBelow + 8), zIndex: 999 })
+        setDropStyle({ position: 'fixed', top: rBottom + 6, left, width: w, maxHeight: Math.min(320, spaceBelow + 8), zIndex: 999 })
       } else {
-        setDropStyle({ position: 'fixed', bottom: window.innerHeight - r.top + 6, left, width: w, maxHeight: Math.min(320, spaceAbove), zIndex: 999 })
+        setDropStyle({ position: 'fixed', bottom: window.innerHeight - rTop + 6, left, width: w, maxHeight: Math.min(320, spaceAbove), zIndex: 999 })
       }
     }
     compute()
