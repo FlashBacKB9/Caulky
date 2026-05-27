@@ -478,36 +478,16 @@ async def _extract_text(file_path: str, mime_type: str) -> str:
                 return "\n".join(p.extract_text() or "" for p in pdf.pages)
         except Exception:
             return ""
-
-    # ── Google Cloud Vision (set GOOGLE_VISION_API_KEY to enable) ────────────
-    gvision_key = os.environ.get("GOOGLE_VISION_API_KEY")
-    if gvision_key:
+    else:
         try:
-            import base64
-            import httpx
-            with open(file_path, "rb") as f:
-                b64 = base64.b64encode(f.read()).decode()
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                resp = await client.post(
-                    f"https://vision.googleapis.com/v1/images:annotate?key={gvision_key}",
-                    json={"requests": [{"image": {"content": b64},
-                                        "features": [{"type": "DOCUMENT_TEXT_DETECTION"}]}]},
-                )
-                data = resp.json()
-            annotations = data.get("responses", [{}])[0].get("textAnnotations", [])
-            if annotations:
-                return annotations[0]["description"]
+            import pytesseract
+            from PIL import Image
+            img = Image.open(file_path)
+            # PSM 6: uniform block → reads row-by-row, keeps product + price
+            # on the same line (PSM 3 splits multi-column receipts by column).
+            return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 6")
         except Exception:
-            pass   # fall through to Tesseract
-
-    # ── Tesseract fallback ────────────────────────────────────────────────────
-    try:
-        import pytesseract
-        from PIL import Image
-        img = Image.open(file_path)
-        return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 6")
-    except Exception:
-        return ""
+            return ""
 
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
