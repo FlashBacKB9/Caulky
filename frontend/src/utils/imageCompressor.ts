@@ -1,11 +1,5 @@
-/**
- * Compresses an image File to JPEG before uploading.
- * PDFs are returned unchanged.
- * Resizes to max 2048px on the longest side and encodes at 0.82 quality.
- * Typical phone photo: 6–12 MB → ~400–800 KB.
- */
-export async function compressImage(file: File): Promise<File> {
-  if (file.type === 'application/pdf') return file
+function _compress(file: File, maxPx: number, quality: number): Promise<File> {
+  if (file.type === 'application/pdf') return Promise.resolve(file)
 
   return new Promise<File>(resolve => {
     const img = new Image()
@@ -13,11 +7,10 @@ export async function compressImage(file: File): Promise<File> {
 
     img.onload = () => {
       URL.revokeObjectURL(url)
-      const MAX = 2048
       let { naturalWidth: w, naturalHeight: h } = img
-      if (w > MAX || h > MAX) {
-        if (w >= h) { h = Math.round(h * MAX / w); w = MAX }
-        else        { w = Math.round(w * MAX / h); h = MAX }
+      if (w > maxPx || h > maxPx) {
+        if (w >= h) { h = Math.round(h * maxPx / w); w = maxPx }
+        else        { w = Math.round(w * maxPx / h); h = maxPx }
       }
       const canvas = document.createElement('canvas')
       canvas.width  = w
@@ -30,7 +23,7 @@ export async function compressImage(file: File): Promise<File> {
           resolve(new File([blob], name, { type: 'image/jpeg', lastModified: file.lastModified }))
         },
         'image/jpeg',
-        0.82,
+        quality,
       )
     }
 
@@ -38,3 +31,17 @@ export async function compressImage(file: File): Promise<File> {
     img.src = url
   })
 }
+
+/**
+ * Compresses a general image for upload.
+ * Resizes to max 2048px, quality 0.82.
+ * Typical phone photo: 6–12 MB → ~400–800 KB.
+ */
+export const compressImage = (file: File) => _compress(file, 2048, 0.82)
+
+/**
+ * Compresses a ticket image for OCR upload.
+ * Uses higher quality (0.95) and larger max size (3000px) to preserve
+ * small characters like commas in prices ("1,19" must not become "119").
+ */
+export const compressTicketImage = (file: File) => _compress(file, 3000, 0.95)

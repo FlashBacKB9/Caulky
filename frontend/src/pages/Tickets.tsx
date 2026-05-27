@@ -9,7 +9,7 @@ import {
   Eye, EyeOff, Search, ArrowRightLeft, ExternalLink,
 } from 'lucide-react'
 import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicketMeta, ticketFileUrl, attachTicketToMovement, type Ticket, type TicketItem } from '../api/tickets'
-import { compressImage } from '../utils/imageCompressor'
+import { compressTicketImage } from '../utils/imageCompressor'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import MovementForm from '../components/MovementForm'
 import {
@@ -1031,7 +1031,7 @@ export default function Tickets() {
       </div>
 
       <div className="relative">
-        <UploadArea onFile={async f => { setUploadError(null); analyzeMut.mutate(await compressImage(f)) }} />
+        <UploadArea onFile={async f => { setUploadError(null); analyzeMut.mutate(await compressTicketImage(f)) }} />
         {analyzeMut.isPending && (
           <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 rounded-xl flex items-center justify-center gap-2">
             <Loader2 className="w-5 h-5 animate-spin text-blue-500" />

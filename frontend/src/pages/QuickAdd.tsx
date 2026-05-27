@@ -8,7 +8,7 @@ import { createMovement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getAccountsSummary } from '../api/accounts'
 import { analyzeTicket, attachTicketToMovement, updateTicketMeta, type Ticket } from '../api/tickets'
-import { compressImage } from '../utils/imageCompressor'
+import { compressTicketImage } from '../utils/imageCompressor'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { type MovementTemplate } from '../utils/recurringTemplates'
@@ -288,7 +288,7 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
 
   const handleFile = async (file: File) => {
     setTicket(null); setError(null); setDone(new Set())
-    analyzeMut.mutate(await compressImage(file))
+    analyzeMut.mutate(await compressTicketImage(file))
   }
 
   // Per-mode totals
