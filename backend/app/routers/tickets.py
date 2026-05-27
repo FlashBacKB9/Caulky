@@ -626,7 +626,7 @@ async def _analyze_with_gemini(file_path: str, mime_type: str) -> dict | None:
 
     url = (
         "https://generativelanguage.googleapis.com/v1beta/models/"
-        f"gemini-2.0-flash:generateContent?key={api_key}"
+        f"gemini-1.5-flash:generateContent?key={api_key}"
     )
     try:
         async with httpx.AsyncClient(timeout=60.0) as client:
@@ -641,7 +641,11 @@ async def _analyze_with_gemini(file_path: str, mime_type: str) -> dict | None:
             print(f"[Tickets] Gemini OK — tienda={result.get('store_name')} total={result.get('total')} productos={len(result.get('items') or [])}")
             return result
     except Exception as exc:
-        print(f"[Tickets] Gemini OCR error: {exc}")
+        # Mask the API key in the error message before logging
+        msg = str(exc)
+        if api_key:
+            msg = msg.replace(api_key, "***")
+        print(f"[Tickets] Gemini OCR error: {msg}")
         return None
 
 
