@@ -477,19 +477,18 @@ def _preprocess_image(img):
     1. Grayscale    — removes colour noise, simplifies the histogram.
     2. Autocontrast — stretches the histogram so faded receipts get full
                       black-on-white contrast (clips 1 % of outliers).
-    3. UnsharpMask  — sharpens character edges.  Safe without upscaling
-                      because there are no JPEG artefacts to amplify.
-    4. White border — prevents characters at the image edge from being
+    3. White border — prevents characters at the image edge from being
                       clipped by Tesseract's page-layout analysis.
 
     Deliberately NO upscaling: scaling up a JPEG amplifies compression
     artefacts and destroys small characters like commas in prices.
+    Deliberately NO UnsharpMask: it amplifies background texture noise
+    from photos taken on non-white surfaces, flooding OCR with garbage.
     """
-    from PIL import ImageOps, ImageFilter
-    img = img.convert("L")                                               # 1. grayscale
-    img = ImageOps.autocontrast(img, cutoff=1)                           # 2. stretch contrast
-    img = img.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))  # 3. sharpen
-    img = ImageOps.expand(img, border=10, fill=255)                      # 4. white border
+    from PIL import ImageOps
+    img = img.convert("L")                        # 1. grayscale
+    img = ImageOps.autocontrast(img, cutoff=1)    # 2. stretch contrast
+    img = ImageOps.expand(img, border=10, fill=255)  # 3. white border
     return img
 
 
@@ -507,10 +506,54 @@ async def _extract_text(file_path: str, mime_type: str) -> str:
             from PIL import Image
             img = Image.open(file_path)
             img = _preprocess_image(img)
-            # PSM 6: uniform block → reads row-by-row, keeps product + price
-            #        on the same line (PSM 3 splits multi-column receipts by column).
-            # OEM 1: LSTM neural network only — more accurate than legacy engine (OEM 0).
-            return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 6 --oem 1")
+
+            # ── PSM 11 + word-level bounding boxes + our own line reconstruction ──
+            # PSM 6 (uniform block) skips entire rows when the receipt barcode
+            # breaks its block-detection heuristic — many products are lost.
+            # PSM 11 (sparse text) finds every text region regardless of layout.
+            # We then reconstruct reading order from Y/X bounding-box coordinates,
+            # grouping words whose vertical centres are within 70 % of the median
+            # word height (≈ same line), then sorting left → right within each line.
+            data = pytesseract.image_to_data(
+                img,
+                lang="spa+eng",
+                config="--psm 11 --oem 1",
+                output_type=pytesseract.Output.DICT,
+            )
+
+            words: list[tuple[float, float, str]] = []
+            heights: list[int] = []
+            for i in range(len(data["text"])):
+                word = (data["text"][i] or "").strip()
+                if not word:
+                    continue
+                if int(data["conf"][i]) < 0:   # -1 = structural row, not a word
+                    continue
+                y_center = data["top"][i] + data["height"][i] / 2.0
+                words.append((y_center, float(data["left"][i]), word))
+                heights.append(data["height"][i])
+
+            if not words:
+                # Fallback: plain string mode
+                return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 6 --oem 1")
+
+            words.sort(key=lambda w: w[0])
+            median_h = sorted(heights)[len(heights) // 2] if heights else 20
+            threshold = max(5.0, median_h * 0.7)
+
+            lines_out: list[list[tuple[float, float, str]]] = [[words[0]]]
+            for w in words[1:]:
+                if w[0] - lines_out[-1][-1][0] <= threshold:
+                    lines_out[-1].append(w)
+                else:
+                    lines_out.append([w])
+
+            text_lines: list[str] = []
+            for line in lines_out:
+                line.sort(key=lambda w: w[1])          # sort left → right by X
+                text_lines.append("  ".join(w[2] for w in line))
+
+            return "\n".join(text_lines)
         except Exception:
             return ""
 
