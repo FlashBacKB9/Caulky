@@ -470,6 +470,29 @@ def _compute_categories(items: list[dict]) -> dict[str, float]:
     return totals
 
 
+def _preprocess_image(img):
+    """Preprocess a receipt image for better Tesseract OCR quality.
+
+    Steps recommended by the Tesseract documentation (ImproveQuality):
+    1. Grayscale    — removes colour noise, simplifies the histogram.
+    2. Autocontrast — stretches the histogram so faded receipts get full
+                      black-on-white contrast (clips 1 % of outliers).
+    3. UnsharpMask  — sharpens character edges.  Safe without upscaling
+                      because there are no JPEG artefacts to amplify.
+    4. White border — prevents characters at the image edge from being
+                      clipped by Tesseract's page-layout analysis.
+
+    Deliberately NO upscaling: scaling up a JPEG amplifies compression
+    artefacts and destroys small characters like commas in prices.
+    """
+    from PIL import ImageOps, ImageFilter
+    img = img.convert("L")                                               # 1. grayscale
+    img = ImageOps.autocontrast(img, cutoff=1)                           # 2. stretch contrast
+    img = img.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))  # 3. sharpen
+    img = ImageOps.expand(img, border=10, fill=255)                      # 4. white border
+    return img
+
+
 async def _extract_text(file_path: str, mime_type: str) -> str:
     if mime_type == "application/pdf" or file_path.lower().endswith(".pdf"):
         try:
@@ -483,9 +506,11 @@ async def _extract_text(file_path: str, mime_type: str) -> str:
             import pytesseract
             from PIL import Image
             img = Image.open(file_path)
+            img = _preprocess_image(img)
             # PSM 6: uniform block → reads row-by-row, keeps product + price
-            # on the same line (PSM 3 splits multi-column receipts by column).
-            return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 6")
+            #        on the same line (PSM 3 splits multi-column receipts by column).
+            # OEM 1: LSTM neural network only — more accurate than legacy engine (OEM 0).
+            return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 6 --oem 1")
         except Exception:
             return ""
 
@@ -767,15 +792,31 @@ async def get_ticket_ocr_text(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(current_active_user),
 ):
-    """Return raw OCR/PDF text for debugging purposes."""
+    """Return raw OCR text + preprocessed image (base64) for debugging."""
     t = await db.get(Ticket, ticket_id)
     if not t or t.user_id != user.id:
         raise HTTPException(status_code=404, detail="Ticket not found")
     path = os.path.join(UPLOAD_DIR, t.filename)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="File not found")
+
     text = await _extract_text(path, t.mime_type)
-    return {"text": text, "lines": text.splitlines()}
+
+    # Build a base64 PNG preview of the preprocessed image (images only)
+    preprocessed_image: str | None = None
+    is_pdf = t.mime_type == "application/pdf" or path.lower().endswith(".pdf")
+    if not is_pdf:
+        try:
+            import base64, io
+            from PIL import Image
+            preview = _preprocess_image(Image.open(path))
+            buf = io.BytesIO()
+            preview.save(buf, format="PNG")
+            preprocessed_image = base64.b64encode(buf.getvalue()).decode()
+        except Exception:
+            pass
+
+    return {"text": text, "lines": text.splitlines(), "preprocessed_image": preprocessed_image}
 
 
 @router.delete("/{ticket_id}", status_code=204)

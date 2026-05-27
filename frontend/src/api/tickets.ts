@@ -67,3 +67,12 @@ export const attachTicketToMovement = (
   mode: 'food' | 'supplies' | 'combined',
 ): Promise<void> =>
   api.post(`/tickets/${ticketId}/attach/${movementId}`, { mode }).then(() => undefined)
+
+export interface TicketOcrDebug {
+  text: string
+  lines: string[]
+  preprocessed_image: string | null
+}
+
+export const getTicketOcrDebug = (id: number): Promise<TicketOcrDebug> =>
+  api.get<TicketOcrDebug>(`/tickets/${id}/ocr-text`).then(r => r.data)

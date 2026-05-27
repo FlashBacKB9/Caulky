@@ -8,7 +8,7 @@ import {
   Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
   Eye, EyeOff, Search, ArrowRightLeft, ExternalLink, AlertTriangle,
 } from 'lucide-react'
-import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicketMeta, ticketFileUrl, attachTicketToMovement, type Ticket, type TicketItem } from '../api/tickets'
+import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicketMeta, ticketFileUrl, attachTicketToMovement, getTicketOcrDebug, type Ticket, type TicketItem, type TicketOcrDebug } from '../api/tickets'
 import { compressTicketImage } from '../utils/imageCompressor'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import MovementForm from '../components/MovementForm'
@@ -378,6 +378,18 @@ function TicketCard({
   const [editItems, setEditItems] = useState<TicketItem[] | null>(null)
   const [showMovPanel, setShowMovPanel] = useState(false)
   const [movSuccess, setMovSuccess] = useState<string | null>(null)
+  const [showOcrDebug, setShowOcrDebug] = useState(false)
+  const [ocrDebug, setOcrDebug] = useState<TicketOcrDebug | null>(null)
+  const [ocrDebugLoading, setOcrDebugLoading] = useState(false)
+
+  useEffect(() => {
+    if (!showOcrDebug || ocrDebug) return
+    setOcrDebugLoading(true)
+    getTicketOcrDebug(ticket.id)
+      .then(setOcrDebug)
+      .catch(() => {})
+      .finally(() => setOcrDebugLoading(false))
+  }, [showOcrDebug, ticket.id])
   const [movFormConfig, setMovFormConfig] = useState<{
     mode: 'food' | 'supplies' | 'combined'
     name: string; money: string; date: string; movement_type_id: string
@@ -701,6 +713,39 @@ function TicketCard({
             )
           })()}
 
+          {/* ── OCR debug panel ── */}
+          {showOcrDebug && (
+            <div className="mx-4 mb-3 border border-violet-100 dark:border-violet-900/40 rounded-lg overflow-hidden text-xs">
+              <div className="px-3 py-1.5 bg-violet-50 dark:bg-violet-950/30 text-violet-600 dark:text-violet-400 font-medium">
+                Debug OCR
+              </div>
+              {ocrDebugLoading ? (
+                <div className="p-6 flex justify-center">
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                </div>
+              ) : ocrDebug ? (
+                <div className="flex divide-x divide-gray-100 dark:divide-gray-800">
+                  {ocrDebug.preprocessed_image && (
+                    <div className="w-2/5 p-2 shrink-0">
+                      <p className="text-gray-400 mb-1.5 font-medium">Imagen procesada</p>
+                      <img
+                        src={`data:image/png;base64,${ocrDebug.preprocessed_image}`}
+                        alt="Preprocessed for OCR"
+                        className="w-full object-contain max-h-72 rounded"
+                      />
+                    </div>
+                  )}
+                  <div className="flex-1 min-w-0 p-2">
+                    <p className="text-gray-400 mb-1.5 font-medium">Texto detectado</p>
+                    <pre className="text-[10px] font-mono text-gray-700 dark:text-gray-300 overflow-auto max-h-72 leading-tight whitespace-pre-wrap break-all">
+                      {ocrDebug.text || '(sin texto)'}
+                    </pre>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          )}
+
           {/* ── Actions bar ── */}
           <div className="px-4 py-2 flex items-center gap-2 border-t border-gray-50 dark:border-gray-800/60">
             {isDirty ? (
@@ -731,12 +776,22 @@ function TicketCard({
                 </button>
               </>
             ) : (
-              <button
-                onClick={() => setEditItems(ticket.items.map(it => ({ ...it })))}
-                className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 transition-colors"
-              >
-                <Pencil className="w-3.5 h-3.5" /> Editar productos
-              </button>
+              <>
+                <button
+                  onClick={() => setEditItems(ticket.items.map(it => ({ ...it })))}
+                  className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 transition-colors"
+                >
+                  <Pencil className="w-3.5 h-3.5" /> Editar productos
+                </button>
+                <div className="flex-1" />
+                <button
+                  onClick={() => setShowOcrDebug(p => !p)}
+                  title={showOcrDebug ? 'Ocultar debug OCR' : 'Ver debug OCR'}
+                  className={`flex items-center gap-1 text-xs transition-colors ${showOcrDebug ? 'text-violet-500' : 'text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400'}`}
+                >
+                  {showOcrDebug ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                </button>
+              </>
             )}
           </div>
 
