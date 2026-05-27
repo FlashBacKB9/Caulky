@@ -543,7 +543,11 @@ async def _extract_text(file_path: str, mime_type: str) -> str:
 
             lines_out: list[list[tuple[float, float, str]]] = [[words[0]]]
             for w in words[1:]:
-                if w[0] - lines_out[-1][-1][0] <= threshold:
+                # Compare against the Y of the FIRST word in the current line,
+                # not the last.  OCR noise near a line boundary can act as a
+                # "bridge" when compared last-to-next, merging two adjacent
+                # product rows into one (e.g. RIOJA BLANCO + CC ZERO ZERO 2).
+                if w[0] - lines_out[-1][0][0] <= threshold:
                     lines_out[-1].append(w)
                 else:
                     lines_out.append([w])
