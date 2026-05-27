@@ -206,9 +206,23 @@ def _parse_ticket_lines(text: str, custom_rules: dict[str, str] | None = None) -
     """
     rules = custom_rules or {}
     items: list[dict] = []
-    any_price_re = re.compile(r'-?\d{1,4}[,.]\d{2}')
+    # Allow 1 OR 2 decimal digits so "5,0" (OCR drop of trailing zero) is accepted.
+    any_price_re = re.compile(r'-?\d{1,4}[,.]\d{1,2}')
 
-    for line in text.splitlines():
+    lines = text.splitlines()
+
+    # Stop before the TOTAL / TARJETA / DETALLE line — everything after that is
+    # payment summary and IVA table, not products.
+    cutoff = len(lines)
+    for i, line in enumerate(lines):
+        if i < max(4, len(lines) // 5):   # ignore the first ~20 % of lines
+            continue
+        low_l = line.strip().lower()
+        if re.match(r'^(total\b|tarjeta\b|detalle\b)', low_l):
+            cutoff = i
+            break
+
+    for line in lines[:cutoff]:
         line = line.strip()
         if not line or len(line) < 4:
             continue
