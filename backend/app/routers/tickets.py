@@ -409,8 +409,9 @@ def _extract_store_name(text: str) -> str | None:
             line, re.IGNORECASE,
         ):
             continue
-        # All-caps line → store name (e.g. "MERCADONA", "LIDL")
-        if line.isupper():
+        # All-caps line with no digits → store name (e.g. "MERCADONA", "LIDL")
+        # Note: isupper() is True even with digits/spaces — must exclude digits explicitly
+        if line.isupper() and not re.search(r'\d', line):
             return line.title()
         # Sentence-case line with no digits → could be a store name
         if line[0].isupper() and not re.search(r'\d', line):
