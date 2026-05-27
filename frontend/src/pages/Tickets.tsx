@@ -185,11 +185,11 @@ function CategoryPicker({
 
             {/* List with hidden scrollbar + fade */}
             {!adding && (
-              <div className="relative flex-1 min-h-0">
+              <div className="relative flex-1 min-h-0 overflow-hidden">
                 <div
                   ref={listRef}
                   onScroll={handleListScroll}
-                  className="overflow-y-auto h-full [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-track]:bg-transparent"
+                  className="absolute inset-0 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-track]:bg-transparent"
                   style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgb(209 213 219) transparent' } as React.CSSProperties}
                 >
                   {filtered.map(cat => {
