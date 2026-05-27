@@ -413,7 +413,7 @@ async def get_ticket_file(
     path = os.path.join(UPLOAD_DIR, t.filename)
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="File not found")
-    return FileResponse(path, media_type=t.mime_type, filename=t.original_name)
+    return FileResponse(path, media_type=t.mime_type, content_disposition_type="inline")
 
 
 @router.delete("/{ticket_id}", status_code=204)

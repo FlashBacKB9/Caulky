@@ -1,22 +1,45 @@
 import { useRef, useState, useMemo, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import { Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check, Eye, EyeOff } from 'lucide-react'
+import { Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check, Eye, EyeOff, Search } from 'lucide-react'
 import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, ticketFileUrl, type Ticket, type TicketItem } from '../api/tickets'
 
-// ── Category list (mirrors backend CATEGORIES keys) ───────────────────────────
+// ── Category config: emoji + color ────────────────────────────────────────────
 
-const KNOWN_CATEGORIES = [
-  'Aceites especias y salsas', 'Agua y refrescos', 'Aperitivos',
-  'Arroz legumbres y pasta', 'Azúcar caramelos y chocolate', 'Bebé',
-  'Bodega', 'Cacao café e infusiones', 'Carne', 'Cereales y galletas',
-  'Charcutería y quesos', 'Congelados', 'Conservas caldos y cremas',
-  'Cuidado del cabello', 'Cuidado facial y corporal',
-  'Fitoterapia y parafarmacia', 'Fruta y verdura',
-  'Huevos leche y mantequilla', 'Limpieza y hogar', 'Maquillaje',
-  'Marisco y pescado', 'Mascotas', 'Panadería y pastelería',
-  'Pizzas y platos preparados', 'Postres y yogures', 'Sin categoría', 'Zumos',
-]
+const CAT_CFG: Record<string, { emoji: string; color: string }> = {
+  'Aceites especias y salsas':    { emoji: '🫒', color: '#d97706' },
+  'Agua y refrescos':             { emoji: '💧', color: '#3b82f6' },
+  'Aperitivos':                   { emoji: '🍿', color: '#f97316' },
+  'Arroz legumbres y pasta':      { emoji: '🍝', color: '#ca8a04' },
+  'Azúcar caramelos y chocolate': { emoji: '🍫', color: '#7c3aed' },
+  'Bebé':                         { emoji: '🍼', color: '#ec4899' },
+  'Bodega':                       { emoji: '🍷', color: '#b91c1c' },
+  'Cacao café e infusiones':      { emoji: '☕', color: '#92400e' },
+  'Carne':                        { emoji: '🥩', color: '#ef4444' },
+  'Cereales y galletas':          { emoji: '🥣', color: '#b45309' },
+  'Charcutería y quesos':         { emoji: '🧀', color: '#f59e0b' },
+  'Congelados':                   { emoji: '🧊', color: '#0891b2' },
+  'Conservas caldos y cremas':    { emoji: '🥫', color: '#65a30d' },
+  'Cuidado del cabello':          { emoji: '💆', color: '#9333ea' },
+  'Cuidado facial y corporal':    { emoji: '🧴', color: '#db2777' },
+  'Fitoterapia y parafarmacia':   { emoji: '💊', color: '#059669' },
+  'Fruta y verdura':              { emoji: '🥦', color: '#16a34a' },
+  'Huevos leche y mantequilla':   { emoji: '🥛', color: '#eab308' },
+  'Limpieza y hogar':             { emoji: '🧹', color: '#4f46e5' },
+  'Maquillaje':                   { emoji: '💄', color: '#e11d48' },
+  'Marisco y pescado':            { emoji: '🐟', color: '#0284c7' },
+  'Mascotas':                     { emoji: '🐾', color: '#ea580c' },
+  'Panadería y pastelería':       { emoji: '🥐', color: '#c2410c' },
+  'Pizzas y platos preparados':   { emoji: '🍕', color: '#dc2626' },
+  'Postres y yogures':            { emoji: '🍮', color: '#c026d3' },
+  'Sin categoría':                { emoji: '📦', color: '#6b7280' },
+  'Zumos':                        { emoji: '🍊', color: '#ea580c' },
+}
+
+const catCfg = (cat: string) => CAT_CFG[cat] ?? { emoji: '🏷️', color: '#6b7280' }
+
+const KNOWN_CATEGORIES = Object.keys(CAT_CFG)
 
 // ── Palette ────────────────────────────────────────────────────────────────────
 
@@ -27,6 +50,119 @@ const COLORS = [
   '#818cf8','#fb923c','#a3e635','#38bdf8','#c084fc','#4ade80',
   '#f472b6','#2dd4bf',
 ]
+
+// ── Category picker ───────────────────────────────────────────────────────────
+
+function CategoryPicker({
+  value,
+  onChange,
+  allCategories,
+}: {
+  value: string
+  onChange: (cat: string) => void
+  allCategories: string[]
+}) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const searchRef = useRef<HTMLInputElement>(null)
+  const [dropRect, setDropRect] = useState<DOMRect | null>(null)
+
+  const filtered = useMemo(
+    () => allCategories.filter(c => c.toLowerCase().includes(search.toLowerCase())),
+    [allCategories, search]
+  )
+
+  const handleOpen = () => {
+    if (triggerRef.current) setDropRect(triggerRef.current.getBoundingClientRect())
+    setOpen(true)
+    setSearch('')
+    setTimeout(() => searchRef.current?.focus(), 40)
+  }
+
+  const handleSelect = (cat: string) => { onChange(cat); setOpen(false) }
+
+  useEffect(() => {
+    if (!open) return
+    const close = (e: MouseEvent) => {
+      if (!triggerRef.current?.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [open])
+
+  const cfg = catCfg(value)
+  const dropTop = dropRect
+    ? dropRect.bottom + 6 + 300 > window.innerHeight
+      ? dropRect.top - 310
+      : dropRect.bottom + 6
+    : 0
+
+  return (
+    <>
+      <button
+        ref={triggerRef}
+        type="button"
+        onClick={handleOpen}
+        className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium transition-opacity hover:opacity-75 whitespace-nowrap max-w-[180px]"
+        style={{ background: cfg.color + '22', color: cfg.color, border: `1px solid ${cfg.color}55` }}
+      >
+        <span className="shrink-0">{cfg.emoji}</span>
+        <span className="truncate">{value || 'Sin categoría'}</span>
+        <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
+      </button>
+
+      {open && dropRect && createPortal(
+        <>
+          <div className="fixed inset-0 z-[998]" onMouseDown={() => setOpen(false)} />
+          <div
+            className="fixed z-[999] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden flex flex-col"
+            style={{ top: dropTop, left: dropRect.left, minWidth: Math.max(dropRect.width, 260), maxHeight: 300 }}
+            onMouseDown={e => e.stopPropagation()}
+          >
+            <div className="p-2 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1.5 shrink-0">
+              <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+              <input
+                ref={searchRef}
+                className="flex-1 text-xs bg-transparent outline-none text-gray-700 dark:text-gray-300 placeholder-gray-400"
+                placeholder="Buscar categoría…"
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+              />
+            </div>
+            <div className="overflow-y-auto">
+              {filtered.map(cat => {
+                const cc = catCfg(cat)
+                const selected = cat === value
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onMouseDown={() => handleSelect(cat)}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/70 ${selected ? 'bg-gray-50 dark:bg-gray-800/70' : ''}`}
+                  >
+                    <span
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-base shrink-0"
+                      style={{ background: cc.color + '22' }}
+                    >
+                      {cc.emoji}
+                    </span>
+                    <span className="flex-1 text-gray-700 dark:text-gray-300">{cat}</span>
+                    {selected && <Check className="w-3 h-3 shrink-0" style={{ color: cc.color }} />}
+                  </button>
+                )
+              })}
+              {filtered.length === 0 && (
+                <p className="px-3 py-4 text-xs text-gray-400 text-center">Sin resultados</p>
+              )}
+            </div>
+          </div>
+        </>,
+        document.body
+      )}
+    </>
+  )
+}
 
 // ── Upload area ────────────────────────────────────────────────────────────────
 
@@ -86,7 +222,6 @@ function TicketCard({
 
   const isDirty = editItems !== null
   const displayItems = editItems ?? ticket.items
-  const datalistId = `cats-${ticket.id}`
 
   const allCats = useMemo(() => {
     const set = new Set([...KNOWN_CATEGORIES, ...extraCategories])
@@ -172,10 +307,6 @@ function TicketCard({
           )}
 
           {/* ── Items table ── */}
-          <datalist id={datalistId}>
-            {allCats.map(c => <option key={c} value={c} />)}
-          </datalist>
-
           {displayItems.length > 0 || isDirty ? (
             <div className="overflow-x-auto">
               <table className="w-full text-xs">
@@ -203,14 +334,23 @@ function TicketCard({
                       </td>
                       <td className="px-2 py-1.5">
                         {isDirty
-                          ? <input
-                              className="w-full min-w-[140px] bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-gray-500 dark:text-gray-400 outline-none focus:border-blue-400"
+                          ? <CategoryPicker
                               value={item.category}
-                              list={datalistId}
-                              onChange={e => updItem(i, { category: e.target.value })}
-                              placeholder="Categoría"
+                              onChange={cat => updItem(i, { category: cat })}
+                              allCategories={allCats}
                             />
-                          : <span className="text-gray-400 dark:text-gray-500">{item.category}</span>
+                          : (() => {
+                              const cc = catCfg(item.category)
+                              return (
+                                <span
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium"
+                                  style={{ background: cc.color + '18', color: cc.color }}
+                                >
+                                  <span>{cc.emoji}</span>
+                                  <span className="max-w-[110px] truncate">{item.category}</span>
+                                </span>
+                              )
+                            })()
                         }
                       </td>
                       <td className="px-4 py-1.5 text-right">
