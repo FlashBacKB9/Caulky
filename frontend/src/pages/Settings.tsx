@@ -18,6 +18,7 @@ import { loadNavConfig, saveNavConfig, PAGE_META, type NavEntry } from '../hooks
 import {
   Pencil, Sun, Moon, Lock, Trash2, Plus, Check, X, ChevronRight, ChevronDown, ChevronUp,
   LayoutDashboard, Download, Upload, AlertTriangle, Puzzle, Palette,
+  Leaf, Package, ShoppingCart,
 } from 'lucide-react'
 import { usePlugins, type PluginScanResult } from '../hooks/usePlugins'
 import AppIcon, { ICON_KEYS } from '../components/AppIcon'
@@ -1306,9 +1307,9 @@ function BackupSection() {
 // ── Tickets section ───────────────────────────────────────────────────────────
 
 const TICKET_TYPE_ROWS = [
-  { key: 'ticket_food_type_id',     label: '🥦 Supermercado / Comida' },
-  { key: 'ticket_supplies_type_id', label: '🧹 Suministros' },
-  { key: 'ticket_combined_type_id', label: '🛒 Combinado (todo el ticket)' },
+  { key: 'ticket_food_type_id',     label: 'Supermercado / Comida',  icon: Leaf         },
+  { key: 'ticket_supplies_type_id', label: 'Suministros',            icon: Package      },
+  { key: 'ticket_combined_type_id', label: 'Combinado (todo el ticket)', icon: ShoppingCart },
 ] as const
 
 function TicketsSection() {
@@ -1327,9 +1328,12 @@ function TicketsSection() {
       <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
         Elige el tipo de movimiento que se usará al generar un movimiento desde un ticket.
       </p>
-      {TICKET_TYPE_ROWS.map(({ key, label }) => (
+      {TICKET_TYPE_ROWS.map(({ key, label, icon: RowIcon }) => (
         <div key={key}>
-          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</p>
+          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center gap-1.5">
+            <RowIcon className="w-3.5 h-3.5 shrink-0" />
+            {label}
+          </p>
           <select
             className="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 outline-none focus:border-blue-400 text-gray-700 dark:text-gray-300"
             value={vals[key]}

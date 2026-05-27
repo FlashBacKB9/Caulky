@@ -2,7 +2,13 @@ import { useRef, useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import { Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check, Eye, EyeOff, Search, ArrowRightLeft } from 'lucide-react'
+import {
+  Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
+  Eye, EyeOff, Search, ArrowRightLeft,
+  Droplets, GlassWater, Popcorn, Wheat, Candy, Baby, Wine, Coffee, Beef, Cookie, Sandwich,
+  Snowflake, Archive, Scissors, Sparkles, Pill, Apple, Milk, Home, Palette, Fish, PawPrint,
+  CakeSlice, Pizza, IceCreamCone, Tag, Citrus, Leaf, Package, ShoppingCart,
+} from 'lucide-react'
 import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, ticketFileUrl, createMovementFromTicket, type Ticket, type TicketItem } from '../api/tickets'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 
@@ -13,39 +19,48 @@ const SUPPLIES_CATS = new Set([
   'Maquillaje', 'Mascotas',
 ])
 
-// ── Category config: emoji + color ────────────────────────────────────────────
+// ── Category config: icon + color ─────────────────────────────────────────────
 
-const CAT_CFG: Record<string, { emoji: string; color: string }> = {
-  'Aceites especias y salsas':    { emoji: '🫒', color: '#d97706' },
-  'Agua y refrescos':             { emoji: '💧', color: '#3b82f6' },
-  'Aperitivos':                   { emoji: '🍿', color: '#f97316' },
-  'Arroz legumbres y pasta':      { emoji: '🍝', color: '#ca8a04' },
-  'Azúcar caramelos y chocolate': { emoji: '🍫', color: '#7c3aed' },
-  'Bebé':                         { emoji: '🍼', color: '#ec4899' },
-  'Bodega':                       { emoji: '🍷', color: '#b91c1c' },
-  'Cacao café e infusiones':      { emoji: '☕', color: '#92400e' },
-  'Carne':                        { emoji: '🥩', color: '#ef4444' },
-  'Cereales y galletas':          { emoji: '🥣', color: '#b45309' },
-  'Charcutería y quesos':         { emoji: '🧀', color: '#f59e0b' },
-  'Congelados':                   { emoji: '🧊', color: '#0891b2' },
-  'Conservas caldos y cremas':    { emoji: '🥫', color: '#65a30d' },
-  'Cuidado del cabello':          { emoji: '💆', color: '#9333ea' },
-  'Cuidado facial y corporal':    { emoji: '🧴', color: '#db2777' },
-  'Fitoterapia y parafarmacia':   { emoji: '💊', color: '#059669' },
-  'Fruta y verdura':              { emoji: '🥦', color: '#16a34a' },
-  'Huevos leche y mantequilla':   { emoji: '🥛', color: '#eab308' },
-  'Limpieza y hogar':             { emoji: '🧹', color: '#4f46e5' },
-  'Maquillaje':                   { emoji: '💄', color: '#e11d48' },
-  'Marisco y pescado':            { emoji: '🐟', color: '#0284c7' },
-  'Mascotas':                     { emoji: '🐾', color: '#ea580c' },
-  'Panadería y pastelería':       { emoji: '🥐', color: '#c2410c' },
-  'Pizzas y platos preparados':   { emoji: '🍕', color: '#dc2626' },
-  'Postres y yogures':            { emoji: '🍮', color: '#c026d3' },
-  'Sin categoría':                { emoji: '📦', color: '#6b7280' },
-  'Zumos':                        { emoji: '🍊', color: '#ea580c' },
+type CatIcon = React.ComponentType<{ className?: string; style?: React.CSSProperties }>
+type CatCfgType = { icon: CatIcon; color: string }
+
+const CAT_CFG: Record<string, CatCfgType> = {
+  'Aceites especias y salsas':    { icon: Droplets,    color: '#d97706' },
+  'Agua y refrescos':             { icon: GlassWater,  color: '#3b82f6' },
+  'Aperitivos':                   { icon: Popcorn,     color: '#f97316' },
+  'Arroz legumbres y pasta':      { icon: Wheat,       color: '#ca8a04' },
+  'Azúcar caramelos y chocolate': { icon: Candy,       color: '#7c3aed' },
+  'Bebé':                         { icon: Baby,        color: '#ec4899' },
+  'Bodega':                       { icon: Wine,        color: '#b91c1c' },
+  'Cacao café e infusiones':      { icon: Coffee,      color: '#92400e' },
+  'Carne':                        { icon: Beef,        color: '#ef4444' },
+  'Cereales y galletas':          { icon: Cookie,      color: '#b45309' },
+  'Charcutería y quesos':         { icon: Sandwich,    color: '#f59e0b' },
+  'Congelados':                   { icon: Snowflake,   color: '#0891b2' },
+  'Conservas caldos y cremas':    { icon: Archive,     color: '#65a30d' },
+  'Cuidado del cabello':          { icon: Scissors,    color: '#9333ea' },
+  'Cuidado facial y corporal':    { icon: Sparkles,    color: '#db2777' },
+  'Fitoterapia y parafarmacia':   { icon: Pill,        color: '#059669' },
+  'Fruta y verdura':              { icon: Apple,       color: '#16a34a' },
+  'Huevos leche y mantequilla':   { icon: Milk,        color: '#eab308' },
+  'Limpieza y hogar':             { icon: Home,        color: '#4f46e5' },
+  'Maquillaje':                   { icon: Palette,     color: '#e11d48' },
+  'Marisco y pescado':            { icon: Fish,        color: '#0284c7' },
+  'Mascotas':                     { icon: PawPrint,    color: '#ea580c' },
+  'Panadería y pastelería':       { icon: CakeSlice,   color: '#c2410c' },
+  'Pizzas y platos preparados':   { icon: Pizza,       color: '#dc2626' },
+  'Postres y yogures':            { icon: IceCreamCone,color: '#c026d3' },
+  'Sin categoría':                { icon: Tag,         color: '#6b7280' },
+  'Zumos':                        { icon: Citrus,      color: '#ea580c' },
 }
 
-const catCfg = (cat: string) => CAT_CFG[cat] ?? { emoji: '🏷️', color: '#6b7280' }
+// ── Icon name → component map (for custom category serialization) ─────────────
+
+const ICON_NAME_MAP: Record<string, CatIcon> = {
+  Droplets, GlassWater, Popcorn, Wheat, Candy, Baby, Wine, Coffee, Beef, Cookie, Sandwich,
+  Snowflake, Archive, Scissors, Sparkles, Pill, Apple, Milk, Home, Palette, Fish, PawPrint,
+  CakeSlice, Pizza, IceCreamCone, Tag, Citrus, Leaf, Package, ShoppingCart, Upload, Receipt,
+}
 
 const KNOWN_CATEGORIES = Object.keys(CAT_CFG)
 
@@ -61,13 +76,20 @@ const COLORS = [
 
 // ── Custom category persistence ───────────────────────────────────────────────
 
-let _customCats: Record<string, { emoji: string; color: string }> = (() => {
+let _customCats: Record<string, { iconName: string; color: string }> = (() => {
   try { return JSON.parse(localStorage.getItem('caulky_cat_cfg') ?? '{}') } catch { return {} }
 })()
 
-const registerCustomCat = (name: string, cfg: { emoji: string; color: string }) => {
+const registerCustomCat = (name: string, cfg: { iconName: string; color: string }) => {
   _customCats[name] = cfg
   try { localStorage.setItem('caulky_cat_cfg', JSON.stringify(_customCats)) } catch {}
+}
+
+const catCfg = (cat: string): CatCfgType => {
+  if (CAT_CFG[cat]) return CAT_CFG[cat]
+  const custom = _customCats[cat]
+  if (custom) return { icon: ICON_NAME_MAP[custom.iconName] ?? Tag, color: custom.color }
+  return { icon: Tag, color: '#6b7280' }
 }
 
 // ── Category picker ───────────────────────────────────────────────────────────
@@ -77,10 +99,40 @@ const PRESET_COLORS = [
   '#3b82f6','#8b5cf6','#ec4899','#6b7280',
   '#0891b2','#b91c1c','#92400e','#166534',
 ]
-const PRESET_EMOJIS = [
-  '🍎','🥬','🥩','🐟','🧀','🍕','🥐','🍫',
-  '🧃','🍷','🧹','💊','🐾','💆','💄','🛍️',
-  '🎁','🏠','🎵','⚽','✈️','🎓','🛒','🏷️',
+
+const PRESET_ICONS: { name: string; Icon: CatIcon }[] = [
+  { name: 'Apple',       Icon: Apple       },
+  { name: 'Fish',        Icon: Fish        },
+  { name: 'Beef',        Icon: Beef        },
+  { name: 'Milk',        Icon: Milk        },
+  { name: 'Coffee',      Icon: Coffee      },
+  { name: 'Cookie',      Icon: Cookie      },
+  { name: 'Pizza',       Icon: Pizza       },
+  { name: 'Candy',       Icon: Candy       },
+  { name: 'Wine',        Icon: Wine        },
+  { name: 'GlassWater',  Icon: GlassWater  },
+  { name: 'Snowflake',   Icon: Snowflake   },
+  { name: 'Pill',        Icon: Pill        },
+  { name: 'PawPrint',    Icon: PawPrint    },
+  { name: 'Scissors',    Icon: Scissors    },
+  { name: 'Palette',     Icon: Palette     },
+  { name: 'Sparkles',    Icon: Sparkles    },
+  { name: 'Home',        Icon: Home        },
+  { name: 'Package',     Icon: Package     },
+  { name: 'ShoppingCart',Icon: ShoppingCart},
+  { name: 'Leaf',        Icon: Leaf        },
+  { name: 'Wheat',       Icon: Wheat       },
+  { name: 'Archive',     Icon: Archive     },
+  { name: 'Sandwich',    Icon: Sandwich    },
+  { name: 'IceCreamCone',Icon: IceCreamCone},
+  { name: 'Tag',         Icon: Tag         },
+  { name: 'Citrus',      Icon: Citrus      },
+  { name: 'Droplets',    Icon: Droplets    },
+  { name: 'Baby',        Icon: Baby        },
+  { name: 'CakeSlice',   Icon: CakeSlice   },
+  { name: 'Popcorn',     Icon: Popcorn     },
+  { name: 'Receipt',     Icon: Receipt     },
+  { name: 'Upload',      Icon: Upload      },
 ]
 
 function CategoryPicker({
@@ -96,7 +148,7 @@ function CategoryPicker({
   const [search, setSearch] = useState('')
   const [showFade, setShowFade] = useState(false)
   const [adding, setAdding] = useState(false)
-  const [newEmoji, setNewEmoji] = useState('🏷️')
+  const [newIconName, setNewIconName] = useState('Tag')
   const [newColor, setNewColor] = useState('#6b7280')
   const triggerRef = useRef<HTMLButtonElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -144,7 +196,7 @@ function CategoryPicker({
   const handleCreate = () => {
     const name = search.trim()
     if (!name) return
-    registerCustomCat(name, { emoji: newEmoji, color: newColor })
+    registerCustomCat(name, { iconName: newIconName, color: newColor })
     onChange(name)
     setOpen(false); setAdding(false); setSearch('')
   }
@@ -172,7 +224,7 @@ function CategoryPicker({
         className="flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-medium transition-opacity hover:opacity-75 whitespace-nowrap max-w-[180px]"
         style={{ background: cfg.color + '22', color: cfg.color, border: `1px solid ${cfg.color}55` }}
       >
-        <span className="shrink-0">{cfg.emoji}</span>
+        <cfg.icon className="w-3 h-3 shrink-0" />
         <span className="truncate">{value || 'Sin categoría'}</span>
         <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
       </button>
@@ -216,8 +268,8 @@ function CategoryPicker({
                         onMouseDown={() => handleSelect(cat)}
                         className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/70 ${selected ? 'bg-gray-50 dark:bg-gray-800/70' : ''}`}
                       >
-                        <span className="w-7 h-7 rounded-full flex items-center justify-center text-base shrink-0" style={{ background: cc.color + '22' }}>
-                          {cc.emoji}
+                        <span className="w-7 h-7 rounded-full flex items-center justify-center shrink-0" style={{ background: cc.color + '22', color: cc.color }}>
+                          <cc.icon className="w-4 h-4" />
                         </span>
                         <span className="flex-1 text-gray-700 dark:text-gray-300">{cat}</span>
                         {selected && <Check className="w-3 h-3 shrink-0" style={{ color: cc.color }} />}
@@ -229,7 +281,7 @@ function CategoryPicker({
                   {noResults && (
                     <button
                       type="button"
-                      onMouseDown={() => { setAdding(true); setNewEmoji('🏷️'); setNewColor('#6b7280') }}
+                      onMouseDown={() => { setAdding(true); setNewIconName('Tag'); setNewColor('#6b7280') }}
                       className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/70"
                     >
                       <span className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">
@@ -254,28 +306,21 @@ function CategoryPicker({
                 <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
                   Nueva categoría: <span className="font-semibold">{search.trim()}</span>
                 </p>
-                {/* Emoji picker */}
+                {/* Icon picker */}
                 <div>
                   <p className="text-[11px] text-gray-400 mb-1.5">Icono</p>
                   <div className="grid grid-cols-8 gap-1">
-                    {PRESET_EMOJIS.map(em => (
+                    {PRESET_ICONS.map(({ name, Icon }) => (
                       <button
-                        key={em}
+                        key={name}
                         type="button"
-                        onMouseDown={() => setNewEmoji(em)}
-                        className={`w-7 h-7 rounded-lg text-base flex items-center justify-center transition-colors ${newEmoji === em ? 'bg-blue-100 dark:bg-blue-900/40 ring-1 ring-blue-400' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                        onMouseDown={() => setNewIconName(name)}
+                        className={`w-7 h-7 rounded-lg flex items-center justify-center transition-colors ${newIconName === name ? 'bg-blue-100 dark:bg-blue-900/40 ring-1 ring-blue-400 text-blue-500' : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-300'}`}
                       >
-                        {em}
+                        <Icon className="w-4 h-4" />
                       </button>
                     ))}
                   </div>
-                  <input
-                    className="mt-1.5 w-full text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 outline-none focus:border-blue-400"
-                    placeholder="O escribe un emoji…"
-                    value={newEmoji}
-                    maxLength={4}
-                    onChange={e => setNewEmoji(e.target.value || '🏷️')}
-                  />
                 </div>
                 {/* Color picker */}
                 <div>
@@ -294,10 +339,13 @@ function CategoryPicker({
                 </div>
                 {/* Preview + confirm */}
                 <div className="flex items-center justify-between pt-1">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
-                    style={{ background: newColor + '22', color: newColor, border: `1px solid ${newColor}55` }}>
-                    {newEmoji} {search.trim()}
-                  </span>
+                  {(() => { const PreviewIcon = ICON_NAME_MAP[newIconName] ?? Tag; return (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                      style={{ background: newColor + '22', color: newColor, border: `1px solid ${newColor}55` }}>
+                      <PreviewIcon className="w-3.5 h-3.5 shrink-0" />
+                      {search.trim()}
+                    </span>
+                  ) })()}
                   <div className="flex gap-1.5">
                     <button type="button" onMouseDown={() => setAdding(false)}
                       className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-1">
@@ -431,9 +479,9 @@ function TicketCard({
   })
 
   const MOV_OPTIONS = [
-    { mode: 'food'     as const, label: '🥦 Comida / Supermercado', total: foodTotal,     typeId: foodTypeId     },
-    { mode: 'supplies' as const, label: '🧹 Suministros',           total: suppliesTotal, typeId: suppliesTypeId },
-    { mode: 'combined' as const, label: '🛒 Combinado',             total: combinedTotal, typeId: combinedTypeId },
+    { mode: 'food'     as const, label: 'Comida / Supermercado', icon: Leaf,         color: '#16a34a', total: foodTotal,     typeId: foodTypeId     },
+    { mode: 'supplies' as const, label: 'Suministros',           icon: Package,      color: '#4f46e5', total: suppliesTotal, typeId: suppliesTypeId },
+    { mode: 'combined' as const, label: 'Combinado',             icon: ShoppingCart, color: '#6b7280', total: combinedTotal, typeId: combinedTypeId },
   ]
 
   return (
@@ -483,17 +531,20 @@ function TicketCard({
       {showMovPanel && (
         <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-3 space-y-2 bg-emerald-50/50 dark:bg-emerald-950/20">
           <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Generar movimiento</p>
-          {MOV_OPTIONS.map(({ mode, label, total, typeId }) => {
+          {MOV_OPTIONS.map(({ mode, label, icon: ModeIcon, color, total, typeId }) => {
             const typeName = typeNameById(typeId)
             const disabled = !typeId || total <= 0 || movMut.isPending
             return (
               <div key={mode} className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
-                  <span className="text-xs text-gray-700 dark:text-gray-300">{label}</span>
-                  {typeName
-                    ? <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">· {typeName}</span>
-                    : <span className="ml-1.5 text-xs text-amber-500">· Sin configurar</span>
-                  }
+                  <div className="flex items-center gap-1.5 text-xs text-gray-700 dark:text-gray-300">
+                    <ModeIcon className="w-3.5 h-3.5 shrink-0" style={{ color }} />
+                    <span>{label}</span>
+                    {typeName
+                      ? <span className="text-gray-400 dark:text-gray-500">· {typeName}</span>
+                      : <span className="text-amber-500">· Sin configurar</span>
+                    }
+                  </div>
                 </div>
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
                   {total.toFixed(2)} €
@@ -582,7 +633,7 @@ function TicketCard({
                                   className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-xs font-medium"
                                   style={{ background: cc.color + '18', color: cc.color }}
                                 >
-                                  <span>{cc.emoji}</span>
+                                  <cc.icon className="w-3 h-3 shrink-0" />
                                   <span className="max-w-[110px] truncate">{item.category}</span>
                                 </span>
                               )
