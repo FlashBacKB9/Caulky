@@ -2,7 +2,7 @@ import { useRef, useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts'
 import { Leaf, Package, ShoppingCart, Tag } from 'lucide-react'
 import {
   Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
@@ -667,71 +667,259 @@ function TicketCard({
 
 // ── Category chart ─────────────────────────────────────────────────────────────
 
+type DateRange = 'all' | 'month' | '3m' | 'year'
+type GroupBy   = 'cat' | 'store' | 'month'
+type ChartView = 'donut' | 'bar' | 'area'
+
+interface ChartDatum { name: string; value: number; pct: number; color: string }
+
+const TOOLTIP_STYLE = { fontSize: 12, borderRadius: 8, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.12)' }
+
+/** Small pill toggle-group */
+function TGroup<T extends string>({
+  value, onChange, options,
+}: {
+  value: T
+  onChange: (v: T) => void
+  options: { value: T; label: string }[]
+}) {
+  return (
+    <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-[11px]">
+      {options.map(o => (
+        <button
+          key={o.value}
+          type="button"
+          onClick={() => onChange(o.value)}
+          className={`px-2.5 py-1 transition-colors whitespace-nowrap ${
+            value === o.value
+              ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 font-semibold'
+              : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+          }`}
+        >
+          {o.label}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Donut + legend list */
+function DonutView({ data, grand }: { data: ChartDatum[]; grand: number }) {
+  return (
+    <div className="flex flex-col lg:flex-row gap-6">
+      <div className="w-full lg:w-56 h-52 shrink-0">
+        <ResponsiveContainer width="100%" height="100%">
+          <PieChart>
+            <Pie data={data} cx="50%" cy="50%" innerRadius={46} outerRadius={84} paddingAngle={2} dataKey="value">
+              {data.map((_e, i) => <Cell key={i} fill={data[i].color} />)}
+            </Pie>
+            <Tooltip formatter={(v) => [`${Number(v).toFixed(2)} €`]} contentStyle={TOOLTIP_STYLE} />
+          </PieChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 content-start overflow-y-auto max-h-52">
+        {data.map((d, i) => (
+          <div key={i} className="flex items-center gap-2 py-0.5">
+            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
+            <span className="text-xs text-gray-600 dark:text-gray-400 truncate flex-1">{d.name}</span>
+            <span className="text-xs font-semibold text-gray-800 dark:text-white whitespace-nowrap">{d.pct}%</span>
+            <span className="text-xs text-gray-400 whitespace-nowrap">{d.value.toFixed(2)} €</span>
+          </div>
+        ))}
+        {data.length > 0 && (
+          <div className="flex items-center gap-2 py-0.5 col-span-full border-t border-gray-100 dark:border-gray-800 mt-1 pt-1">
+            <span className="w-2.5 h-2.5 shrink-0" />
+            <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex-1">Total</span>
+            <span className="text-xs font-bold text-gray-800 dark:text-white whitespace-nowrap">{grand.toFixed(2)} €</span>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+/** Horizontal bars (categories / stores) */
+function HBarView({ data }: { data: ChartDatum[] }) {
+  const shown = data.slice(0, 15)
+  const max = shown[0]?.value ?? 1
+  return (
+    <div className="space-y-1.5">
+      {shown.map((d, i) => (
+        <div key={i} className="flex items-center gap-2.5">
+          <span className="w-32 text-xs text-gray-600 dark:text-gray-400 truncate text-right shrink-0">{d.name}</span>
+          <div className="flex-1 h-4 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+            <div
+              className="h-full rounded-full transition-all duration-300"
+              style={{ width: `${(d.value / max) * 100}%`, background: d.color }}
+            />
+          </div>
+          <span className="w-18 text-xs text-gray-500 dark:text-gray-400 text-right whitespace-nowrap shrink-0">{d.value.toFixed(2)} €</span>
+          <span className="text-[10px] text-gray-400 w-8 text-right shrink-0">{d.pct}%</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/** Vertical bars (monthly totals via recharts) */
+function VBarView({ data }: { data: ChartDatum[] }) {
+  return (
+    <div className="h-52">
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} margin={{ top: 4, right: 8, left: -12, bottom: 4 }} barCategoryGap="30%">
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.15)" vertical={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
+          <Tooltip formatter={(v: unknown) => [`${Number(v).toFixed(2)} €`]} contentStyle={TOOLTIP_STYLE} />
+          <Bar dataKey="value" radius={[4, 4, 0, 0]}>
+            {data.map((_e, i) => <Cell key={i} fill={data[i].color} />)}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
+/** Area chart (monthly trend) */
+function AreaView({ data }: { data: ChartDatum[] }) {
+  return (
+    <div className="h-52">
+      <ResponsiveContainer width="100%" height="100%">
+        <AreaChart data={data} margin={{ top: 4, right: 8, left: -12, bottom: 4 }}>
+          <defs>
+            <linearGradient id="ticketAreaGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%"  stopColor="#6366f1" stopOpacity={0.28} />
+              <stop offset="95%" stopColor="#6366f1" stopOpacity={0.02} />
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.15)" vertical={false} />
+          <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+          <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
+          <Tooltip formatter={(v: unknown) => [`${Number(v).toFixed(2)} €`]} contentStyle={TOOLTIP_STYLE} />
+          <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} fill="url(#ticketAreaGrad)" dot={{ fill: '#6366f1', r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} />
+        </AreaChart>
+      </ResponsiveContainer>
+    </div>
+  )
+}
+
 function CategoryChart({ tickets }: { tickets: Ticket[] }) {
-  const data = useMemo(() => {
+  const [range,   setRange]   = useState<DateRange>('all')
+  const [groupBy, setGroupBy] = useState<GroupBy>('cat')
+  const [view,    setView]    = useState<ChartView>('donut')
+
+  // ── Date filter ──────────────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    if (range === 'all') return tickets
+    const now = new Date()
+    return tickets.filter(t => {
+      const raw = t.ticket_date ?? t.created_at.slice(0, 10)
+      const d   = new Date(raw + 'T00:00:00')
+      if (range === 'month') return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+      if (range === 'year')  return d.getFullYear() === now.getFullYear()
+      // 3m: last 3 calendar months including current
+      const cutoff = new Date(now.getFullYear(), now.getMonth() - 2, 1)
+      return d >= cutoff
+    })
+  }, [tickets, range])
+
+  // ── Compute chart data ───────────────────────────────────────────────────────
+  const { data, grand } = useMemo(() => {
     const totals: Record<string, number> = {}
-    for (const t of tickets) {
-      for (const [cat, amt] of Object.entries(t.categories)) {
-        totals[cat] = (totals[cat] ?? 0) + amt
+
+    if (groupBy === 'cat') {
+      for (const t of filtered)
+        for (const [cat, amt] of Object.entries(t.categories))
+          totals[cat] = (totals[cat] ?? 0) + amt
+    } else if (groupBy === 'store') {
+      for (const t of filtered) {
+        const key = t.store_name?.trim() || 'Desconocida'
+        totals[key] = (totals[key] ?? 0) + (t.total ?? 0)
+      }
+    } else { // month
+      for (const t of filtered) {
+        const raw = t.ticket_date ?? t.created_at.slice(0, 10)
+        const d   = new Date(raw + 'T00:00:00')
+        const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+        totals[key] = (totals[key] ?? 0) + (t.total ?? 0)
       }
     }
-    const grand = Object.values(totals).reduce((a, b) => a + b, 0)
-    return Object.entries(totals)
-      .sort((a, b) => b[1] - a[1])
-      .map(([name, value], i) => ({
-        name,
-        value: Math.round(value * 100) / 100,
-        pct: grand > 0 ? Math.round((value / grand) * 1000) / 10 : 0,
-        color: COLORS[i % COLORS.length],
-      }))
-  }, [tickets])
 
-  if (data.length === 0) return null
+    const entries = groupBy === 'month'
+      ? Object.entries(totals).sort((a, b) => a[0].localeCompare(b[0]))
+      : Object.entries(totals).sort((a, b) => b[1] - a[1])
 
-  const grand = data.reduce((a, b) => a + b.value, 0)
+    const grand = entries.reduce((s, [, v]) => s + v, 0)
+
+    const data: ChartDatum[] = entries.map(([key, value], i) => {
+      let name = key
+      if (groupBy === 'month') {
+        const [y, m] = key.split('-')
+        name = new Date(+y, +m - 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
+      }
+      const color = groupBy === 'cat' ? (catCfg(key).color) : COLORS[i % COLORS.length]
+      return { name, value: Math.round(value * 100) / 100, pct: grand > 0 ? Math.round((value / grand) * 1000) / 10 : 0, color }
+    })
+
+    return { data, grand }
+  }, [filtered, groupBy])
+
+  // Derive view: donut not valid for month; area not valid for cat/store
+  const effectiveView: ChartView =
+    (view === 'donut' && groupBy === 'month') ? 'bar' :
+    (view === 'area'  && groupBy !== 'month') ? 'donut' :
+    view
+
+  const viewOpts: { value: ChartView; label: string }[] =
+    groupBy === 'month'
+      ? [{ value: 'bar', label: 'Barras' }, { value: 'area', label: 'Área' }]
+      : [{ value: 'donut', label: 'Dona' }, { value: 'bar', label: 'Barras' }]
+
+  if (tickets.length === 0) return null
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5">
-      <h2 className="text-sm font-semibold text-gray-800 dark:text-white mb-4">
-        Desglose por categoría — {grand.toFixed(2)} €
-      </h2>
-      <div className="flex flex-col lg:flex-row gap-6">
-        <div className="w-full lg:w-64 h-56 shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={data}
-                cx="50%"
-                cy="50%"
-                innerRadius={50}
-                outerRadius={90}
-                paddingAngle={2}
-                dataKey="value"
-              >
-                {data.map((entry, i) => (
-                  <Cell key={i} fill={entry.color} />
-                ))}
-              </Pie>
-              <Tooltip
-                formatter={(v) => [`${Number(v).toFixed(2)} €`]}
-                contentStyle={{ fontSize: 12, borderRadius: 8, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.1)' }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-1 content-start">
-          {data.map((d, i) => (
-            <div key={i} className="flex items-center gap-2 py-0.5">
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
-              <span className="text-xs text-gray-600 dark:text-gray-400 truncate flex-1">{d.name}</span>
-              <span className="text-xs font-medium text-gray-800 dark:text-white whitespace-nowrap">
-                {d.pct}%
-              </span>
-              <span className="text-xs text-gray-400 whitespace-nowrap">{d.value.toFixed(2)} €</span>
-            </div>
-          ))}
-        </div>
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5 space-y-3">
+      {/* Row 1: total + period filter */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="text-sm font-semibold text-gray-800 dark:text-white">
+          Desglose
+          {grand > 0 && <span className="ml-1.5 text-gray-500 font-normal">— {grand.toFixed(2)} €</span>}
+          {filtered.length < tickets.length && (
+            <span className="text-xs font-normal text-gray-400 ml-2">({filtered.length} ticket{filtered.length !== 1 ? 's' : ''})</span>
+          )}
+        </span>
+        <TGroup value={range} onChange={setRange} options={[
+          { value: 'all',   label: 'Todo'  },
+          { value: 'month', label: 'Mes'   },
+          { value: '3m',    label: '3M'    },
+          { value: 'year',  label: 'Año'   },
+        ]} />
       </div>
+
+      {/* Row 2: groupBy + chart type */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <TGroup value={groupBy} onChange={v => setGroupBy(v as GroupBy)} options={[
+          { value: 'cat',   label: 'Categoría' },
+          { value: 'store', label: 'Tienda'    },
+          { value: 'month', label: 'Mes'       },
+        ]} />
+        <TGroup value={effectiveView} onChange={v => setView(v as ChartView)} options={viewOpts} />
+      </div>
+
+      {/* Chart */}
+      {data.length === 0 ? (
+        <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">
+          No hay datos para el período seleccionado.
+        </p>
+      ) : effectiveView === 'donut' ? (
+        <DonutView data={data} grand={grand} />
+      ) : effectiveView === 'bar' && groupBy !== 'month' ? (
+        <HBarView data={data} />
+      ) : effectiveView === 'bar' ? (
+        <VBarView data={data} />
+      ) : (
+        <AreaView data={data} />
+      )}
     </div>
   )
 }
