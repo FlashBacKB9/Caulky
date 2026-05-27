@@ -21,4 +21,5 @@ class Ticket(Base):
     total: Mapped[float | None] = mapped_column(Float, nullable=True)
     items: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
     categories: Mapped[str] = mapped_column(Text, nullable=False, server_default="{}")
+    generated_movements: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)

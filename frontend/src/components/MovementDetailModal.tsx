@@ -175,24 +175,29 @@ export default function MovementDetailModal({ movement, types, onClose }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('common.type')}</label>
-              <div className="relative">
-                {selType && <span className="absolute left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full z-10 pointer-events-none" style={{ backgroundColor: selType.color }} />}
-                <select className={IN + (selType ? ' pl-8' : '')} value={draft.movement_type_id} onChange={e => setField('movement_type_id', e.target.value)}>
-                  <option value="">{t('detail.noType')}</option>
-                  {Object.entries(byCategory).map(([cat, items]) => (
-                    <optgroup key={cat} label={cat}>
-                      {items.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                    </optgroup>
-                  ))}
-                </select>
-              </div>
-              {linkedAcc && (
-                <div className="mt-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 rounded-lg text-xs text-blue-600 dark:text-blue-400">
-                  {parseFloat(draft.money) < 0
-                    ? <><span className="font-semibold">{linkedAcc.name}</span> → {t('detail.linkedAccount')}</>
-                    : <>{t('detail.linkedAccount')} → <span className="font-semibold">{linkedAcc.name}</span></>}
-                </div>
-              )}
+              {draft.is_transfer
+                ? <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1.5">Sin tipo — es una transferencia</p>
+                : <>
+                    <div className="relative">
+                      {selType && <span className="absolute left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full z-10 pointer-events-none" style={{ backgroundColor: selType.color }} />}
+                      <select className={IN + (selType ? ' pl-8' : '')} value={draft.movement_type_id} onChange={e => setField('movement_type_id', e.target.value)}>
+                        <option value="">{t('detail.noType')}</option>
+                        {Object.entries(byCategory).map(([cat, items]) => (
+                          <optgroup key={cat} label={cat}>
+                            {items.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                    {linkedAcc && (
+                      <div className="mt-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 rounded-lg text-xs text-blue-600 dark:text-blue-400">
+                        {parseFloat(draft.money) < 0
+                          ? <><span className="font-semibold">{linkedAcc.name}</span> → {t('detail.linkedAccount')}</>
+                          : <>{t('detail.linkedAccount')} → <span className="font-semibold">{linkedAcc.name}</span></>}
+                      </div>
+                    )}
+                  </>
+              }
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('movement.bankDate')}</label>
@@ -200,18 +205,37 @@ export default function MovementDetailModal({ movement, types, onClose }: {
             </div>
           </div>
 
+          {/* Account / transfer accounts */}
           {(() => {
-            const corrientes = accounts.filter(a => a.category === 'corriente')
+            const allAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro')
+            if (allAccounts.length === 0) return null
+            if (draft.is_transfer) {
+              return (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Cuenta origen</label>
+                    <select value={draft.from_account_id} onChange={e => setField('from_account_id', e.target.value)} className={IN}>
+                      <option value="">— Selecciona —</option>
+                      {allAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Cuenta destino</label>
+                    <select value={draft.account_id} onChange={e => setField('account_id', e.target.value)} className={IN}>
+                      <option value="">— Selecciona —</option>
+                      {allAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+              )
+            }
+            const corrientes = allAccounts.filter(a => a.category === 'corriente')
             if (corrientes.length <= 1) return null
             const mainAcc = corrientes.find(a => a.is_main)
             return (
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('settings.affectedAccount')}</label>
-                <select
-                  className={IN}
-                  value={draft.account_id}
-                  onChange={e => setField('account_id', e.target.value)}
-                >
+                <select className={IN} value={draft.account_id} onChange={e => setField('account_id', e.target.value)}>
                   <option value="">{mainAcc ? `${mainAcc.name} ${t('settings.defaultSuffix')}` : t('settings.mainAccount')}</option>
                   {corrientes.filter(a => !a.is_main).map(a => (
                     <option key={a.id} value={a.id}>{a.name}</option>
@@ -221,8 +245,16 @@ export default function MovementDetailModal({ movement, types, onClose }: {
             )
           })()}
 
-          {/* Pagado / No contar / Compartido */}
-          <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-3' : 'grid-cols-2'}`}>
+          {/* Transferencia / Pagado / No contar / Compartido */}
+          <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-4' : 'grid-cols-3'}`}>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Transferencia</label>
+              <Toggle
+                value={draft.is_transfer}
+                onChange={v => setDraft(d => ({ ...d, is_transfer: v, movement_type_id: v ? '' : d.movement_type_id, from_account_id: v ? d.from_account_id : '' }))}
+                color="#8b5cf6"
+              />
+            </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">{t('form.paid')}</label>
               <Toggle value={draft.paid} onChange={v => setField('paid', v)} color="#22c55e" />

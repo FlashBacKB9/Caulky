@@ -15,6 +15,7 @@ export interface Ticket {
   total: number | null
   items: TicketItem[]
   categories: Record<string, number>
+  generated_movements?: { food?: number; supplies?: number; combined?: number } | null
   created_at: string
 }
 
@@ -53,3 +54,10 @@ export const createMovementFromTicket = (
   }).then(r => r.data)
 
 export const ticketFileUrl = (id: number) => `/api/tickets/${id}/file`
+
+export const attachTicketToMovement = (
+  ticketId: number,
+  movementId: number,
+  mode: 'food' | 'supplies' | 'combined',
+): Promise<void> =>
+  api.post(`/tickets/${ticketId}/attach/${movementId}`, { mode }).then(() => undefined)

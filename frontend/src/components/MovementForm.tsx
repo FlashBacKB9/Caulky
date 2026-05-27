@@ -17,7 +17,17 @@ import {
 } from '../utils/recurringTemplates'
 import { getTemplates, createTemplate, updateTemplate, deleteTemplate } from '../api/templates'
 
-interface Props { onClose: () => void; initialDate?: string }
+interface Props {
+  onClose: () => void
+  initialDate?: string
+  initialValues?: {
+    name?: string
+    money?: string
+    date?: string
+    movement_type_id?: string
+  }
+  onMovementCreated?: (id: number) => void
+}
 
 // ── Shared constants ───────────────────────────────────────────────────────────
 
@@ -163,7 +173,7 @@ function RuleEditor({ rule, onChange }: { rule: RecurrenceRule; onChange: (r: Re
 
 type PanelMode = 'form' | 'template' | 'recurrence' | 'multibulk'
 
-export default function MovementForm({ onClose, initialDate }: Props) {
+export default function MovementForm({ onClose, initialDate, initialValues, onMovementCreated }: Props) {
   const qc = useQueryClient()
   const today = new Date().toLocaleDateString('en-CA')
   const { sharedEnabled } = useSharedMovements()
@@ -172,10 +182,14 @@ export default function MovementForm({ onClose, initialDate }: Props) {
   const [dragging, setDragging] = useState(false)
 
   // ── Main form ────────────────────────────────────────────────────────────────
-  const startDate = initialDate ?? today
+  const startDate = initialValues?.date ?? initialDate ?? today
   const [form, setForm] = useState({
-    name: '', money: '', date: startDate, bank_date: startDate,
-    movement_type_id: '', account_id: '', is_transfer: false, from_account_id: '',
+    name: initialValues?.name ?? '',
+    money: initialValues?.money ?? '',
+    date: startDate,
+    bank_date: startDate,
+    movement_type_id: initialValues?.movement_type_id ?? '',
+    account_id: '', is_transfer: false, from_account_id: '',
     paid: true, no_count: false, notes: '',
     is_shared: false, shared_between: '2', my_share: '',
   })
@@ -236,12 +250,14 @@ export default function MovementForm({ onClose, initialDate }: Props) {
         pendingFiles.forEach(f => fd.append('files', f))
         await api.post(`/movements/${mv.id}/files`, fd)
       }
+      return mv
     },
-    onSuccess: () => {
+    onSuccess: (mv) => {
       qc.invalidateQueries({ queryKey: ['movements'] })
       qc.invalidateQueries({ queryKey: ['dashboard'] })
       qc.invalidateQueries({ queryKey: ['annual'] })
       qc.invalidateQueries({ queryKey: ['accounts-summary'] })
+      onMovementCreated?.(mv.id)
       onClose()
     },
   })

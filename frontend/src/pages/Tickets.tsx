@@ -1,16 +1,18 @@
 import { useRef, useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
+import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
 import {
   Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
-  Eye, EyeOff, Search, ArrowRightLeft,
+  Eye, EyeOff, Search, ArrowRightLeft, ExternalLink,
   Droplets, GlassWater, Popcorn, Wheat, Candy, Baby, Wine, Coffee, Beef, Cookie, Sandwich,
   Snowflake, Archive, Scissors, Sparkles, Pill, Apple, Milk, Home, Palette, Fish, PawPrint,
   CakeSlice, Pizza, IceCreamCone, Tag, Citrus, Leaf, Package, ShoppingCart,
 } from 'lucide-react'
-import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, ticketFileUrl, createMovementFromTicket, type Ticket, type TicketItem } from '../api/tickets'
+import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, ticketFileUrl, attachTicketToMovement, type Ticket, type TicketItem } from '../api/tickets'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
+import MovementForm from '../components/MovementForm'
 
 // ── Supplies category set (mirrors backend SUPPLIES_CATEGORIES) ───────────────
 const SUPPLIES_CATS = new Set([
@@ -419,11 +421,16 @@ function TicketCard({
 }) {
   const qc = useQueryClient()
   const [ticket, setTicket] = useState(initialTicket)
+  const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [viewFile, setViewFile] = useState(false)
   const [editItems, setEditItems] = useState<TicketItem[] | null>(null)
   const [showMovPanel, setShowMovPanel] = useState(false)
   const [movSuccess, setMovSuccess] = useState<string | null>(null)
+  const [movFormConfig, setMovFormConfig] = useState<{
+    mode: 'food' | 'supplies' | 'combined'
+    name: string; money: string; date: string; movement_type_id: string
+  } | null>(null)
 
   useEffect(() => { setTicket(initialTicket) }, [initialTicket])
 
@@ -467,16 +474,29 @@ function TicketCard({
   const typeNameById = (id: number | null) =>
     movementTypes.find(mt => mt.id === id)?.name ?? null
 
-  const movMut = useMutation({
-    mutationFn: ({ mode, typeId }: { mode: 'food' | 'supplies' | 'combined'; typeId: number }) =>
-      createMovementFromTicket(ticket.id, mode, typeId, ticket.ticket_date ?? undefined),
-    onSuccess: (res) => {
-      setMovSuccess(`Movimiento creado: ${res.name} — ${res.amount.toFixed(2)} €`)
-      setShowMovPanel(false)
-      setTimeout(() => setMovSuccess(null), 4000)
-      qc.invalidateQueries({ queryKey: ['movements'] })
-    },
-  })
+  const genMovements = ticket.generated_movements ?? {}
+
+  const openMovForm = (mode: 'food' | 'supplies' | 'combined', total: number, typeId: number | null) => {
+    if (!typeId) return
+    const name = ticket.store_name ?? ticket.original_name.replace(/\.[^.]+$/, '')
+    setMovFormConfig({
+      mode,
+      name,
+      money: total.toFixed(2),
+      date: ticket.ticket_date ?? new Date().toLocaleDateString('en-CA'),
+      movement_type_id: String(typeId),
+    })
+    setShowMovPanel(false)
+  }
+
+  const handleMovementCreated = async (movId: number) => {
+    if (!movFormConfig) return
+    await attachTicketToMovement(ticket.id, movId, movFormConfig.mode)
+    qc.invalidateQueries({ queryKey: ['tickets'] })
+    setMovFormConfig(null)
+    setMovSuccess('Movimiento creado correctamente')
+    setTimeout(() => setMovSuccess(null), 4000)
+  }
 
   const MOV_OPTIONS = [
     { mode: 'food'     as const, label: 'Comida / Supermercado', icon: Leaf,         color: '#16a34a', total: foodTotal,     typeId: foodTypeId     },
@@ -533,7 +553,8 @@ function TicketCard({
           <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Generar movimiento</p>
           {MOV_OPTIONS.map(({ mode, label, icon: ModeIcon, color, total, typeId }) => {
             const typeName = typeNameById(typeId)
-            const disabled = !typeId || total <= 0 || movMut.isPending
+            const existingMovId = genMovements[mode]
+            const canCreate = !!typeId && total > 0
             return (
               <div key={mode} className="flex items-center gap-3">
                 <div className="flex-1 min-w-0">
@@ -549,14 +570,24 @@ function TicketCard({
                 <span className="text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
                   {total.toFixed(2)} €
                 </span>
-                <button
-                  disabled={disabled}
-                  onClick={() => typeId && movMut.mutate({ mode, typeId })}
-                  className="flex items-center gap-1 text-xs bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-2.5 py-1 rounded transition-colors"
-                >
-                  {movMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
-                  Crear
-                </button>
+                {existingMovId ? (
+                  <button
+                    onClick={() => navigate('/movements')}
+                    className="flex items-center gap-1 text-xs bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-1 rounded transition-colors"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    Ver
+                  </button>
+                ) : (
+                  <button
+                    disabled={!canCreate}
+                    onClick={() => openMovForm(mode, total, typeId)}
+                    className="flex items-center gap-1 text-xs bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-2.5 py-1 rounded transition-colors"
+                  >
+                    <Plus className="w-3 h-3" />
+                    Crear
+                  </button>
+                )}
               </div>
             )
           })}
@@ -569,6 +600,20 @@ function TicketCard({
           <Check className="w-3.5 h-3.5 shrink-0" />
           {movSuccess}
         </div>
+      )}
+
+      {/* ── Movement form modal ── */}
+      {movFormConfig && (
+        <MovementForm
+          onClose={() => setMovFormConfig(null)}
+          initialValues={{
+            name: movFormConfig.name,
+            money: movFormConfig.money,
+            date: movFormConfig.date,
+            movement_type_id: movFormConfig.movement_type_id,
+          }}
+          onMovementCreated={handleMovementCreated}
+        />
       )}
 
       {open && (

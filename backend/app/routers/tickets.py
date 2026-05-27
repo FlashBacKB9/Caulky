@@ -434,6 +434,10 @@ class TicketToMovementRequest(PydanticModel):
     movement_date: str | None = None   # ISO date, defaults to ticket_date or today
 
 
+class AttachMovementRequest(PydanticModel):
+    mode: str           # "food" | "supplies" | "combined"
+
+
 @router.post("/{ticket_id}/to-movement", status_code=201)
 async def ticket_to_movement(
     ticket_id: int,
@@ -496,6 +500,45 @@ async def ticket_to_movement(
 
     await db.commit()
     return {"movement_id": mv.id, "amount": amount, "name": name}
+
+
+@router.post("/{ticket_id}/attach/{movement_id}", status_code=200)
+async def attach_ticket_to_movement(
+    ticket_id: int,
+    movement_id: int,
+    body: AttachMovementRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    """Copy ticket file to a movement attachment and record the link."""
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    mv = await db.get(MovementModel, movement_id)
+    if not mv or mv.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Movement not found")
+
+    # Copy ticket file → movement file
+    src = os.path.join(UPLOAD_DIR, t.filename)
+    if os.path.exists(src):
+        ext = os.path.splitext(t.filename)[1]
+        new_fn = f"{uuid.uuid4().hex}{ext}"
+        shutil.copy2(src, os.path.join(UPLOAD_DIR, new_fn))
+        db.add(MovementFile(
+            movement_id=mv.id,
+            filename=new_fn,
+            original_name=t.original_name,
+            mime_type=t.mime_type,
+        ))
+
+    # Record which mode was linked
+    existing = json.loads(t.generated_movements) if t.generated_movements else {}
+    existing[body.mode] = movement_id
+    t.generated_movements = json.dumps(existing)
+
+    await db.commit()
+    return {"ok": True}
 
 
 @router.delete("/{ticket_id}", status_code=204)

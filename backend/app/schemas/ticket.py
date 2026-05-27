@@ -19,6 +19,7 @@ class TicketRead(BaseModel):
     total: Optional[float] = None
     items: list[TicketItem]
     categories: dict[str, float]
+    generated_movements: Optional[dict] = None
     created_at: datetime
 
     @field_validator("items", mode="before")
@@ -39,6 +40,16 @@ class TicketRead(BaseModel):
                 return json.loads(v)
             except (json.JSONDecodeError, ValueError):
                 return {}
+        return v
+
+    @field_validator("generated_movements", mode="before")
+    @classmethod
+    def parse_generated_movements(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except (json.JSONDecodeError, ValueError):
+                return None
         return v
 
     model_config = {"from_attributes": True}
