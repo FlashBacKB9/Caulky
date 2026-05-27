@@ -470,6 +470,61 @@ def _compute_categories(items: list[dict]) -> dict[str, float]:
     return totals
 
 
+# Global EasyOCR reader — loaded once at first use, reused across requests.
+# (Initializing per request would reload PyTorch weights every time.)
+_ocr_reader = None
+
+def _get_ocr_reader():
+    global _ocr_reader
+    if _ocr_reader is None:
+        import easyocr
+        _ocr_reader = easyocr.Reader(["es", "en"], gpu=False)
+    return _ocr_reader
+
+
+def _easyocr_to_text(results: list) -> str:
+    """Convert EasyOCR results (bbox, text, conf) to a plain line-by-line string.
+
+    EasyOCR returns individual text regions with bounding boxes.  We sort them
+    by their vertical centre and group regions that share the same line (within
+    half a median text-height), then sort within each line by X.  This lets the
+    downstream parser see the same left-to-right, top-to-bottom layout that the
+    original receipt has.
+    """
+    if not results:
+        return ""
+
+    items = []  # (y_center, height, x_left, text)
+    for bbox, text, _conf in results:
+        # bbox = [[x1,y1],[x2,y1],[x2,y2],[x1,y2]]
+        y_center = (bbox[0][1] + bbox[2][1]) / 2
+        height   = abs(bbox[2][1] - bbox[0][1])
+        x_left   = min(bbox[0][0], bbox[3][0])
+        items.append((y_center, height, x_left, text))
+
+    items.sort(key=lambda x: x[0])   # sort by Y centre (top → bottom)
+
+    # Line-grouping threshold = 60 % of the median text-box height
+    heights = sorted(h for _, h, _, _ in items)
+    median_h = heights[len(heights) // 2]
+    threshold = max(8.0, median_h * 0.6)
+
+    lines: list[list] = [[items[0]]]
+    for item in items[1:]:
+        # items are sorted ascending by Y, so the difference is always >= 0
+        if item[0] - lines[-1][-1][0] <= threshold:
+            lines[-1].append(item)
+        else:
+            lines.append([item])
+
+    text_lines = []
+    for line in lines:
+        line.sort(key=lambda x: x[2])                  # sort by X (left -> right)
+        text_lines.append("  ".join(t for _, _, _, t in line))
+
+    return "\n".join(text_lines)
+
+
 async def _extract_text(file_path: str, mime_type: str) -> str:
     if mime_type == "application/pdf" or file_path.lower().endswith(".pdf"):
         try:
@@ -480,12 +535,10 @@ async def _extract_text(file_path: str, mime_type: str) -> str:
             return ""
     else:
         try:
-            import pytesseract
-            from PIL import Image
-            img = Image.open(file_path)
-            # PSM 6: uniform block → reads row-by-row, keeps product + price
-            # on the same line (PSM 3 splits multi-column receipts by column).
-            return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 6")
+            import asyncio
+            reader = _get_ocr_reader()
+            results = await asyncio.to_thread(reader.readtext, file_path)
+            return _easyocr_to_text(results)
         except Exception:
             return ""
 
