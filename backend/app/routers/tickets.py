@@ -243,7 +243,7 @@ def _extract_total(text: str) -> float | None:
     return None
 
 
-def _extract_date(text: str) -> str | None:
+def _extract_date(text: str):
     date_re = re.compile(
         r'(\d{1,2})[/\-.](\d{1,2})[/\-.](\d{2,4})'
     )
@@ -254,7 +254,7 @@ def _extract_date(text: str) -> str | None:
             y = "20" + y
         try:
             from datetime import date
-            return str(date(int(y), int(mo), int(d)))
+            return date(int(y), int(mo), int(d))
         except ValueError:
             pass
     return None
@@ -294,38 +294,32 @@ async def analyze_ticket(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(current_active_user),
 ):
-    import traceback
-    try:
-        content = await file.read()
-        ext = os.path.splitext(file.filename or "ticket")[1] or ".jpg"
-        filename = f"{uuid.uuid4().hex}{ext}"
-        dest = os.path.join(UPLOAD_DIR, filename)
-        with open(dest, "wb") as f:
-            f.write(content)
+    content = await file.read()
+    ext = os.path.splitext(file.filename or "ticket")[1] or ".jpg"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    dest = os.path.join(UPLOAD_DIR, filename)
+    with open(dest, "wb") as f:
+        f.write(content)
 
-        text = await _extract_text(dest, file.content_type or "")
-        items = _parse_ticket_lines(text)
-        categories = _compute_categories(items)
+    text = await _extract_text(dest, file.content_type or "")
+    items = _parse_ticket_lines(text)
+    categories = _compute_categories(items)
 
-        record = Ticket(
-            user_id=user.id,
-            original_name=file.filename or filename,
-            filename=filename,
-            mime_type=file.content_type or "application/octet-stream",
-            store_name=_extract_store_name(text),
-            ticket_date=_extract_date(text),
-            total=_extract_total(text),
-            items=json.dumps(items, ensure_ascii=False),
-            categories=json.dumps(categories, ensure_ascii=False),
-        )
-        db.add(record)
-        await db.commit()
-        await db.refresh(record)
-        return record
-    except Exception as exc:
-        tb = traceback.format_exc()
-        print(f"[tickets] analyze error:\n{tb}", flush=True)
-        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}")
+    record = Ticket(
+        user_id=user.id,
+        original_name=file.filename or filename,
+        filename=filename,
+        mime_type=file.content_type or "application/octet-stream",
+        store_name=_extract_store_name(text),
+        ticket_date=_extract_date(text),
+        total=_extract_total(text),
+        items=json.dumps(items, ensure_ascii=False),
+        categories=json.dumps(categories, ensure_ascii=False),
+    )
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
+    return record
 
 
 @router.get("", response_model=list[TicketRead])
