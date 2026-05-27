@@ -178,7 +178,7 @@ CATEGORIES: dict[str, list[str]] = {
 
 SKIP_WORDS = {
     "total", "subtotal", "iva", "ticket", "importe", "efectivo", "tarjeta",
-    "cambio", "euros", "fecha", "hora", "cajero", "tienda", "gracias",
+    "cambio", "euros", "fecha", "hora", "cajero", "caja", "centro", "tienda", "gracias",
     "unidades", "descuento", "ahorro", "puntos", "oferta", "precio",
     "operacion", "n.operacion", "cif", "nif", "direccion", "telefono",
     "web", "bienvenido", "bienvenida", "www", "factura", "albaran",
@@ -352,26 +352,44 @@ def _extract_store_name(text: str) -> str | None:
         "amazon", "zara", "primark", "ikea", "leroy merlin", "decathlon",
         "mediamarkt", "fnac", "el jamon", "mas y mas",
     ]
+    # OCR-noise-tolerant patterns: handles O→0, A→4, letter spacing, etc.
+    ocr_patterns = [
+        (r'merc[a4]d[o0]n[a4]', "Mercadona"),
+        (r'c[a4]rref[o0]ur', "Carrefour"),
+        (r'l[i1]dl', "Lidl"),
+        (r'[a4]ld[i1]', "Aldi"),
+    ]
     lines = text.splitlines()
-
-    # 1. Search the ENTIRE text for known chains
-    #    (PSM 6 may push the header further down due to barcode lines)
     full_low = text.lower()
+
+    # 1. OCR-noise-tolerant patterns (handles O→0, A→4 substitutions)
+    for pattern, name in ocr_patterns:
+        if re.search(pattern, full_low):
+            return name
+
+    # 2. Exact substring search across the entire text
+    #    (PSM 6 may push the header further down due to barcode lines)
     for store in known:
         if store in full_low:
             return store.strip().title()
 
-    # 2. Heuristic fallback: look for a short all-caps or title-case line in the
+    # 3. Heuristic fallback: look for a short all-caps or title-case line in the
     #    first 10 lines that looks like a store name.
     for line in lines[:10]:
         line = line.strip()
         if not line or len(line) < 4 or len(line) > 60:
+            continue
+        # Must start with an actual letter (not |, =, barcode garbage, etc.)
+        if not line[0].isalpha():
             continue
         # Skip lines that start with a digit (product quantity lines)
         if line[0].isdigit():
             continue
         # Skip lines with long digit runs (zip, phone, CIF, barcodes)
         if re.search(r'\d{4,}', line):
+            continue
+        # Skip lines with price patterns — these are product lines, not store names
+        if re.search(r'\d[,.]\d', line):
             continue
         # Skip lines that look like addresses or web references
         if re.search(r'(calle|avda|av\.|c\/|telf|tel\.|www|http|@|cif|nif)', line, re.IGNORECASE):
@@ -391,9 +409,12 @@ def _extract_store_name(text: str) -> str | None:
             line, re.IGNORECASE,
         ):
             continue
-        # Keep if all-caps or sentence-case
-        if line.isupper() or (line[0].isupper() and not line[1:].isupper()):
-            return line.title() if line.isupper() else line
+        # All-caps line → store name (e.g. "MERCADONA", "LIDL")
+        if line.isupper():
+            return line.title()
+        # Sentence-case line with no digits → could be a store name
+        if line[0].isupper() and not re.search(r'\d', line):
+            return line
 
     return None
 
