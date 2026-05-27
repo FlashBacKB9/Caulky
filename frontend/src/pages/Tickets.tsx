@@ -2,8 +2,16 @@ import { useRef, useState, useMemo, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts'
-import { Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check, Eye, EyeOff, Search } from 'lucide-react'
-import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, ticketFileUrl, type Ticket, type TicketItem } from '../api/tickets'
+import { Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check, Eye, EyeOff, Search, ArrowRightLeft } from 'lucide-react'
+import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, ticketFileUrl, createMovementFromTicket, type Ticket, type TicketItem } from '../api/tickets'
+import { getMovementTypes, type MovementType } from '../api/movementTypes'
+
+// ── Supplies category set (mirrors backend SUPPLIES_CATEGORIES) ───────────────
+const SUPPLIES_CATS = new Set([
+  'Cuidado del cabello', 'Cuidado facial y corporal',
+  'Fitoterapia y parafarmacia', 'Limpieza y hogar',
+  'Maquillaje', 'Mascotas',
+])
 
 // ── Category config: emoji + color ────────────────────────────────────────────
 
@@ -354,16 +362,20 @@ function TicketCard({
   ticket: initialTicket,
   onDelete,
   extraCategories,
+  movementTypes,
 }: {
   ticket: Ticket
   onDelete: () => void
   extraCategories: string[]
+  movementTypes: MovementType[]
 }) {
   const qc = useQueryClient()
   const [ticket, setTicket] = useState(initialTicket)
   const [open, setOpen] = useState(false)
   const [viewFile, setViewFile] = useState(false)
   const [editItems, setEditItems] = useState<TicketItem[] | null>(null)
+  const [showMovPanel, setShowMovPanel] = useState(false)
+  const [movSuccess, setMovSuccess] = useState<string | null>(null)
 
   useEffect(() => { setTicket(initialTicket) }, [initialTicket])
 
@@ -395,6 +407,35 @@ function TicketCard({
   const addItem = () =>
     setEditItems(prev => [...(prev ?? ticket.items.map(it => ({ ...it }))), { name: '', amount: 0, category: 'Sin categoría' }])
 
+  // ── Movement generation ──────────────────────────────────────────────────────
+  const suppliesTotal = ticket.items.filter(i => SUPPLIES_CATS.has(i.category)).reduce((s, i) => s + i.amount, 0)
+  const foodTotal     = ticket.items.filter(i => !SUPPLIES_CATS.has(i.category)).reduce((s, i) => s + i.amount, 0)
+  const combinedTotal = ticket.items.reduce((s, i) => s + i.amount, 0)
+
+  const foodTypeId     = parseInt(localStorage.getItem('ticket_food_type_id') || '') || null
+  const suppliesTypeId = parseInt(localStorage.getItem('ticket_supplies_type_id') || '') || null
+  const combinedTypeId = parseInt(localStorage.getItem('ticket_combined_type_id') || '') || null
+
+  const typeNameById = (id: number | null) =>
+    movementTypes.find(mt => mt.id === id)?.name ?? null
+
+  const movMut = useMutation({
+    mutationFn: ({ mode, typeId }: { mode: 'food' | 'supplies' | 'combined'; typeId: number }) =>
+      createMovementFromTicket(ticket.id, mode, typeId, ticket.ticket_date ?? undefined),
+    onSuccess: (res) => {
+      setMovSuccess(`Movimiento creado: ${res.name} — ${res.amount.toFixed(2)} €`)
+      setShowMovPanel(false)
+      setTimeout(() => setMovSuccess(null), 4000)
+      qc.invalidateQueries({ queryKey: ['movements'] })
+    },
+  })
+
+  const MOV_OPTIONS = [
+    { mode: 'food'     as const, label: '🥦 Comida / Supermercado', total: foodTotal,     typeId: foodTypeId     },
+    { mode: 'supplies' as const, label: '🧹 Suministros',           total: suppliesTotal, typeId: suppliesTypeId },
+    { mode: 'combined' as const, label: '🛒 Combinado',             total: combinedTotal, typeId: combinedTypeId },
+  ]
+
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden">
 
@@ -417,6 +458,13 @@ function TicketCard({
           {viewFile ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
         </button>
         <button
+          className={`p-1.5 transition-colors ${showMovPanel ? 'text-emerald-500' : 'text-gray-400 hover:text-emerald-500'}`}
+          onClick={() => setShowMovPanel(v => !v)}
+          title="Generar movimiento"
+        >
+          <ArrowRightLeft className="w-4 h-4" />
+        </button>
+        <button
           className="p-1.5 text-gray-400 hover:text-red-500 transition-colors"
           onClick={onDelete}
           title="Eliminar ticket"
@@ -430,6 +478,47 @@ function TicketCard({
           {open ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
       </div>
+
+      {/* ── Movement generation panel ── */}
+      {showMovPanel && (
+        <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-3 space-y-2 bg-emerald-50/50 dark:bg-emerald-950/20">
+          <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Generar movimiento</p>
+          {MOV_OPTIONS.map(({ mode, label, total, typeId }) => {
+            const typeName = typeNameById(typeId)
+            const disabled = !typeId || total <= 0 || movMut.isPending
+            return (
+              <div key={mode} className="flex items-center gap-3">
+                <div className="flex-1 min-w-0">
+                  <span className="text-xs text-gray-700 dark:text-gray-300">{label}</span>
+                  {typeName
+                    ? <span className="ml-1.5 text-xs text-gray-400 dark:text-gray-500">· {typeName}</span>
+                    : <span className="ml-1.5 text-xs text-amber-500">· Sin configurar</span>
+                  }
+                </div>
+                <span className="text-xs font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                  {total.toFixed(2)} €
+                </span>
+                <button
+                  disabled={disabled}
+                  onClick={() => typeId && movMut.mutate({ mode, typeId })}
+                  className="flex items-center gap-1 text-xs bg-emerald-500 hover:bg-emerald-600 disabled:opacity-40 disabled:cursor-not-allowed text-white px-2.5 py-1 rounded transition-colors"
+                >
+                  {movMut.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                  Crear
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+
+      {/* ── Success toast ── */}
+      {movSuccess && (
+        <div className="border-t border-emerald-100 dark:border-emerald-900 px-4 py-2 flex items-center gap-2 bg-emerald-50 dark:bg-emerald-950/30 text-xs text-emerald-700 dark:text-emerald-400">
+          <Check className="w-3.5 h-3.5 shrink-0" />
+          {movSuccess}
+        </div>
+      )}
 
       {open && (
         <div className="border-t border-gray-100 dark:border-gray-800">
@@ -662,6 +751,12 @@ export default function Tickets() {
     queryFn: getTickets,
   })
 
+  const { data: movementTypes = [] } = useQuery({
+    queryKey: ['movement-types'],
+    queryFn: getMovementTypes,
+    staleTime: 5 * 60 * 1000,
+  })
+
   const analyzeMut = useMutation({
     mutationFn: analyzeTicket,
     onSuccess: (ticket) => {
@@ -719,6 +814,7 @@ export default function Tickets() {
                 extraCategories={Object.keys(
                   tickets.reduce((acc, tk) => ({ ...acc, ...tk.categories }), {} as Record<string, number>)
                 )}
+                movementTypes={movementTypes}
               />
             ))}
           </div>

@@ -26,6 +26,7 @@ import {
   t, BUILT_IN_LANGS, getLanguage, setLanguage,
   loadCustomLanguages, saveCustomLanguages, parseLanguageFile, type CustomLanguage,
 } from '../utils/i18n'
+import { syncPref } from '../utils/prefSync'
 
 // ── Account Card ──────────────────────────────────────────────────────────────
 
@@ -1302,6 +1303,49 @@ function BackupSection() {
 
 // ── Plugins section ───────────────────────────────────────────────────────────
 
+// ── Tickets section ───────────────────────────────────────────────────────────
+
+const TICKET_TYPE_ROWS = [
+  { key: 'ticket_food_type_id',     label: '🥦 Supermercado / Comida' },
+  { key: 'ticket_supplies_type_id', label: '🧹 Suministros' },
+  { key: 'ticket_combined_type_id', label: '🛒 Combinado (todo el ticket)' },
+] as const
+
+function TicketsSection() {
+  const { data: types = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
+  const [vals, setVals] = useState<Record<string, string>>(() =>
+    Object.fromEntries(TICKET_TYPE_ROWS.map(r => [r.key, localStorage.getItem(r.key) ?? '']))
+  )
+
+  const handleChange = (key: string, val: string) => {
+    setVals(v => ({ ...v, [key]: val }))
+    syncPref(key, val)
+  }
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-gray-400 dark:text-gray-500 -mt-1">
+        Elige el tipo de movimiento que se usará al generar un movimiento desde un ticket.
+      </p>
+      {TICKET_TYPE_ROWS.map(({ key, label }) => (
+        <div key={key}>
+          <p className="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">{label}</p>
+          <select
+            className="w-full text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 outline-none focus:border-blue-400 text-gray-700 dark:text-gray-300"
+            value={vals[key]}
+            onChange={e => handleChange(key, e.target.value)}
+          >
+            <option value="">— Sin asignar —</option>
+            {types.map(mt => (
+              <option key={mt.id} value={String(mt.id)}>{mt.name}</option>
+            ))}
+          </select>
+        </div>
+      ))}
+    </div>
+  )
+}
+
 function PluginsSection() {
   const { plugins, addPlugin, removePlugin, togglePlugin, removeAll } = usePlugins()
   const fileRef = useRef<HTMLInputElement>(null)
@@ -2022,6 +2066,10 @@ export default function Settings() {
 
           <Section title={t('settings.backup')}>
             <BackupSection />
+          </Section>
+
+          <Section title="Tickets">
+            <TicketsSection />
           </Section>
 
           <Section title={t('settings.plugins')}>

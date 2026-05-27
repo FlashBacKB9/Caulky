@@ -34,4 +34,22 @@ export const updateTicketItems = (id: number, items: TicketItem[]): Promise<Tick
 export const deleteTicket = (id: number): Promise<void> =>
   api.delete(`/tickets/${id}`).then(() => undefined)
 
+export interface TicketToMovementResult {
+  movement_id: number
+  amount: number
+  name: string
+}
+
+export const createMovementFromTicket = (
+  ticketId: number,
+  mode: 'food' | 'supplies' | 'combined',
+  typeId: number,
+  movementDate?: string,
+): Promise<TicketToMovementResult> =>
+  api.post(`/tickets/${ticketId}/to-movement`, {
+    mode,
+    type_id: typeId,
+    movement_date: movementDate ?? null,
+  }).then(r => r.data)
+
 export const ticketFileUrl = (id: number) => `/api/tickets/${id}/file`

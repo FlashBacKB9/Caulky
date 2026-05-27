@@ -2,6 +2,8 @@ import os
 import re
 import json
 import uuid
+import shutil
+from datetime import date as _date
 from fastapi import APIRouter, Depends, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from pydantic import BaseModel as PydanticModel
@@ -10,9 +12,19 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.ticket import Ticket
 from app.models.item_category_rule import ItemCategoryRule
+from app.models.movement import Movement as MovementModel
+from app.models.movement_file import MovementFile
 from app.schemas.ticket import TicketRead
 from app.auth.setup import current_active_user
 from app.models.user import User
+
+# ── Category groups ────────────────────────────────────────────────────────────
+
+SUPPLIES_CATEGORIES = frozenset({
+    "Cuidado del cabello", "Cuidado facial y corporal",
+    "Fitoterapia y parafarmacia", "Limpieza y hogar",
+    "Maquillaje", "Mascotas",
+})
 
 UPLOAD_DIR = os.environ.get("CAULKY_UPLOADS_DIR") or os.path.join(
     os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads"
@@ -414,6 +426,76 @@ async def get_ticket_file(
     if not os.path.exists(path):
         raise HTTPException(status_code=404, detail="File not found")
     return FileResponse(path, media_type=t.mime_type, content_disposition_type="inline")
+
+
+class TicketToMovementRequest(PydanticModel):
+    mode: str           # "food" | "supplies" | "combined"
+    type_id: int
+    movement_date: str | None = None   # ISO date, defaults to ticket_date or today
+
+
+@router.post("/{ticket_id}/to-movement", status_code=201)
+async def ticket_to_movement(
+    ticket_id: int,
+    body: TicketToMovementRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    items = json.loads(t.items)
+
+    if body.mode == "food":
+        amount = sum(i["amount"] for i in items if i["category"] not in SUPPLIES_CATEGORIES)
+    elif body.mode == "supplies":
+        amount = sum(i["amount"] for i in items if i["category"] in SUPPLIES_CATEGORIES)
+    else:  # combined
+        amount = sum(i["amount"] for i in items)
+
+    amount = round(amount, 2)
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="No hay productos en este grupo")
+
+    # Resolve date
+    if body.movement_date:
+        try:
+            mv_date = _date.fromisoformat(body.movement_date)
+        except ValueError:
+            mv_date = t.ticket_date or _date.today()
+    else:
+        mv_date = t.ticket_date or _date.today()
+
+    name = t.store_name or os.path.splitext(t.original_name)[0]
+
+    mv = MovementModel(
+        user_id=user.id,
+        name=name,
+        money=amount,
+        date=mv_date,
+        movement_type_id=body.type_id,
+        paid=True,
+        no_count=False,
+    )
+    db.add(mv)
+    await db.flush()   # get mv.id
+
+    # Copy ticket file → movement file
+    src = os.path.join(UPLOAD_DIR, t.filename)
+    if os.path.exists(src):
+        ext = os.path.splitext(t.filename)[1]
+        new_fn = f"{uuid.uuid4().hex}{ext}"
+        shutil.copy2(src, os.path.join(UPLOAD_DIR, new_fn))
+        db.add(MovementFile(
+            movement_id=mv.id,
+            filename=new_fn,
+            original_name=t.original_name,
+            mime_type=t.mime_type,
+        ))
+
+    await db.commit()
+    return {"movement_id": mv.id, "amount": amount, "name": name}
 
 
 @router.delete("/{ticket_id}", status_code=204)
