@@ -237,12 +237,36 @@ def _extract_store_name(text: str) -> str | None:
         "mercadona", "lidl", "aldi", "dia", "carrefour", "eroski",
         "alcampo", "hipercor", "el corte ingles", "consum", "ahorramas",
         "supersol", "coviran", "spar", "plus fresc", "bon preu",
-        "condis", "sorli", "simply", "family cash",
+        "condis", "sorli", "simply", "family cash", "caprabo", "bonpreu",
+        "froiz", "gadis", "lupa", "masymas", "vidal", "suma",
     ]
-    first_lines = "\n".join(text.splitlines()[:8]).lower()
+    lines = text.splitlines()
+    first_lines_low = "\n".join(lines[:8]).lower()
+
+    # 1. Try known chains first
     for store in known:
-        if store in first_lines:
+        if store in first_lines_low:
             return store.title()
+
+    # 2. Heuristic fallback: look for a short all-caps or title-case line in the
+    #    first 6 lines that looks like a name (≥3 chars, mostly letters, no digits).
+    for line in lines[:6]:
+        line = line.strip()
+        if not line or len(line) < 3 or len(line) > 60:
+            continue
+        # Skip lines that look like addresses or numbers
+        if re.search(r'\d{4,}', line):  # long digit run (zip, phone, CIF)
+            continue
+        if re.search(r'(calle|avda|av\.|c\/|telf|tel\.|www|http|@)', line, re.IGNORECASE):
+            continue
+        alpha = sum(c.isalpha() or c.isspace() for c in line)
+        if alpha / len(line) < 0.6:
+            continue
+        # Keep if all-caps or sentence-case (first word capitalised)
+        if line.isupper() or (line[0].isupper() and not line[1:].isupper()):
+            # Normalise: title-case the all-caps variant
+            return line.title() if line.isupper() else line
+
     return None
 
 

@@ -240,8 +240,16 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
     mutationFn: analyzeTicket,
     onSuccess: t => { setTicket(t); setError(null); setDone(new Set()) },
     onError: (err: unknown) => {
-      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
-      setError(detail ? `Error: ${detail}` : 'No se pudo analizar el ticket.')
+      const e = err as { response?: { status?: number; data?: { detail?: unknown } }; message?: string }
+      const status  = e?.response?.status
+      const detail  = e?.response?.data?.detail
+      const detailStr = typeof detail === 'string' ? detail : detail ? JSON.stringify(detail) : null
+      setError(
+        detailStr  ? `Error ${status ?? ''}: ${detailStr}` :
+        status     ? `Error HTTP ${status} al analizar el ticket.` :
+        e?.message ? `Error de red: ${e.message}` :
+        'No se pudo analizar el ticket.',
+      )
     },
   })
 
