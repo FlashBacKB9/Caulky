@@ -256,18 +256,21 @@ def _parse_ticket_lines(text: str, custom_rules: dict[str, str] | None = None) -
             else:
                 pending_name = None
 
-        # ── 3-digit integer fallback ─────────────────────────────────────────────
-        # OCR sometimes drops the decimal: "1,50" → "150", "1,99" → "100".
-        # Treat a lone 3-digit integer as X.XX (divide by 100).
+        # ── 2-3 digit integer fallback ───────────────────────────────────────────
+        # OCR sometimes drops the decimal separator:
+        #   "1,50" → "150" (3 digits) → divide by 100 → 1.50
+        #   "1,5"  → "15"  (2 digits) → divide by  10 → 1.5
+        # Only applied when NO decimal price was found on this line.
         fallback_price: float | None = None
         if not price_spans:
-            m_int = re.search(r'(?<!\d)(\d{3})(?!\d)', line)
+            m_int = re.search(r'(?<!\d)(\d{2,3})(?!\d)', line)
             if m_int:
                 try:
-                    val = int(m_int.group(1)) / 100.0
+                    digs = m_int.group(1)
+                    val = int(digs) / (100.0 if len(digs) == 3 else 10.0)
                     if 0.10 <= val <= 50.0:
                         fallback_price = val
-                        price_spans = [(m_int.start(), m_int.end(), m_int.group(1))]
+                        price_spans = [(m_int.start(), m_int.end(), digs)]
                 except ValueError:
                     pass
 
