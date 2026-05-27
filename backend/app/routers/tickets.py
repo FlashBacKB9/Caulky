@@ -202,6 +202,7 @@ def _parse_ticket_lines(text: str, custom_rules: dict[str, str] | None = None) -
       - Single-price:  PRODUCT_NAME  1,99
       - Dual-price:    2 PRODUCT_NAME  1,19  2,38   (unit + total)
     Always takes the *last* price on the line as the total amount.
+    Also strips OCR garbage that may appear before the leading quantity digit.
     """
     rules = custom_rules or {}
     items: list[dict] = []
@@ -218,47 +219,56 @@ def _parse_ticket_lines(text: str, custom_rules: dict[str, str] | None = None) -
             continue
 
         # Use the last price as the total amount
-        last_start, last_end, last_price_str = price_spans[-1]
+        last_start, _last_end, last_price_str = price_spans[-1]
         raw_name = line[:last_start].strip()
 
         if not raw_name or len(raw_name) < 2:
             continue
 
-        # --- Filters on the raw name ---
-        low = raw_name.lower()
+        # --- Step 1: strip leading OCR garbage before "N PRODUCT" ---------------
+        # Tesseract sometimes reads margin artifacts as chars before the qty number.
+        # e.g. "Él 1 RIOJA CRIANZAT" → "1 RIOJA CRIANZAT"
+        m_qty = re.search(r'(\d+\s+[A-ZÁÉÍÓÚÜÑA-Z])', raw_name, re.UNICODE)
+        if m_qty:
+            clean_name = raw_name[m_qty.start():]
+        else:
+            clean_name = raw_name
 
-        # Skip known non-product headers/footers
-        if any(skip in low for skip in SKIP_WORDS):
-            continue
-
-        # Skip IVA/tax percentage lines (e.g. "4%  3,17" or "21%  7,69")
-        if re.match(r'^\d{1,3}\s*%', raw_name):
-            continue
-
-        # Skip column headers
-        if re.search(r'descripci[oó]n|precio|importe|unidad', low):
-            continue
-
-        # Strip leading "N x " or "Nx" quantity notation → remove from name
-        clean_name = re.sub(r'^\d+\s*[xX×]\s*', '', raw_name).strip()
-
-        # Strip trailing unit price if there were two price columns
-        # e.g. "2 SOJA NATURAL 1,19" → "2 SOJA NATURAL"
+        # --- Step 2: strip trailing unit price (dual-column: "2 PROD 1,19") -----
         if len(price_spans) >= 2:
-            # The second-to-last price may be embedded in the name string
             clean_name = re.sub(r'\s+\d{1,4}[,.]\d{2}\s*$', '', clean_name).strip()
 
-        # Strip leading quantity number (e.g. "2 SOJA NATURAL" → keep as-is, but
-        # "2 " alone after stripping means the name is just a number → skip)
-        clean_name = re.sub(r'^\d+\s+', lambda m: m.group() if len(raw_name) > len(m.group()) + 1 else '', clean_name).strip()
+        # --- Step 3: strip leading quantity number ("2 SOJA NATURAL" → "SOJA NAT") -
+        clean_name = re.sub(r'^\d+\s+', '', clean_name).strip()
 
         if not clean_name or len(clean_name) < 2:
             continue
 
-        # Skip lines that are only symbols/numbers after cleaning
-        if re.match(r'^[\d\s%.,+\-*/]+$', clean_name):
+        low = clean_name.lower()
+
+        # --- Filters on the cleaned name ----------------------------------------
+
+        # Skip known non-product words
+        if any(skip in low for skip in SKIP_WORDS):
             continue
 
+        # Skip IVA/tax percentage lines (e.g. "4%", "21%")
+        if re.match(r'^\d{1,3}\s*%', clean_name):
+            continue
+
+        # Skip column headers (Descripción, Precio, Importe, Unidad)
+        if re.search(r'descripci[oó]n|precio|importe|unidad', low):
+            continue
+
+        # Skip weight/variable-price lines ("0,154 Kg", "7,50 €/Kg")
+        if re.search(r'\bkg\b|€/kg|€/ud', low, re.IGNORECASE):
+            continue
+
+        # Skip pure symbol/number strings
+        if re.match(r'^[\d\s%.,+\-*/()€]+$', clean_name):
+            continue
+
+        # --- Parse amount --------------------------------------------------------
         try:
             price = float(last_price_str.replace(",", "."))
         except ValueError:
@@ -266,8 +276,7 @@ def _parse_ticket_lines(text: str, custom_rules: dict[str, str] | None = None) -
         if price <= 0:
             continue
 
-        low_clean = clean_name.lower()
-        category = rules.get(low_clean) or _categorize(clean_name)
+        category = rules.get(low) or _categorize(clean_name)
         items.append({
             "name": clean_name.title(),
             "amount": round(price, 2),
@@ -287,32 +296,39 @@ def _extract_store_name(text: str) -> str | None:
         "mediamarkt", "fnac", "el jamon", "mas y mas",
     ]
     lines = text.splitlines()
-    # Search the first 20 lines for known chains (OCR may shift the header down)
-    first_block_low = "\n".join(lines[:20]).lower()
 
-    # 1. Try known chains first
+    # 1. Search the ENTIRE text for known chains
+    #    (PSM 6 may push the header further down due to barcode lines)
+    full_low = text.lower()
     for store in known:
-        if store in first_block_low:
+        if store in full_low:
             return store.strip().title()
 
     # 2. Heuristic fallback: look for a short all-caps or title-case line in the
-    #    first 8 lines that looks like a store name (≥3 chars, mostly letters, no digits).
-    for line in lines[:8]:
+    #    first 10 lines that looks like a store name.
+    for line in lines[:10]:
         line = line.strip()
-        if not line or len(line) < 3 or len(line) > 60:
+        if not line or len(line) < 4 or len(line) > 60:
             continue
-        # Skip lines that start with a digit (likely a product or quantity line)
+        # Skip lines that start with a digit (product quantity lines)
         if line[0].isdigit():
             continue
-        # Skip lines that look like addresses, phones or CIFs
+        # Skip lines with long digit runs (zip, phone, CIF, barcodes)
         if re.search(r'\d{4,}', line):
             continue
+        # Skip lines that look like addresses or web references
         if re.search(r'(calle|avda|av\.|c\/|telf|tel\.|www|http|@|cif|nif)', line, re.IGNORECASE):
             continue
+        # Must be mostly letters (≥60 %)
         alpha = sum(c.isalpha() or c.isspace() for c in line)
         if alpha / len(line) < 0.6:
             continue
-        # Keep if all-caps or sentence-case (first word capitalised)
+        # Must contain at least one real word (≥4 alphabetic chars)
+        # This filters out barcode garbage like "See iii > 4" or "Ill Iv"
+        real_words = re.findall(r'[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{4,}', line)
+        if not real_words:
+            continue
+        # Keep if all-caps or sentence-case
         if line.isupper() or (line[0].isupper() and not line[1:].isupper()):
             return line.title() if line.isupper() else line
 
