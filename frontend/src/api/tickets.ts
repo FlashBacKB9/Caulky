@@ -70,6 +70,7 @@ export const attachTicketToMovement = (
 
 export interface TicketOcrDebug {
   text: string
+  header_text: string | null
   metadata_text: string | null
   lines: string[]
   preprocessed_image: string | null

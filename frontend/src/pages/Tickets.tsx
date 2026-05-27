@@ -744,7 +744,27 @@ function TicketCard({
                     </div>
                   )}
                   <div className="flex-1 min-w-0 p-2 space-y-3">
-                    <div>
+                    {ocrDebug.header_text != null && (
+                      <div>
+                        <p className="text-gray-400 mb-1 font-medium">
+                          Cabecera <span className="font-normal opacity-60">(recorte superior 22 %, PSM 6)</span>
+                        </p>
+                        <pre className="text-[10px] font-mono text-gray-700 dark:text-gray-300 overflow-auto max-h-32 leading-tight whitespace-pre-wrap break-all">
+                          {ocrDebug.header_text || '(sin texto)'}
+                        </pre>
+                      </div>
+                    )}
+                    {ocrDebug.metadata_text != null && (
+                      <div className="border-t border-gray-100 dark:border-gray-800 pt-2">
+                        <p className="text-gray-400 mb-1 font-medium">
+                          Imagen completa <span className="font-normal opacity-60">(PSM 3)</span>
+                        </p>
+                        <pre className="text-[10px] font-mono text-gray-700 dark:text-gray-300 overflow-auto max-h-32 leading-tight whitespace-pre-wrap break-all">
+                          {ocrDebug.metadata_text || '(sin texto)'}
+                        </pre>
+                      </div>
+                    )}
+                    <div className="border-t border-gray-100 dark:border-gray-800 pt-2">
                       <p className="text-gray-400 mb-1 font-medium">
                         Productos <span className="font-normal opacity-60">(PSM 11)</span>
                       </p>
@@ -752,16 +772,6 @@ function TicketCard({
                         {ocrDebug.text || '(sin texto)'}
                       </pre>
                     </div>
-                    {ocrDebug.metadata_text != null && (
-                      <div className="border-t border-gray-100 dark:border-gray-800 pt-2">
-                        <p className="text-gray-400 mb-1 font-medium">
-                          Cabecera / metadatos <span className="font-normal opacity-60">(PSM 3)</span>
-                        </p>
-                        <pre className="text-[10px] font-mono text-gray-700 dark:text-gray-300 overflow-auto max-h-44 leading-tight whitespace-pre-wrap break-all">
-                          {ocrDebug.metadata_text || '(sin texto)'}
-                        </pre>
-                      </div>
-                    )}
                   </div>
                 </div>
               ) : null}

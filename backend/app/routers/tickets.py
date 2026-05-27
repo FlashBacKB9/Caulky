@@ -549,6 +549,37 @@ async def _extract_text_psm3(file_path: str) -> str:
         return ""
 
 
+async def _extract_text_header(file_path: str) -> str:
+    """Crop the top ~22 % of the receipt image and run PSM 6 (uniform text block).
+
+    The store name / logo is printed in large bold text at the very top of most
+    receipts.  PSM 11 (sparse text, used for products) tends to skip large
+    single-font blocks, and PSM 3 (auto) often skips or mis-segments the same
+    region when the barcode and product table dominate the page.
+
+    Isolating just the header strip removes both distractors and lets PSM 6 read
+    the uniform block of store-name + address + CIF cleanly.
+
+    The crop is at least 80 px tall regardless of image height so that very
+    short or heavily-cropped photos still give Tesseract enough pixels to work.
+    """
+    try:
+        import pytesseract
+        from PIL import Image
+        img = Image.open(file_path)
+        img = _preprocess_image(img)
+        w, h = img.size
+        strip_h = max(80, int(h * 0.22))
+        header_strip = img.crop((0, 0, w, strip_h))
+        return pytesseract.image_to_string(
+            header_strip,
+            lang="spa+eng",
+            config="--psm 6 --oem 1",
+        )
+    except Exception:
+        return ""
+
+
 async def _extract_text(file_path: str, mime_type: str) -> str:
     if mime_type == "application/pdf" or file_path.lower().endswith(".pdf"):
         try:
@@ -671,21 +702,41 @@ async def analyze_ticket(
         or dest.lower().endswith(".pdf")
     )
     if is_image:
-        meta_text = await _extract_text_psm3(dest)
+        # Three-pass metadata strategy for images:
+        #   header_text  — top-22 % crop + PSM 6: best for store name / date
+        #                  (large bold logo text that PSM 11/3 tend to skip)
+        #   meta_text    — full image + PSM 3: best for TOTAL keyword + TARJETA
+        #   text         — full image + PSM 11: products + TARJETA fallback
+        header_text = await _extract_text_header(dest)
+        meta_text   = await _extract_text_psm3(dest)
         if not meta_text.strip():
             meta_text = text   # PSM 3 failed completely → fall back to PSM 11
     else:
-        meta_text = text
+        header_text = ""
+        meta_text   = text
 
     record = Ticket(
         user_id=user.id,
         original_name=file.filename or filename,
         filename=filename,
         mime_type=file.content_type or "application/octet-stream",
-        store_name=(_extract_store_name(meta_text)
-                    or _extract_store_name(text)
-                    or "Supermercado"),
-        ticket_date=_extract_date(meta_text) or _extract_date(text),
+        # Store name: header crop first (most likely to find logo text),
+        # then PSM 3, then PSM 11, then hard fallback.
+        store_name=(
+            _extract_store_name(header_text)
+            or _extract_store_name(meta_text)
+            or _extract_store_name(text)
+            or "Supermercado"
+        ),
+        # Date: header crop first (date is usually printed near the logo),
+        # then PSM 3, then PSM 11.
+        ticket_date=(
+            _extract_date(header_text)
+            or _extract_date(meta_text)
+            or _extract_date(text)
+        ),
+        # Total: PSM 3 full image first (TOTAL keyword), then PSM 11
+        # (TARJETA … 32,68 on one reconstructed line).
         total=_extract_total(meta_text) or _extract_total(text),
         items=json.dumps(items, ensure_ascii=False),
         categories=json.dumps(categories, ensure_ascii=False),
@@ -926,6 +977,9 @@ async def get_ticket_ocr_text(
     preprocessed_image: str | None = None
     metadata_text: str | None = None
     is_pdf = t.mime_type == "application/pdf" or path.lower().endswith(".pdf")
+    header_text: str | None = None
+    metadata_text: str | None = None
+    preprocessed_image: str | None = None
     if not is_pdf:
         try:
             import base64, io
@@ -936,10 +990,12 @@ async def get_ticket_ocr_text(
             preprocessed_image = base64.b64encode(buf.getvalue()).decode()
         except Exception:
             pass
+        header_text   = await _extract_text_header(path)
         metadata_text = await _extract_text_psm3(path)
 
     return {
         "text": text,
+        "header_text": header_text,
         "metadata_text": metadata_text,
         "lines": text.splitlines(),
         "preprocessed_image": preprocessed_image,
