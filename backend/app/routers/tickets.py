@@ -328,6 +328,12 @@ def _extract_store_name(text: str) -> str | None:
         real_words = re.findall(r'[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{4,}', line)
         if not real_words:
             continue
+        # Skip lines that contain receipt column-header words
+        if re.search(
+            r'\b(precio|importe|descripci|unidad|total|tarjeta|bancaria|detalle)\b',
+            line, re.IGNORECASE,
+        ):
+            continue
         # Keep if all-caps or sentence-case
         if line.isupper() or (line[0].isupper() and not line[1:].isupper()):
             return line.title() if line.isupper() else line
