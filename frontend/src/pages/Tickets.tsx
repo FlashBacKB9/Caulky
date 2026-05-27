@@ -6,7 +6,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import { Leaf, Package, ShoppingCart, Tag } from 'lucide-react'
 import {
   Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
-  Eye, EyeOff, Search, ArrowRightLeft, ExternalLink,
+  Eye, EyeOff, Search, ArrowRightLeft, ExternalLink, AlertTriangle,
 } from 'lucide-react'
 import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicketMeta, ticketFileUrl, attachTicketToMovement, type Ticket, type TicketItem } from '../api/tickets'
 import { compressTicketImage } from '../utils/imageCompressor'
@@ -680,6 +680,26 @@ function TicketCard({
               No se detectaron productos en este ticket.
             </p>
           )}
+
+          {/* ── Coverage check ── */}
+          {ticket.total != null && !isDirty && (() => {
+            const diff = Math.round((ticket.total - combinedTotal) * 100) / 100
+            if (Math.abs(diff) < 0.02) return (
+              <div className="mx-4 mb-2 mt-1 flex items-center gap-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+                <Check className="w-3.5 h-3.5 shrink-0" />
+                <span>La suma de productos cuadra con el total del ticket</span>
+              </div>
+            )
+            return (
+              <div className="mx-4 mb-2 mt-1 flex items-center gap-2 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 rounded-lg px-2.5 py-1.5">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                <span>
+                  Detectados <strong>{combinedTotal.toFixed(2)} €</strong> de <strong>{ticket.total.toFixed(2)} €</strong>
+                  {diff > 0 && <> · Faltan <strong>{diff.toFixed(2)} €</strong> — añádelos con "Editar productos"</>}
+                </span>
+              </div>
+            )
+          })()}
 
           {/* ── Actions bar ── */}
           <div className="px-4 py-2 flex items-center gap-2 border-t border-gray-50 dark:border-gray-800/60">
