@@ -51,7 +51,29 @@ const COLORS = [
   '#f472b6','#2dd4bf',
 ]
 
+// ── Custom category persistence ───────────────────────────────────────────────
+
+let _customCats: Record<string, { emoji: string; color: string }> = (() => {
+  try { return JSON.parse(localStorage.getItem('caulky_cat_cfg') ?? '{}') } catch { return {} }
+})()
+
+const registerCustomCat = (name: string, cfg: { emoji: string; color: string }) => {
+  _customCats[name] = cfg
+  try { localStorage.setItem('caulky_cat_cfg', JSON.stringify(_customCats)) } catch {}
+}
+
 // ── Category picker ───────────────────────────────────────────────────────────
+
+const PRESET_COLORS = [
+  '#ef4444','#f97316','#eab308','#22c55e',
+  '#3b82f6','#8b5cf6','#ec4899','#6b7280',
+  '#0891b2','#b91c1c','#92400e','#166534',
+]
+const PRESET_EMOJIS = [
+  '🍎','🥬','🥩','🐟','🧀','🍕','🥐','🍫',
+  '🧃','🍷','🧹','💊','🐾','💆','💄','🛍️',
+  '🎁','🏠','🎵','⚽','✈️','🎓','🛒','🏷️',
+]
 
 function CategoryPicker({
   value,
@@ -64,39 +86,74 @@ function CategoryPicker({
 }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
+  const [showFade, setShowFade] = useState(false)
+  const [adding, setAdding] = useState(false)
+  const [newEmoji, setNewEmoji] = useState('🏷️')
+  const [newColor, setNewColor] = useState('#6b7280')
   const triggerRef = useRef<HTMLButtonElement>(null)
   const searchRef = useRef<HTMLInputElement>(null)
-  const [dropRect, setDropRect] = useState<DOMRect | null>(null)
+  const listRef = useRef<HTMLDivElement>(null)
 
   const filtered = useMemo(
     () => allCategories.filter(c => c.toLowerCase().includes(search.toLowerCase())),
     [allCategories, search]
   )
 
-  const handleOpen = () => {
-    if (triggerRef.current) setDropRect(triggerRef.current.getBoundingClientRect())
-    setOpen(true)
-    setSearch('')
-    setTimeout(() => searchRef.current?.focus(), 40)
+  // ── Position: computed fresh from DOM at render time (no stale state) ────────
+  const getDropStyle = (): React.CSSProperties => {
+    const el = triggerRef.current
+    if (!el) return { display: 'none' }
+    const r = el.getBoundingClientRect()
+    const w = Math.max(r.width, 260)
+    const spaceBelow = window.innerHeight - r.bottom - 8
+    const spaceAbove = r.top - 8
+    const openBelow = spaceBelow >= 180 || spaceBelow >= spaceAbove
+    const top = openBelow ? r.bottom + 6 : r.top - Math.min(320, spaceAbove) - 6
+    const left = Math.min(r.left, window.innerWidth - w - 8)
+    return { position: 'fixed', top, left, width: w, maxHeight: 320, zIndex: 999 }
   }
 
+  // ── Scroll fade ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!open) return
+    requestAnimationFrame(() => {
+      const el = listRef.current
+      if (el) setShowFade(el.scrollHeight > el.clientHeight + 4)
+    })
+  }, [open, filtered.length, adding])
+
+  const handleListScroll = () => {
+    const el = listRef.current
+    if (el) setShowFade(el.scrollTop + el.clientHeight < el.scrollHeight - 4)
+  }
+
+  // ── Handlers ─────────────────────────────────────────────────────────────────
+  const handleOpen = () => {
+    setOpen(true); setSearch(''); setAdding(false)
+    setTimeout(() => searchRef.current?.focus(), 40)
+  }
   const handleSelect = (cat: string) => { onChange(cat); setOpen(false) }
+  const handleCreate = () => {
+    const name = search.trim()
+    if (!name) return
+    registerCustomCat(name, { emoji: newEmoji, color: newColor })
+    onChange(name)
+    setOpen(false); setAdding(false); setSearch('')
+  }
 
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent) => {
-      if (!triggerRef.current?.contains(e.target as Node)) setOpen(false)
+      if (!triggerRef.current?.contains(e.target as Node)) {
+        setOpen(false); setAdding(false)
+      }
     }
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
   }, [open])
 
   const cfg = catCfg(value)
-  const dropTop = dropRect
-    ? dropRect.bottom + 6 + 300 > window.innerHeight
-      ? dropRect.top - 310
-      : dropRect.bottom + 6
-    : 0
+  const noResults = filtered.length === 0 && search.trim() !== ''
 
   return (
     <>
@@ -112,14 +169,15 @@ function CategoryPicker({
         <ChevronDown className="w-3 h-3 shrink-0 opacity-60" />
       </button>
 
-      {open && dropRect && createPortal(
+      {open && createPortal(
         <>
-          <div className="fixed inset-0 z-[998]" onMouseDown={() => setOpen(false)} />
+          <div className="fixed inset-0 z-[998]" onMouseDown={() => { setOpen(false); setAdding(false) }} />
           <div
-            className="fixed z-[999] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden flex flex-col"
-            style={{ top: dropTop, left: dropRect.left, minWidth: Math.max(dropRect.width, 260), maxHeight: 300 }}
+            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl flex flex-col overflow-hidden"
+            style={getDropStyle()}
             onMouseDown={e => e.stopPropagation()}
           >
+            {/* Search bar */}
             <div className="p-2 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1.5 shrink-0">
               <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
               <input
@@ -127,35 +185,124 @@ function CategoryPicker({
                 className="flex-1 text-xs bg-transparent outline-none text-gray-700 dark:text-gray-300 placeholder-gray-400"
                 placeholder="Buscar categoría…"
                 value={search}
-                onChange={e => setSearch(e.target.value)}
+                onChange={e => { setSearch(e.target.value); setAdding(false) }}
               />
             </div>
-            <div className="overflow-y-auto">
-              {filtered.map(cat => {
-                const cc = catCfg(cat)
-                const selected = cat === value
-                return (
-                  <button
-                    key={cat}
-                    type="button"
-                    onMouseDown={() => handleSelect(cat)}
-                    className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/70 ${selected ? 'bg-gray-50 dark:bg-gray-800/70' : ''}`}
-                  >
-                    <span
-                      className="w-7 h-7 rounded-full flex items-center justify-center text-base shrink-0"
-                      style={{ background: cc.color + '22' }}
+
+            {/* List with hidden scrollbar + fade */}
+            {!adding && (
+              <div className="relative flex-1 min-h-0">
+                <div
+                  ref={listRef}
+                  onScroll={handleListScroll}
+                  className="overflow-y-auto h-full [&::-webkit-scrollbar]:hidden"
+                  style={{ scrollbarWidth: 'none' } as React.CSSProperties}
+                >
+                  {filtered.map(cat => {
+                    const cc = catCfg(cat)
+                    const selected = cat === value
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onMouseDown={() => handleSelect(cat)}
+                        className={`w-full flex items-center gap-2.5 px-3 py-2 text-xs text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/70 ${selected ? 'bg-gray-50 dark:bg-gray-800/70' : ''}`}
+                      >
+                        <span className="w-7 h-7 rounded-full flex items-center justify-center text-base shrink-0" style={{ background: cc.color + '22' }}>
+                          {cc.emoji}
+                        </span>
+                        <span className="flex-1 text-gray-700 dark:text-gray-300">{cat}</span>
+                        {selected && <Check className="w-3 h-3 shrink-0" style={{ color: cc.color }} />}
+                      </button>
+                    )
+                  })}
+
+                  {/* No results → add new */}
+                  {noResults && (
+                    <button
+                      type="button"
+                      onMouseDown={() => { setAdding(true); setNewEmoji('🏷️'); setNewColor('#6b7280') }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-xs text-left transition-colors hover:bg-gray-50 dark:hover:bg-gray-800/70"
                     >
-                      {cc.emoji}
-                    </span>
-                    <span className="flex-1 text-gray-700 dark:text-gray-300">{cat}</span>
-                    {selected && <Check className="w-3 h-3 shrink-0" style={{ color: cc.color }} />}
-                  </button>
-                )
-              })}
-              {filtered.length === 0 && (
-                <p className="px-3 py-4 text-xs text-gray-400 text-center">Sin resultados</p>
-              )}
-            </div>
+                      <span className="w-7 h-7 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center shrink-0">
+                        <Plus className="w-3.5 h-3.5 text-gray-400" />
+                      </span>
+                      <span className="text-gray-500 dark:text-gray-400">
+                        Añadir <span className="font-medium text-gray-700 dark:text-gray-200">"{search.trim()}"</span>
+                      </span>
+                    </button>
+                  )}
+                </div>
+                {/* Bottom fade */}
+                {showFade && (
+                  <div className="absolute bottom-0 inset-x-0 h-10 pointer-events-none bg-gradient-to-t from-white dark:from-gray-900 to-transparent" />
+                )}
+              </div>
+            )}
+
+            {/* New category form */}
+            {adding && (
+              <div className="p-3 space-y-3">
+                <p className="text-xs font-medium text-gray-700 dark:text-gray-300">
+                  Nueva categoría: <span className="font-semibold">{search.trim()}</span>
+                </p>
+                {/* Emoji picker */}
+                <div>
+                  <p className="text-[11px] text-gray-400 mb-1.5">Icono</p>
+                  <div className="grid grid-cols-8 gap-1">
+                    {PRESET_EMOJIS.map(em => (
+                      <button
+                        key={em}
+                        type="button"
+                        onMouseDown={() => setNewEmoji(em)}
+                        className={`w-7 h-7 rounded-lg text-base flex items-center justify-center transition-colors ${newEmoji === em ? 'bg-blue-100 dark:bg-blue-900/40 ring-1 ring-blue-400' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                      >
+                        {em}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    className="mt-1.5 w-full text-xs bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-2 py-1 outline-none focus:border-blue-400"
+                    placeholder="O escribe un emoji…"
+                    value={newEmoji}
+                    maxLength={4}
+                    onChange={e => setNewEmoji(e.target.value || '🏷️')}
+                  />
+                </div>
+                {/* Color picker */}
+                <div>
+                  <p className="text-[11px] text-gray-400 mb-1.5">Color</p>
+                  <div className="flex flex-wrap gap-1.5">
+                    {PRESET_COLORS.map(col => (
+                      <button
+                        key={col}
+                        type="button"
+                        onMouseDown={() => setNewColor(col)}
+                        className="w-6 h-6 rounded-full transition-transform hover:scale-110"
+                        style={{ background: col, outline: newColor === col ? `2px solid ${col}` : 'none', outlineOffset: 2 }}
+                      />
+                    ))}
+                  </div>
+                </div>
+                {/* Preview + confirm */}
+                <div className="flex items-center justify-between pt-1">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+                    style={{ background: newColor + '22', color: newColor, border: `1px solid ${newColor}55` }}>
+                    {newEmoji} {search.trim()}
+                  </span>
+                  <div className="flex gap-1.5">
+                    <button type="button" onMouseDown={() => setAdding(false)}
+                      className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 px-2 py-1">
+                      Atrás
+                    </button>
+                    <button type="button" onMouseDown={handleCreate}
+                      className="text-xs bg-blue-500 hover:bg-blue-600 text-white px-2.5 py-1 rounded transition-colors">
+                      Crear
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </>,
         document.body
