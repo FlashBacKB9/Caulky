@@ -28,25 +28,18 @@ const EXPENSE_CATEGORIES = new Set([
   'Vida Diaria', 'Coche', 'Moto',
 ])
 
-const CURRENT_YEAR = new Date().getFullYear()
-const YEAR_OPTIONS = [CURRENT_YEAR, CURRENT_YEAR - 1, CURRENT_YEAR - 2, CURRENT_YEAR - 3]
-const MONTHS_SHORT = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-const COLORS_KEY = 'caulky-expense-type-colors'
+const CURRENT_YEAR  = new Date().getFullYear()
+const YEAR_OPTIONS  = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i)
+const MONTHS_SHORT  = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
+const COLORS_KEY    = 'caulky-expense-type-colors'
+const FILTER_KEY    = 'caulky-expense-type-filter'
 const TOOLTIP_STYLE = { fontSize: 12, borderRadius: 8, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.12)' }
 
-const VIEW_MODES = [
-  { id: 'stacked-bar'  as const, label: 'B. Apilado' },
-  { id: 'bar'          as const, label: 'Barras'      },
-  { id: 'stacked-line' as const, label: 'Área'        },
-  { id: 'line'         as const, label: 'Líneas'      },
-  { id: 'table'        as const, label: 'Tabla'       },
-]
-
-type ViewMode  = 'stacked-bar' | 'bar' | 'stacked-line' | 'line' | 'table'
+type ChartKind = 'bar' | 'area' | 'line'
 type SortField = 'date' | 'name' | 'amount' | 'type'
 type SortDir   = 'asc' | 'desc'
 
-// ── Color helpers ─────────────────────────────────────────────────────────────
+// ── Storage helpers ───────────────────────────────────────────────────────────
 
 function loadColors(): Record<number, string> {
   try { return JSON.parse(localStorage.getItem(COLORS_KEY) ?? '{}') } catch { return {} }
@@ -54,14 +47,24 @@ function loadColors(): Record<number, string> {
 function saveColors(c: Record<number, string>) { localStorage.setItem(COLORS_KEY, JSON.stringify(c)) }
 function typeColor(t: MovementType, custom: Record<number, string>): string { return custom[t.id] ?? t.color }
 
+function loadTypeFilter(): number[] | null {
+  try {
+    const s = localStorage.getItem(FILTER_KEY)
+    if (!s) return null
+    const a = JSON.parse(s)
+    return Array.isArray(a) ? (a as number[]) : null
+  } catch { return null }
+}
+function saveTypeFilter(ids: Set<number>) { localStorage.setItem(FILTER_KEY, JSON.stringify([...ids])) }
+
 // ── SummaryCard ───────────────────────────────────────────────────────────────
 
 function SummaryCard({ type, cur, prev, customColors }: {
   type: MovementType; cur: number; prev: number; customColors: Record<number, string>
 }) {
-  const delta  = cur - prev
+  const delta   = cur - prev
   const hasPrev = prev > 0.01
-  const color  = typeColor(type, customColors)
+  const color   = typeColor(type, customColors)
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
       <div className="flex items-center gap-2 mb-2">
@@ -71,8 +74,7 @@ function SummaryCard({ type, cur, prev, customColors }: {
       <p className="text-lg font-bold text-gray-900 dark:text-white">{cur.toFixed(2)} €</p>
       {hasPrev ? (
         <div className={`flex items-center gap-1 mt-1 text-[11px] font-medium ${
-          delta >  0.01 ? 'text-red-500' :
-          delta < -0.01 ? 'text-emerald-500' : 'text-gray-400'
+          delta >  0.01 ? 'text-red-500' : delta < -0.01 ? 'text-emerald-500' : 'text-gray-400'
         }`}>
           {delta >  0.01 ? <TrendingUp  className="w-3 h-3" /> :
            delta < -0.01 ? <TrendingDown className="w-3 h-3" /> :
@@ -122,7 +124,7 @@ function MovementRow({ movement, type, onRefresh }: {
     finally { setUploading(false); e.target.value = '' }
   }
 
-  const dateStr = movement.date
+  const dateStr  = movement.date
     ? new Date(movement.date + 'T00:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: '2-digit' })
     : '—'
   const hasFiles = movement.files.length > 0
@@ -532,14 +534,17 @@ function MovementsPanel({ movements, allTypes, groups, typeMap, typeToGroupMap, 
 
 export default function ExpenseControl() {
   const qc = useQueryClient()
-  const [year, setYear]               = useState(CURRENT_YEAR)
-  const [compareYears, setCompareYears] = useState<number[]>([])
-  const [selectedTypeIds, setSelectedTypeIds] = useState<Set<number>>(new Set())
-  const [initialized, setInitialized] = useState(false)
-  const [viewMode, setViewMode]       = useState<ViewMode>('stacked-bar')
-  const [customColors, setCustomColors] = useState<Record<number, string>>(loadColors)
 
-  // ── Queries ──────────────────────────────────────────────────────────────────
+  // ── State ─────────────────────────────────────────────────────────────────────
+  const [selectedTypeIds, setSelectedTypeIds] = useState<Set<number>>(new Set())
+  const [initialized, setInitialized]         = useState(false)
+  const [chartKind, setChartKind]             = useState<ChartKind>('bar')
+  const [stacked, setStacked]                 = useState(true)
+  const [showTable, setShowTable]             = useState(false)
+  const [activeYears, setActiveYears]         = useState<number[]>([CURRENT_YEAR])
+  const [customColors, setCustomColors]       = useState<Record<number, string>>(loadColors)
+
+  // ── Queries ───────────────────────────────────────────────────────────────────
   const { data: allTypes = [] } = useQuery({
     queryKey: ['movement-types'],
     queryFn: getMovementTypes,
@@ -552,10 +557,7 @@ export default function ExpenseControl() {
     staleTime: 5 * 60 * 1000,
   })
 
-  const allYears = useMemo(
-    () => [year, ...compareYears].sort((a, b) => a - b),
-    [year, compareYears]
-  )
+  const allYears = useMemo(() => [...activeYears].sort((a, b) => a - b), [activeYears])
 
   const yearQueries = useQueries({
     queries: allYears.map(y => ({
@@ -566,20 +568,26 @@ export default function ExpenseControl() {
   })
 
   const movementsByYear = useMemo(() => {
-    const result: Record<number, Movement[]> = {}
-    allYears.forEach((y, i) => { result[y] = yearQueries[i]?.data ?? [] })
-    return result
+    const r: Record<number, Movement[]> = {}
+    allYears.forEach((y, i) => { r[y] = yearQueries[i]?.data ?? [] })
+    return r
   }, [allYears, yearQueries])
 
-  const isLoading = yearQueries.some(q => q.isLoading)
+  const isLoading   = yearQueries.some(q => q.isLoading)
+  const primaryYear = Math.max(...allYears)
 
-  // ── Init selection ────────────────────────────────────────────────────────────
+  // ── Init type filter (with persistence) ───────────────────────────────────────
   useEffect(() => {
     if (initialized || allTypes.length === 0) return
     setInitialized(true)
-    setSelectedTypeIds(new Set(
-      allTypes.filter(t => EXPENSE_CATEGORIES.has(t.category)).map(t => t.id)
-    ))
+    const saved = loadTypeFilter()
+    if (saved !== null) {
+      setSelectedTypeIds(new Set(saved.filter(id => allTypes.some(t => t.id === id))))
+    } else {
+      setSelectedTypeIds(new Set(
+        allTypes.filter(t => EXPENSE_CATEGORIES.has(t.category)).map(t => t.id)
+      ))
+    }
   }, [allTypes, initialized])
 
   // ── Derived ───────────────────────────────────────────────────────────────────
@@ -608,19 +616,14 @@ export default function ExpenseControl() {
     [allTypes, selectedTypeIds]
   )
 
-  // chartRows: 12 month rows; annualByType: typeId → year → total
   const { chartRows, annualByType } = useMemo(() => {
     const chartRows = MONTHS_SHORT.map(label => {
       const row: Record<string, string | number> = { month: label }
       for (const y of allYears) for (const t of chartTypes) row[`${t.id}_${y}`] = 0
       return row
     })
-
     const annualByType: Record<number, Record<number, number>> = {}
-    for (const t of chartTypes) {
-      annualByType[t.id] = {}
-      for (const y of allYears) annualByType[t.id][y] = 0
-    }
+    for (const t of chartTypes) { annualByType[t.id] = {}; for (const y of allYears) annualByType[t.id][y] = 0 }
 
     for (const y of allYears) {
       for (const mv of movementsByYear[y] ?? []) {
@@ -635,21 +638,23 @@ export default function ExpenseControl() {
     return { chartRows, annualByType }
   }, [movementsByYear, allYears, chartTypes, selectedTypeIds])
 
-  // Chart series: allYears × chartTypes
-  const chartSeries = useMemo(() =>
-    allYears.flatMap(y => chartTypes.map(t => ({ key: `${t.id}_${y}`, color: typeColor(t, customColors), y, t }))),
-    [allYears, chartTypes, customColors]
-  )
+  // Chart series: sorted newest→oldest for correct opacity (newest = most opaque)
+  const chartSeries = useMemo(() => {
+    const newestFirst = [...allYears].sort((a, b) => b - a)
+    return allYears.flatMap(y => {
+      const yi = newestFirst.indexOf(y)  // 0 = newest
+      return chartTypes.map(t => ({ key: `${t.id}_${y}`, color: typeColor(t, customColors), yi, y, t }))
+    })
+  }, [allYears, chartTypes, customColors])
 
-  // Summary: current vs previous month (always from base year's data)
+  // Summary for the primary (most recent active) year
   const summaryData = useMemo(() => {
     const now    = new Date()
     const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
     const prev   = new Date(now.getFullYear(), now.getMonth() - 1, 1)
     const prvKey = `${prev.getFullYear()}-${String(prev.getMonth() + 1).padStart(2, '0')}`
-
     const byType: Record<number, { cur: number; prev: number }> = {}
-    for (const mv of movementsByYear[year] ?? []) {
+    for (const mv of movementsByYear[primaryYear] ?? []) {
       if (!mv.movement_type_id || !selectedTypeIds.has(mv.movement_type_id)) continue
       const k = mv.date.slice(0, 7)
       if (k !== curKey && k !== prvKey) continue
@@ -662,19 +667,20 @@ export default function ExpenseControl() {
       .map(([id, { cur, prev }]) => ({ type: typeMap[Number(id)], cur: Math.round(cur * 100) / 100, prev: Math.round(prev * 100) / 100 }))
       .filter(d => d.type)
       .sort((a, b) => b.cur - a.cur)
-  }, [movementsByYear, year, selectedTypeIds, typeMap])
+  }, [movementsByYear, primaryYear, selectedTypeIds, typeMap])
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
   const toggleType = (id: number) => {
-    setSelectedTypeIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+    setSelectedTypeIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); saveTypeFilter(n); return n })
   }
 
   const toggleCategory = (cat: string) => {
-    const ids = (typesByCategory[cat] ?? []).map(t => t.id)
+    const ids    = (typesByCategory[cat] ?? []).map(t => t.id)
     const allSel = ids.every(id => selectedTypeIds.has(id))
     setSelectedTypeIds(prev => {
       const n = new Set(prev)
       ids.forEach(id => allSel ? n.delete(id) : n.add(id))
+      saveTypeFilter(n)
       return n
     })
   }
@@ -683,45 +689,44 @@ export default function ExpenseControl() {
     setCustomColors(prev => { const n = { ...prev, [id]: color }; saveColors(n); return n })
   }
 
-  const toggleCompareYear = (y: number, checked: boolean) => {
-    setCompareYears(prev => checked ? [...prev, y] : prev.filter(cy => cy !== y))
+  const toggleYear = (y: number) => {
+    setActiveYears(prev => {
+      if (prev.includes(y)) {
+        if (prev.length === 1) return prev
+        return prev.filter(ay => ay !== y)
+      }
+      return [...prev, y].sort((a, b) => a - b)
+    })
   }
 
-  const onRefresh = () => qc.invalidateQueries({ queryKey: ['movements-expense', year] })
+  const onRefresh = () => allYears.forEach(y => qc.invalidateQueries({ queryKey: ['movements-expense', y] }))
 
-  // Tooltip formatter: parse "typeId_year" key
+  // Tooltip: parse "typeId_year" dataKey
   const fmtTooltip = (v: unknown, name: string | number | undefined): [string, string] => {
-    const s    = String(name ?? '')
-    const idx  = s.indexOf('_')
-    const tid  = Number(idx >= 0 ? s.slice(0, idx) : s)
-    const yr   = idx >= 0 ? s.slice(idx + 1) : ''
+    const s   = String(name ?? '')
+    const idx = s.indexOf('_')
+    const tid = Number(idx >= 0 ? s.slice(0, idx) : s)
+    const yr  = idx >= 0 ? s.slice(idx + 1) : ''
     const tName = typeMap[tid]?.name ?? s
     return [`${Number(v).toFixed(2)} €`, allYears.length > 1 && yr ? `${tName} (${yr})` : tName]
   }
 
   const axisProps = {
     tick: { fontSize: 11, fill: '#9ca3af' } as const,
-    axisLine: false as const,
-    tickLine: false as const,
+    axisLine: false as const, tickLine: false as const,
   }
 
-  // ── Render ─────────────────────────────────────────────────────────────────────
+  const nYears = allYears.length
+
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
 
       {/* Header */}
-      <div className="flex items-center justify-between gap-2 flex-wrap">
-        <div className="flex items-center gap-2">
-          <ScrollText className="w-5 h-5 text-gray-600 dark:text-gray-400" strokeWidth={1.5} />
-          <h1 className="text-xl font-bold text-gray-800 dark:text-white">Control de Gastos</h1>
-        </div>
-        <div className="flex items-center gap-2 flex-wrap">
-          <select value={year} onChange={e => setYear(Number(e.target.value))}
-            className="text-sm border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300 outline-none focus:border-blue-400">
-            {YEAR_OPTIONS.map(y => <option key={y} value={y}>{y}</option>)}
-          </select>
-          {isLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
-        </div>
+      <div className="flex items-center gap-2">
+        <ScrollText className="w-5 h-5 text-gray-600 dark:text-gray-400" strokeWidth={1.5} />
+        <h1 className="text-xl font-bold text-gray-800 dark:text-white">Control de Gastos</h1>
+        {isLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400 ml-1" />}
       </div>
 
       {/* Type filter */}
@@ -746,89 +751,142 @@ export default function ExpenseControl() {
       {/* Chart section */}
       {chartTypes.length > 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5 space-y-4">
-          {/* Controls row */}
-          <div className="flex items-center justify-between gap-3 flex-wrap">
-            <h2 className="text-sm font-semibold text-gray-800 dark:text-white">
-              Evolución mensual
-            </h2>
-            <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-[11px]">
-              {VIEW_MODES.map(({ id, label }) => (
-                <button key={id} type="button" onClick={() => setViewMode(id)}
-                  className={`px-2.5 py-1 transition-colors ${
-                    viewMode === id
-                      ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 font-semibold'
-                      : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+
+          {/* Row 1: title + chart-type controls */}
+          <div className="flex items-start justify-between gap-3 flex-wrap">
+            <h2 className="text-sm font-semibold text-gray-800 dark:text-white pt-0.5">Evolución mensual</h2>
+
+            <div className="flex items-center gap-2 flex-wrap">
+              {/* Chart type segmented control */}
+              <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-xs">
+                {(['bar', 'area', 'line'] as const).map(k => (
+                  <button key={k} type="button"
+                    onClick={() => { setChartKind(k); setShowTable(false) }}
+                    className={`px-3 py-1.5 transition-colors ${
+                      chartKind === k && !showTable
+                        ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 font-semibold'
+                        : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                    }`}>
+                    {k === 'bar' ? 'Barras' : k === 'area' ? 'Área' : 'Líneas'}
+                  </button>
+                ))}
+              </div>
+
+              {/* Stacked toggle — only for bar and area */}
+              {!showTable && chartKind !== 'line' && (
+                <label className="flex items-center gap-1.5 text-xs cursor-pointer text-gray-600 dark:text-gray-400 select-none whitespace-nowrap">
+                  <input type="checkbox" checked={stacked} onChange={e => setStacked(e.target.checked)}
+                    className="rounded accent-blue-500" />
+                  Apilado
+                </label>
+              )}
+
+              {/* Table toggle */}
+              <button type="button" onClick={() => setShowTable(v => !v)}
+                className={`text-xs px-3 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+                  showTable
+                    ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 font-semibold border-gray-800 dark:border-gray-100'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-white dark:bg-gray-900'
+                }`}>
+                Tabla
+              </button>
+            </div>
+          </div>
+
+          {/* Row 2: year chips */}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider shrink-0">Años:</span>
+            <div className="flex gap-1.5 flex-wrap">
+              {YEAR_OPTIONS.map(y => (
+                <button key={y} type="button" onClick={() => toggleYear(y)}
+                  className={`text-xs px-2.5 py-0.5 rounded-full font-medium border transition-all ${
+                    activeYears.includes(y)
+                      ? 'bg-blue-500 text-white border-blue-500 shadow-sm'
+                      : 'bg-white dark:bg-gray-900 text-gray-400 dark:text-gray-500 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700 hover:text-blue-500'
                   }`}>
-                  {label}
+                  {y}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Compare years */}
-          <div className="flex items-center gap-4 flex-wrap">
-            <span className="text-[11px] text-gray-400 uppercase tracking-wider font-semibold">Comparar:</span>
-            {YEAR_OPTIONS.filter(y => y !== year).map(y => (
-              <label key={y} className="flex items-center gap-1.5 cursor-pointer text-xs text-gray-600 dark:text-gray-400">
-                <input type="checkbox" checked={compareYears.includes(y)}
-                  onChange={e => toggleCompareYear(y, e.target.checked)}
-                  className="rounded accent-blue-500" />
-                {y}
-              </label>
-            ))}
-          </div>
-
-          {/* Legend chips */}
-          {viewMode !== 'table' && (
-            <div className="flex flex-wrap gap-3">
+          {/* Legend chips (only in chart mode) */}
+          {!showTable && (
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
               {chartTypes.map(t => (
                 <span key={t.id} className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
                   <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: typeColor(t, customColors) }} />
                   {t.name}
+                  {nYears > 1 && (
+                    <span className="text-[10px] text-gray-300 dark:text-gray-600 ml-0.5">
+                      — reciente sólido, anterior atenuado
+                    </span>
+                  )}
                 </span>
               ))}
+              {nYears > 1 && chartKind === 'line' && (
+                <span className="text-[10px] text-gray-400 dark:text-gray-500 italic self-center">
+                  años anteriores con línea discontinua
+                </span>
+              )}
             </div>
           )}
 
           {/* Chart or Table */}
-          {viewMode === 'table' ? (
+          {showTable ? (
             <TableView chartTypes={chartTypes} chartRows={chartRows} annualByType={annualByType}
               allYears={allYears} customColors={customColors} />
           ) : (
-            <div className="h-64">
+            <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
-                {viewMode === 'line' ? (
+                {chartKind === 'line' ? (
                   <LineChart data={chartRows} margin={{ top: 4, right: 8, left: -12, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.15)" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.12)" vertical={false} />
                     <XAxis dataKey="month" {...axisProps} />
                     <YAxis {...axisProps} tickFormatter={v => `${v}€`} width={48} />
                     <Tooltip formatter={fmtTooltip} contentStyle={TOOLTIP_STYLE} />
                     {chartSeries.map(s => (
-                      <Line key={s.key} type="monotone" dataKey={s.key} stroke={s.color}
-                        strokeWidth={2} dot={{ fill: s.color, r: 3, strokeWidth: 0 }}
-                        activeDot={{ r: 5 }} connectNulls />
+                      <Line key={s.key} type="monotone" dataKey={s.key}
+                        stroke={s.color}
+                        strokeWidth={s.yi === 0 ? 2 : 1.5}
+                        strokeOpacity={nYears > 1 ? Math.max(0.4, 1 - s.yi * 0.22) : 1}
+                        strokeDasharray={s.yi > 0 ? `${4 + s.yi * 2} 4` : undefined}
+                        dot={false}
+                        activeDot={{ r: 4 }}
+                        connectNulls
+                      />
                     ))}
                   </LineChart>
-                ) : viewMode === 'stacked-line' ? (
+                ) : chartKind === 'area' ? (
                   <AreaChart data={chartRows} margin={{ top: 4, right: 8, left: -12, bottom: 4 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.15)" vertical={false} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.12)" vertical={false} />
                     <XAxis dataKey="month" {...axisProps} />
                     <YAxis {...axisProps} tickFormatter={v => `${v}€`} width={48} />
                     <Tooltip formatter={fmtTooltip} contentStyle={TOOLTIP_STYLE} />
                     {chartSeries.map(s => (
-                      <Area key={s.key} type="monotone" dataKey={s.key} stackId={String(s.y)}
-                        stroke={s.color} fill={s.color} fillOpacity={0.25} strokeWidth={1.5} connectNulls />
+                      <Area key={s.key} type="monotone" dataKey={s.key}
+                        stroke={s.color}
+                        fill={s.color}
+                        strokeWidth={1.5}
+                        strokeOpacity={nYears > 1 ? Math.max(0.4, 1 - s.yi * 0.2) : 1}
+                        fillOpacity={nYears > 1 ? Math.max(0.06, 0.22 - s.yi * 0.07) : 0.22}
+                        stackId={stacked ? String(s.y) : undefined}
+                        connectNulls
+                      />
                     ))}
                   </AreaChart>
                 ) : (
-                  <BarChart data={chartRows} margin={{ top: 4, right: 8, left: -12, bottom: 4 }} barCategoryGap="20%">
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.15)" vertical={false} />
+                  <BarChart data={chartRows} margin={{ top: 4, right: 8, left: -12, bottom: 4 }} barCategoryGap="22%">
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.12)" vertical={false} />
                     <XAxis dataKey="month" {...axisProps} />
                     <YAxis {...axisProps} tickFormatter={v => `${v}€`} width={48} />
                     <Tooltip formatter={fmtTooltip} contentStyle={TOOLTIP_STYLE} />
                     {chartSeries.map(s => (
-                      <Bar key={s.key} dataKey={s.key} fill={s.color}
-                        stackId={viewMode === 'stacked-bar' ? String(s.y) : undefined} />
+                      <Bar key={s.key} dataKey={s.key}
+                        fill={s.color}
+                        fillOpacity={nYears > 1 ? Math.max(0.35, 1 - s.yi * 0.22) : 1}
+                        stackId={stacked ? String(s.y) : undefined}
+                      />
                     ))}
                   </BarChart>
                 )}
@@ -840,7 +898,7 @@ export default function ExpenseControl() {
 
       {/* Movements panel */}
       <MovementsPanel
-        movements={movementsByYear[year] ?? []}
+        movements={movementsByYear[primaryYear] ?? []}
         allTypes={allTypes}
         groups={groups}
         typeMap={typeMap}
