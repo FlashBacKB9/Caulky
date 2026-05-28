@@ -33,10 +33,10 @@ async def _compute_balances(db: AsyncSession, user_id: uuid.UUID) -> dict[int, f
         else_=-func.abs(Movement.money),
     )
 
-    # Dinero of movements with explicit account_id → that account
+    # Dinero of non-transfer movements with explicit account_id → that account
     per_acc_res = await db.execute(
         select(Movement.account_id, func.sum(dinero_expr))
-        .where(Movement.user_id == user_id, Movement.no_count == False, Movement.account_id.is_not(None))
+        .where(Movement.user_id == user_id, Movement.no_count == False, Movement.account_id.is_not(None), Movement.is_transfer == False)
         .outerjoin(MovementType, Movement.movement_type_id == MovementType.id)
         .outerjoin(IncomeExpenseGroup, MovementType.income_expense_group_id == IncomeExpenseGroup.id)
         .group_by(Movement.account_id)
@@ -45,17 +45,17 @@ async def _compute_balances(db: AsyncSession, user_id: uuid.UUID) -> dict[int, f
         if aid in balances:
             balances[aid] += float(total)
 
-    # Dinero of movements without account_id → main account
+    # Dinero of non-transfer movements without account_id → main account
     if main_id is not None:
         null_res = await db.execute(
             select(func.coalesce(func.sum(dinero_expr), 0))
-            .where(Movement.user_id == user_id, Movement.no_count == False, Movement.account_id.is_(None))
+            .where(Movement.user_id == user_id, Movement.no_count == False, Movement.account_id.is_(None), Movement.is_transfer == False)
             .outerjoin(MovementType, Movement.movement_type_id == MovementType.id)
             .outerjoin(IncomeExpenseGroup, MovementType.income_expense_group_id == IncomeExpenseGroup.id)
         )
         balances[main_id] += float(null_res.scalar())
 
-    # Linked accounts (savings) via MovementType.linked_account_id
+    # Linked accounts (savings) via MovementType.linked_account_id — overwrites with = intentionally
     savings_res = await db.execute(
         select(MovementType.linked_account_id, func.sum(Movement.money))
         .join(Movement, Movement.movement_type_id == MovementType.id)
@@ -65,6 +65,20 @@ async def _compute_balances(db: AsyncSession, user_id: uuid.UUID) -> dict[int, f
     for account_id, total in savings_res.all():
         if account_id in balances:
             balances[account_id] = float(total)
+
+    # Transfers: credit destination (+money), debit source (-money)
+    # Must run after savings_res so the += is not overwritten by savings = assignment
+    transfer_res = await db.execute(
+        select(Movement.account_id, Movement.from_account_id, func.sum(func.abs(Movement.money)))
+        .where(Movement.user_id == user_id, Movement.no_count == False, Movement.is_transfer == True)
+        .group_by(Movement.account_id, Movement.from_account_id)
+    )
+    for dest_id, src_id, total in transfer_res.all():
+        amount = float(total or 0)
+        if dest_id is not None and dest_id in balances:
+            balances[dest_id] += amount
+        if src_id is not None and src_id in balances:
+            balances[src_id] -= amount
 
     return balances
 
