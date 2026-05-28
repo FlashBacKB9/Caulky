@@ -13,6 +13,19 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.7.1', date: 'Mayo 2026',
+    items: [
+      { type: 'fix',     text: 'Dashboard: los widgets se actualizan tras crear un movimiento sin recargar la página' },
+      { type: 'fix',     text: 'Inversiones: las fechas de compra respetan el formato de fecha configurado en ajustes' },
+      { type: 'fix',     text: 'Transferencias: se guarda y muestra el subtipo asociado a la cuenta destino en calendario y filtros' },
+      { type: 'fix',     text: 'Regla 50/30/20: el cubo Ahorro/Inv. aparece correctamente en el gráfico y en los porcentajes' },
+      { type: 'fix',     text: 'Regla 50/30/20: el color es verde si supera el objetivo de ahorro y rojo si queda por debajo (lógica invertida respecto a Necesidades/Deseos)' },
+      { type: 'improve', text: 'Análisis: Mayor tipo de gasto agrupa todos los movimientos de la misma categoría (no el movimiento individual mayor)' },
+      { type: 'improve', text: 'Análisis: "Proyección de Patrimonio" renombrada a "Proyección de Líquido" y usa solo saldo corriente + ahorro' },
+      { type: 'improve', text: 'Filtro de subtipos: dropdown flotante sin barra de scroll, difuminado inferior y selección por bloque completo' },
+    ],
+  },
+  {
     version: 'v1.7.0', date: 'Mayo 2026',
     items: [
       { type: 'feat',    text: 'Control de Gastos: nuevo módulo con evolución mensual por tipo, comparativa multi-año, modos barra/área/línea, apilado y acumulado' },
@@ -137,7 +150,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-white">{t('about.title')}</h2>
-            <span className="text-xs text-gray-400 dark:text-gray-500">v1.7.0</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">v1.7.1</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />

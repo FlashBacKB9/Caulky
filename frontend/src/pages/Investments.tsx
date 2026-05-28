@@ -9,6 +9,7 @@ import {
 import { getMovement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { useCurrency } from '../hooks/useCurrency'
+import { useDateFormat } from '../hooks/useDateFormat'
 import MovementDetailModal from '../components/MovementDetailModal'
 import { TrendingUp, TrendingDown, Plus, Pencil, Trash2, X, Check, RefreshCw, ChevronDown, ChevronRight } from 'lucide-react'
 
@@ -101,6 +102,7 @@ function FundForm({ movementTypes, initial, onSave, onCancel, isSaving }: {
 
 function PurchaseRow({ p, fund, fmt, onOpen }: { p: InvestmentPurchase; fund: InvestmentFund; fmt: (n: number) => string; onOpen: () => void }) {
   const qc = useQueryClient()
+  const { fmtDate } = useDateFormat()
   const [editing, setEditing] = useState(false)
   const [price, setPrice] = useState(String(p.price_at_purchase ?? ''))
   const [units, setUnits] = useState(String(p.units ?? ''))
@@ -141,7 +143,7 @@ function PurchaseRow({ p, fund, fmt, onOpen }: { p: InvestmentPurchase; fund: In
   if (editing) {
     return (
       <tr className="bg-blue-50/30 dark:bg-blue-900/10">
-        <td className="px-4 py-2 text-xs text-gray-500">{p.bank_date ?? p.date}</td>
+        <td className="px-4 py-2 text-xs text-gray-500">{fmtDate(p.bank_date ?? p.date)}</td>
         <td className="px-3 py-2 text-right text-xs font-mono text-gray-600 dark:text-gray-400">{fmt(p.amount_eur)}</td>
         <td className="px-3 py-2">
           <input type="number" step="0.0001" value={price} onChange={e => setPrice(e.target.value)}
@@ -167,7 +169,7 @@ function PurchaseRow({ p, fund, fmt, onOpen }: { p: InvestmentPurchase; fund: In
 
   return (
     <tr className="hover:bg-gray-50 dark:hover:bg-gray-800/40 text-gray-600 dark:text-gray-400 cursor-pointer" onClick={onOpen}>
-      <td className="px-4 py-2 text-xs">{p.bank_date ?? p.date}</td>
+      <td className="px-4 py-2 text-xs">{fmtDate(p.bank_date ?? p.date)}</td>
       <td className="px-3 py-2 text-right text-xs font-mono">{fmt(p.amount_eur)}</td>
       <td className="px-3 py-2 text-right text-xs font-mono">
         {p.price_at_purchase != null
