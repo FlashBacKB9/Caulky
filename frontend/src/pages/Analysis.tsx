@@ -478,10 +478,10 @@ function PatronesDeGasto({ realExpenseMovements, fmt }: {
 type RuleBucket = 'necesidades' | 'deseos' | 'ahorro' | 'unassigned'
 const RULE_KEY = 'spendly-5030-assignment'
 
-const BUCKETS: { id: RuleBucket; labelKey: string; target: number; color: string; textColor: string }[] = [
-  { id: 'necesidades', labelKey: 'analysis.bucketNeeds',   target: 50, color: '#3b82f6', textColor: 'text-blue-600 dark:text-blue-400' },
-  { id: 'deseos',      labelKey: 'analysis.bucketWants',   target: 30, color: '#8b5cf6', textColor: 'text-violet-600 dark:text-violet-400' },
-  { id: 'ahorro',      labelKey: 'analysis.bucketSavings', target: 20, color: '#22c55e', textColor: 'text-green-600 dark:text-green-400' },
+const BUCKETS: { id: RuleBucket; labelKey: string; target: number; color: string; textColor: string; higherIsBetter: boolean }[] = [
+  { id: 'necesidades', labelKey: 'analysis.bucketNeeds',   target: 50, color: '#3b82f6', textColor: 'text-blue-600 dark:text-blue-400',   higherIsBetter: false },
+  { id: 'deseos',      labelKey: 'analysis.bucketWants',   target: 30, color: '#8b5cf6', textColor: 'text-violet-600 dark:text-violet-400', higherIsBetter: false },
+  { id: 'ahorro',      labelKey: 'analysis.bucketSavings', target: 20, color: '#22c55e', textColor: 'text-green-600 dark:text-green-400',   higherIsBetter: true  },
 ]
 
 function Regla502030({ realExpenseMovements, periodMovements, groups, types, actualSavings, savingsGroupIdSet, fmt }: {
@@ -549,8 +549,8 @@ function Regla502030({ realExpenseMovements, periodMovements, groups, types, act
 
   const pieData = useMemo(() => {
     const slices = [
-      ...BUCKETS.map(b => ({ name: t(b.labelKey), value: byBucket[b.id], color: b.color, target: b.target, textColor: b.textColor })),
-      ...(byBucket.unassigned > 0 ? [{ name: t('analysis.unassigned'), value: byBucket.unassigned, color: '#f59e0b', target: 0, textColor: 'text-yellow-600 dark:text-yellow-400' }] : []),
+      ...BUCKETS.map(b => ({ name: t(b.labelKey), value: byBucket[b.id], color: b.color, target: b.target, textColor: b.textColor, higherIsBetter: b.higherIsBetter })),
+      ...(byBucket.unassigned > 0 ? [{ name: t('analysis.unassigned'), value: byBucket.unassigned, color: '#f59e0b', target: 0, textColor: 'text-yellow-600 dark:text-yellow-400', higherIsBetter: false }] : []),
     ]
     return slices.filter(s => s.value > 0)
   }, [byBucket])
@@ -604,11 +604,14 @@ function Regla502030({ realExpenseMovements, periodMovements, groups, types, act
                 <span className={`w-24 font-medium shrink-0 ${entry.textColor}`}>{entry.name}</span>
                 <span className="text-gray-600 dark:text-gray-300 w-12 text-right shrink-0 font-medium">{pct.toFixed(1)}%</span>
                 <span className="text-gray-400 dark:text-gray-500 flex-1">{fmt(entry.value)}</span>
-                {entry.target > 0 && (
-                  <span className={`shrink-0 ${over ? 'text-red-400' : under ? 'text-gray-400 dark:text-gray-500' : 'text-green-500'}`}>
-                    {over ? `+${(pct - entry.target).toFixed(0)}% obj.` : under ? `obj. ${entry.target}%` : '✓'}
-                  </span>
-                )}
+                {entry.target > 0 && (() => {
+                  if (!over && !under) return <span className="shrink-0 text-green-500">✓</span>
+                  const diff = Math.round(Math.abs(pct - entry.target))
+                  const good = over ? entry.higherIsBetter : !entry.higherIsBetter
+                  const color = good ? 'text-green-500' : 'text-red-400'
+                  const sign = over ? '+' : '-'
+                  return <span className={`shrink-0 ${color}`}>{sign}{diff}%</span>
+                })()}
               </div>
             )
           })}
