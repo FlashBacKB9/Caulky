@@ -229,15 +229,14 @@ export default function MovementDetailModal({ movement, types, onClose }: {
                 </div>
               )
             }
-            const corrientes = allAccounts.filter(a => a.category === 'corriente')
-            if (corrientes.length <= 1) return null
-            const mainAcc = corrientes.find(a => a.is_main)
+            if (allAccounts.length <= 1) return null
+            const mainAcc = allAccounts.find(a => a.is_main)
             return (
               <div>
                 <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('settings.affectedAccount')}</label>
                 <select className={IN} value={draft.account_id} onChange={e => setField('account_id', e.target.value)}>
                   <option value="">{mainAcc ? `${mainAcc.name} ${t('settings.defaultSuffix')}` : t('settings.mainAccount')}</option>
-                  {corrientes.filter(a => !a.is_main).map(a => (
+                  {allAccounts.filter(a => !a.is_main).map(a => (
                     <option key={a.id} value={a.id}>{a.name}</option>
                   ))}
                 </select>
