@@ -12,6 +12,7 @@ import {
   Minus, Loader2, ChevronDown, ChevronUp, Filter,
   ArrowUp, ArrowDown, ArrowUpDown,
   GripVertical, BarChart2, LineChart as LcLineChart, Table2,
+  Layers, Activity, type LucideIcon,
 } from 'lucide-react'
 import {
   getMovements, uploadMovementFile, deleteMovementFile,
@@ -38,12 +39,13 @@ const ORDER_KEY     = 'caulky-expense-type-order'
 const TOOLTIP_STYLE = { fontSize: 12, borderRadius: 8, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.12)' }
 
 const CHART_KINDS = [
-  { id: 'bar'  as const, Icon: BarChart2   },
-  { id: 'area' as const, Icon: TrendingUp  },
-  { id: 'line' as const, Icon: LcLineChart },
+  { id: 'bar'   as const, Icon: BarChart2,   title: 'Barras' },
+  { id: 'area'  as const, Icon: TrendingUp,  title: 'Área' },
+  { id: 'line'  as const, Icon: LcLineChart, title: 'Líneas' },
+  { id: 'table' as const, Icon: Table2,      title: 'Tabla' },
 ]
 
-type ChartKind = 'bar' | 'area' | 'line'
+type ChartKind = 'bar' | 'area' | 'line' | 'table'
 type StackMode  = 'normal' | 'stacked' | 'cumulative'
 type SortField  = 'date' | 'name' | 'amount' | 'type'
 type SortDir    = 'asc' | 'desc'
@@ -274,14 +276,30 @@ function TypeFilterDropdown({ typesByCategory, selectedTypeIds, customColors, on
 
 // ── TableView ─────────────────────────────────────────────────────────────────
 
-function TableView({ chartTypes, chartRows, annualByType, allYears, customColors }: {
+function TableView({ chartTypes, chartRows, annualByType, allYears, customColors, onReorder }: {
   chartTypes: MovementType[]
   chartRows: Record<string, string | number>[]
   annualByType: Record<number, Record<number, number>>
   allYears: number[]
   customColors: Record<number, string>
+  onReorder: (newOrder: number[]) => void
 }) {
   const [tableMode, setTableMode] = useState<'monthly' | 'annual'>('monthly')
+  const [dragId, setDragId]       = useState<number | null>(null)
+  const [dragOvId, setDragOvId]   = useState<number | null>(null)
+
+  const tblDragStart = (e: React.DragEvent<HTMLTableRowElement>, id: number) => { setDragId(id); e.dataTransfer.effectAllowed = 'move' }
+  const tblDragOver  = (e: React.DragEvent<HTMLTableRowElement>, id: number) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; setDragOvId(id) }
+  const tblDrop      = (e: React.DragEvent<HTMLTableRowElement>, targetId: number) => {
+    e.preventDefault()
+    if (dragId == null || dragId === targetId) { setDragId(null); setDragOvId(null); return }
+    const ids = chartTypes.map(t => t.id)
+    const fi = ids.indexOf(dragId), ti = ids.indexOf(targetId)
+    if (fi < 0 || ti < 0) { setDragId(null); setDragOvId(null); return }
+    const next = [...ids]; next.splice(fi, 1); next.splice(ti, 0, dragId)
+    onReorder(next); setDragId(null); setDragOvId(null)
+  }
+  const tblDragEnd   = () => { setDragId(null); setDragOvId(null) }
   const multiYear   = allYears.length > 1
   const singleYear  = allYears[0]!
   const sortedYears = [...allYears].sort((a, b) => a - b)
@@ -330,9 +348,13 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
                 const values = chartRows.map(row => Number(row[`${t.id}_${singleYear}`] ?? 0))
                 const total  = values.reduce((a, b) => a + b, 0)
                 return (
-                  <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/50 dark:hover:bg-gray-800/20">
+                  <tr key={t.id} draggable
+                    onDragStart={e => tblDragStart(e, t.id)} onDragOver={e => tblDragOver(e, t.id)}
+                    onDrop={e => tblDrop(e, t.id)} onDragEnd={tblDragEnd}
+                    className={`border-b border-gray-50 dark:border-gray-800/60 cursor-grab active:cursor-grabbing transition-all ${dragId === t.id ? 'opacity-40' : dragOvId === t.id ? 'bg-blue-50/60 dark:bg-blue-950/20' : 'hover:bg-gray-50/50 dark:hover:bg-gray-800/20'}`}>
                     <td className={tdName}>
                       <span className="flex items-center gap-1.5">
+                        <GripVertical className="w-3 h-3 text-gray-300 dark:text-gray-600 shrink-0" />
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
                         {t.name}
                       </span>
@@ -392,9 +414,13 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
                 return (
                   <Fragment key={t.id}>
                     {/* Type header */}
-                    <tr className="bg-gray-50/70 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-800">
+                    <tr draggable
+                      onDragStart={e => tblDragStart(e, t.id)} onDragOver={e => tblDragOver(e, t.id)}
+                      onDrop={e => tblDrop(e, t.id)} onDragEnd={tblDragEnd}
+                      className={`border-t border-gray-100 dark:border-gray-800 cursor-grab active:cursor-grabbing transition-all ${dragId === t.id ? 'opacity-40' : dragOvId === t.id ? 'bg-blue-50/60 dark:bg-blue-950/20' : 'bg-gray-50/70 dark:bg-gray-800/30'}`}>
                       <td colSpan={14} className="px-3 py-1.5">
                         <span className="flex items-center gap-1.5 text-[11px] font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide">
+                          <GripVertical className="w-3 h-3 text-gray-300 dark:text-gray-600 shrink-0" />
                           <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
                           {t.name}
                         </span>
@@ -465,9 +491,13 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
                 const latest = annualByType[t.id]?.[latestYear] ?? 0
                 const delta  = base > 0.01 ? ((latest - base) / base) * 100 : null
                 return (
-                  <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/50 dark:hover:bg-gray-800/20">
+                  <tr key={t.id} draggable
+                    onDragStart={e => tblDragStart(e, t.id)} onDragOver={e => tblDragOver(e, t.id)}
+                    onDrop={e => tblDrop(e, t.id)} onDragEnd={tblDragEnd}
+                    className={`border-b border-gray-50 dark:border-gray-800/60 cursor-grab active:cursor-grabbing transition-all ${dragId === t.id ? 'opacity-40' : dragOvId === t.id ? 'bg-blue-50/60 dark:bg-blue-950/20' : 'hover:bg-gray-50/50 dark:hover:bg-gray-800/20'}`}>
                     <td className={tdName}>
                       <span className="flex items-center gap-1.5">
+                        <GripVertical className="w-3 h-3 text-gray-300 dark:text-gray-600 shrink-0" />
                         <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
                         {t.name}
                       </span>
@@ -647,14 +677,11 @@ export default function ExpenseControl() {
 
   const [selectedTypeIds, setSelectedTypeIds] = useState<Set<number>>(new Set())
   const [initialized, setInitialized]         = useState(false)
-  const [chartKind, setChartKind]             = useState<ChartKind>('bar')
-  const [stackMode, setStackMode]             = useState<StackMode>('stacked')
-  const [showTable, setShowTable]             = useState(false)
-  const [activeYears, setActiveYears]         = useState<number[]>([CURRENT_YEAR])
-  const [customColors, setCustomColors]       = useState<Record<number, string>>(loadColors)
-  const [typeOrderIds, setTypeOrderIds]       = useState<number[]>(loadTypeOrder)
-  const [dragTypeId, setDragTypeId]           = useState<number | null>(null)
-  const [dragOverId, setDragOverId]           = useState<number | null>(null)
+  const [chartKind, setChartKind]       = useState<ChartKind>('bar')
+  const [stackMode, setStackMode]       = useState<StackMode>('stacked')
+  const [activeYears, setActiveYears]   = useState<number[]>([CURRENT_YEAR])
+  const [customColors, setCustomColors] = useState<Record<number, string>>(loadColors)
+  const [typeOrderIds, setTypeOrderIds] = useState<number[]>(loadTypeOrder)
 
   // ── Queries ───────────────────────────────────────────────────────────────────
   const { data: allTypes = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes, staleTime: 5 * 60 * 1000 })
@@ -802,31 +829,13 @@ export default function ExpenseControl() {
   }
   const handleChartKindChange = (kind: ChartKind) => {
     setChartKind(kind)
-    setShowTable(false)
     if (kind === 'line' && stackMode === 'stacked') setStackMode('normal')
   }
 
-  // Drag-to-reorder legend
-  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: number) => {
-    setDragTypeId(id)
-    e.dataTransfer.effectAllowed = 'move'
+  const handleReorderTypes = (newOrder: number[]) => {
+    setTypeOrderIds(newOrder)
+    saveTypeOrder(newOrder)
   }
-  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: number) => {
-    e.preventDefault()
-    e.dataTransfer.dropEffect = 'move'
-    setDragOverId(id)
-  }
-  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetId: number) => {
-    e.preventDefault()
-    if (dragTypeId == null || dragTypeId === targetId) { setDragTypeId(null); setDragOverId(null); return }
-    const ids = chartTypes.map(t => t.id)
-    const fi = ids.indexOf(dragTypeId), ti = ids.indexOf(targetId)
-    if (fi < 0 || ti < 0) { setDragTypeId(null); setDragOverId(null); return }
-    const newOrder = [...ids]; newOrder.splice(fi, 1); newOrder.splice(ti, 0, dragTypeId)
-    setTypeOrderIds(newOrder); saveTypeOrder(newOrder)
-    setDragTypeId(null); setDragOverId(null)
-  }
-  const handleDragEnd = () => { setDragTypeId(null); setDragOverId(null) }
 
   const onRefresh = () => allYears.forEach(y => qc.invalidateQueries({ queryKey: ['movements-expense', y] }))
 
@@ -841,9 +850,9 @@ export default function ExpenseControl() {
   const axisProps = { tick: { fontSize: 11, fill: '#9ca3af' } as const, axisLine: false as const, tickLine: false as const }
 
   // Stack mode buttons depend on chart kind
-  const stackModes: { id: StackMode; label: string }[] = chartKind === 'line'
-    ? [{ id: 'normal', label: 'Normal' }, { id: 'cumulative', label: 'Acumulado' }]
-    : [{ id: 'normal', label: 'Normal' }, { id: 'stacked', label: 'Apilado' }, { id: 'cumulative', label: 'Acumulado' }]
+  const stackModes: { id: StackMode; Icon: LucideIcon; title: string }[] = chartKind === 'line'
+    ? [{ id: 'normal', Icon: Minus, title: 'Normal' }, { id: 'cumulative', Icon: Activity, title: 'Acumulado' }]
+    : [{ id: 'normal', Icon: Minus, title: 'Normal' }, { id: 'stacked', Icon: Layers, title: 'Apilado' }, { id: 'cumulative', Icon: Activity, title: 'Acumulado' }]
 
   const useStackId = stackMode !== 'normal'  // stacked AND cumulative use stackId
 
@@ -882,13 +891,12 @@ export default function ExpenseControl() {
             <h2 className="text-sm font-semibold text-gray-800 dark:text-white pt-1">Evolución mensual</h2>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Chart kind icons */}
+              {/* Chart kind + table — all in one group */}
               <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
-                {CHART_KINDS.map(({ id, Icon }) => (
-                  <button key={id} type="button" onClick={() => handleChartKindChange(id)}
-                    title={id === 'bar' ? 'Barras' : id === 'area' ? 'Área' : 'Líneas'}
+                {CHART_KINDS.map(({ id, Icon, title }) => (
+                  <button key={id} type="button" onClick={() => handleChartKindChange(id)} title={title}
                     className={`px-2.5 py-2 transition-colors ${
-                      chartKind === id && !showTable
+                      chartKind === id
                         ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900'
                         : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     }`}>
@@ -897,31 +905,21 @@ export default function ExpenseControl() {
                 ))}
               </div>
 
-              {/* Stack mode buttons — only when not in table */}
-              {!showTable && (
-                <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-[11px]">
-                  {stackModes.map(({ id, label }) => (
-                    <button key={id} type="button" onClick={() => setStackMode(id)}
-                      className={`px-2.5 py-1.5 transition-colors whitespace-nowrap ${
+              {/* Stack mode icons — only when chart is active */}
+              {chartKind !== 'table' && (
+                <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                  {stackModes.map(({ id, Icon, title }) => (
+                    <button key={id} type="button" onClick={() => setStackMode(id)} title={title}
+                      className={`px-2.5 py-2 transition-colors ${
                         stackMode === id
-                          ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 font-semibold'
+                          ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900'
                           : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                       }`}>
-                      {label}
+                      <Icon className="w-3.5 h-3.5" />
                     </button>
                   ))}
                 </div>
               )}
-
-              {/* Table icon button */}
-              <button type="button" onClick={() => setShowTable(v => !v)} title="Tabla"
-                className={`px-2.5 py-2 rounded-lg border transition-colors ${
-                  showTable
-                    ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-800 dark:border-gray-100'
-                    : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-white dark:bg-gray-900'
-                }`}>
-                <Table2 className="w-3.5 h-3.5" />
-              </button>
             </div>
           </div>
 
@@ -943,25 +941,16 @@ export default function ExpenseControl() {
           </div>
 
           {/* Legend + year opacity key */}
-          {!showTable && (
+          {chartKind !== 'table' && (
             <div className="space-y-2">
-              {/* Draggable type chips */}
+              {/* Type chips — click to toggle visibility */}
               <div className="flex flex-wrap gap-x-1 gap-y-1">
                 {chartTypes.map(t => (
-                  <div key={t.id} draggable
-                    onDragStart={e => handleDragStart(e, t.id)}
-                    onDragOver={e => handleDragOver(e, t.id)}
-                    onDrop={e => handleDrop(e, t.id)}
-                    onDragEnd={handleDragEnd}
-                    className={`flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-md cursor-grab active:cursor-grabbing select-none transition-all ${
-                      dragTypeId === t.id ? 'opacity-40 ring-1 ring-blue-300' : ''
-                    } ${
-                      dragOverId === t.id && dragTypeId !== t.id ? 'ring-2 ring-blue-400 bg-blue-50 dark:bg-blue-950/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800/40'
-                    }`}>
-                    <GripVertical className="w-3 h-3 text-gray-300 dark:text-gray-600 shrink-0" />
+                  <button key={t.id} type="button" onClick={() => toggleType(t.id)}
+                    className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors select-none">
                     <span className="w-2 h-2 rounded-full shrink-0" style={{ background: typeColor(t, customColors) }} />
                     {t.name}
-                  </div>
+                  </button>
                 ))}
               </div>
 
@@ -982,9 +971,9 @@ export default function ExpenseControl() {
           )}
 
           {/* Chart or Table */}
-          {showTable ? (
+          {chartKind === 'table' ? (
             <TableView chartTypes={chartTypes} chartRows={chartRows} annualByType={annualByType}
-              allYears={allYears} customColors={customColors} />
+              allYears={allYears} customColors={customColors} onReorder={handleReorderTypes} />
           ) : (
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
