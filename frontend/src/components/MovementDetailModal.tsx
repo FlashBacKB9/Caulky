@@ -119,10 +119,10 @@ export default function MovementDetailModal({ movement, types, onClose }: {
   const selType = types.find(t => String(t.id) === draft.movement_type_id)
 
   const invalidate = () => {
-    qc.invalidateQueries({ queryKey: ['movements'] })
-    qc.invalidateQueries({ queryKey: ['dashboard'] })
-    qc.invalidateQueries({ queryKey: ['annual'] })
-    qc.invalidateQueries({ queryKey: ['accounts-summary'] })
+    qc.invalidateQueries({ queryKey: ['movements'], refetchType: 'all' })
+    qc.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
+    qc.invalidateQueries({ queryKey: ['annual'], refetchType: 'all' })
+    qc.invalidateQueries({ queryKey: ['accounts-summary'], refetchType: 'all' })
   }
 
   const updateMut = useMutation({

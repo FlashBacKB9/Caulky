@@ -253,10 +253,10 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
       return mv
     },
     onSuccess: (mv) => {
-      qc.invalidateQueries({ queryKey: ['movements'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      qc.invalidateQueries({ queryKey: ['annual'] })
-      qc.invalidateQueries({ queryKey: ['accounts-summary'] })
+      qc.invalidateQueries({ queryKey: ['movements'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['annual'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['accounts-summary'], refetchType: 'all' })
       onMovementCreated?.(mv.id)
       onClose()
     },
@@ -285,10 +285,10 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
     },
     onSuccess: (n) => {
       setRecBulkDone(n)
-      qc.invalidateQueries({ queryKey: ['movements'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      qc.invalidateQueries({ queryKey: ['annual'] })
-      qc.invalidateQueries({ queryKey: ['accounts-summary'] })
+      qc.invalidateQueries({ queryKey: ['movements'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['annual'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['accounts-summary'], refetchType: 'all' })
     },
   })
 
@@ -418,10 +418,10 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
         return mv
       })
     ).then(() => {
-      qc.invalidateQueries({ queryKey: ['movements'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      qc.invalidateQueries({ queryKey: ['annual'] })
-      qc.invalidateQueries({ queryKey: ['accounts-summary'] })
+      qc.invalidateQueries({ queryKey: ['movements'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['annual'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['accounts-summary'], refetchType: 'all' })
       onClose()
     })
   }
