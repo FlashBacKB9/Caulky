@@ -53,7 +53,7 @@ export function draftPayload(d: DraftRow, original: Movement) {
     money: parseFloat(d.money) || original.money,
     date: d.date,
     bank_date: d.bank_date || null,
-    movement_type_id: !d.is_transfer && d.movement_type_id ? parseInt(d.movement_type_id) : null,
+    movement_type_id: d.movement_type_id ? parseInt(d.movement_type_id) : null,
     account_id: d.account_id ? parseInt(d.account_id) : null,
     is_transfer: d.is_transfer,
     from_account_id: d.is_transfer && d.from_account_id ? parseInt(d.from_account_id) : null,
@@ -94,7 +94,14 @@ export default function MovementDetailModal({ movement, types, onClose }: {
 }) {
   const qc = useQueryClient()
   const { sharedEnabled } = useSharedMovements()
-  const [draft, setDraft] = useState<DraftRow>(() => toDraft(movement))
+  const [draft, setDraft] = useState<DraftRow>(() => {
+    const d = toDraft(movement)
+    if (d.is_transfer && !d.movement_type_id && d.account_id) {
+      const linked = types.find(t => t.linked_account_id === parseInt(d.account_id))
+      if (linked) d.movement_type_id = String(linked.id)
+    }
+    return d
+  })
   const { data: accountsSummary } = useQuery({ queryKey: ['accounts-summary'], queryFn: () => import('../api/accounts').then(m => m.getAccountsSummary()) })
   const accounts = accountsSummary?.accounts ?? []
   const setField = <K extends keyof DraftRow>(k: K, v: DraftRow[K]) =>
@@ -232,7 +239,11 @@ export default function MovementDetailModal({ movement, types, onClose }: {
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Cuenta destino</label>
-                    <select value={draft.account_id} onChange={e => setField('account_id', e.target.value)} className={IN}>
+                    <select value={draft.account_id} onChange={e => {
+                      const newAccId = e.target.value
+                      const linked = newAccId ? types.find(t => t.linked_account_id === parseInt(newAccId)) : null
+                      setDraft(d => ({ ...d, account_id: newAccId, movement_type_id: linked ? String(linked.id) : '' }))
+                    }} className={IN}>
                       <option value="">— Selecciona —</option>
                       {allAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                     </select>
