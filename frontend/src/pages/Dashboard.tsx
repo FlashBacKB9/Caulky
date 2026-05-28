@@ -1623,7 +1623,7 @@ export default function Dashboard() {
   if (isLoading) return <div className="p-8 text-gray-500">{t('common.loading')}</div>
   if (!data) return null
 
-  const savingsAccounts = accountsData?.accounts.filter(a => !a.is_main) ?? []
+  const savingsAccounts = accountsData?.accounts.filter(a => !a.is_main && a.category !== 'vehiculo' && a.category !== 'inmueble') ?? []
   const allAccounts     = accountsData?.accounts ?? []
   const initialTotal    = accountsData?.accounts.reduce((s, a) => s + a.initial_balance, 0) ?? 0
 

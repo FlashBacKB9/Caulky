@@ -470,6 +470,7 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
   const fmtSize = (b: number) => b >= 1024 * 1024 ? `${(b / 1024 / 1024).toFixed(1)} MB` : `${(b / 1024).toFixed(0)} KB`
   const removeFile = (i: number) => setPendingFiles(prev => prev.filter((_, idx) => idx !== i))
   const valid = form.name.trim() && form.money && !isNaN(parseFloat(form.money))
+    && (!form.is_transfer || (!!form.from_account_id && !!form.account_id))
 
   // ── Panel titles ─────────────────────────────────────────────────────────────
   const panelTitle = panel === 'template'
