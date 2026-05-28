@@ -185,6 +185,12 @@ function MovementContextMenu({ menu, onDuplicate, onDelete, onClose }: {
   )
 }
 
+function mvDineroForAccount(mv: Movement, accFilter: number | null): number {
+  if (mv.is_transfer && accFilter !== null)
+    return mv.account_id === accFilter ? Math.abs(mv.money) : -Math.abs(mv.money)
+  return mv.dinero
+}
+
 // ── Calendar preview tracking ─────────────────────────────────────────────────
 
 const PREVIEW_MAP_KEY = 'caulky-preview-movements'
@@ -197,10 +203,11 @@ function savePreviewMap(map: PreviewEntry[]) { localStorage.setItem(PREVIEW_MAP_
 
 // ── Calendar view ────────────────────────────────────────────────────────────
 
-function CalendarView({ movements, types, selectedYear }: {
+function CalendarView({ movements, types, selectedYear, accountFilter }: {
   movements: Movement[]
   types: MovementType[]
   selectedYear?: number | null
+  accountFilter: number | null
 }) {
   const { fmt } = useCurrency()
   const fmtCal = (v: number) => (v >= 0 ? '+' : '') + fmt(v)
@@ -456,8 +463,8 @@ function CalendarView({ movements, types, selectedYear }: {
                       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, mv }) }}
                       className={`mb-1 rounded-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-1.5 py-1 cursor-grab active:cursor-grabbing hover:border-gray-300 dark:hover:border-gray-500 transition-all ${draggingId === mv.id ? 'opacity-40' : ''}`}>
                       <span className="truncate text-[11px] text-gray-700 dark:text-gray-300 leading-tight block">{mv.name}</span>
-                      <span className={`text-[11px] font-mono ${mv.dinero >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                        {fmtCal(mv.dinero)}
+                      <span className={`text-[11px] font-mono ${mvDineroForAccount(mv, accountFilter) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {fmtCal(mvDineroForAccount(mv, accountFilter))}
                       </span>
                       {typ && (
                         <span className="block text-[10px] px-1 rounded mt-0.5 w-full" style={{ backgroundColor: typ.color + '22', color: typ.color }}>
@@ -1586,7 +1593,7 @@ export default function Movements() {
       )}
 
       {viewMode === 'calendar' && (
-        <CalendarView movements={filteredMovements} types={types} selectedYear={year} />
+        <CalendarView movements={filteredMovements} types={types} selectedYear={year} accountFilter={accountFilter} />
       )}
 
       {viewMode === 'kanban' && (
@@ -1789,8 +1796,8 @@ export default function Movements() {
                             </td>
                           )
                           case 'amount': return (
-                            <td key="amount" className={cellCls + ` font-mono font-semibold text-right ${mv.dinero >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`} style={st} onClick={e => enterEdit(e, mv)}>
-                              {isEditing ? <input type="number" step="0.01" value={d!.money} className={INPUT + ' text-right'} onChange={e => setField('money', e.target.value)} onClick={e => e.stopPropagation()} /> : fmt(mv.dinero)}
+                            <td key="amount" className={cellCls + ` font-mono font-semibold text-right ${mvDineroForAccount(mv, accountFilter) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`} style={st} onClick={e => enterEdit(e, mv)}>
+                              {isEditing ? <input type="number" step="0.01" value={d!.money} className={INPUT + ' text-right'} onChange={e => setField('money', e.target.value)} onClick={e => e.stopPropagation()} /> : fmt(mvDineroForAccount(mv, accountFilter))}
                             </td>
                           )
                           case 'paid': return (
