@@ -417,7 +417,7 @@ function CalendarView({ movements, types, selectedYear }: {
                   setDraggingId(null); setDragOverDate(null)
                 }}
                 onDoubleClick={() => cell.current && setFormDate(cell.dateStr)}
-                className={`min-h-[110px] border-r border-b border-gray-100 dark:border-gray-800 p-1.5 transition-colors ${
+                className={`group min-h-[110px] border-r border-b border-gray-100 dark:border-gray-800 p-1.5 transition-colors ${
                   isDropTarget ? 'bg-blue-50 dark:bg-blue-950/40 ring-1 ring-inset ring-blue-300 dark:ring-blue-700' :
                   isToday ? 'bg-blue-50/60 dark:bg-blue-950/20' :
                   !cell.current ? 'bg-gray-50/50 dark:bg-gray-800/30' : 'cursor-pointer'
@@ -430,10 +430,20 @@ function CalendarView({ movements, types, selectedYear }: {
                         : 'text-red-500 dark:text-red-400'
                     }`}>{fmtCal(mvs.reduce((s, mv) => s + mv.dinero, 0))}</span>
                   ) : <span />}
-                  <span className={`text-xs font-medium ${
-                    isToday ? 'text-blue-600 dark:text-blue-400 font-bold'
-                      : cell.current ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'
-                  }`}>{cell.day}</span>
+                  <div className="flex items-center gap-0.5">
+                    {cell.current && (
+                      <button type="button"
+                        onClick={e => { e.stopPropagation(); setFormDate(cell.dateStr) }}
+                        title="Añadir movimiento"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 rounded text-gray-300 dark:text-gray-600 hover:text-blue-500 dark:hover:text-blue-400">
+                        <Plus className="w-3 h-3" />
+                      </button>
+                    )}
+                    <span className={`text-xs font-medium ${
+                      isToday ? 'text-blue-600 dark:text-blue-400 font-bold'
+                        : cell.current ? 'text-gray-500 dark:text-gray-400' : 'text-gray-300 dark:text-gray-600'
+                    }`}>{cell.day}</span>
+                  </div>
                 </div>
                 {(expandedDays.has(cell.dateStr) ? mvs : mvs.slice(0, MAX)).map(mv => {
                   const typ = typeMap[mv.movement_type_id ?? 0]
@@ -833,7 +843,7 @@ export default function Movements() {
   const [bulkField, setBulkField] = useState('')
   const [bulkValue, setBulkValue] = useState('')
   const [isBulkPending, setIsBulkPending] = useState(false)
-  const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'kanban'>('table')
+  const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'kanban'>('calendar')
   const [showYearPicker, setShowYearPicker] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [quickSearch, setQuickSearch] = useState('')
@@ -1268,11 +1278,11 @@ export default function Movements() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
-            <button onClick={() => setViewMode('table')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`} title={t('movements.tableTitle')}>
-              <Table2 className="w-4 h-4" />
-            </button>
             <button onClick={() => setViewMode('calendar')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`} title={t('movements.calendarTitle')}>
               <CalendarDays className="w-4 h-4" />
+            </button>
+            <button onClick={() => setViewMode('table')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'table' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`} title={t('movements.tableTitle')}>
+              <Table2 className="w-4 h-4" />
             </button>
             <button onClick={() => setViewMode('kanban')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'kanban' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`} title={t('movements.kanbanTitle')}>
               <LayoutGrid className="w-4 h-4" />
