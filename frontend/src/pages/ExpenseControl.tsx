@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
+import { useState, useMemo, useEffect, useRef, Fragment } from 'react'
 import { useQueries, useQueryClient, useMutation, useQuery } from '@tanstack/react-query'
 import {
   ResponsiveContainer,
@@ -11,6 +11,7 @@ import {
   ScrollText, Upload, FileText, X, TrendingUp, TrendingDown,
   Minus, Loader2, ChevronDown, ChevronUp, Filter,
   ArrowUp, ArrowDown, ArrowUpDown,
+  GripVertical, BarChart2, LineChart as LcLineChart, Table2,
 } from 'lucide-react'
 import {
   getMovements, uploadMovementFile, deleteMovementFile,
@@ -33,11 +34,19 @@ const YEAR_OPTIONS  = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i)
 const MONTHS_SHORT  = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const COLORS_KEY    = 'caulky-expense-type-colors'
 const FILTER_KEY    = 'caulky-expense-type-filter'
+const ORDER_KEY     = 'caulky-expense-type-order'
 const TOOLTIP_STYLE = { fontSize: 12, borderRadius: 8, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.12)' }
 
+const CHART_KINDS = [
+  { id: 'bar'  as const, Icon: BarChart2   },
+  { id: 'area' as const, Icon: TrendingUp  },
+  { id: 'line' as const, Icon: LcLineChart },
+]
+
 type ChartKind = 'bar' | 'area' | 'line'
-type SortField = 'date' | 'name' | 'amount' | 'type'
-type SortDir   = 'asc' | 'desc'
+type StackMode  = 'normal' | 'stacked' | 'cumulative'
+type SortField  = 'date' | 'name' | 'amount' | 'type'
+type SortDir    = 'asc' | 'desc'
 
 // ── Storage helpers ───────────────────────────────────────────────────────────
 
@@ -56,6 +65,31 @@ function loadTypeFilter(): number[] | null {
   } catch { return null }
 }
 function saveTypeFilter(ids: Set<number>) { localStorage.setItem(FILTER_KEY, JSON.stringify([...ids])) }
+
+function loadTypeOrder(): number[] {
+  try {
+    const s = localStorage.getItem(ORDER_KEY)
+    if (s) return JSON.parse(s) as number[]
+  } catch { /**/ }
+  return []
+}
+function saveTypeOrder(ids: number[]) { localStorage.setItem(ORDER_KEY, JSON.stringify(ids)) }
+
+function makeCumulative(
+  rows: Record<string, string | number>[],
+  keys: string[],
+): Record<string, string | number>[] {
+  const acc: Record<string, number> = {}
+  for (const k of keys) acc[k] = 0
+  return rows.map(row => {
+    const next: Record<string, string | number> = { month: row.month as string }
+    for (const k of keys) {
+      acc[k] = (acc[k] ?? 0) + Number(row[k] ?? 0)
+      next[k] = Math.round(acc[k] * 100) / 100
+    }
+    return next
+  })
+}
 
 // ── SummaryCard ───────────────────────────────────────────────────────────────
 
@@ -247,141 +281,234 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
   allYears: number[]
   customColors: Record<number, string>
 }) {
-  if (chartTypes.length === 0) return (
-    <p className="text-center text-sm text-gray-400 py-8">Sin datos para mostrar.</p>
-  )
-
-  const singleYear = allYears[0]!
-
-  if (allYears.length === 1) {
-    return (
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-gray-100 dark:border-gray-800">
-              <th className="text-left px-3 py-2 text-gray-400 font-semibold sticky left-0 bg-white dark:bg-gray-900 min-w-[120px]">Tipo</th>
-              {MONTHS_SHORT.map(m => (
-                <th key={m} className="text-right px-2 py-2 text-gray-400 font-semibold min-w-[48px]">{m}</th>
-              ))}
-              <th className="text-right px-3 py-2 text-gray-400 font-semibold">Total</th>
-            </tr>
-          </thead>
-          <tbody>
-            {chartTypes.map(t => {
-              const color  = typeColor(t, customColors)
-              const values = chartRows.map(row => Number(row[`${t.id}_${singleYear}`] ?? 0))
-              const total  = values.reduce((a, b) => a + b, 0)
-              return (
-                <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/50 dark:hover:bg-gray-800/20">
-                  <td className="px-3 py-2 sticky left-0 bg-white dark:bg-gray-900">
-                    <span className="flex items-center gap-1.5">
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                      {t.name}
-                    </span>
-                  </td>
-                  {values.map((v, i) => (
-                    <td key={i} className={`text-right px-2 py-2 tabular-nums ${v > 0.01 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
-                      {v > 0.01 ? v.toFixed(0) : '—'}
-                    </td>
-                  ))}
-                  <td className="text-right px-3 py-2 font-semibold text-gray-800 dark:text-white tabular-nums">
-                    {total > 0.01 ? `${total.toFixed(0)} €` : '—'}
-                  </td>
-                </tr>
-              )
-            })}
-            <tr className="border-t-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 font-semibold">
-              <td className="px-3 py-2 text-gray-700 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-800/30">Total</td>
-              {MONTHS_SHORT.map((_, mi) => {
-                const total = chartTypes.reduce((s, t) => s + Number(chartRows[mi]?.[`${t.id}_${singleYear}`] ?? 0), 0)
-                return (
-                  <td key={mi} className={`text-right px-2 py-2 tabular-nums ${total > 0.01 ? 'text-gray-800 dark:text-white' : 'text-gray-300 dark:text-gray-600'}`}>
-                    {total > 0.01 ? total.toFixed(0) : '—'}
-                  </td>
-                )
-              })}
-              <td className="text-right px-3 py-2 tabular-nums text-gray-800 dark:text-white">
-                {chartTypes.reduce((s, t) => s + (annualByType[t.id]?.[singleYear] ?? 0), 0).toFixed(0)} €
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    )
-  }
-
-  // Multi-year: types × years + ∆%
+  const [tableMode, setTableMode] = useState<'monthly' | 'annual'>('monthly')
+  const multiYear   = allYears.length > 1
+  const singleYear  = allYears[0]!
   const sortedYears = [...allYears].sort((a, b) => a - b)
   const baseYear    = sortedYears[0]!
   const latestYear  = sortedYears[sortedYears.length - 1]!
 
+  const tdName = 'px-3 py-2 sticky left-0 bg-white dark:bg-gray-900 text-gray-700 dark:text-gray-300'
+
+  if (chartTypes.length === 0) return (
+    <p className="text-center text-sm text-gray-400 py-8">Sin datos para mostrar.</p>
+  )
+
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-gray-100 dark:border-gray-800">
-            <th className="text-left px-3 py-2 text-gray-400 font-semibold sticky left-0 bg-white dark:bg-gray-900 min-w-[120px]">Tipo</th>
-            {sortedYears.map(y => (
-              <th key={y} className="text-right px-3 py-2 text-gray-400 font-semibold min-w-[80px]">{y}</th>
-            ))}
-            <th className="text-right px-3 py-2 text-gray-400 font-semibold min-w-[80px]">∆% {baseYear}→{latestYear}</th>
-          </tr>
-        </thead>
-        <tbody>
-          {chartTypes.map(t => {
-            const color  = typeColor(t, customColors)
-            const base   = annualByType[t.id]?.[baseYear]   ?? 0
-            const latest = annualByType[t.id]?.[latestYear] ?? 0
-            const delta  = base > 0.01 ? ((latest - base) / base) * 100 : null
-            return (
-              <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/50 dark:hover:bg-gray-800/20">
-                <td className="px-3 py-2 sticky left-0 bg-white dark:bg-gray-900">
-                  <span className="flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                    {t.name}
-                  </span>
-                </td>
-                {sortedYears.map(y => {
-                  const v = annualByType[t.id]?.[y] ?? 0
+    <div className="space-y-3">
+      {/* Mode toggle — only when multi-year */}
+      {multiYear && (
+        <div className="flex gap-1.5">
+          {(['monthly', 'annual'] as const).map(m => (
+            <button key={m} type="button" onClick={() => setTableMode(m)}
+              className={`text-xs px-2.5 py-1 rounded-lg border transition-colors ${
+                tableMode === m
+                  ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 font-semibold border-gray-800 dark:border-gray-100'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 bg-white dark:bg-gray-900'
+              }`}>
+              {m === 'monthly' ? 'Por mes' : 'Anual'}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="overflow-x-auto">
+
+        {/* ── Single year: types × months ── */}
+        {(!multiYear || tableMode === 'monthly' && !multiYear) && !multiYear && (
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <th className="text-left px-3 py-2 text-gray-400 font-semibold sticky left-0 bg-white dark:bg-gray-900 min-w-[120px]">Tipo</th>
+                {MONTHS_SHORT.map(m => <th key={m} className="text-right px-2 py-2 text-gray-400 font-semibold min-w-[44px]">{m}</th>)}
+                <th className="text-right px-3 py-2 text-gray-400 font-semibold">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {chartTypes.map(t => {
+                const color  = typeColor(t, customColors)
+                const values = chartRows.map(row => Number(row[`${t.id}_${singleYear}`] ?? 0))
+                const total  = values.reduce((a, b) => a + b, 0)
+                return (
+                  <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/50 dark:hover:bg-gray-800/20">
+                    <td className={tdName}>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                        {t.name}
+                      </span>
+                    </td>
+                    {values.map((v, i) => (
+                      <td key={i} className={`text-right px-2 py-2 tabular-nums ${v > 0.01 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
+                        {v > 0.01 ? v.toFixed(0) : '—'}
+                      </td>
+                    ))}
+                    <td className="text-right px-3 py-2 font-semibold text-gray-800 dark:text-white tabular-nums">
+                      {total > 0.01 ? `${total.toFixed(0)} €` : '—'}
+                    </td>
+                  </tr>
+                )
+              })}
+              <tr className="border-t-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 font-semibold">
+                <td className="px-3 py-2 text-gray-700 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-800/30">Total</td>
+                {MONTHS_SHORT.map((_, mi) => {
+                  const total = chartTypes.reduce((s, t) => s + Number(chartRows[mi]?.[`${t.id}_${singleYear}`] ?? 0), 0)
                   return (
-                    <td key={y} className={`text-right px-3 py-2 tabular-nums ${v > 0.01 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
-                      {v > 0.01 ? `${v.toFixed(0)} €` : '—'}
+                    <td key={mi} className={`text-right px-2 py-2 tabular-nums ${total > 0.01 ? 'text-gray-800 dark:text-white' : 'text-gray-300 dark:text-gray-600'}`}>
+                      {total > 0.01 ? total.toFixed(0) : '—'}
                     </td>
                   )
                 })}
-                <td className={`text-right px-3 py-2 tabular-nums font-medium ${
-                  delta == null ? 'text-gray-400' : delta > 0 ? 'text-red-500' : delta < 0 ? 'text-emerald-500' : 'text-gray-400'
-                }`}>
-                  {delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`}
+                <td className="text-right px-3 py-2 tabular-nums text-gray-800 dark:text-white">
+                  {chartTypes.reduce((s, t) => s + (annualByType[t.id]?.[singleYear] ?? 0), 0).toFixed(0)} €
                 </td>
               </tr>
-            )
-          })}
-          <tr className="border-t-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 font-semibold">
-            <td className="px-3 py-2 text-gray-700 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-800/30">Total</td>
-            {sortedYears.map(y => {
-              const total = chartTypes.reduce((s, t) => s + (annualByType[t.id]?.[y] ?? 0), 0)
-              return (
-                <td key={y} className="text-right px-3 py-2 tabular-nums text-gray-800 dark:text-white">
-                  {total > 0.01 ? `${total.toFixed(0)} €` : '—'}
-                </td>
-              )
-            })}
-            {(() => {
-              const tb = chartTypes.reduce((s, t) => s + (annualByType[t.id]?.[baseYear]   ?? 0), 0)
-              const tl = chartTypes.reduce((s, t) => s + (annualByType[t.id]?.[latestYear] ?? 0), 0)
-              const d  = tb > 0.01 ? ((tl - tb) / tb) * 100 : null
-              return (
-                <td className={`text-right px-3 py-2 tabular-nums font-medium ${
-                  d == null ? 'text-gray-400' : d > 0 ? 'text-red-500' : d < 0 ? 'text-emerald-500' : 'text-gray-400'
-                }`}>
-                  {d == null ? '—' : `${d > 0 ? '+' : ''}${d.toFixed(1)}%`}
-                </td>
-              )
-            })()}
-          </tr>
-        </tbody>
-      </table>
+            </tbody>
+          </table>
+        )}
+
+        {/* ── Multi-year monthly: grouped type → year rows + ∆% ── */}
+        {multiYear && tableMode === 'monthly' && (
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <th className="text-left px-3 py-2 text-gray-400 font-semibold sticky left-0 bg-white dark:bg-gray-900 min-w-[110px]">Tipo · Año</th>
+                {MONTHS_SHORT.map(m => <th key={m} className="text-right px-2 py-2 text-gray-400 font-semibold min-w-[40px]">{m}</th>)}
+                <th className="text-right px-3 py-2 text-gray-400 font-semibold">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {chartTypes.map(t => {
+                const color    = typeColor(t, customColors)
+                const yearData = sortedYears.map(y => ({
+                  y,
+                  vals:  chartRows.map(row => Number(row[`${t.id}_${y}`] ?? 0)),
+                  total: annualByType[t.id]?.[y] ?? 0,
+                }))
+                const baseVals  = yearData.find(d => d.y === baseYear)?.vals   ?? Array(12).fill(0) as number[]
+                const topVals   = yearData.find(d => d.y === latestYear)?.vals ?? Array(12).fill(0) as number[]
+                const baseTotal = yearData.find(d => d.y === baseYear)?.total   ?? 0
+                const topTotal  = yearData.find(d => d.y === latestYear)?.total ?? 0
+
+                return (
+                  <Fragment key={t.id}>
+                    {/* Type header */}
+                    <tr className="bg-gray-50/70 dark:bg-gray-800/30 border-t border-gray-100 dark:border-gray-800">
+                      <td colSpan={14} className="px-3 py-1.5">
+                        <span className="flex items-center gap-1.5 text-[11px] font-bold text-gray-700 dark:text-gray-200 uppercase tracking-wide">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                          {t.name}
+                        </span>
+                      </td>
+                    </tr>
+                    {/* Year rows */}
+                    {yearData.map(({ y, vals, total }) => (
+                      <tr key={y} className="border-b border-gray-50 dark:border-gray-800/40">
+                        <td className="pl-5 pr-3 py-1.5 text-gray-500 dark:text-gray-400 sticky left-0 bg-white dark:bg-gray-900 tabular-nums">{y}</td>
+                        {vals.map((v, i) => (
+                          <td key={i} className={`text-right px-2 py-1.5 tabular-nums ${v > 0.01 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
+                            {v > 0.01 ? v.toFixed(0) : '—'}
+                          </td>
+                        ))}
+                        <td className="text-right px-3 py-1.5 font-semibold tabular-nums text-gray-800 dark:text-white">
+                          {total > 0.01 ? `${total.toFixed(0)} €` : '—'}
+                        </td>
+                      </tr>
+                    ))}
+                    {/* ∆% row: latestYear vs baseYear */}
+                    <tr className="border-b-2 border-gray-100 dark:border-gray-800">
+                      <td className="pl-5 pr-3 py-1 text-[10px] text-gray-400 sticky left-0 bg-white dark:bg-gray-900">
+                        ∆% {baseYear}→{latestYear}
+                      </td>
+                      {topVals.map((tv, i) => {
+                        const bv = (baseVals[i] ?? 0)
+                        const d  = bv > 0.01 ? ((tv - bv) / bv) * 100 : null
+                        return (
+                          <td key={i} className={`text-right px-2 py-1 text-[10px] tabular-nums font-medium ${
+                            d == null ? 'text-gray-300 dark:text-gray-600' : d > 0 ? 'text-red-500' : d < 0 ? 'text-emerald-500' : 'text-gray-400'
+                          }`}>
+                            {d == null ? '—' : `${d > 0 ? '+' : ''}${Math.round(d)}%`}
+                          </td>
+                        )
+                      })}
+                      {(() => {
+                        const d = baseTotal > 0.01 ? ((topTotal - baseTotal) / baseTotal) * 100 : null
+                        return (
+                          <td className={`text-right px-3 py-1 text-[10px] tabular-nums font-medium ${
+                            d == null ? 'text-gray-300 dark:text-gray-600' : d > 0 ? 'text-red-500' : d < 0 ? 'text-emerald-500' : 'text-gray-400'
+                          }`}>
+                            {d == null ? '—' : `${d > 0 ? '+' : ''}${d.toFixed(1)}%`}
+                          </td>
+                        )
+                      })()}
+                    </tr>
+                  </Fragment>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+
+        {/* ── Multi-year annual: types × years + ∆% ── */}
+        {multiYear && tableMode === 'annual' && (
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-gray-100 dark:border-gray-800">
+                <th className="text-left px-3 py-2 text-gray-400 font-semibold sticky left-0 bg-white dark:bg-gray-900 min-w-[120px]">Tipo</th>
+                {sortedYears.map(y => <th key={y} className="text-right px-3 py-2 text-gray-400 font-semibold min-w-[80px]">{y}</th>)}
+                <th className="text-right px-3 py-2 text-gray-400 font-semibold min-w-[80px]">∆% {baseYear}→{latestYear}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {chartTypes.map(t => {
+                const color  = typeColor(t, customColors)
+                const base   = annualByType[t.id]?.[baseYear]   ?? 0
+                const latest = annualByType[t.id]?.[latestYear] ?? 0
+                const delta  = base > 0.01 ? ((latest - base) / base) * 100 : null
+                return (
+                  <tr key={t.id} className="border-b border-gray-50 dark:border-gray-800/60 hover:bg-gray-50/50 dark:hover:bg-gray-800/20">
+                    <td className={tdName}>
+                      <span className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                        {t.name}
+                      </span>
+                    </td>
+                    {sortedYears.map(y => {
+                      const v = annualByType[t.id]?.[y] ?? 0
+                      return (
+                        <td key={y} className={`text-right px-3 py-2 tabular-nums ${v > 0.01 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
+                          {v > 0.01 ? `${v.toFixed(0)} €` : '—'}
+                        </td>
+                      )
+                    })}
+                    <td className={`text-right px-3 py-2 tabular-nums font-medium ${
+                      delta == null ? 'text-gray-400' : delta > 0 ? 'text-red-500' : delta < 0 ? 'text-emerald-500' : 'text-gray-400'
+                    }`}>
+                      {delta == null ? '—' : `${delta > 0 ? '+' : ''}${delta.toFixed(1)}%`}
+                    </td>
+                  </tr>
+                )
+              })}
+              <tr className="border-t-2 border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/30 font-semibold">
+                <td className="px-3 py-2 text-gray-700 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-800/30">Total</td>
+                {sortedYears.map(y => {
+                  const total = chartTypes.reduce((s, t) => s + (annualByType[t.id]?.[y] ?? 0), 0)
+                  return <td key={y} className="text-right px-3 py-2 tabular-nums text-gray-800 dark:text-white">{total > 0.01 ? `${total.toFixed(0)} €` : '—'}</td>
+                })}
+                {(() => {
+                  const tb = chartTypes.reduce((s, t) => s + (annualByType[t.id]?.[baseYear]   ?? 0), 0)
+                  const tl = chartTypes.reduce((s, t) => s + (annualByType[t.id]?.[latestYear] ?? 0), 0)
+                  const d  = tb > 0.01 ? ((tl - tb) / tb) * 100 : null
+                  return (
+                    <td className={`text-right px-3 py-2 tabular-nums font-medium ${d == null ? 'text-gray-400' : d > 0 ? 'text-red-500' : d < 0 ? 'text-emerald-500' : 'text-gray-400'}`}>
+                      {d == null ? '—' : `${d > 0 ? '+' : ''}${d.toFixed(1)}%`}
+                    </td>
+                  )
+                })()}
+              </tr>
+            </tbody>
+          </table>
+        )}
+      </div>
     </div>
   )
 }
@@ -410,11 +537,7 @@ function MovementsPanel({ movements, allTypes, groups, typeMap, typeToGroupMap, 
   )
 
   const togglePanelType = (id: number) => {
-    setPanelTypeFilter(prev => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id); else next.add(id)
-      return next
-    })
+    setPanelTypeFilter(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
   const handleSort = (field: SortField) => {
@@ -451,13 +574,9 @@ function MovementsPanel({ movements, allTypes, groups, typeMap, typeToGroupMap, 
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
       <button type="button" onClick={() => setOpen(v => !v)}
         className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors rounded-xl">
-        <span>
-          Movimientos
-          <span className="ml-2 text-[10px] font-normal text-gray-400">{filtered.length} registros</span>
-        </span>
+        <span>Movimientos<span className="ml-2 text-[10px] font-normal text-gray-400">{filtered.length} registros</span></span>
         {open ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
       </button>
-
       {open && (
         <div className="border-t border-gray-100 dark:border-gray-800">
           {selectedTypes.length > 0 && (
@@ -473,8 +592,7 @@ function MovementsPanel({ movements, allTypes, groups, typeMap, typeToGroupMap, 
               ))}
             </div>
           )}
-
-          <div className="px-4 py-2 border-b border-gray-50 dark:border-gray-800/60 flex items-center gap-2">
+          <div className="px-4 py-2 border-b border-gray-50 dark:border-gray-800/60">
             <button type="button" onClick={() => setShowFilterPanel(v => !v)}
               className="flex items-center gap-1.5 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors">
               <Filter className="w-3.5 h-3.5" />
@@ -486,39 +604,31 @@ function MovementsPanel({ movements, allTypes, groups, typeMap, typeToGroupMap, 
               )}
             </button>
           </div>
-
           {showFilterPanel && (
             <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
               <FilterPanel filter={filter} onChange={setFilter} types={allTypes} groups={groups} />
             </div>
           )}
-
           <div className="flex items-center gap-3 px-4 py-1.5 bg-gray-50/70 dark:bg-gray-800/40 border-b border-gray-100 dark:border-gray-800 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
-            <button type="button" onClick={() => handleSort('date')}
-              className="flex items-center gap-1 w-16 shrink-0 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+            <button type="button" onClick={() => handleSort('date')} className="flex items-center gap-1 w-16 shrink-0 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
               Fecha {sortIcon('date')}
             </button>
-            <button type="button" onClick={() => handleSort('type')}
-              className="flex items-center gap-1 w-20 shrink-0 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+            <button type="button" onClick={() => handleSort('type')} className="flex items-center gap-1 w-20 shrink-0 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
               Tipo {sortIcon('type')}
             </button>
-            <button type="button" onClick={() => handleSort('name')}
-              className="flex items-center gap-1 flex-1 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+            <button type="button" onClick={() => handleSort('name')} className="flex items-center gap-1 flex-1 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
               Nombre {sortIcon('name')}
             </button>
-            <button type="button" onClick={() => handleSort('amount')}
-              className="flex items-center gap-1 justify-end w-20 shrink-0 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+            <button type="button" onClick={() => handleSort('amount')} className="flex items-center gap-1 justify-end w-20 shrink-0 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
               {sortIcon('amount')} Importe
             </button>
             <span className="w-7 shrink-0" />
           </div>
-
           {filtered.map(mv => (
             <MovementRow key={mv.id} movement={mv}
               type={mv.movement_type_id != null ? typeMap[mv.movement_type_id] : undefined}
               onRefresh={onRefresh} />
           ))}
-
           {filtered.length === 0 && (
             <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-6">
               No hay movimientos para los filtros aplicados.
@@ -535,27 +645,20 @@ function MovementsPanel({ movements, allTypes, groups, typeMap, typeToGroupMap, 
 export default function ExpenseControl() {
   const qc = useQueryClient()
 
-  // ── State ─────────────────────────────────────────────────────────────────────
   const [selectedTypeIds, setSelectedTypeIds] = useState<Set<number>>(new Set())
   const [initialized, setInitialized]         = useState(false)
   const [chartKind, setChartKind]             = useState<ChartKind>('bar')
-  const [stacked, setStacked]                 = useState(true)
+  const [stackMode, setStackMode]             = useState<StackMode>('stacked')
   const [showTable, setShowTable]             = useState(false)
   const [activeYears, setActiveYears]         = useState<number[]>([CURRENT_YEAR])
   const [customColors, setCustomColors]       = useState<Record<number, string>>(loadColors)
+  const [typeOrderIds, setTypeOrderIds]       = useState<number[]>(loadTypeOrder)
+  const [dragTypeId, setDragTypeId]           = useState<number | null>(null)
+  const [dragOverId, setDragOverId]           = useState<number | null>(null)
 
   // ── Queries ───────────────────────────────────────────────────────────────────
-  const { data: allTypes = [] } = useQuery({
-    queryKey: ['movement-types'],
-    queryFn: getMovementTypes,
-    staleTime: 5 * 60 * 1000,
-  })
-
-  const { data: groups = [] } = useQuery({
-    queryKey: ['groups'],
-    queryFn: getGroups,
-    staleTime: 5 * 60 * 1000,
-  })
+  const { data: allTypes = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes, staleTime: 5 * 60 * 1000 })
+  const { data: groups   = [] } = useQuery({ queryKey: ['groups'],         queryFn: getGroups,        staleTime: 5 * 60 * 1000 })
 
   const allYears = useMemo(() => [...activeYears].sort((a, b) => a - b), [activeYears])
 
@@ -575,19 +678,18 @@ export default function ExpenseControl() {
 
   const isLoading   = yearQueries.some(q => q.isLoading)
   const primaryYear = Math.max(...allYears)
+  const nYears      = allYears.length
 
-  // ── Init type filter (with persistence) ───────────────────────────────────────
+  // ── Init filter ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (initialized || allTypes.length === 0) return
     setInitialized(true)
     const saved = loadTypeFilter()
-    if (saved !== null) {
-      setSelectedTypeIds(new Set(saved.filter(id => allTypes.some(t => t.id === id))))
-    } else {
-      setSelectedTypeIds(new Set(
-        allTypes.filter(t => EXPENSE_CATEGORIES.has(t.category)).map(t => t.id)
-      ))
-    }
+    setSelectedTypeIds(
+      saved !== null
+        ? new Set(saved.filter(id => allTypes.some(t => t.id === id)))
+        : new Set(allTypes.filter(t => EXPENSE_CATEGORIES.has(t.category)).map(t => t.id))
+    )
   }, [allTypes, initialized])
 
   // ── Derived ───────────────────────────────────────────────────────────────────
@@ -611,10 +713,16 @@ export default function ExpenseControl() {
     [allTypes]
   )
 
-  const chartTypes = useMemo(() =>
-    allTypes.filter(t => selectedTypeIds.has(t.id)).sort((a, b) => a.name.localeCompare(b.name)),
-    [allTypes, selectedTypeIds]
-  )
+  const chartTypes = useMemo(() => {
+    const selected = allTypes.filter(t => selectedTypeIds.has(t.id))
+    return [...selected].sort((a, b) => {
+      const ia = typeOrderIds.indexOf(a.id), ib = typeOrderIds.indexOf(b.id)
+      if (ia >= 0 && ib >= 0) return ia - ib
+      if (ia >= 0) return -1
+      if (ib >= 0) return  1
+      return a.name.localeCompare(b.name)
+    })
+  }, [allTypes, selectedTypeIds, typeOrderIds])
 
   const { chartRows, annualByType } = useMemo(() => {
     const chartRows = MONTHS_SHORT.map(label => {
@@ -627,9 +735,8 @@ export default function ExpenseControl() {
 
     for (const y of allYears) {
       for (const mv of movementsByYear[y] ?? []) {
-        if (mv.movement_type_id == null || !selectedTypeIds.has(mv.movement_type_id)) continue
-        if (!annualByType[mv.movement_type_id]) continue
-        const mi  = new Date(mv.date + 'T00:00:00').getMonth()
+        if (mv.movement_type_id == null || !selectedTypeIds.has(mv.movement_type_id) || !annualByType[mv.movement_type_id]) continue
+        const mi = new Date(mv.date + 'T00:00:00').getMonth()
         const key = `${mv.movement_type_id}_${y}`
         chartRows[mi][key] = Math.round((Number(chartRows[mi][key]) + Math.abs(mv.money)) * 100) / 100
         annualByType[mv.movement_type_id][y] = (annualByType[mv.movement_type_id][y] ?? 0) + Math.abs(mv.money)
@@ -638,16 +745,22 @@ export default function ExpenseControl() {
     return { chartRows, annualByType }
   }, [movementsByYear, allYears, chartTypes, selectedTypeIds])
 
-  // Chart series: sorted newest→oldest for correct opacity (newest = most opaque)
+  // Series: newest first so opacity gradation works (yi=0 = newest)
   const chartSeries = useMemo(() => {
     const newestFirst = [...allYears].sort((a, b) => b - a)
     return allYears.flatMap(y => {
-      const yi = newestFirst.indexOf(y)  // 0 = newest
+      const yi = newestFirst.indexOf(y)
       return chartTypes.map(t => ({ key: `${t.id}_${y}`, color: typeColor(t, customColors), yi, y, t }))
     })
   }, [allYears, chartTypes, customColors])
 
-  // Summary for the primary (most recent active) year
+  // Cumulative transform when stackMode === 'cumulative'
+  const displayRows = useMemo(() => {
+    if (stackMode !== 'cumulative') return chartRows
+    return makeCumulative(chartRows, chartSeries.map(s => s.key))
+  }, [chartRows, chartSeries, stackMode])
+
+  // Summary for primary year
   const summaryData = useMemo(() => {
     const now    = new Date()
     const curKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -673,50 +786,66 @@ export default function ExpenseControl() {
   const toggleType = (id: number) => {
     setSelectedTypeIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); saveTypeFilter(n); return n })
   }
-
   const toggleCategory = (cat: string) => {
     const ids    = (typesByCategory[cat] ?? []).map(t => t.id)
     const allSel = ids.every(id => selectedTypeIds.has(id))
-    setSelectedTypeIds(prev => {
-      const n = new Set(prev)
-      ids.forEach(id => allSel ? n.delete(id) : n.add(id))
-      saveTypeFilter(n)
-      return n
-    })
+    setSelectedTypeIds(prev => { const n = new Set(prev); ids.forEach(id => allSel ? n.delete(id) : n.add(id)); saveTypeFilter(n); return n })
   }
-
   const handleColorChange = (id: number, color: string) => {
     setCustomColors(prev => { const n = { ...prev, [id]: color }; saveColors(n); return n })
   }
-
   const toggleYear = (y: number) => {
     setActiveYears(prev => {
-      if (prev.includes(y)) {
-        if (prev.length === 1) return prev
-        return prev.filter(ay => ay !== y)
-      }
+      if (prev.includes(y)) { if (prev.length === 1) return prev; return prev.filter(ay => ay !== y) }
       return [...prev, y].sort((a, b) => a - b)
     })
   }
+  const handleChartKindChange = (kind: ChartKind) => {
+    setChartKind(kind)
+    setShowTable(false)
+    if (kind === 'line' && stackMode === 'stacked') setStackMode('normal')
+  }
+
+  // Drag-to-reorder legend
+  const handleDragStart = (e: React.DragEvent<HTMLDivElement>, id: number) => {
+    setDragTypeId(id)
+    e.dataTransfer.effectAllowed = 'move'
+  }
+  const handleDragOver = (e: React.DragEvent<HTMLDivElement>, id: number) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDragOverId(id)
+  }
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>, targetId: number) => {
+    e.preventDefault()
+    if (dragTypeId == null || dragTypeId === targetId) { setDragTypeId(null); setDragOverId(null); return }
+    const ids = chartTypes.map(t => t.id)
+    const fi = ids.indexOf(dragTypeId), ti = ids.indexOf(targetId)
+    if (fi < 0 || ti < 0) { setDragTypeId(null); setDragOverId(null); return }
+    const newOrder = [...ids]; newOrder.splice(fi, 1); newOrder.splice(ti, 0, dragTypeId)
+    setTypeOrderIds(newOrder); saveTypeOrder(newOrder)
+    setDragTypeId(null); setDragOverId(null)
+  }
+  const handleDragEnd = () => { setDragTypeId(null); setDragOverId(null) }
 
   const onRefresh = () => allYears.forEach(y => qc.invalidateQueries({ queryKey: ['movements-expense', y] }))
 
-  // Tooltip: parse "typeId_year" dataKey
   const fmtTooltip = (v: unknown, name: string | number | undefined): [string, string] => {
-    const s   = String(name ?? '')
-    const idx = s.indexOf('_')
+    const s   = String(name ?? ''), idx = s.indexOf('_')
     const tid = Number(idx >= 0 ? s.slice(0, idx) : s)
     const yr  = idx >= 0 ? s.slice(idx + 1) : ''
     const tName = typeMap[tid]?.name ?? s
-    return [`${Number(v).toFixed(2)} €`, allYears.length > 1 && yr ? `${tName} (${yr})` : tName]
+    return [`${Number(v).toFixed(2)} €`, nYears > 1 && yr ? `${tName} (${yr})` : tName]
   }
 
-  const axisProps = {
-    tick: { fontSize: 11, fill: '#9ca3af' } as const,
-    axisLine: false as const, tickLine: false as const,
-  }
+  const axisProps = { tick: { fontSize: 11, fill: '#9ca3af' } as const, axisLine: false as const, tickLine: false as const }
 
-  const nYears = allYears.length
+  // Stack mode buttons depend on chart kind
+  const stackModes: { id: StackMode; label: string }[] = chartKind === 'line'
+    ? [{ id: 'normal', label: 'Normal' }, { id: 'cumulative', label: 'Acumulado' }]
+    : [{ id: 'normal', label: 'Normal' }, { id: 'stacked', label: 'Apilado' }, { id: 'cumulative', label: 'Acumulado' }]
+
+  const useStackId = stackMode !== 'normal'  // stacked AND cumulative use stackId
 
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
@@ -731,12 +860,8 @@ export default function ExpenseControl() {
 
       {/* Type filter */}
       <TypeFilterDropdown
-        typesByCategory={typesByCategory}
-        selectedTypeIds={selectedTypeIds}
-        customColors={customColors}
-        onToggleType={toggleType}
-        onToggleCategory={toggleCategory}
-        onColorChange={handleColorChange}
+        typesByCategory={typesByCategory} selectedTypeIds={selectedTypeIds} customColors={customColors}
+        onToggleType={toggleType} onToggleCategory={toggleCategory} onColorChange={handleColorChange}
       />
 
       {/* Summary cards */}
@@ -752,48 +877,55 @@ export default function ExpenseControl() {
       {chartTypes.length > 0 && (
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5 space-y-4">
 
-          {/* Row 1: title + chart-type controls */}
+          {/* Controls row */}
           <div className="flex items-start justify-between gap-3 flex-wrap">
-            <h2 className="text-sm font-semibold text-gray-800 dark:text-white pt-0.5">Evolución mensual</h2>
+            <h2 className="text-sm font-semibold text-gray-800 dark:text-white pt-1">Evolución mensual</h2>
 
             <div className="flex items-center gap-2 flex-wrap">
-              {/* Chart type segmented control */}
-              <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-xs">
-                {(['bar', 'area', 'line'] as const).map(k => (
-                  <button key={k} type="button"
-                    onClick={() => { setChartKind(k); setShowTable(false) }}
-                    className={`px-3 py-1.5 transition-colors ${
-                      chartKind === k && !showTable
-                        ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 font-semibold'
+              {/* Chart kind icons */}
+              <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+                {CHART_KINDS.map(({ id, Icon }) => (
+                  <button key={id} type="button" onClick={() => handleChartKindChange(id)}
+                    title={id === 'bar' ? 'Barras' : id === 'area' ? 'Área' : 'Líneas'}
+                    className={`px-2.5 py-2 transition-colors ${
+                      chartKind === id && !showTable
+                        ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900'
                         : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
                     }`}>
-                    {k === 'bar' ? 'Barras' : k === 'area' ? 'Área' : 'Líneas'}
+                    <Icon className="w-3.5 h-3.5" />
                   </button>
                 ))}
               </div>
 
-              {/* Stacked toggle — only for bar and area */}
-              {!showTable && chartKind !== 'line' && (
-                <label className="flex items-center gap-1.5 text-xs cursor-pointer text-gray-600 dark:text-gray-400 select-none whitespace-nowrap">
-                  <input type="checkbox" checked={stacked} onChange={e => setStacked(e.target.checked)}
-                    className="rounded accent-blue-500" />
-                  Apilado
-                </label>
+              {/* Stack mode buttons — only when not in table */}
+              {!showTable && (
+                <div className="flex rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 text-[11px]">
+                  {stackModes.map(({ id, label }) => (
+                    <button key={id} type="button" onClick={() => setStackMode(id)}
+                      className={`px-2.5 py-1.5 transition-colors whitespace-nowrap ${
+                        stackMode === id
+                          ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 font-semibold'
+                          : 'bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+                      }`}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
               )}
 
-              {/* Table toggle */}
-              <button type="button" onClick={() => setShowTable(v => !v)}
-                className={`text-xs px-3 py-1.5 rounded-lg border transition-colors whitespace-nowrap ${
+              {/* Table icon button */}
+              <button type="button" onClick={() => setShowTable(v => !v)} title="Tabla"
+                className={`px-2.5 py-2 rounded-lg border transition-colors ${
                   showTable
-                    ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 font-semibold border-gray-800 dark:border-gray-100'
+                    ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 border-gray-800 dark:border-gray-100'
                     : 'border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 bg-white dark:bg-gray-900'
                 }`}>
-                Tabla
+                <Table2 className="w-3.5 h-3.5" />
               </button>
             </div>
           </div>
 
-          {/* Row 2: year chips */}
+          {/* Year chips */}
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-[11px] font-semibold text-gray-400 uppercase tracking-wider shrink-0">Años:</span>
             <div className="flex gap-1.5 flex-wrap">
@@ -810,24 +942,41 @@ export default function ExpenseControl() {
             </div>
           </div>
 
-          {/* Legend chips (only in chart mode) */}
+          {/* Legend + year opacity key */}
           {!showTable && (
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-              {chartTypes.map(t => (
-                <span key={t.id} className="flex items-center gap-1.5 text-[11px] text-gray-500 dark:text-gray-400">
-                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: typeColor(t, customColors) }} />
-                  {t.name}
-                  {nYears > 1 && (
-                    <span className="text-[10px] text-gray-300 dark:text-gray-600 ml-0.5">
-                      — reciente sólido, anterior atenuado
+            <div className="space-y-2">
+              {/* Draggable type chips */}
+              <div className="flex flex-wrap gap-x-1 gap-y-1">
+                {chartTypes.map(t => (
+                  <div key={t.id} draggable
+                    onDragStart={e => handleDragStart(e, t.id)}
+                    onDragOver={e => handleDragOver(e, t.id)}
+                    onDrop={e => handleDrop(e, t.id)}
+                    onDragEnd={handleDragEnd}
+                    className={`flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-md cursor-grab active:cursor-grabbing select-none transition-all ${
+                      dragTypeId === t.id ? 'opacity-40 ring-1 ring-blue-300' : ''
+                    } ${
+                      dragOverId === t.id && dragTypeId !== t.id ? 'ring-2 ring-blue-400 bg-blue-50 dark:bg-blue-950/20' : 'hover:bg-gray-50 dark:hover:bg-gray-800/40'
+                    }`}>
+                    <GripVertical className="w-3 h-3 text-gray-300 dark:text-gray-600 shrink-0" />
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: typeColor(t, customColors) }} />
+                    {t.name}
+                  </div>
+                ))}
+              </div>
+
+              {/* Year opacity key — only when multiple years active */}
+              {nYears > 1 && (
+                <div className="flex items-center gap-3 flex-wrap pt-0.5">
+                  {[...allYears].sort((a, b) => b - a).map((y, yi) => (
+                    <span key={y} className="flex items-center gap-1.5 text-[11px] text-gray-400">
+                      <span className="w-5 h-1.5 rounded-full inline-block bg-gray-500"
+                        style={{ opacity: Math.max(0.28, 1 - yi * 0.22) }} />
+                      {y}
                     </span>
-                  )}
-                </span>
-              ))}
-              {nYears > 1 && chartKind === 'line' && (
-                <span className="text-[10px] text-gray-400 dark:text-gray-500 italic self-center">
-                  años anteriores con línea discontinua
-                </span>
+                  ))}
+                  {chartKind === 'line' && <span className="text-[10px] text-gray-400 italic">— años anteriores con línea discontinua</span>}
+                </div>
               )}
             </div>
           )}
@@ -840,53 +989,44 @@ export default function ExpenseControl() {
             <div className="h-72">
               <ResponsiveContainer width="100%" height="100%">
                 {chartKind === 'line' ? (
-                  <LineChart data={chartRows} margin={{ top: 4, right: 8, left: -12, bottom: 4 }}>
+                  <LineChart data={displayRows} margin={{ top: 4, right: 8, left: -12, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.12)" vertical={false} />
                     <XAxis dataKey="month" {...axisProps} />
                     <YAxis {...axisProps} tickFormatter={v => `${v}€`} width={48} />
                     <Tooltip formatter={fmtTooltip} contentStyle={TOOLTIP_STYLE} />
                     {chartSeries.map(s => (
-                      <Line key={s.key} type="monotone" dataKey={s.key}
-                        stroke={s.color}
+                      <Line key={s.key} type="monotone" dataKey={s.key} stroke={s.color}
                         strokeWidth={s.yi === 0 ? 2 : 1.5}
                         strokeOpacity={nYears > 1 ? Math.max(0.4, 1 - s.yi * 0.22) : 1}
                         strokeDasharray={s.yi > 0 ? `${4 + s.yi * 2} 4` : undefined}
-                        dot={false}
-                        activeDot={{ r: 4 }}
-                        connectNulls
-                      />
+                        dot={false} activeDot={{ r: 4 }} connectNulls />
                     ))}
                   </LineChart>
                 ) : chartKind === 'area' ? (
-                  <AreaChart data={chartRows} margin={{ top: 4, right: 8, left: -12, bottom: 4 }}>
+                  <AreaChart data={displayRows} margin={{ top: 4, right: 8, left: -12, bottom: 4 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.12)" vertical={false} />
                     <XAxis dataKey="month" {...axisProps} />
                     <YAxis {...axisProps} tickFormatter={v => `${v}€`} width={48} />
                     <Tooltip formatter={fmtTooltip} contentStyle={TOOLTIP_STYLE} />
                     {chartSeries.map(s => (
                       <Area key={s.key} type="monotone" dataKey={s.key}
-                        stroke={s.color}
-                        fill={s.color}
-                        strokeWidth={1.5}
+                        stroke={s.color} fill={s.color} strokeWidth={1.5}
                         strokeOpacity={nYears > 1 ? Math.max(0.4, 1 - s.yi * 0.2) : 1}
                         fillOpacity={nYears > 1 ? Math.max(0.06, 0.22 - s.yi * 0.07) : 0.22}
-                        stackId={stacked ? String(s.y) : undefined}
-                        connectNulls
-                      />
+                        stackId={useStackId ? String(s.y) : undefined}
+                        connectNulls />
                     ))}
                   </AreaChart>
                 ) : (
-                  <BarChart data={chartRows} margin={{ top: 4, right: 8, left: -12, bottom: 4 }} barCategoryGap="22%">
+                  <BarChart data={displayRows} margin={{ top: 4, right: 8, left: -12, bottom: 4 }} barCategoryGap="22%">
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.12)" vertical={false} />
                     <XAxis dataKey="month" {...axisProps} />
                     <YAxis {...axisProps} tickFormatter={v => `${v}€`} width={48} />
                     <Tooltip formatter={fmtTooltip} contentStyle={TOOLTIP_STYLE} />
                     {chartSeries.map(s => (
-                      <Bar key={s.key} dataKey={s.key}
-                        fill={s.color}
+                      <Bar key={s.key} dataKey={s.key} fill={s.color}
                         fillOpacity={nYears > 1 ? Math.max(0.35, 1 - s.yi * 0.22) : 1}
-                        stackId={stacked ? String(s.y) : undefined}
-                      />
+                        stackId={useStackId ? String(s.y) : undefined} />
                     ))}
                   </BarChart>
                 )}
@@ -896,17 +1036,12 @@ export default function ExpenseControl() {
         </div>
       )}
 
-      {/* Movements panel */}
+      {/* Movements */}
       <MovementsPanel
         movements={movementsByYear[primaryYear] ?? []}
-        allTypes={allTypes}
-        groups={groups}
-        typeMap={typeMap}
-        typeToGroupMap={typeToGroupMap}
-        selectedTypeIds={selectedTypeIds}
-        onRefresh={onRefresh}
+        allTypes={allTypes} groups={groups} typeMap={typeMap}
+        typeToGroupMap={typeToGroupMap} selectedTypeIds={selectedTypeIds} onRefresh={onRefresh}
       />
-
     </div>
   )
 }
