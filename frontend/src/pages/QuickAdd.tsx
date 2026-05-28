@@ -1,15 +1,19 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTemplates } from '../api/templates'
 import { useNavigate } from 'react-router-dom'
-import { Check, Delete, ChevronDown, X } from 'lucide-react'
+import { Check, Delete, ChevronDown, X, Upload, Loader2, AlertCircle, Receipt, ShoppingCart, Package, Leaf, RotateCcw } from 'lucide-react'
 import { createMovement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getAccountsSummary } from '../api/accounts'
+import { analyzeTicket, attachTicketToMovement, updateTicketMeta, type Ticket } from '../api/tickets'
+import { compressTicketImage } from '../utils/imageCompressor'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDarkMode } from '../hooks/useDarkMode'
 import { type MovementTemplate } from '../utils/recurringTemplates'
 import { t } from '../utils/i18n'
+import MovementForm from '../components/MovementForm'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -207,6 +211,283 @@ function TemplatePicker({ templates, onApply, onClose }: {
   )
 }
 
+// ── Inline editable field for SpeedMode ticket header ─────────────────────────
+
+function SpeedMetaField({ value, placeholder, type = 'text', className = '', format, onSave }: {
+  value: string; placeholder?: string; type?: 'text' | 'date'
+  className?: string; format?: (v: string) => string; onSave: (v: string) => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [draft, setDraft] = useState(value)
+
+  const commit = (v: string) => { setEditing(false); if (v !== value) onSave(v) }
+  const display = format ? format(value) : value
+
+  if (editing) {
+    return (
+      <input
+        type={type}
+        autoFocus
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={e => commit(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur(); if (e.key === 'Escape') { setEditing(false); setDraft(value) } }}
+        className={`${className} bg-transparent border-b border-blue-400 outline-none w-full`}
+      />
+    )
+  }
+  return (
+    <p className={`${className} cursor-text`} onClick={() => { setDraft(value); setEditing(true) }}>
+      {display || <span className="opacity-40">{placeholder}</span>}
+    </p>
+  )
+}
+
+// ── Ticket tab ────────────────────────────────────────────────────────────────
+
+const SUPPLIES_CATS = new Set([
+  'Cuidado del cabello', 'Cuidado facial y corporal',
+  'Fitoterapia y parafarmacia', 'Limpieza y hogar',
+  'Maquillaje', 'Mascotas',
+])
+
+type MovMode = 'food' | 'supplies' | 'combined'
+
+interface MovFormCfg {
+  mode: MovMode
+  name: string
+  money: string
+  date: string
+  movement_type_id: string
+}
+
+function TicketTab(_: { movementTypes: MovementType[] }) {
+  const qc = useQueryClient()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [ticket, setTicket]     = useState<Ticket | null>(null)
+  const [error,  setError]      = useState<string | null>(null)
+  const [done,   setDone]       = useState<Set<MovMode>>(new Set())
+  const [movForm, setMovForm]   = useState<MovFormCfg | null>(null)
+
+  const analyzeMut = useMutation({
+    mutationFn: analyzeTicket,
+    onSuccess: t => { setTicket(t); setError(null); setDone(new Set()) },
+    onError: (err: unknown) => {
+      const e = err as { response?: { status?: number; data?: { detail?: unknown } }; message?: string }
+      const status  = e?.response?.status
+      const detail  = e?.response?.data?.detail
+      const detailStr = typeof detail === 'string' ? detail : detail ? JSON.stringify(detail) : null
+      setError(
+        detailStr  ? `Error ${status ?? ''}: ${detailStr}` :
+        status     ? `Error HTTP ${status} al analizar el ticket.` :
+        e?.message ? `Error de red: ${e.message}` :
+        'No se pudo analizar el ticket.',
+      )
+    },
+  })
+
+  const handleFile = async (file: File) => {
+    setTicket(null); setError(null); setDone(new Set())
+    analyzeMut.mutate(await compressTicketImage(file))
+  }
+
+  // Per-mode totals
+  const foodTotal = ticket
+    ? Object.entries(ticket.categories).filter(([c]) => !SUPPLIES_CATS.has(c)).reduce((s, [, v]) => s + v, 0)
+    : 0
+  const suppliesTotal = ticket
+    ? Object.entries(ticket.categories).filter(([c]) => SUPPLIES_CATS.has(c)).reduce((s, [, v]) => s + v, 0)
+    : 0
+  const combinedTotal = ticket ? (ticket.total ?? foodTotal + suppliesTotal) : 0
+
+  const openMovForm = (mode: MovMode) => {
+    if (!ticket) return
+    const total = mode === 'food' ? foodTotal : mode === 'supplies' ? suppliesTotal : combinedTotal
+    const prefKey = mode === 'food' ? 'ticket_food_type_id' : mode === 'supplies' ? 'ticket_supplies_type_id' : 'ticket_combined_type_id'
+    const typeId = localStorage.getItem(prefKey) ?? ''
+    const modeLabel = mode === 'food' ? 'Comida' : mode === 'supplies' ? 'Suministros' : 'Completo'
+    setMovForm({
+      mode,
+      name: `${ticket.store_name?.trim() || 'Ticket'} — ${modeLabel}`,
+      money: total.toFixed(2),
+      date: ticket.ticket_date ?? new Date().toISOString().slice(0, 10),
+      movement_type_id: typeId,
+    })
+  }
+
+  const handleMovCreated = async (movId: number) => {
+    if (!ticket || !movForm) return
+    try { await attachTicketToMovement(ticket.id, movId, movForm.mode) } catch {}
+    setDone(prev => new Set([...prev, movForm.mode]))
+    qc.invalidateQueries({ queryKey: ['tickets'] })
+    setMovForm(null)
+  }
+
+  const MOV_OPTS: { mode: MovMode; label: string; Icon: React.ComponentType<{ className?: string }>; color: string; total: number }[] = [
+    { mode: 'food',     label: 'Comida',       Icon: ShoppingCart, color: '#10b981', total: foodTotal     },
+    { mode: 'supplies', label: 'Suministros',  Icon: Package,      color: '#8b5cf6', total: suppliesTotal },
+    { mode: 'combined', label: 'Todo',         Icon: Leaf,         color: '#3b82f6', total: combinedTotal },
+  ]
+
+  return (
+    <div className="flex-1 overflow-y-auto">
+      {/* ── Upload area ── */}
+      {!ticket && !analyzeMut.isPending && (
+        <div className="p-5 space-y-4">
+          {error && (
+            <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-2xl text-sm text-red-600 dark:text-red-400">
+              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+              {error}
+            </div>
+          )}
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,application/pdf"
+            className="hidden"
+            onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }}
+          />
+          {/* Camera button */}
+          <button
+            onClick={() => { fileRef.current?.setAttribute('capture', 'environment'); fileRef.current?.click() }}
+            className="w-full h-28 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-colors active:scale-[0.98]"
+          >
+            <Upload className="w-7 h-7" />
+            <span className="text-sm font-medium">Hacer foto o subir imagen / PDF</span>
+            <span className="text-xs text-gray-400">El sistema extraerá productos y precios automáticamente</span>
+          </button>
+          {/* Gallery / file picker */}
+          <button
+            onClick={() => { fileRef.current?.removeAttribute('capture'); fileRef.current?.click() }}
+            className="w-full py-3 rounded-2xl bg-gray-100 dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors active:scale-[0.98]"
+          >
+            Elegir desde galería o archivos
+          </button>
+        </div>
+      )}
+
+      {/* ── Analyzing ── */}
+      {analyzeMut.isPending && (
+        <div className="flex flex-col items-center justify-center gap-3 py-20">
+          <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+          <span className="text-sm text-gray-500 dark:text-gray-400">Analizando ticket…</span>
+        </div>
+      )}
+
+      {/* ── Results ── */}
+      {ticket && (
+        <div className="p-5 space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <SpeedMetaField
+                value={ticket.store_name ?? 'Supermercado'}
+                placeholder="Nombre del establecimiento"
+                className="text-base font-semibold text-gray-800 dark:text-white"
+                onSave={v => updateTicketMeta(ticket.id, { store_name: v }).then(t => setTicket(t))}
+              />
+              <SpeedMetaField
+                value={ticket.ticket_date ?? ''}
+                placeholder="Añadir fecha"
+                type="date"
+                className="text-xs text-gray-400"
+                format={v => v ? new Date(v + 'T00:00:00').toLocaleDateString('es-ES', { day: 'numeric', month: 'long', year: 'numeric' }) : ''}
+                onSave={v => updateTicketMeta(ticket.id, { ticket_date: v }).then(t => setTicket(t))}
+              />
+            </div>
+            <button
+              onClick={() => { setTicket(null); setError(null) }}
+              className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors py-1 px-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 shrink-0"
+            >
+              <RotateCcw className="w-3.5 h-3.5" /> Nuevo
+            </button>
+          </div>
+
+          {/* Products list */}
+          {ticket.items.length > 0 ? (
+            <div className="rounded-2xl border border-gray-100 dark:border-gray-800 overflow-hidden">
+              <div className="grid grid-cols-[1fr_auto] px-3 py-1.5 bg-gray-50 dark:bg-gray-800/60 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
+                <span>Producto</span>
+                <span className="text-right">Precio</span>
+              </div>
+              <div className="divide-y divide-gray-50 dark:divide-gray-800/60 max-h-56 overflow-y-auto">
+                {ticket.items.map((item, i) => (
+                  <div key={i} className="grid grid-cols-[1fr_auto] items-center px-3 py-2">
+                    <div className="min-w-0">
+                      <p className="text-sm text-gray-800 dark:text-white truncate">{item.name}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{item.category}</p>
+                    </div>
+                    <span className="text-sm font-medium text-gray-700 dark:text-gray-300 ml-3 whitespace-nowrap">
+                      {item.amount.toFixed(2)} €
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <p className="text-sm text-gray-400 text-center py-4">No se detectaron productos.</p>
+          )}
+
+          {/* Movement buttons */}
+          <div className="space-y-2.5">
+            {MOV_OPTS.filter(o => o.total > 0.005).map(({ mode, label, Icon, color, total }) => {
+              const isDone = done.has(mode)
+              return (
+                <button
+                  key={mode}
+                  onClick={() => !isDone && openMovForm(mode)}
+                  disabled={isDone}
+                  className="w-full flex items-center justify-between px-4 py-3.5 rounded-2xl transition-all active:scale-[0.98]"
+                  style={{
+                    background: isDone ? undefined : color + '18',
+                    borderWidth: 1,
+                    borderStyle: 'solid',
+                    borderColor: isDone ? undefined : color + '55',
+                    backgroundColor: isDone ? undefined : undefined,
+                    opacity: isDone ? 0.7 : 1,
+                  }}
+                  {...(isDone ? { className: 'w-full flex items-center justify-between px-4 py-3.5 rounded-2xl bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800' } : {})}
+                >
+                  <span className="flex items-center gap-2.5">
+                    <span className="w-7 h-7 rounded-full flex items-center justify-center" style={{ background: isDone ? '#10b981' + '22' : color + '22', color: isDone ? '#10b981' : color }}>
+                      {isDone
+                        ? <Check className="w-4 h-4" />
+                        : <Icon className="w-4 h-4" />}
+                    </span>
+                    <span className="text-sm font-semibold" style={{ color: isDone ? '#10b981' : color }}>
+                      {isDone ? `${label} — creado` : `Crear movimiento · ${label}`}
+                    </span>
+                  </span>
+                  {!isDone && (
+                    <span className="text-sm font-bold" style={{ color }}>
+                      {total.toFixed(2)} €
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* MovementForm modal */}
+      {movForm && createPortal(
+        <MovementForm
+          onClose={() => setMovForm(null)}
+          initialValues={{
+            name: movForm.name,
+            money: movForm.money,
+            date: movForm.date,
+            movement_type_id: movForm.movement_type_id || undefined,
+          }}
+          onMovementCreated={handleMovCreated}
+        />,
+        document.body,
+      )}
+    </div>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function QuickAdd() {
@@ -306,22 +587,42 @@ export default function QuickAdd() {
   const clrBg        = isGreen ? 'bg-green-50 dark:bg-green-950/20' : 'bg-red-50 dark:bg-red-950/20'
   const selectedType = allTypes.find(t => t.id === typeId)
 
+  const [tab, setTab] = useState<'movement' | 'ticket'>('movement')
+
   return (
     // h-full respects CSS zoom unlike h-screen (100vh ignores zoom on <html>)
     <div className="flex flex-col bg-white dark:bg-gray-950 max-w-md mx-auto h-full overflow-hidden">
 
-      {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto">
-
-        {/* Cancel */}
-        <div className="flex items-center px-5 pt-5 pb-1">
+      {/* Header: cancel + tabs */}
+      <div className="shrink-0 flex items-center gap-3 px-5 pt-5 pb-3">
+        <button
+          onClick={() => navigate(-1)}
+          className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors shrink-0"
+        >
+          Cancelar
+        </button>
+        <div className="flex-1 flex rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 text-sm">
           <button
-            onClick={() => navigate(-1)}
-            className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors"
+            onClick={() => setTab('movement')}
+            className={`flex-1 py-1.5 font-medium transition-colors ${tab === 'movement' ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900' : 'bg-white dark:bg-gray-900 text-gray-400 dark:text-gray-500'}`}
           >
-            Cancelar
+            Movimiento
+          </button>
+          <button
+            onClick={() => setTab('ticket')}
+            className={`flex-1 py-1.5 font-medium transition-colors flex items-center justify-center gap-1.5 ${tab === 'ticket' ? 'bg-gray-900 dark:bg-gray-100 text-white dark:text-gray-900' : 'bg-white dark:bg-gray-900 text-gray-400 dark:text-gray-500'}`}
+          >
+            <Receipt className="w-3.5 h-3.5" />
+            Ticket
           </button>
         </div>
+      </div>
+
+      {/* Ticket tab */}
+      {tab === 'ticket' && <TicketTab movementTypes={allTypes} />}
+
+      {/* Movement tab — Scrollable content */}
+      {tab === 'movement' && <div className="flex-1 overflow-y-auto">
 
         {/* Editable name */}
         <div className="px-6 pt-3 pb-2">
@@ -432,29 +733,31 @@ export default function QuickAdd() {
         </div>
 
         <div className="h-4" />
-      </div>
+      </div>}
 
-      {/* Save button — always visible at bottom */}
-      <div className="shrink-0 px-5 py-4 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
-        <button
-          onClick={() => mutation.mutate()}
-          disabled={!canSave || mutation.isPending || saved}
-          className={`w-full h-14 rounded-2xl text-base font-bold transition-all active:scale-[0.97] disabled:opacity-40
-            ${saved
-              ? 'bg-green-500 text-white'
-              : isGreen
-                ? 'bg-green-500 hover:bg-green-600 text-white'
-                : 'bg-red-500 hover:bg-red-600 text-white'}`}
-        >
-          {saved ? (
-            <span className="flex items-center justify-center gap-2">
-              <Check className="w-5 h-5" /> ¡Guardado!
-            </span>
-          ) : mutation.isPending ? t('quickadd.saving') : (
-            `${t('quickadd.save')}${canSave ? ` ${fmt(value, 2)}` : ''}`
-          )}
-        </button>
-      </div>
+      {/* Save button — only in movement tab */}
+      {tab === 'movement' && (
+        <div className="shrink-0 px-5 py-4 bg-white dark:bg-gray-950 border-t border-gray-100 dark:border-gray-800">
+          <button
+            onClick={() => mutation.mutate()}
+            disabled={!canSave || mutation.isPending || saved}
+            className={`w-full h-14 rounded-2xl text-base font-bold transition-all active:scale-[0.97] disabled:opacity-40
+              ${saved
+                ? 'bg-green-500 text-white'
+                : isGreen
+                  ? 'bg-green-500 hover:bg-green-600 text-white'
+                  : 'bg-red-500 hover:bg-red-600 text-white'}`}
+          >
+            {saved ? (
+              <span className="flex items-center justify-center gap-2">
+                <Check className="w-5 h-5" /> ¡Guardado!
+              </span>
+            ) : mutation.isPending ? t('quickadd.saving') : (
+              `${t('quickadd.save')}${canSave ? ` ${fmt(value, 2)}` : ''}`
+            )}
+          </button>
+        </div>
+      )}
 
       {showTypePicker && (
         <TypePicker

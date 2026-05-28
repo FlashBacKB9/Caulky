@@ -1,0 +1,1302 @@
+import os
+import re
+import json
+import uuid
+import shutil
+from datetime import date as _date
+from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi.responses import FileResponse
+from pydantic import BaseModel as PydanticModel
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_db
+from app.models.ticket import Ticket
+from app.models.item_category_rule import ItemCategoryRule
+from app.models.movement import Movement as MovementModel
+from app.models.movement_file import MovementFile
+from app.schemas.ticket import TicketRead
+from app.auth.setup import current_active_user
+from app.models.user import User
+
+# ── Category groups ────────────────────────────────────────────────────────────
+
+SUPPLIES_CATEGORIES = frozenset({
+    "Cuidado del cabello", "Cuidado facial y corporal",
+    "Fitoterapia y parafarmacia", "Limpieza y hogar",
+    "Maquillaje", "Mascotas",
+})
+
+UPLOAD_DIR = os.environ.get("CAULKY_UPLOADS_DIR") or os.path.join(
+    os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "uploads"
+)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
+
+router = APIRouter(prefix="/tickets", tags=["tickets"])
+
+# ── Categories + keywords ──────────────────────────────────────────────────────
+
+CATEGORIES: dict[str, list[str]] = {
+    "Aceites especias y salsas": [
+        "aceite", "oliva", "girasol", "vinagre", "sal ", "pimienta", "oregano",
+        "pimenton", "mayonesa", "ketchup", "mostaza", "salsa", "especias", "tomillo",
+        "laurel", "canela", "comino", "curry", "nuez moscada", "alioli", "sriracha",
+    ],
+    "Agua y refrescos": [
+        "agua ", "aquarius", "coca-cola", "cocacola", "pepsi", "fanta", "sprite",
+        "refresco", "tonica", "bitter", "seven up", "nestea", "isotonica", "powerade",
+        "gatorade", "monster", "red bull", "casera",
+    ],
+    "Aperitivos": [
+        "patatas fritas", "chips", "nachos", "palomitas", "pistachos", "cacahuetes",
+        "almendras", "gusanitos", "doritos", "ruffles", "pringles", "aperitivo",
+        "snack", "frutos secos", "nueces", "pipas", "anacardos", "mix frutos",
+    ],
+    "Arroz legumbres y pasta": [
+        "arroz", "pasta", "macarron", "espaguet", "fideo", "lenteja", "garbanzo",
+        "judia", "haba", "alubia", "soja", "quinoa", "cous cous", "bulgur",
+        "tagliatelle", "penne", "lasaña seca", "canelones secos",
+    ],
+    "Azúcar caramelos y chocolate": [
+        "azucar", "chocolate", "caramelo", "golosina", "chuche", "gominola",
+        "regaliz", "turron", "mazapan", "bombon", "tableta choco", "praline",
+        "nougat", "kinder", "ferrero", "kit kat", "snickers", "twix", "toblerone",
+    ],
+    "Bebé": [
+        "pañal", "potito", "leche infantil", "cereales bebe", "toallitas bebe",
+        "crema bebe", "suero fisiologico", "chupete", "biberón", "papilla",
+    ],
+    "Bodega": [
+        "vino", "cerveza", "cava", "champan", "sidra", "ron ", "whisky", "vodka",
+        "gin ", "licor", "tequila", "brandy", "vermut", "jerez", "oporto", "rioja",
+        "rueda", "ribera", "albariño", "ribeiro", "mahou", "estrella", "cruzcampo",
+        "heineken", "coronita", "amstel", "san miguel", "alhambra",
+    ],
+    "Cacao café e infusiones": [
+        "cafe ", "café", "descafeinado", "nescafe", "cola cao", "colacao",
+        "nesquik", "cacao", "te ", "manzanilla", "poleo", "infusion", "tila",
+        "rooibos", "capuchino", "espresso", "lungo", "dolce gusto", "senseo",
+    ],
+    "Carne": [
+        "pollo", "cerdo", "ternera", "cordero", "pavo fresco", "carne", "filete",
+        "pechuga", "muslo", "costilla", "chuleta", "hamburguesa", "jamon fresco",
+        "lomo fresco", "falda", "morcillo", "carrillada", "codillo", "secreto",
+        "entrecot", "solomillo", "redondo", "alita", "contramuslo",
+    ],
+    "Cereales y galletas": [
+        "cereal", "corn flake", "muesli", "galleta", "maria ", "digestive",
+        "palito", "cracker", "copos avena", "granola", "kellogg", "nestle cereales",
+        "cookie", "oreo", "chips ahoy", "barquillo",
+    ],
+    "Charcutería y quesos": [
+        "jamon serrano", "jamon cocido", "salchichon", "chorizo", "fuet",
+        "mortadela", "queso", "pavo cocido", "pate", "sobrasada", "fiambre",
+        "lonchas", "cecina", "morcilla", "butifarra", "salami", "pepperoni",
+        "york ", "pechuga pavo",
+    ],
+    "Congelados": [
+        "congelad", "helado", "pizza congelada", "verduras cong", "guisantes cong",
+        "croqueta congelada", "canelones congelados", "lasaña congelada",
+        "patatas congeladas", "gambas congeladas", "merluza congelada",
+    ],
+    "Conservas caldos y cremas": [
+        "atun ", "sardina", "mejillon lata", "lata ", "conserva", "caldo",
+        "sopa sobre", "crema bote", "tomate frito", "tomate triturado", "pisto",
+        "escabeche", "berberecho", "navajuela", "pulpo lata", "bonito lata",
+        "fabada lata", "cocido lata", "lentejas lata",
+    ],
+    "Cuidado del cabello": [
+        "champu", "acondicionador", "tinte pelo", "gel capilar", "laca",
+        "mascarilla pelo", "serum capilar", "suavizante pelo",
+    ],
+    "Cuidado facial y corporal": [
+        "jabon ", "gel de ducha", "gel ducha", "crema hidra", "desodorante",
+        "antitranspirante", "locion", "aftershave", "colonia", "perfume",
+        "protector solar", "pasta dientes", "cepillo dientes", "hilo dental",
+        "enjuague", "espuma afeitar", "maquinilla", "tonico facial",
+    ],
+    "Fitoterapia y parafarmacia": [
+        "vitamina", "suplemento", "melatonina", "magnesio", "omega", "probiotico",
+        "collageno", "zinc ", "hierro suple", "echinacea", "propolis",
+    ],
+    "Fruta y verdura": [
+        "manzana", "pera ", "platano", "naranja", "limon", "fresa", "uva ",
+        "melocoton", "albaricoque", "sandia", "melon", "kiwi", "mango",
+        "tomate", "patata", "zanahoria", "cebolla", "ajo ", "lechuga",
+        "espinaca", "brocoli", "coliflor", "pimiento", "calabacin", "berenjena",
+        "pepino", "apio", "puerro", "aguacate", "ciruela", "cereza",
+        "mandarina", "pomelo", "higo", "frambuesa", "arandano", "verdura",
+        "fruta ", "ensalada", "rucula", "canons", "escarola",
+    ],
+    "Huevos leche y mantequilla": [
+        "huevo", "leche ", "mantequilla", "margarina", "nata ", "crema leche",
+        "leche evaporada", "leche condensada", "leche sin lactosa",
+    ],
+    "Limpieza y hogar": [
+        "detergente", "suavizante", "limpiahogar", "friegasuelos", "limpiacristales",
+        "lejia", "amoniaco", "bayeta", "fregona", "papel higienico", "papel cocina",
+        "bolsa basura", "esponja", "quitamanchas", "limpiador", "wc", "inodoro",
+        "baño limpia", "cocina limpia", "multiusos", "domestos", "fairy", "mistol",
+        "ariel", "persil", "skip ", "dixan", "colon ", "norit",
+    ],
+    "Maquillaje": [
+        "maquillaje", "base maquillaje", "colorete", "sombra ojos", "labial",
+        "pintaunas", "rimmel", "mascara ojos", "corrector", "contorno",
+    ],
+    "Marisco y pescado": [
+        "salmon", "merluza", "bacalao", "atun fresco", "dorada", "lubina",
+        "gamba", "langostino", "sepia", "calamar", "almeja", "mejillon fresco",
+        "pescado", "rape", "boquerones", "anchoas frescas", "trucha", "rodaballo",
+        "lenguado", "pulpo fresco", "navaja", "chirla", "berberecho fresco",
+    ],
+    "Mascotas": [
+        "pienso", "comida gato", "comida perro", "arena gato", "purina",
+        "whiskas", "royal canin", "felix gato", "pedigree", "friskies",
+        "snack mascota", "antiparasitario",
+    ],
+    "Panadería y pastelería": [
+        "pan ", "barra pan", "hogaza", "baguette", "cruasan", "croissant",
+        "brioche", "magdalena", "bizcocho", "tarta", "pastel", "bollo",
+        "rosquilla", "donuts", "pan molde", "tostada", "pan integral",
+        "pan artesano", "chapata", "ciabatta", "tortitas", "crepe",
+    ],
+    "Pizzas y platos preparados": [
+        "pizza", "lasaña prep", "canelones prep", "empanada", "croqueta",
+        "nugget", "plato preparado", "precocinado", "cocido prep",
+        "paella preparada", "arroz prep", "wok prep", "wrap", "burrito",
+        "fajita", "taco prep",
+    ],
+    "Postres y yogures": [
+        "yogur", "yogurt", "postre", "natillas", "mousse", "flan",
+        "gelatina", "arroz con leche", "cuajada", "petit suisse",
+        "danonino", "activia",
+    ],
+    "Zumos": [
+        "zumo", "nectar", "jugo ", "don simon", "tropicana", "granini",
+        "zumosol", "minute maid", "rich ",
+    ],
+}
+
+SKIP_WORDS = {
+    "total", "subtotal", "iva", "ticket", "importe", "efectivo", "tarjeta",
+    "cambio", "euros", "fecha", "hora", "cajero", "caja", "centro", "tienda", "gracias",
+    "unidades", "descuento", "ahorro", "puntos", "oferta", "precio",
+    "operacion", "n.operacion", "cif", "nif", "direccion", "telefono",
+    "web", "bienvenido", "bienvenida", "www", "factura", "albaran",
+    "base imp", "cuota", "tipo", "suma", "pagado", "devolucion", "entregado",
+}
+
+
+_VALID_CATEGORIES = sorted(CATEGORIES.keys()) + ["Sin categoría"]
+
+# Comma-separated string for use in AI prompts
+_CATEGORIES_LIST = ", ".join(f'"{c}"' for c in _VALID_CATEGORIES)
+
+
+def _categorize(name: str) -> str:
+    name_lower = name.lower()
+    for cat, keywords in CATEGORIES.items():
+        for kw in keywords:
+            if kw in name_lower:
+                return cat
+    return "Sin categoría"
+
+
+def _parse_ticket_lines(text: str, custom_rules: dict[str, str] | None = None) -> list[dict]:
+    """Extract item lines from raw OCR/PDF text.
+
+    Handles supermarket receipts with one or two price columns:
+      - Single-price:  PRODUCT_NAME  1,99
+      - Dual-price:    2 PRODUCT_NAME  1,19  2,38   (unit + total)
+    Always takes the *last* price on the line as the total amount.
+    Also strips OCR garbage that may appear before the leading quantity digit.
+    """
+    rules = custom_rules or {}
+    items: list[dict] = []
+    # Allow 1 OR 2 decimal digits so "5,0" (OCR drop of trailing zero) is accepted.
+    any_price_re = re.compile(r'-?\d{1,4}[,.]\d{1,2}')
+
+    lines = text.splitlines()
+
+    # Stop before the TOTAL / TARJETA / DETALLE line — everything after that is
+    # payment summary and IVA table, not products.
+    cutoff = len(lines)
+    for i, line in enumerate(lines):
+        if i < max(4, len(lines) // 5):   # ignore the first ~20 % of lines
+            continue
+        low_l = line.strip().lower()
+        if re.match(r'^(total\b|tarjeta\b|detalle\b)', low_l):
+            cutoff = i
+            break
+
+    # Track a product name that had no price on its line (e.g. BOLLERIA GRANE),
+    # so we can assign the price from the next line (the weight sub-line).
+    pending_name: str | None = None
+
+    for line in lines[:cutoff]:
+        line = line.strip()
+        if not line or len(line) < 4:
+            continue
+
+        price_spans = [(m.start(), m.end(), m.group()) for m in any_price_re.finditer(line)]
+        is_weight = bool(re.search(r'\bkg\b|€/kg|€/ud', line, re.IGNORECASE))
+
+        # ── Pending-name resolution ──────────────────────────────────────────────
+        # A previous line had a product name but no price (e.g. "1 BOLLERIA GRANE").
+        # If this line has a price and no new product name, assign the price here.
+        if pending_name is not None:
+            has_own_product = (
+                bool(re.search(r'\d+\s+[A-ZÁÉÍÓÚÜÑ]', line, re.UNICODE))
+                and bool(price_spans)
+            )
+            if price_spans and not has_own_product:
+                try:
+                    p = float(price_spans[-1][2].replace(',', '.'))
+                    if p > 0:
+                        cat = rules.get(pending_name.lower()) or _categorize(pending_name)
+                        items.append({"name": pending_name.title(), "amount": round(p, 2), "category": cat})
+                except ValueError:
+                    pass
+                pending_name = None
+                if is_weight:
+                    continue   # weight sub-line fully consumed
+            else:
+                pending_name = None
+
+        # ── 2-3 digit integer fallback ───────────────────────────────────────────
+        # OCR sometimes drops the decimal separator:
+        #   "1,50" → "150" (3 digits) → divide by 100 → 1.50
+        #   "1,5"  → "15"  (2 digits) → divide by  10 → 1.5
+        # Only applied when NO decimal price was found on this line.
+        fallback_price: float | None = None
+        if not price_spans:
+            m_int = re.search(r'(?<!\d)(\d{2,3})(?!\d)', line)
+            if m_int:
+                try:
+                    digs = m_int.group(1)
+                    val = int(digs) / (100.0 if len(digs) == 3 else 10.0)
+                    if 0.10 <= val <= 50.0:
+                        fallback_price = val
+                        price_spans = [(m_int.start(), m_int.end(), digs)]
+                except ValueError:
+                    pass
+
+        if not price_spans:
+            # No price at all — check if it's a name-only product line whose
+            # price will appear on the very next line (e.g. weight items).
+            m_pname = re.search(r'\d+\s+([A-ZÁÉÍÓÚÜÑ][A-ZÁÉÍÓÚÜÑ\s.]+)', line, re.UNICODE)
+            if m_pname:
+                candidate = m_pname.group(1).strip()
+                # Drop trailing isolated uppercase chars (OCR noise)
+                candidate = re.sub(r'\s+[A-Z]{1,2}$', '', candidate).strip()
+                low_c = candidate.lower()
+                if (len(candidate) >= 3
+                        and not any(skip in low_c for skip in SKIP_WORDS)
+                        and not re.search(r'descripci|precio|importe|unidad', low_c)):
+                    pending_name = candidate
+            continue
+
+        # ── Normal processing ────────────────────────────────────────────────────
+        last_start, _last_end, last_price_str = price_spans[-1]
+        raw_name = line[:last_start].strip()
+
+        if not raw_name or len(raw_name) < 2:
+            continue
+
+        # Step 1: strip leading OCR garbage before "N PRODUCT"
+        m_qty = re.search(r'(\d+\s+[A-ZÁÉÍÓÚÜÑA-Z])', raw_name, re.UNICODE)
+        if m_qty:
+            clean_name = raw_name[m_qty.start():]
+        else:
+            clean_name = raw_name
+
+        # Step 2: strip trailing unit price (dual-column: "2 PROD 1,19")
+        if len(price_spans) >= 2:
+            clean_name = re.sub(r'\s+\d{1,4}[,.]\d{1,2}\s*$', '', clean_name).strip()
+
+        # Step 3: strip leading quantity number
+        clean_name = re.sub(r'^\d+\s+', '', clean_name).strip()
+
+        if not clean_name or len(clean_name) < 2:
+            continue
+
+        low = clean_name.lower()
+
+        if any(skip in low for skip in SKIP_WORDS):
+            continue
+        if re.match(r'^\d{1,3}\s*%', clean_name):
+            continue
+        if re.search(r'descripci[oó]n|precio|importe|unidad', low):
+            continue
+        if re.search(r'\bkg\b|€/kg|€/ud', low, re.IGNORECASE):
+            continue
+        if re.match(r'^[\d\s%.,+\-*/()€]+$', clean_name):
+            continue
+
+        if fallback_price is not None:
+            price = fallback_price
+        else:
+            try:
+                price = float(last_price_str.replace(",", "."))
+            except ValueError:
+                continue
+        if price <= 0:
+            continue
+
+        category = rules.get(low) or _categorize(clean_name)
+        items.append({
+            "name": clean_name.title(),
+            "amount": round(price, 2),
+            "category": category,
+        })
+    return items
+
+
+def _extract_store_name(text: str) -> str | None:
+    known = [
+        "mercadona", "lidl", "aldi", "dia ", "carrefour", "eroski",
+        "alcampo", "hipercor", "el corte ingles", "consum", "ahorramas",
+        "supersol", "coviran", "spar", "plus fresc", "bon preu",
+        "condis", "sorli", "simply", "family cash", "caprabo", "bonpreu",
+        "froiz", "gadis", "lupa", "masymas", "vidal", "suma",
+        "amazon", "zara", "primark", "ikea", "leroy merlin", "decathlon",
+        "mediamarkt", "fnac", "el jamon", "mas y mas",
+    ]
+    # OCR-noise-tolerant patterns: handles O→0, A→4, letter spacing, etc.
+    ocr_patterns = [
+        (r'merc[a4]d[o0]n[a4]', "Mercadona"),
+        (r'c[a4]rref[o0]ur', "Carrefour"),
+        (r'l[i1]dl', "Lidl"),
+        (r'[a4]ld[i1]', "Aldi"),
+    ]
+    lines = text.splitlines()
+    full_low = text.lower()
+
+    # 1. OCR-noise-tolerant patterns (handles O→0, A→4 substitutions)
+    for pattern, name in ocr_patterns:
+        if re.search(pattern, full_low):
+            return name
+
+    # 1b. Chain-store fingerprints that survive even when the logo/name is not
+    #     OCR-readable (decorative font, cropped, etc.).
+    #
+    #     Mercadona: receipts contain a store-number line like
+    #       "Nº TIENDA 016 CENTRO LUGO" or just "016  CENTRO" in OCR output.
+    #     CIF A-46103834 also uniquely identifies Mercadona.
+    if re.search(r'\bA-?46103834\b', text) or re.search(r'\d{3,4}\s+CENTRO\b', text, re.IGNORECASE):
+        return "Mercadona"
+
+    # 2. Exact substring search across the entire text
+    #    (PSM 6 may push the header further down due to barcode lines)
+    for store in known:
+        if store in full_low:
+            return store.strip().title()
+
+    # 3. Heuristic fallback: look for a short all-caps or title-case line in the
+    #    first 10 lines that looks like a store name.
+    for line in lines[:10]:
+        line = line.strip()
+        if not line or len(line) < 4 or len(line) > 60:
+            continue
+        # Must start with an actual letter (not |, =, barcode garbage, etc.)
+        if not line[0].isalpha():
+            continue
+        # Skip lines that start with a digit (product quantity lines)
+        if line[0].isdigit():
+            continue
+        # Skip lines with long digit runs (zip, phone, CIF, barcodes)
+        if re.search(r'\d{4,}', line):
+            continue
+        # Skip lines with price patterns — these are product lines, not store names
+        if re.search(r'\d[,.]\d', line):
+            continue
+        # Skip lines that look like addresses or web references
+        if re.search(r'(calle|avda|av\.|c\/|telf|tel\.|www|http|@|cif|nif)', line, re.IGNORECASE):
+            continue
+        # Must be mostly letters (≥60 %)
+        alpha = sum(c.isalpha() or c.isspace() for c in line)
+        if alpha / len(line) < 0.6:
+            continue
+        # Must contain at least one real word (≥4 alphabetic chars)
+        # This filters out barcode garbage like "See iii > 4" or "Ill Iv"
+        real_words = re.findall(r'[a-záéíóúüñA-ZÁÉÍÓÚÜÑ]{4,}', line)
+        if not real_words:
+            continue
+        # Skip lines that contain receipt column-header words
+        if re.search(
+            r'\b(precio|importe|descripci|unidad|total|tarjeta|bancaria|detalle)\b',
+            line, re.IGNORECASE,
+        ):
+            continue
+        # All-caps line with no digits → store name (e.g. "MERCADONA", "LIDL")
+        # Note: isupper() is True even with digits/spaces — must exclude digits explicitly
+        if line.isupper() and not re.search(r'\d', line):
+            return line.title()
+        # Sentence-case line with no digits → could be a store name
+        if line[0].isupper() and not re.search(r'\d', line):
+            return line
+
+    return None
+
+
+def _extract_total(text: str) -> float | None:
+    # Strategy 1a: "total" keyword with amount on the SAME line.
+    # Deliberately use [^\d\n] (no newlines) so that "TOTAL\n…\n3,17" (IVA
+    # detail at the bottom of the receipt) is NOT mistaken for the total.
+    total_same_re = re.compile(
+        r'(?:total|importe total|a pagar|total a pagar)[^\d\n]{0,20}(\d{1,5}[,.]\d{2})',
+        re.IGNORECASE,
+    )
+    m = total_same_re.search(text)
+    if m:
+        try:
+            return float(m.group(1).replace(",", "."))
+        except ValueError:
+            pass
+
+    # Strategy 1b: "total" keyword with amount on the VERY NEXT line.
+    # PSM 3 sometimes puts the label and the amount in separate columns →
+    # "TOTAL\n32,68" instead of "TOTAL  32,68".
+    total_next_re = re.compile(
+        r'(?:total|importe total|a pagar|total a pagar)\s*\n\s*(\d{1,5}[,.]\d{2})',
+        re.IGNORECASE,
+    )
+    m = total_next_re.search(text)
+    if m:
+        try:
+            return float(m.group(1).replace(",", "."))
+        except ValueError:
+            pass
+
+    # Strategy 2: payment-method line — TARJETA and BIZUM always equal the
+    # total paid (unlike EFECTIVO where change may exceed total due to change).
+    # PSM 11 keeps the label + amount on the same reconstructed line, so this
+    # works even when PSM 3 puts them in separate columns.
+    tarjeta_re = re.compile(
+        r'(?:tarjeta|bizum)[^\d\n]{0,30}(\d{1,5}[,.]\d{2})',
+        re.IGNORECASE,
+    )
+    m = tarjeta_re.search(text)
+    if m:
+        try:
+            v = float(m.group(1).replace(",", "."))
+            if v > 0:
+                return v
+        except ValueError:
+            pass
+    return None
+
+
+def _extract_date(text: str):
+    from datetime import date as _dt
+    patterns = [
+        # ISO: YYYY-MM-DD or YYYY/MM/DD
+        (r'\b(\d{4})\s*[/\-.]\s*(\d{1,2})\s*[/\-.]\s*(\d{1,2})\b', 'ymd'),
+        # DD/MM/YYYY or DD-MM-YYYY or DD.MM.YYYY (optional spaces around sep)
+        (r'\b(\d{1,2})\s*[/\-.]\s*(\d{1,2})\s*[/\-.]\s*(\d{2,4})\b', 'dmy'),
+    ]
+    for pattern, fmt in patterns:
+        for m in re.finditer(pattern, text):
+            try:
+                if fmt == 'ymd':
+                    y, mo, d = int(m.group(1)), int(m.group(2)), int(m.group(3))
+                else:
+                    d, mo = int(m.group(1)), int(m.group(2))
+                    y = int(m.group(3))
+                    if y < 100:
+                        y += 2000
+                if 1 <= mo <= 12 and 1 <= d <= 31 and 2000 <= y <= 2099:
+                    return _dt(y, mo, d)
+            except ValueError:
+                pass
+    return None
+
+
+def _compute_categories(items: list[dict]) -> dict[str, float]:
+    totals: dict[str, float] = {}
+    for item in items:
+        cat = item["category"]
+        totals[cat] = round(totals.get(cat, 0.0) + item["amount"], 2)
+    return totals
+
+
+def _preprocess_image(img):
+    """Preprocess a receipt image for better Tesseract OCR quality.
+
+    Steps recommended by the Tesseract documentation (ImproveQuality):
+    1. Grayscale    — removes colour noise, simplifies the histogram.
+    2. Autocontrast — stretches the histogram so faded receipts get full
+                      black-on-white contrast (clips 1 % of outliers).
+    3. White border — prevents characters at the image edge from being
+                      clipped by Tesseract's page-layout analysis.
+
+    Deliberately NO upscaling: scaling up a JPEG amplifies compression
+    artefacts and destroys small characters like commas in prices.
+    Deliberately NO UnsharpMask: it amplifies background texture noise
+    from photos taken on non-white surfaces, flooding OCR with garbage.
+    """
+    from PIL import ImageOps
+    img = img.convert("L")                        # 1. grayscale
+    img = ImageOps.autocontrast(img, cutoff=1)    # 2. stretch contrast
+    img = ImageOps.expand(img, border=10, fill=255)  # 3. white border
+    return img
+
+
+async def _extract_text_psm3(file_path: str) -> str:
+    """PSM 3 (auto page-segmentation) pass — reads structured receipt headers
+    (store name, date, total) better than the sparse-text PSM 11 pass used for
+    products.  Called only for image files; PDF uses pdfplumber directly."""
+    try:
+        import pytesseract
+        from PIL import Image
+        img = Image.open(file_path)
+        img = _preprocess_image(img)
+        return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 3 --oem 1")
+    except Exception:
+        return ""
+
+
+async def _analyze_with_mistral(file_path: str, mime_type: str, api_key: str = "") -> dict | None:
+    """Use Mistral pixtral-12b-2409 (free tier) to extract structured data from a receipt.
+
+    api_key: caller-supplied key (from user preferences); falls back to MISTRAL_API_KEY env var.
+    Only handles image files; PDFs fall through to Tesseract/pdfplumber.
+    Uses httpx (already in requirements) — no new packages needed.
+    """
+    api_key = api_key.strip() or os.environ.get("MISTRAL_API_KEY", "").strip()
+    if not api_key:
+        print("[Tickets] MISTRAL_API_KEY no configurada — saltando Mistral")
+        return None
+
+    # Mistral pixtral handles images; skip PDFs here
+    is_pdf = (mime_type == "application/pdf"
+              or os.path.splitext(file_path)[1].lower() == ".pdf")
+    if is_pdf:
+        return None
+
+    import base64
+    import httpx
+
+    ext = os.path.splitext(file_path)[1].lower()
+    if mime_type and mime_type.startswith("image/"):
+        media_type = mime_type
+    elif ext == ".png":
+        media_type = "image/png"
+    elif ext == ".webp":
+        media_type = "image/webp"
+    else:
+        media_type = "image/jpeg"
+
+    try:
+        with open(file_path, "rb") as fh:
+            file_b64 = base64.b64encode(fh.read()).decode()
+    except Exception as exc:
+        print(f"[Tickets] Mistral: no se puede leer el fichero: {exc}")
+        return None
+
+    prompt = (
+        "Eres un asistente especializado en analizar tickets de compra españoles. "
+        "Analiza la imagen del ticket y devuelve los datos en este JSON exacto "
+        "(sin texto adicional, sin bloques markdown):\n"
+        '{"store_name":"nombre del supermercado","date":"YYYY-MM-DD",'
+        '"total":0.00,"items":[{"name":"PRODUCTO","amount":0.00,"category":"CATEGORIA"}]}\n\n'
+        "Reglas:\n"
+        "- store_name: nombre exacto de la tienda (ej: Mercadona, Lidl, Carrefour). "
+        "null si no se ve claramente.\n"
+        "- date: fecha de compra en YYYY-MM-DD. null si no se ve.\n"
+        "- total: importe total pagado (TOTAL, TOTAL A PAGAR, TARJETA, BIZUM). "
+        "null si no se ve.\n"
+        "- items: TODOS los productos con su precio de línea (precio total, no unitario). "
+        "Incluye descuentos como importes negativos. "
+        "Omite IVA, subtotales, formas de pago y datos del establecimiento.\n"
+        f"- category: elige UNA de estas categorías exactas: {_CATEGORIES_LIST}. "
+        'Usa "Sin categoría" si no encaja en ninguna.\n'
+        "Responde ÚNICAMENTE con el JSON."
+    )
+
+    payload = {
+        "model": "pixtral-12b-2409",
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{file_b64}"}},
+                {"type": "text", "text": prompt},
+            ],
+        }],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.1,
+    }
+
+    print(f"[Tickets] Llamando a Mistral pixtral-12b para {os.path.basename(file_path)}")
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                "https://api.mistral.ai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            raw = data["choices"][0]["message"]["content"].strip()
+            raw = re.sub(r'^```[a-z]*\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
+            result = json.loads(raw)
+            print(f"[Tickets] Mistral OK — tienda={result.get('store_name')} total={result.get('total')} productos={len(result.get('items') or [])}")
+            return result
+    except Exception as exc:
+        msg = str(exc).replace(api_key, "***")
+        print(f"[Tickets] Mistral error: {msg}")
+        return None
+
+
+async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = "") -> dict | None:
+    """Use Gemini 2.0 Flash (free tier) to extract structured data from a receipt.
+
+    api_key: caller-supplied key (from user preferences); falls back to GEMINI_API_KEY env var.
+    Returns a dict with keys:
+      store_name (str | None), date (str | None, YYYY-MM-DD),
+      total (float | None), items (list[{name, amount}])
+    or None if the API key is absent or the request fails (caller falls back to
+    Tesseract in that case).
+
+    Uses httpx (already in requirements) so no new package is needed.
+    Free-tier limits (as of 2025): 15 RPM / 1 500 req-per-day — more than enough
+    for personal use.
+    """
+    api_key = api_key.strip() or os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        print("[Tickets] GEMINI_API_KEY no configurada — usando Tesseract")
+        return None
+    print(f"[Tickets] Llamando a Gemini 2.0 Flash para {os.path.basename(file_path)}")
+
+    import base64
+    import httpx
+
+    # Determine the inline MIME type Gemini should use
+    ext = os.path.splitext(file_path)[1].lower()
+    if mime_type and mime_type.startswith("image/"):
+        media_type = mime_type
+    elif mime_type == "application/pdf" or ext == ".pdf":
+        media_type = "application/pdf"
+    elif ext in (".jpg", ".jpeg"):
+        media_type = "image/jpeg"
+    elif ext == ".png":
+        media_type = "image/png"
+    elif ext == ".webp":
+        media_type = "image/webp"
+    else:
+        media_type = "image/jpeg"
+
+    try:
+        with open(file_path, "rb") as fh:
+            file_b64 = base64.b64encode(fh.read()).decode()
+    except Exception as exc:
+        print(f"Gemini: cannot read file: {exc}")
+        return None
+
+    prompt = (
+        "Eres un asistente especializado en analizar tickets de compra españoles. "
+        "Analiza la imagen del ticket y devuelve los datos en este JSON exacto "
+        "(sin texto adicional, sin bloques markdown):\n"
+        '{"store_name":"nombre del supermercado","date":"YYYY-MM-DD",'
+        '"total":0.00,"items":[{"name":"PRODUCTO","amount":0.00,"category":"CATEGORIA"}]}\n\n'
+        "Reglas:\n"
+        "- store_name: nombre exacto de la tienda (ej: Mercadona, Lidl, Carrefour). "
+        "null si no se ve claramente.\n"
+        "- date: fecha de compra en YYYY-MM-DD. null si no se ve.\n"
+        "- total: importe total pagado (TOTAL, TOTAL A PAGAR, TARJETA, BIZUM). "
+        "null si no se ve.\n"
+        "- items: TODOS los productos con su precio de línea (precio total, no unitario). "
+        "Incluye descuentos como importes negativos. "
+        "Omite IVA, subtotales, formas de pago y datos del establecimiento.\n"
+        f"- category: elige UNA de estas categorías exactas: {_CATEGORIES_LIST}. "
+        'Usa "Sin categoría" si no encaja en ninguna.\n'
+        "Responde ÚNICAMENTE con el JSON."
+    )
+
+    payload = {
+        "contents": [{
+            "parts": [
+                {"inline_data": {"mime_type": media_type, "data": file_b64}},
+                {"text": prompt},
+            ]
+        }],
+        "generationConfig": {
+            "response_mime_type": "application/json",
+            "temperature": 0.1,
+        },
+    }
+
+    # Try models in order — availability varies by account/region.
+    # GEMINI_MODEL env var lets the user pin a specific model.
+    env_model = os.environ.get("GEMINI_MODEL", "").strip()
+    models_to_try = [m for m in [
+        env_model,
+        "gemini-2.0-flash",
+        "gemini-2.0-flash-lite",
+        "gemini-1.5-flash-latest",
+        "gemini-1.5-flash-8b",
+    ] if m]
+
+    base_url = "https://generativelanguage.googleapis.com/v1beta/models"
+
+    async with httpx.AsyncClient(timeout=60.0) as client:
+        for model in models_to_try:
+            url = f"{base_url}/{model}:generateContent?key={api_key}"
+            try:
+                resp = await client.post(url, json=payload)
+                if resp.status_code in (404, 400):
+                    print(f"[Tickets] Gemini: modelo {model!r} no disponible ({resp.status_code}), probando siguiente…")
+                    continue
+                if resp.status_code == 429:
+                    try:
+                        err = resp.json()
+                        reason = err.get("error", {}).get("message", resp.text[:200])
+                    except Exception:
+                        reason = resp.text[:200]
+                    print(f"[Tickets] Gemini 429 ({model!r}): {reason}")
+                    continue
+                resp.raise_for_status()
+                data = resp.json()
+                raw = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                raw = re.sub(r'^```[a-z]*\s*', '', raw)
+                raw = re.sub(r'\s*```$', '', raw)
+                result = json.loads(raw)
+                print(f"[Tickets] Gemini OK ({model}) — tienda={result.get('store_name')} total={result.get('total')} productos={len(result.get('items') or [])}")
+                return result
+            except Exception as exc:
+                msg = str(exc).replace(api_key, "***")
+                print(f"[Tickets] Gemini error con {model!r}: {msg}")
+                continue
+
+    print("[Tickets] Gemini: ningún modelo disponible, usando Tesseract")
+    return None
+
+
+async def _extract_text_header(file_path: str) -> str:
+    """Crop the top ~22 % of the receipt image and run PSM 6 (uniform text block).
+
+    The store name / logo is printed in large bold text at the very top of most
+    receipts.  PSM 11 (sparse text, used for products) tends to skip large
+    single-font blocks, and PSM 3 (auto) often skips or mis-segments the same
+    region when the barcode and product table dominate the page.
+
+    Isolating just the header strip removes both distractors and lets PSM 6 read
+    the uniform block of store-name + address + CIF cleanly.
+
+    The crop is at least 80 px tall regardless of image height so that very
+    short or heavily-cropped photos still give Tesseract enough pixels to work.
+    """
+    try:
+        import pytesseract
+        from PIL import Image
+        img = Image.open(file_path)
+        img = _preprocess_image(img)
+        w, h = img.size
+        strip_h = max(80, int(h * 0.22))
+        header_strip = img.crop((0, 0, w, strip_h))
+        return pytesseract.image_to_string(
+            header_strip,
+            lang="spa+eng",
+            config="--psm 6 --oem 1",
+        )
+    except Exception:
+        return ""
+
+
+async def _extract_text(file_path: str, mime_type: str) -> str:
+    if mime_type == "application/pdf" or file_path.lower().endswith(".pdf"):
+        try:
+            import pdfplumber
+            with pdfplumber.open(file_path) as pdf:
+                return "\n".join(p.extract_text() or "" for p in pdf.pages)
+        except Exception:
+            return ""
+    else:
+        try:
+            import pytesseract
+            from PIL import Image
+            img = Image.open(file_path)
+            img = _preprocess_image(img)
+
+            # ── PSM 11 + word-level bounding boxes + our own line reconstruction ──
+            # PSM 6 (uniform block) skips entire rows when the receipt barcode
+            # breaks its block-detection heuristic — many products are lost.
+            # PSM 11 (sparse text) finds every text region regardless of layout.
+            # We then reconstruct reading order from Y/X bounding-box coordinates,
+            # grouping words whose vertical centres are within 70 % of the median
+            # word height (≈ same line), then sorting left → right within each line.
+            data = pytesseract.image_to_data(
+                img,
+                lang="spa+eng",
+                config="--psm 11 --oem 1",
+                output_type=pytesseract.Output.DICT,
+            )
+
+            words: list[tuple[float, float, str]] = []
+            heights: list[int] = []
+            for i in range(len(data["text"])):
+                word = (data["text"][i] or "").strip()
+                if not word:
+                    continue
+                if int(data["conf"][i]) < 0:   # -1 = structural row, not a word
+                    continue
+                y_center = data["top"][i] + data["height"][i] / 2.0
+                words.append((y_center, float(data["left"][i]), word))
+                heights.append(data["height"][i])
+
+            if not words:
+                # Fallback: plain string mode
+                return pytesseract.image_to_string(img, lang="spa+eng", config="--psm 6 --oem 1")
+
+            words.sort(key=lambda w: w[0])
+            median_h = sorted(heights)[len(heights) // 2] if heights else 20
+            threshold = max(5.0, median_h * 0.7)
+
+            lines_out: list[list[tuple[float, float, str]]] = [[words[0]]]
+            for w in words[1:]:
+                # Compare against the Y of the FIRST word in the current line,
+                # not the last.  OCR noise near a line boundary can act as a
+                # "bridge" when compared last-to-next, merging two adjacent
+                # product rows into one (e.g. RIOJA BLANCO + CC ZERO ZERO 2).
+                if w[0] - lines_out[-1][0][0] <= threshold:
+                    lines_out[-1].append(w)
+                else:
+                    lines_out.append([w])
+
+            text_lines: list[str] = []
+            for line in lines_out:
+                line.sort(key=lambda w: w[1])          # sort left → right by X
+                text_lines.append("  ".join(w[2] for w in line))
+
+            return "\n".join(text_lines)
+        except Exception:
+            return ""
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────────
+
+# ── Pydantic schemas for write operations ─────────────────────────────────────
+
+class TicketItemIn(PydanticModel):
+    name: str
+    amount: float
+    category: str
+
+
+class TicketItemsPatch(PydanticModel):
+    items: list[TicketItemIn]
+
+
+class TicketMetaPatch(PydanticModel):
+    store_name: str | None = None   # "" → clear
+    ticket_date: str | None = None  # "YYYY-MM-DD" or "" → clear
+
+
+# ── Endpoints ──────────────────────────────────────────────────────────────────
+
+@router.post("/analyze", response_model=TicketRead, status_code=201)
+async def analyze_ticket(
+    file: UploadFile,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    content = await file.read()
+    ext = os.path.splitext(file.filename or "ticket")[1] or ".jpg"
+    filename = f"{uuid.uuid4().hex}{ext}"
+    dest = os.path.join(UPLOAD_DIR, filename)
+    with open(dest, "wb") as f:
+        f.write(content)
+
+    # Load user's custom category rules + API keys from preferences
+    from app.models.user_preference import UserPreference
+    prefs_result = await db.execute(
+        select(UserPreference).where(UserPreference.user_id == user.id)
+    )
+    prefs = {p.key: p.value for p in prefs_result.scalars().all()}
+    custom_rules = {}
+    rules_result = await db.execute(
+        select(ItemCategoryRule).where(ItemCategoryRule.user_id == user.id)
+    )
+    custom_rules = {r.item_name: r.category for r in rules_result.scalars().all()}
+
+    gemini_key  = prefs.get("gemini_api_key", "")
+    mistral_key = prefs.get("mistral_api_key", "")
+
+    # ── Primary: Gemini 2.0 Flash → Mistral pixtral-12b (free tiers) ────────
+    ai_result = await _analyze_with_gemini(dest, file.content_type or "", api_key=gemini_key)
+    ocr_source = "gemini" if ai_result else None
+    if not ai_result:
+        ai_result = await _analyze_with_mistral(dest, file.content_type or "", api_key=mistral_key)
+        if ai_result:
+            ocr_source = "mistral"
+
+    if not ai_result:
+        ocr_source = "tesseract"
+
+    _valid_cat_set = set(_VALID_CATEGORIES)
+
+    if ai_result:
+        # Use AI-provided category when valid; fall back to keyword matcher
+        raw_items = ai_result.get("items") or []
+        items: list[dict] = []
+        for it in raw_items:
+            name = str(it.get("name") or "").strip()
+            if not name:
+                continue
+            try:
+                amount = float(it.get("amount") or 0)
+            except (TypeError, ValueError):
+                continue
+            if amount == 0:
+                continue
+            low = name.lower()
+            ai_cat = str(it.get("category") or "").strip()
+            cat = (
+                custom_rules.get(low)
+                or (ai_cat if ai_cat in _valid_cat_set else None)
+                or _categorize(name)
+            )
+            items.append({"name": name.title(), "amount": round(amount, 2), "category": cat})
+
+        categories = _compute_categories(items)
+
+        # Parse date
+        ticket_date = None
+        raw_date = ai_result.get("date")
+        if raw_date:
+            try:
+                from datetime import date as _dt2
+                ticket_date = _dt2.fromisoformat(str(raw_date))
+            except ValueError:
+                ticket_date = _extract_date(str(raw_date))
+
+        # Parse total
+        total = None
+        try:
+            v = float(ai_result.get("total") or 0)
+            if v:
+                total = v
+        except (TypeError, ValueError):
+            pass
+
+        store_name = str(ai_result.get("store_name") or "").strip() or "Supermercado"
+
+    else:
+        # ── Fallback: Tesseract three-pass strategy ───────────────────────────
+        text = await _extract_text(dest, file.content_type or "")
+        items = _parse_ticket_lines(text, custom_rules)
+        categories = _compute_categories(items)
+
+        is_image = not (
+            (file.content_type or "").startswith("application/pdf")
+            or dest.lower().endswith(".pdf")
+        )
+        if is_image:
+            header_text = await _extract_text_header(dest)
+            meta_text   = await _extract_text_psm3(dest)
+            if not meta_text.strip():
+                meta_text = text
+        else:
+            header_text = ""
+            meta_text   = text
+
+        store_name = (
+            _extract_store_name(header_text)
+            or _extract_store_name(meta_text)
+            or _extract_store_name(text)
+            or "Supermercado"
+        )
+        ticket_date = (
+            _extract_date(header_text)
+            or _extract_date(meta_text)
+            or _extract_date(text)
+        )
+        total = _extract_total(meta_text) or _extract_total(text)
+
+    record = Ticket(
+        user_id=user.id,
+        original_name=file.filename or filename,
+        filename=filename,
+        mime_type=file.content_type or "application/octet-stream",
+        store_name=store_name,
+        ticket_date=ticket_date,
+        total=total,
+        items=json.dumps(items, ensure_ascii=False),
+        categories=json.dumps(categories, ensure_ascii=False),
+        ocr_source=ocr_source,
+    )
+    db.add(record)
+    await db.commit()
+    await db.refresh(record)
+    return record
+
+
+@router.get("", response_model=list[TicketRead])
+async def list_tickets(
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    result = await db.execute(
+        select(Ticket)
+        .where(Ticket.user_id == user.id)
+        .order_by(Ticket.created_at.desc())
+    )
+    return result.scalars().all()
+
+
+@router.patch("/{ticket_id}/items", response_model=TicketRead)
+async def patch_ticket_items(
+    ticket_id: int,
+    body: TicketItemsPatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # Compare old vs new to detect category changes and save rules
+    original_cat = {item["name"].lower(): item["category"] for item in json.loads(t.items)}
+    new_items = [i.model_dump() for i in body.items]
+
+    for item in new_items:
+        norm = item["name"].lower()
+        if original_cat.get(norm) != item["category"]:
+            result = await db.execute(
+                select(ItemCategoryRule).where(
+                    ItemCategoryRule.user_id == user.id,
+                    ItemCategoryRule.item_name == norm,
+                )
+            )
+            rule = result.scalar_one_or_none()
+            if rule:
+                rule.category = item["category"]
+            else:
+                db.add(ItemCategoryRule(
+                    user_id=user.id,
+                    item_name=norm,
+                    category=item["category"],
+                ))
+
+    t.items = json.dumps(new_items, ensure_ascii=False)
+    t.categories = json.dumps(_compute_categories(new_items), ensure_ascii=False)
+    await db.commit()
+    await db.refresh(t)
+    return t
+
+
+@router.patch("/{ticket_id}/meta", response_model=TicketRead)
+async def patch_ticket_meta(
+    ticket_id: int,
+    body: TicketMetaPatch,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    stmt = select(Ticket).where(Ticket.id == ticket_id, Ticket.user_id == user.id)
+    result = await db.execute(stmt)
+    t = result.scalar_one_or_none()
+    if not t:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if body.store_name is not None:
+        t.store_name = body.store_name.strip() or None
+    if body.ticket_date is not None:
+        if not body.ticket_date:
+            t.ticket_date = None
+        else:
+            try:
+                from datetime import date as _dt
+                t.ticket_date = _dt.fromisoformat(body.ticket_date)
+            except ValueError:
+                pass
+    await db.commit()
+    await db.refresh(t)
+    return t
+
+
+@router.get("/{ticket_id}/file")
+async def get_ticket_file(
+    ticket_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    path = os.path.join(UPLOAD_DIR, t.filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+    return FileResponse(path, media_type=t.mime_type, content_disposition_type="inline")
+
+
+class TicketToMovementRequest(PydanticModel):
+    mode: str           # "food" | "supplies" | "combined"
+    type_id: int
+    movement_date: str | None = None   # ISO date, defaults to ticket_date or today
+
+
+class AttachMovementRequest(PydanticModel):
+    mode: str           # "food" | "supplies" | "combined"
+
+
+@router.post("/{ticket_id}/to-movement", status_code=201)
+async def ticket_to_movement(
+    ticket_id: int,
+    body: TicketToMovementRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    items = json.loads(t.items)
+
+    if body.mode == "food":
+        amount = sum(i["amount"] for i in items if i["category"] not in SUPPLIES_CATEGORIES)
+    elif body.mode == "supplies":
+        amount = sum(i["amount"] for i in items if i["category"] in SUPPLIES_CATEGORIES)
+    else:  # combined
+        amount = sum(i["amount"] for i in items)
+
+    amount = round(amount, 2)
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="No hay productos en este grupo")
+
+    # Resolve date
+    if body.movement_date:
+        try:
+            mv_date = _date.fromisoformat(body.movement_date)
+        except ValueError:
+            mv_date = t.ticket_date or _date.today()
+    else:
+        mv_date = t.ticket_date or _date.today()
+
+    name = t.store_name or os.path.splitext(t.original_name)[0]
+
+    mv = MovementModel(
+        user_id=user.id,
+        name=name,
+        money=amount,
+        date=mv_date,
+        movement_type_id=body.type_id,
+        paid=True,
+        no_count=False,
+    )
+    db.add(mv)
+    await db.flush()   # get mv.id
+
+    # Copy ticket file → movement file
+    src = os.path.join(UPLOAD_DIR, t.filename)
+    if os.path.exists(src):
+        ext = os.path.splitext(t.filename)[1]
+        new_fn = f"{uuid.uuid4().hex}{ext}"
+        shutil.copy2(src, os.path.join(UPLOAD_DIR, new_fn))
+        db.add(MovementFile(
+            movement_id=mv.id,
+            filename=new_fn,
+            original_name=t.original_name,
+            mime_type=t.mime_type,
+        ))
+
+    await db.commit()
+    return {"movement_id": mv.id, "amount": amount, "name": name}
+
+
+@router.post("/{ticket_id}/attach/{movement_id}", status_code=200)
+async def attach_ticket_to_movement(
+    ticket_id: int,
+    movement_id: int,
+    body: AttachMovementRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    """Copy ticket file to a movement attachment and record the link."""
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    mv = await db.get(MovementModel, movement_id)
+    if not mv or mv.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Movement not found")
+
+    # Copy ticket file → movement file
+    src = os.path.join(UPLOAD_DIR, t.filename)
+    if os.path.exists(src):
+        ext = os.path.splitext(t.filename)[1]
+        new_fn = f"{uuid.uuid4().hex}{ext}"
+        shutil.copy2(src, os.path.join(UPLOAD_DIR, new_fn))
+        db.add(MovementFile(
+            movement_id=mv.id,
+            filename=new_fn,
+            original_name=t.original_name,
+            mime_type=t.mime_type,
+        ))
+
+    # Record which mode was linked
+    existing = json.loads(t.generated_movements) if t.generated_movements else {}
+    existing[body.mode] = movement_id
+    t.generated_movements = json.dumps(existing)
+
+    await db.commit()
+    return {"ok": True}
+
+
+@router.get("/{ticket_id}/ocr-text")
+async def get_ticket_ocr_text(
+    ticket_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    """Return raw OCR text + preprocessed image (base64) for debugging."""
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    path = os.path.join(UPLOAD_DIR, t.filename)
+    if not os.path.exists(path):
+        raise HTTPException(status_code=404, detail="File not found")
+
+    text = await _extract_text(path, t.mime_type)
+
+    # Build a base64 PNG preview of the preprocessed image (images only)
+    preprocessed_image: str | None = None
+    metadata_text: str | None = None
+    is_pdf = t.mime_type == "application/pdf" or path.lower().endswith(".pdf")
+    header_text: str | None = None
+    metadata_text: str | None = None
+    preprocessed_image: str | None = None
+    if not is_pdf:
+        try:
+            import base64, io
+            from PIL import Image
+            preview = _preprocess_image(Image.open(path))
+            buf = io.BytesIO()
+            preview.save(buf, format="PNG")
+            preprocessed_image = base64.b64encode(buf.getvalue()).decode()
+        except Exception:
+            pass
+        header_text   = await _extract_text_header(path)
+        metadata_text = await _extract_text_psm3(path)
+
+    return {
+        "text": text,
+        "header_text": header_text,
+        "metadata_text": metadata_text,
+        "lines": text.splitlines(),
+        "preprocessed_image": preprocessed_image,
+    }
+
+
+@router.delete("/{ticket_id}", status_code=204)
+async def delete_ticket(
+    ticket_id: int,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    path = os.path.join(UPLOAD_DIR, t.filename)
+    if os.path.exists(path):
+        os.remove(path)
+    await db.delete(t)
+    await db.commit()

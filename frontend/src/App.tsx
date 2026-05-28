@@ -18,6 +18,8 @@ import AccountsPage from './pages/AccountsPage'
 import Projection from './pages/Projection'
 import Analysis from './pages/Analysis'
 import AiConsultant from './pages/AiConsultant'
+import Tickets from './pages/Tickets'
+import ExpenseControl from './pages/ExpenseControl'
 import QuickAdd from './pages/QuickAdd'
 import LoginPage from './pages/LoginPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -74,6 +76,8 @@ function PageRoutes() {
       <Route path="/proyeccion" element={<Projection />} />
       <Route path="/analisis" element={<Analysis />} />
       <Route path="/consultor-ia" element={<ErrorBoundary><AiConsultant /></ErrorBoundary>} />
+      <Route path="/tickets" element={<Tickets />} />
+      <Route path="/gastos" element={<ExpenseControl />} />
     </Routes>
   )
 }

@@ -43,3 +43,15 @@ export const updateMovement = (id: number, data: Partial<Movement>) =>
 
 export const deleteMovement = (id: number) =>
   api.delete(`/movements/${id}`)
+
+export const uploadMovementFile = async (movementId: number, file: File): Promise<void> => {
+  const form = new FormData()
+  form.append('files', file)
+  await api.post(`/movements/${movementId}/files`, form)
+}
+
+export const deleteMovementFile = (fileId: number): Promise<void> =>
+  api.delete(`/movements/files/${fileId}`).then(() => undefined)
+
+export const movementFileDownloadUrl = (fileId: number) =>
+  `/api/movements/files/${fileId}/download`
