@@ -850,7 +850,9 @@ export default function Movements() {
   const [bulkField, setBulkField] = useState('')
   const [bulkValue, setBulkValue] = useState('')
   const [isBulkPending, setIsBulkPending] = useState(false)
-  const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'kanban'>('calendar')
+  const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'kanban'>(
+    () => searchParams.get('account') ? 'table' : 'calendar'
+  )
   const [showYearPicker, setShowYearPicker] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [quickSearch, setQuickSearch] = useState('')

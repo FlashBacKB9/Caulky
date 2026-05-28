@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from starlette.middleware.base import BaseHTTPMiddleware
 from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin, templates, preferences, audit_log, terminal, tickets
 from app.auth.setup import fastapi_users, auth_backend
 from app.auth.schemas import UserRead, UserCreate, UserUpdate
@@ -18,6 +19,16 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="Caulky API", version="2.0.0", lifespan=lifespan)
 
+
+class NoCacheMiddleware(BaseHTTPMiddleware):
+    async def dispatch(self, request: Request, call_next):
+        response = await call_next(request)
+        if request.method == "GET":
+            response.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        return response
+
+
+app.add_middleware(NoCacheMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,

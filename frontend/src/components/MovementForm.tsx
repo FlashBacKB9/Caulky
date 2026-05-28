@@ -238,7 +238,7 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
       const mv = await createMovement({
         name: form.name, money: parseFloat(form.money), date: form.date,
         bank_date: form.bank_date || undefined,
-        movement_type_id: !form.is_transfer && form.movement_type_id ? parseInt(form.movement_type_id) : undefined,
+        movement_type_id: form.movement_type_id ? parseInt(form.movement_type_id) : undefined,
         account_id: form.account_id ? parseInt(form.account_id) : undefined,
         is_transfer: form.is_transfer,
         from_account_id: form.is_transfer && form.from_account_id ? parseInt(form.from_account_id) : undefined,
@@ -253,10 +253,10 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
       return mv
     },
     onSuccess: (mv) => {
-      qc.invalidateQueries({ queryKey: ['movements'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      qc.invalidateQueries({ queryKey: ['annual'] })
-      qc.invalidateQueries({ queryKey: ['accounts-summary'] })
+      qc.invalidateQueries({ queryKey: ['movements'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['annual'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['accounts-summary'], refetchType: 'all' })
       onMovementCreated?.(mv.id)
       onClose()
     },
@@ -285,10 +285,10 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
     },
     onSuccess: (n) => {
       setRecBulkDone(n)
-      qc.invalidateQueries({ queryKey: ['movements'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      qc.invalidateQueries({ queryKey: ['annual'] })
-      qc.invalidateQueries({ queryKey: ['accounts-summary'] })
+      qc.invalidateQueries({ queryKey: ['movements'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['annual'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['accounts-summary'], refetchType: 'all' })
     },
   })
 
@@ -418,10 +418,10 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
         return mv
       })
     ).then(() => {
-      qc.invalidateQueries({ queryKey: ['movements'] })
-      qc.invalidateQueries({ queryKey: ['dashboard'] })
-      qc.invalidateQueries({ queryKey: ['annual'] })
-      qc.invalidateQueries({ queryKey: ['accounts-summary'] })
+      qc.invalidateQueries({ queryKey: ['movements'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['annual'], refetchType: 'all' })
+      qc.invalidateQueries({ queryKey: ['accounts-summary'], refetchType: 'all' })
       onClose()
     })
   }
@@ -534,7 +534,13 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
                     <label className={LBL}>{t('movement.type')}</label>
                     <div className="space-y-1.5">
                       {form.is_transfer
-                        ? <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1">Sin tipo — es una transferencia</p>
+                        ? (() => {
+                            const destId = form.account_id ? parseInt(form.account_id) : null
+                            const linked = destId ? types.find(t => t.linked_account_id === destId) : null
+                            return linked
+                              ? <div className="flex items-center gap-2 py-1"><span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: linked.color }} /><span className="text-sm text-gray-700 dark:text-gray-300">{linked.name}</span></div>
+                              : <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1">Sin tipo — es una transferencia</p>
+                          })()
                         : <><TypeSelect value={form.movement_type_id} onChange={v => set('movement_type_id', v)} types={types} byCategory={byCategory} />
                           <SavingsHint typeId={form.movement_type_id} money={form.money} /></>
                       }
@@ -560,7 +566,11 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
                         </div>
                         <div>
                           <label className={LBL}>Cuenta destino</label>
-                          <select value={form.account_id} onChange={e => set('account_id', e.target.value)} className={INP}>
+                          <select value={form.account_id} onChange={e => {
+                            const newAccId = e.target.value
+                            const linked = newAccId ? types.find(t => t.linked_account_id === parseInt(newAccId)) : null
+                            setForm(f => ({ ...f, account_id: newAccId, movement_type_id: linked ? String(linked.id) : f.movement_type_id }))
+                          }} className={INP}>
                             <option value="">— Selecciona —</option>
                             {allAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
                           </select>
@@ -595,7 +605,11 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
                   )}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Transferencia</label>
-                    <Toggle value={form.is_transfer} onChange={v => setForm(f => ({ ...f, is_transfer: v, movement_type_id: v ? '' : f.movement_type_id, from_account_id: v ? f.from_account_id : '' }))} color="#8b5cf6" />
+                    <Toggle value={form.is_transfer} onChange={v => setForm(f => {
+                      if (!v) return { ...f, is_transfer: false }
+                      const linked = f.account_id ? types.find(t => t.linked_account_id === parseInt(f.account_id)) : null
+                      return { ...f, is_transfer: true, movement_type_id: linked ? String(linked.id) : '', from_account_id: f.from_account_id }
+                    })} color="#8b5cf6" />
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('form.paid')}</label>

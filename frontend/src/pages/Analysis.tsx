@@ -318,10 +318,8 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
   const topCat = useMemo(() => {
     const map = new Map<string, number>()
     realExpenseMovements.forEach(m => {
-      const typeName = m.movement_type_id
-        ? (typeNameMap.get(m.movement_type_id) ?? m.label ?? t('analysis.noCategory'))
-        : (m.label ?? t('analysis.noCategory'))
-      map.set(typeName, (map.get(typeName) ?? 0) + Math.abs(m.dinero))
+      const catName = m.label ?? (m.movement_type_id ? typeNameMap.get(m.movement_type_id) : null) ?? t('analysis.noCategory')
+      map.set(catName, (map.get(catName) ?? 0) + Math.abs(m.dinero))
     })
     if (map.size === 0) return null
     return [...map.entries()].reduce((a, b) => b[1] > a[1] ? b : a)
@@ -480,17 +478,19 @@ function PatronesDeGasto({ realExpenseMovements, fmt }: {
 type RuleBucket = 'necesidades' | 'deseos' | 'ahorro' | 'unassigned'
 const RULE_KEY = 'spendly-5030-assignment'
 
-const BUCKETS: { id: RuleBucket; labelKey: string; target: number; color: string; textColor: string }[] = [
-  { id: 'necesidades', labelKey: 'analysis.bucketNeeds',   target: 50, color: '#3b82f6', textColor: 'text-blue-600 dark:text-blue-400' },
-  { id: 'deseos',      labelKey: 'analysis.bucketWants',   target: 30, color: '#8b5cf6', textColor: 'text-violet-600 dark:text-violet-400' },
-  { id: 'ahorro',      labelKey: 'analysis.bucketSavings', target: 20, color: '#22c55e', textColor: 'text-green-600 dark:text-green-400' },
+const BUCKETS: { id: RuleBucket; labelKey: string; target: number; color: string; textColor: string; higherIsBetter: boolean }[] = [
+  { id: 'necesidades', labelKey: 'analysis.bucketNeeds',   target: 50, color: '#3b82f6', textColor: 'text-blue-600 dark:text-blue-400',   higherIsBetter: false },
+  { id: 'deseos',      labelKey: 'analysis.bucketWants',   target: 30, color: '#8b5cf6', textColor: 'text-violet-600 dark:text-violet-400', higherIsBetter: false },
+  { id: 'ahorro',      labelKey: 'analysis.bucketSavings', target: 20, color: '#22c55e', textColor: 'text-green-600 dark:text-green-400',   higherIsBetter: true  },
 ]
 
-function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }: {
+function Regla502030({ realExpenseMovements, periodMovements, groups, types, actualSavings, savingsGroupIdSet, fmt }: {
   realExpenseMovements: Movement[]
+  periodMovements: Movement[]
   groups: Group[]
   types: MovementType[]
   actualSavings: number
+  savingsGroupIdSet: Set<number>
   fmt: (v: number) => string
 }) {
   const [assignment, setAssignment] = useState<Record<number, RuleBucket>>(() => {
@@ -508,15 +508,37 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
 
   const byBucket = useMemo(() => {
     const map: Record<RuleBucket, number> = { necesidades: 0, deseos: 0, ahorro: actualSavings, unassigned: 0 }
+    // Expense movements (dinero < 0): assign to bucket
     realExpenseMovements.forEach(m => {
-      if (m.movement_type_id == null) { map.unassigned += Math.abs(m.dinero); return }
-      const t = types.find(t => t.id === m.movement_type_id)
-      if (!t) { map.unassigned += Math.abs(m.dinero); return }
-      const bucket: RuleBucket = assignment[t.income_expense_group_id] ?? 'unassigned'
+      if (m.movement_type_id == null) {
+        // Transfers: classify by the linked type of the destination account
+        if (m.is_transfer && m.account_id != null) {
+          const linkedType = types.find(t => t.linked_account_id === m.account_id)
+          if (linkedType) {
+            const bucket: RuleBucket = assignment[linkedType.income_expense_group_id] ?? 'unassigned'
+            map[bucket] += Math.abs(m.dinero)
+            return
+          }
+        }
+        map.unassigned += Math.abs(m.dinero)
+        return
+      }
+      const tp = types.find(t => t.id === m.movement_type_id)
+      if (!tp) { map.unassigned += Math.abs(m.dinero); return }
+      const bucket: RuleBucket = assignment[tp.income_expense_group_id] ?? 'unassigned'
       map[bucket] += Math.abs(m.dinero)
     })
+    // Income movements (dinero > 0) assigned to 'ahorro' that aren't already in actualSavings
+    periodMovements.forEach(m => {
+      if (m.dinero <= 0 || m.movement_type_id == null) return
+      const tp = types.find(t => t.id === m.movement_type_id)
+      if (!tp) return
+      if (savingsGroupIdSet.has(tp.income_expense_group_id)) return // already in actualSavings
+      const bucket: RuleBucket = assignment[tp.income_expense_group_id] ?? 'unassigned'
+      if (bucket === 'ahorro') map['ahorro'] += m.dinero
+    })
     return map
-  }, [realExpenseMovements, types, assignment, actualSavings])
+  }, [realExpenseMovements, periodMovements, types, assignment, actualSavings, savingsGroupIdSet])
 
   const expenseGroups = useMemo(() => {
     const usedGroupIds = new Set(types.map(t => t.income_expense_group_id))
@@ -527,8 +549,8 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
 
   const pieData = useMemo(() => {
     const slices = [
-      ...BUCKETS.map(b => ({ name: t(b.labelKey), value: byBucket[b.id], color: b.color, target: b.target, textColor: b.textColor })),
-      ...(byBucket.unassigned > 0 ? [{ name: t('analysis.unassigned'), value: byBucket.unassigned, color: '#f59e0b', target: 0, textColor: 'text-yellow-600 dark:text-yellow-400' }] : []),
+      ...BUCKETS.map(b => ({ name: t(b.labelKey), value: byBucket[b.id], color: b.color, target: b.target, textColor: b.textColor, higherIsBetter: b.higherIsBetter })),
+      ...(byBucket.unassigned > 0 ? [{ name: t('analysis.unassigned'), value: byBucket.unassigned, color: '#f59e0b', target: 0, textColor: 'text-yellow-600 dark:text-yellow-400', higherIsBetter: false }] : []),
     ]
     return slices.filter(s => s.value > 0)
   }, [byBucket])
@@ -582,11 +604,14 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
                 <span className={`w-24 font-medium shrink-0 ${entry.textColor}`}>{entry.name}</span>
                 <span className="text-gray-600 dark:text-gray-300 w-12 text-right shrink-0 font-medium">{pct.toFixed(1)}%</span>
                 <span className="text-gray-400 dark:text-gray-500 flex-1">{fmt(entry.value)}</span>
-                {entry.target > 0 && (
-                  <span className={`shrink-0 ${over ? 'text-red-400' : under ? 'text-gray-400 dark:text-gray-500' : 'text-green-500'}`}>
-                    {over ? `+${(pct - entry.target).toFixed(0)}% obj.` : under ? `obj. ${entry.target}%` : '✓'}
-                  </span>
-                )}
+                {entry.target > 0 && (() => {
+                  if (!over && !under) return <span className="shrink-0 text-green-500">✓</span>
+                  const diff = Math.round(Math.abs(pct - entry.target))
+                  const good = over ? entry.higherIsBetter : !entry.higherIsBetter
+                  const color = good ? 'text-green-500' : 'text-red-400'
+                  const sign = over ? '+' : '-'
+                  return <span className={`shrink-0 ${color}`}>{sign}{diff}%</span>
+                })()}
               </div>
             )
           })}
@@ -637,15 +662,15 @@ function Regla502030({ realExpenseMovements, groups, types, actualSavings, fmt }
 
 // ── 4. Proyección de Patrimonio ───────────────────────────────────────────────
 
-function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
-  monthlySavings: number; totalBalance: number; fmt: (v: number) => string
+function ProyeccionPatrimonio({ monthlySavings, liquidBalance, fmt }: {
+  monthlySavings: number; liquidBalance: number; fmt: (v: number) => string
 }) {
   const points = useMemo(() =>
     Array.from({ length: 13 }, (_, i) => ({
       label: i === 0 ? t('analysis.today') : `+${i}m`,
-      balance: totalBalance + monthlySavings * i,
+      balance: liquidBalance + monthlySavings * i,
     })),
-    [monthlySavings, totalBalance]
+    [monthlySavings, liquidBalance]
   )
 
   const positive = monthlySavings >= 0
@@ -653,7 +678,7 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
   return (
     <div className="space-y-4">
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        {t('analysis.projectionDesc').replace('{monthly}', fmt(monthlySavings)).replace('{balance}', fmt(totalBalance))}
+        {t('analysis.projectionDesc').replace('{monthly}', fmt(monthlySavings)).replace('{balance}', fmt(liquidBalance))}
       </p>
       <ResponsiveContainer width="100%" height={200}>
         <AreaChart data={points} margin={{ top: 5, right: 0, left: 0, bottom: 0 }}>
@@ -675,8 +700,8 @@ function ProyeccionPatrimonio({ monthlySavings, totalBalance, fmt }: {
         {[3, 6, 12].map(m => (
           <div key={m} className="bg-gray-50 dark:bg-gray-800 rounded-xl p-3">
             <p className="text-xs text-gray-500 dark:text-gray-400">{t('analysis.inMonths').replace('{n}', String(m))}</p>
-            <p className={`text-sm font-bold mt-0.5 ${totalBalance + monthlySavings * m >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
-              {fmt(totalBalance + monthlySavings * m)}
+            <p className={`text-sm font-bold mt-0.5 ${liquidBalance + monthlySavings * m >= 0 ? 'text-blue-500' : 'text-red-500'}`}>
+              {fmt(liquidBalance + monthlySavings * m)}
             </p>
           </div>
         ))}
@@ -908,14 +933,19 @@ export default function Analysis() {
     () => realExpenseMovements.reduce((s, m) => s + Math.abs(m.dinero), 0),
     [realExpenseMovements]
   )
-  const savingsRate  = income > 0 ? (actualSavings / income) * 100 : 0
-  const totalBalance = accountsSummary?.total ?? 0
+  const savingsRate    = income > 0 ? (actualSavings / income) * 100 : 0
+  const liquidBalance  = useMemo(() =>
+    (accountsSummary?.accounts ?? [])
+      .filter(a => a.category === 'corriente' || a.category === 'ahorro')
+      .reduce((s, a) => s + a.balance, 0),
+    [accountsSummary]
+  )
   const months       = monthsInRange(rangeStart, rangeEnd)
 
   const emergencyBalance = useMemo(() => {
-    if (analysisConfig.emergencyAccountId == null) return totalBalance
+    if (analysisConfig.emergencyAccountId == null) return liquidBalance
     return accountsSummary?.accounts.find(a => a.id === analysisConfig.emergencyAccountId)?.balance ?? 0
-  }, [analysisConfig.emergencyAccountId, accountsSummary, totalBalance])
+  }, [analysisConfig.emergencyAccountId, accountsSummary, liquidBalance])
 
   const incomeMovementsCount = useMemo(
     () => movements.filter(m => m.dinero > 0 && !isSavingsMovement(m, typeGroupMap, savingsGroupIdSet)).length,
@@ -973,15 +1003,17 @@ export default function Analysis() {
       <SectionCard title={t('analysis.section5020')} icon={Target}>
         <Regla502030
           realExpenseMovements={realExpenseMovements}
+          periodMovements={movements}
           groups={groups}
           types={types}
           actualSavings={actualSavings}
+          savingsGroupIdSet={savingsGroupIdSet}
           fmt={fmt}
         />
       </SectionCard>
 
       <SectionCard title={t('analysis.sectionProjection')} icon={TrendingUp}>
-        <ProyeccionPatrimonio monthlySavings={monthlySavings} totalBalance={totalBalance} fmt={fmt} />
+        <ProyeccionPatrimonio monthlySavings={monthlySavings} liquidBalance={liquidBalance} fmt={fmt} />
       </SectionCard>
 
       <SectionCard title={t('analysis.sectionPrompt')} icon={Sparkles}>

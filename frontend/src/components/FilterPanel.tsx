@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { X, Plus, ChevronDown } from 'lucide-react'
 import type { MovementType } from '../api/movementTypes'
 import type { Group } from '../api/groups'
@@ -158,6 +158,45 @@ const SEL = 'border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-8
 
 // ── GroupMultiSelect ──────────────────────────────────────────────────────────
 
+function MultiSelectDropdown({ children, trigger, open }: {
+  children: React.ReactNode
+  trigger: React.ReactNode
+  open: boolean
+}) {
+  const [atBottom, setAtBottom] = useState(false)
+  const listRef = useRef<HTMLDivElement>(null)
+
+  useLayoutEffect(() => {
+    if (open && listRef.current) {
+      const el = listRef.current
+      setAtBottom(el.scrollHeight <= el.clientHeight + 4)
+    }
+  }, [open])
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget
+    setAtBottom(el.scrollTop + el.clientHeight >= el.scrollHeight - 4)
+  }
+
+  return (
+    <>
+      {trigger}
+      {open && (
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl min-w-[220px]">
+          <div className="relative">
+            <div ref={listRef} onScroll={handleScroll} className="max-h-72 overflow-y-auto scrollbar-none p-1.5">
+              {children}
+            </div>
+            {!atBottom && (
+              <div className="absolute bottom-0 left-0 right-0 h-10 rounded-b-xl bg-gradient-to-t from-white dark:from-gray-900 to-transparent pointer-events-none" />
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 function GroupMultiSelect({ groups, selected, onChange }: {
   groups: Group[]
   selected: string[]
@@ -177,23 +216,25 @@ function GroupMultiSelect({ groups, selected, onChange }: {
 
   return (
     <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen(v => !v)} className={SEL + ' flex items-center gap-2 min-w-[160px]'}>
-        <span className="flex-1 text-left">
-          {selected.length === 0 ? t('filter.selectPlaceholder') : `${selected.length} ${t('filter.groupUnit')}`}
-        </span>
-        <ChevronDown className="w-3 h-3 shrink-0 text-gray-400" />
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-1.5 min-w-[220px] max-h-72 overflow-y-auto">
-          {groups.map(g => (
-            <label key={g.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-              <input type="checkbox" checked={selected.includes(String(g.id))} onChange={() => toggle(String(g.id))} className="rounded accent-gray-800 dark:accent-gray-200 w-3.5 h-3.5 shrink-0" />
+      <MultiSelectDropdown open={open} trigger={
+        <button type="button" onClick={() => setOpen(v => !v)} className={SEL + ' flex items-center gap-2 min-w-[160px]'}>
+          <span className="flex-1 text-left">
+            {selected.length === 0 ? t('filter.selectPlaceholder') : `${selected.length} ${t('filter.groupUnit')}`}
+          </span>
+          <ChevronDown className="w-3 h-3 shrink-0 text-gray-400" />
+        </button>
+      }>
+        {groups.map(g => {
+          const isSelected = selected.includes(String(g.id))
+          return (
+            <div key={g.id} onClick={() => toggle(String(g.id))}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-gray-100 dark:bg-gray-700' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
               <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: g.color }} />
-              <span className="text-sm text-gray-800 dark:text-gray-100">{g.name}</span>
-            </label>
-          ))}
-        </div>
-      )}
+              <span className={`text-sm ${isSelected ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-800 dark:text-gray-100'}`}>{g.name}</span>
+            </div>
+          )
+        })}
+      </MultiSelectDropdown>
     </div>
   )
 }
@@ -219,23 +260,25 @@ function TypeMultiSelect({ types, selected, onChange }: {
 
   return (
     <div className="relative" ref={ref}>
-      <button type="button" onClick={() => setOpen(v => !v)} className={SEL + ' flex items-center gap-2 min-w-[160px]'}>
-        <span className="flex-1 text-left">
-          {selected.length === 0 ? t('filter.selectPlaceholder') : `${selected.length} ${t('filter.typeUnit')}`}
-        </span>
-        <ChevronDown className="w-3 h-3 shrink-0 text-gray-400" />
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl p-1.5 min-w-[260px] max-h-80 overflow-y-auto">
-          {types.map(t => (
-            <label key={t.id} className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
-              <input type="checkbox" checked={selected.includes(String(t.id))} onChange={() => toggle(String(t.id))} className="rounded accent-gray-800 dark:accent-gray-200 w-3.5 h-3.5 shrink-0" />
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
-              <span className="text-sm text-gray-800 dark:text-gray-100">{t.name}</span>
-            </label>
-          ))}
-        </div>
-      )}
+      <MultiSelectDropdown open={open} trigger={
+        <button type="button" onClick={() => setOpen(v => !v)} className={SEL + ' flex items-center gap-2 min-w-[160px]'}>
+          <span className="flex-1 text-left">
+            {selected.length === 0 ? t('filter.selectPlaceholder') : `${selected.length} ${t('filter.typeUnit')}`}
+          </span>
+          <ChevronDown className="w-3 h-3 shrink-0 text-gray-400" />
+        </button>
+      }>
+        {types.map(tp => {
+          const isSelected = selected.includes(String(tp.id))
+          return (
+            <div key={tp.id} onClick={() => toggle(String(tp.id))}
+              className={`flex items-center gap-2.5 px-3 py-2 rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-gray-100 dark:bg-gray-700' : 'hover:bg-gray-50 dark:hover:bg-gray-800'}`}>
+              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: tp.color }} />
+              <span className={`text-sm ${isSelected ? 'text-gray-900 dark:text-white font-medium' : 'text-gray-800 dark:text-gray-100'}`}>{tp.name}</span>
+            </div>
+          )
+        })}
+      </MultiSelectDropdown>
     </div>
   )
 }
