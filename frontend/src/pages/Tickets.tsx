@@ -2,7 +2,7 @@ import { useRef, useState, useMemo, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area } from 'recharts'
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line } from 'recharts'
 import { Leaf, Package, ShoppingCart, Tag } from 'lucide-react'
 import {
   Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
@@ -1135,11 +1135,254 @@ function CategoryChart({ tickets }: { tickets: Ticket[] }) {
   )
 }
 
+// ── Monthly stacked category chart ─────────────────────────────────────────────
+
+function MonthlyStackedChart({ tickets }: { tickets: Ticket[] }) {
+  const allCats = useMemo(() => {
+    const totals: Record<string, number> = {}
+    for (const t of tickets)
+      for (const item of t.items)
+        totals[item.category] = (totals[item.category] ?? 0) + item.amount
+    return Object.entries(totals).sort((a, b) => b[1] - a[1]).map(([c]) => c)
+  }, [tickets])
+
+  const [activeCats, setActiveCats] = useState<Set<string>>(new Set())
+  const initialized = useRef(false)
+  useEffect(() => {
+    if (!initialized.current && allCats.length > 0) {
+      initialized.current = true
+      setActiveCats(new Set(allCats))
+    }
+  }, [allCats])
+
+  const chartData = useMemo(() => {
+    const byMonth: Record<string, Record<string, number>> = {}
+    for (const t of tickets) {
+      const raw = t.ticket_date ?? t.created_at.slice(0, 10)
+      const d = new Date(raw + 'T00:00:00')
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`
+      if (!byMonth[key]) byMonth[key] = {}
+      for (const item of t.items) {
+        if (!activeCats.has(item.category)) continue
+        byMonth[key][item.category] = (byMonth[key][item.category] ?? 0) + item.amount
+      }
+    }
+    const months = Object.keys(byMonth).sort()
+    return months.map(month => {
+      const [y, m] = month.split('-')
+      const label = new Date(+y, +m - 1).toLocaleDateString('es-ES', { month: 'short', year: '2-digit' })
+      const row: Record<string, string | number> = { month: label }
+      for (const cat of allCats) {
+        if (activeCats.has(cat)) row[cat] = byMonth[month][cat] ?? 0
+      }
+      return row
+    })
+  }, [tickets, activeCats, allCats])
+
+  const toggleCat = (cat: string) => {
+    setActiveCats(prev => {
+      const next = new Set(prev)
+      if (next.has(cat)) next.delete(cat); else next.add(cat)
+      return next
+    })
+  }
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5 space-y-4">
+      <h2 className="text-sm font-semibold text-gray-800 dark:text-white">Evolución mensual por categoría</h2>
+      <div className="flex flex-wrap gap-1.5">
+        {allCats.map(cat => {
+          const cc = catCfg(cat)
+          const active = activeCats.has(cat)
+          return (
+            <button key={cat} type="button" onClick={() => toggleCat(cat)}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium transition-opacity ${active ? 'opacity-100' : 'opacity-30'}`}
+              style={{ background: cc.color + '22', color: cc.color, border: `1px solid ${cc.color}44` }}
+            >
+              <cc.icon className="w-2.5 h-2.5 shrink-0" />
+              {cat}
+            </button>
+          )
+        })}
+      </div>
+      {chartData.length === 0 ? (
+        <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-6">Sin datos para mostrar.</p>
+      ) : (
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={chartData} margin={{ top: 4, right: 8, left: -12, bottom: 4 }} barCategoryGap="25%">
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.15)" vertical={false} />
+              <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
+              <Tooltip formatter={(v: unknown, name: string) => [`${Number(v).toFixed(2)} €`, name]} contentStyle={TOOLTIP_STYLE} />
+              {allCats.filter(cat => activeCats.has(cat)).map(cat => (
+                <Bar key={cat} dataKey={cat} stackId="stack" fill={catCfg(cat).color} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Product price tracker ──────────────────────────────────────────────────────
+
+const TRACK_COLORS = ['#6366f1', '#f59e0b', '#10b981', '#ef4444', '#3b82f6']
+
+function ProductPriceTracker({ tickets }: { tickets: Ticket[] }) {
+  const [search, setSearch] = useState('')
+  const [selected, setSelected] = useState<string[]>([])
+  const [showDrop, setShowDrop] = useState(false)
+
+  const catalog = useMemo(() => {
+    const c: Record<string, { display: string; count: number }> = {}
+    for (const t of tickets)
+      for (const item of t.items) {
+        const key = item.name.toLowerCase().trim()
+        if (!key) continue
+        if (!c[key]) c[key] = { display: item.name, count: 0 }
+        c[key].count++
+      }
+    return c
+  }, [tickets])
+
+  const suggestions = useMemo(() => {
+    const q = search.toLowerCase().trim()
+    return Object.entries(catalog)
+      .filter(([key]) => !selected.includes(key) && (q === '' || key.includes(q)))
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 12)
+  }, [catalog, search, selected])
+
+  const { chartData, lines } = useMemo(() => {
+    if (selected.length === 0) return { chartData: [] as Record<string, string | number | null>[], lines: [] as string[] }
+    const pts: Record<string, { date: string; amount: number }[]> = {}
+    for (const key of selected) pts[key] = []
+    for (const t of tickets) {
+      const date = t.ticket_date ?? t.created_at.slice(0, 10)
+      for (const item of t.items) {
+        const key = item.name.toLowerCase().trim()
+        if (pts[key]) pts[key].push({ date, amount: item.amount })
+      }
+    }
+    const allDates = Array.from(new Set(selected.flatMap(k => pts[k].map(p => p.date)))).sort()
+    const chartData = allDates.map(date => {
+      const [y, m, d] = date.split('-')
+      const label = new Date(+y, +m - 1, +d).toLocaleDateString('es-ES', { day: 'numeric', month: 'short', year: '2-digit' })
+      const row: Record<string, string | number | null> = { date: label }
+      for (const key of selected) {
+        const dayPts = pts[key].filter(p => p.date === date)
+        row[key] = dayPts.length > 0 ? dayPts.reduce((s, p) => s + p.amount, 0) : null
+      }
+      return row
+    })
+    return { chartData, lines: selected }
+  }, [tickets, selected])
+
+  const addProduct = (key: string) => {
+    if (selected.length >= 5) return
+    setSelected(prev => [...prev, key])
+    setSearch('')
+    setShowDrop(false)
+  }
+
+  const removeProduct = (key: string) => setSelected(prev => prev.filter(k => k !== key))
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-5 space-y-4">
+      <h2 className="text-sm font-semibold text-gray-800 dark:text-white">Evolución de precio por producto</h2>
+      <div
+        className="relative"
+        onBlur={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setShowDrop(false) }}
+      >
+        <div className="flex items-center gap-1.5 px-3 py-2 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800">
+          <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+          <input
+            className="flex-1 text-xs bg-transparent outline-none text-gray-700 dark:text-gray-300 placeholder-gray-400"
+            placeholder={selected.length >= 5 ? 'Máximo 5 productos' : 'Buscar producto…'}
+            value={search}
+            disabled={selected.length >= 5}
+            onChange={e => { setSearch(e.target.value); setShowDrop(true) }}
+            onFocus={() => setShowDrop(true)}
+          />
+        </div>
+        {showDrop && suggestions.length > 0 && (
+          <div className="absolute top-full mt-1 left-0 right-0 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg z-10 max-h-48 overflow-y-auto">
+            {suggestions.map(([key, info]) => (
+              <button key={key} type="button"
+                className="w-full flex items-center justify-between px-3 py-2 text-xs text-left hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 transition-colors"
+                onMouseDown={() => addProduct(key)}
+              >
+                <span className="truncate">{info.display}</span>
+                <span className="text-gray-400 ml-2 shrink-0">{info.count}×</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {selected.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {selected.map((key, i) => (
+            <span key={key}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium"
+              style={{ background: TRACK_COLORS[i] + '22', color: TRACK_COLORS[i], border: `1px solid ${TRACK_COLORS[i]}44` }}
+            >
+              <span className="max-w-[140px] truncate">{catalog[key]?.display ?? key}</span>
+              <button type="button" onMouseDown={() => removeProduct(key)} className="hover:opacity-60 transition-opacity shrink-0">
+                <X className="w-3 h-3" />
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {selected.length === 0 ? (
+        <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
+          Busca y selecciona hasta 5 productos para ver su evolución de precio.
+        </p>
+      ) : chartData.length < 2 ? (
+        <p className="text-sm text-gray-400 dark:text-gray-500 text-center py-8">
+          Se necesitan al menos 2 fechas de compra para ver la evolución.
+        </p>
+      ) : (
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={chartData} margin={{ top: 4, right: 8, left: -12, bottom: 4 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.15)" vertical={false} />
+              <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
+              <Tooltip
+                formatter={(v: unknown, name: string) => [`${Number(v).toFixed(2)} €`, catalog[name]?.display ?? name]}
+                contentStyle={TOOLTIP_STYLE}
+              />
+              {lines.map((key, i) => (
+                <Line
+                  key={key}
+                  type="monotone"
+                  dataKey={key}
+                  stroke={TRACK_COLORS[i]}
+                  strokeWidth={2}
+                  dot={{ fill: TRACK_COLORS[i], r: 4, strokeWidth: 0 }}
+                  activeDot={{ r: 6 }}
+                  connectNulls={false}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function Tickets() {
   const qc = useQueryClient()
   const [uploadError, setUploadError] = useState<string | null>(null)
+  const [pageTab, setPageTab] = useState<'tickets' | 'analysis'>('tickets')
 
   const { data: tickets = [] } = useQuery({
     queryKey: ['tickets'],
@@ -1180,47 +1423,79 @@ export default function Tickets() {
         <h1 className="text-xl font-bold text-gray-800 dark:text-white">Tickets</h1>
       </div>
 
-      <div className="relative">
-        <UploadArea onFile={async f => { setUploadError(null); analyzeMut.mutate(await compressTicketImage(f)) }} />
-        {analyzeMut.isPending && (
-          <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 rounded-xl flex items-center justify-center gap-2">
-            <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
-            <span className="text-sm text-gray-600 dark:text-gray-300">Analizando ticket…</span>
+      <div>
+        {/* Tab navigation */}
+        <div className="flex border-b border-gray-200 dark:border-gray-700 mb-5">
+          {(['tickets', 'analysis'] as const).map(tab => (
+            <button
+              key={tab}
+              onClick={() => setPageTab(tab)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                pageTab === tab
+                  ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              {tab === 'tickets' ? 'Tickets' : 'Análisis'}
+            </button>
+          ))}
+        </div>
+
+        {pageTab === 'tickets' ? (
+          <div className="space-y-5">
+            <div className="relative">
+              <UploadArea onFile={async f => { setUploadError(null); analyzeMut.mutate(await compressTicketImage(f)) }} />
+              {analyzeMut.isPending && (
+                <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 rounded-xl flex items-center justify-center gap-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-500" />
+                  <span className="text-sm text-gray-600 dark:text-gray-300">Analizando ticket…</span>
+                </div>
+              )}
+            </div>
+
+            {uploadError && (
+              <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                {uploadError}
+              </div>
+            )}
+
+            {tickets.length > 0 && (
+              <>
+                <CategoryChart tickets={tickets} />
+                <div className="space-y-2">
+                  {tickets.map(t => (
+                    <TicketCard
+                      key={t.id}
+                      ticket={t}
+                      onDelete={() => deleteMut.mutate(t.id)}
+                      extraCategories={Object.keys(
+                        tickets.reduce((acc, tk) => ({ ...acc, ...tk.categories }), {} as Record<string, number>)
+                      )}
+                      movementTypes={movementTypes}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {tickets.length === 0 && !analyzeMut.isPending && (
+              <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-8">
+                Aún no has subido ningún ticket. Sube una foto o PDF para empezar.
+              </p>
+            )}
+          </div>
+        ) : tickets.length === 0 ? (
+          <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-8">
+            Sube tickets para ver el análisis.
+          </p>
+        ) : (
+          <div className="space-y-5">
+            <MonthlyStackedChart tickets={tickets} />
+            <ProductPriceTracker tickets={tickets} />
           </div>
         )}
       </div>
-
-      {uploadError && (
-        <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 rounded-xl text-sm text-red-600 dark:text-red-400">
-          <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-          {uploadError}
-        </div>
-      )}
-
-      {tickets.length > 0 && (
-        <>
-          <CategoryChart tickets={tickets} />
-          <div className="space-y-2">
-            {tickets.map(t => (
-              <TicketCard
-                key={t.id}
-                ticket={t}
-                onDelete={() => deleteMut.mutate(t.id)}
-                extraCategories={Object.keys(
-                  tickets.reduce((acc, tk) => ({ ...acc, ...tk.categories }), {} as Record<string, number>)
-                )}
-                movementTypes={movementTypes}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      {tickets.length === 0 && !analyzeMut.isPending && (
-        <p className="text-center text-sm text-gray-400 dark:text-gray-500 py-8">
-          Aún no has subido ningún ticket. Sube una foto o PDF para empezar.
-        </p>
-      )}
     </div>
   )
 }
