@@ -549,15 +549,16 @@ async def _extract_text_psm3(file_path: str) -> str:
         return ""
 
 
-async def _analyze_with_mistral(file_path: str, mime_type: str) -> dict | None:
+async def _analyze_with_mistral(file_path: str, mime_type: str, api_key: str = "") -> dict | None:
     """Use Mistral pixtral-12b-2409 (free tier) to extract structured data from a receipt.
 
-    Requires the MISTRAL_API_KEY environment variable (free key at console.mistral.ai).
+    api_key: caller-supplied key (from user preferences); falls back to MISTRAL_API_KEY env var.
     Only handles image files; PDFs fall through to Tesseract/pdfplumber.
     Uses httpx (already in requirements) — no new packages needed.
     """
-    api_key = os.environ.get("MISTRAL_API_KEY", "").strip()
+    api_key = api_key.strip() or os.environ.get("MISTRAL_API_KEY", "").strip()
     if not api_key:
+        print("[Tickets] MISTRAL_API_KEY no configurada — saltando Mistral")
         return None
 
     # Mistral pixtral handles images; skip PDFs here
@@ -639,10 +640,11 @@ async def _analyze_with_mistral(file_path: str, mime_type: str) -> dict | None:
         return None
 
 
-async def _analyze_with_gemini(file_path: str, mime_type: str) -> dict | None:
+async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = "") -> dict | None:
     """Use Gemini 2.0 Flash (free tier) to extract structured data from a receipt.
 
-    Requires the GEMINI_API_KEY environment variable.  Returns a dict with keys:
+    api_key: caller-supplied key (from user preferences); falls back to GEMINI_API_KEY env var.
+    Returns a dict with keys:
       store_name (str | None), date (str | None, YYYY-MM-DD),
       total (float | None), items (list[{name, amount}])
     or None if the API key is absent or the request fails (caller falls back to
@@ -652,7 +654,7 @@ async def _analyze_with_gemini(file_path: str, mime_type: str) -> dict | None:
     Free-tier limits (as of 2025): 15 RPM / 1 500 req-per-day — more than enough
     for personal use.
     """
-    api_key = os.environ.get("GEMINI_API_KEY", "").strip()
+    api_key = api_key.strip() or os.environ.get("GEMINI_API_KEY", "").strip()
     if not api_key:
         print("[Tickets] GEMINI_API_KEY no configurada — usando Tesseract")
         return None
@@ -895,16 +897,31 @@ async def analyze_ticket(
     with open(dest, "wb") as f:
         f.write(content)
 
-    # Load user's custom category rules
+    # Load user's custom category rules + API keys from preferences
+    from app.models.user_preference import UserPreference
+    prefs_result = await db.execute(
+        select(UserPreference).where(UserPreference.user_id == user.id)
+    )
+    prefs = {p.key: p.value for p in prefs_result.scalars().all()}
+    custom_rules = {}
     rules_result = await db.execute(
         select(ItemCategoryRule).where(ItemCategoryRule.user_id == user.id)
     )
     custom_rules = {r.item_name: r.category for r in rules_result.scalars().all()}
 
+    gemini_key  = prefs.get("gemini_api_key", "")
+    mistral_key = prefs.get("mistral_api_key", "")
+
     # ── Primary: Gemini 2.0 Flash → Mistral pixtral-12b (free tiers) ────────
-    ai_result = await _analyze_with_gemini(dest, file.content_type or "")
+    ai_result = await _analyze_with_gemini(dest, file.content_type or "", api_key=gemini_key)
+    ocr_source = "gemini" if ai_result else None
     if not ai_result:
-        ai_result = await _analyze_with_mistral(dest, file.content_type or "")
+        ai_result = await _analyze_with_mistral(dest, file.content_type or "", api_key=mistral_key)
+        if ai_result:
+            ocr_source = "mistral"
+
+    if not ai_result:
+        ocr_source = "tesseract"
 
     if ai_result:
         # Apply our category engine to AI-extracted item names
@@ -989,6 +1006,7 @@ async def analyze_ticket(
         total=total,
         items=json.dumps(items, ensure_ascii=False),
         categories=json.dumps(categories, ensure_ascii=False),
+        ocr_source=ocr_source,
     )
     db.add(record)
     await db.commit()

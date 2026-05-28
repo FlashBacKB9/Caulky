@@ -22,4 +22,5 @@ class Ticket(Base):
     items: Mapped[str] = mapped_column(Text, nullable=False, server_default="[]")
     categories: Mapped[str] = mapped_column(Text, nullable=False, server_default="{}")
     generated_movements: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ocr_source: Mapped[str | None] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), nullable=False)

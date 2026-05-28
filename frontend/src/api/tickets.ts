@@ -16,6 +16,7 @@ export interface Ticket {
   items: TicketItem[]
   categories: Record<string, number>
   generated_movements?: { food?: number; supplies?: number; combined?: number } | null
+  ocr_source?: string | null
   created_at: string
 }
 

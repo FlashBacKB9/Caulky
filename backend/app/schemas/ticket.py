@@ -20,6 +20,7 @@ class TicketRead(BaseModel):
     items: list[TicketItem]
     categories: dict[str, float]
     generated_movements: Optional[dict] = None
+    ocr_source: Optional[str] = None
     created_at: datetime
 
     @field_validator("items", mode="before")

@@ -502,6 +502,17 @@ function TicketCard({
       <div className="flex items-center gap-3 px-4 py-3">
         <Receipt className="w-4 h-4 text-gray-400 shrink-0" strokeWidth={1.5} />
         <div className="flex-1 min-w-0">
+          {ticket.ocr_source && (
+            <span className={`inline-block text-[10px] font-medium px-1.5 py-0.5 rounded mb-0.5 ${
+              ticket.ocr_source === 'gemini'   ? 'bg-blue-50 dark:bg-blue-950/40 text-blue-500' :
+              ticket.ocr_source === 'mistral'  ? 'bg-orange-50 dark:bg-orange-950/40 text-orange-500' :
+              'bg-gray-100 dark:bg-gray-800 text-gray-400'
+            }`}>
+              {ticket.ocr_source === 'gemini'   ? 'Gemini' :
+               ticket.ocr_source === 'mistral'  ? 'Mistral' :
+               'OCR'}
+            </span>
+          )}
           <TicketMetaField
             value={ticket.store_name ?? 'Supermercado'}
             placeholder="Nombre del establecimiento"
