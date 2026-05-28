@@ -19,6 +19,7 @@ const ES: Record<string, string> = {
   'nav.docs':         'Documentación',
   'nav.ai':           'Consultor IA',
   'nav.tickets':      'Tickets',
+  'nav.expenses':     'Control de Gastos',
 
   'common.save':        'Guardar',
   'common.cancel':      'Cancelar',
