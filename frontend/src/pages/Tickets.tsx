@@ -1214,7 +1214,7 @@ function MonthlyStackedChart({ tickets }: { tickets: Ticket[] }) {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.15)" vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
-              <Tooltip formatter={(v: unknown, name: string) => [`${Number(v).toFixed(2)} €`, name]} contentStyle={TOOLTIP_STYLE} />
+              <Tooltip formatter={(v: unknown, name: string | number | undefined) => [`${Number(v).toFixed(2)} €`, String(name ?? '')]} contentStyle={TOOLTIP_STYLE} />
               {allCats.filter(cat => activeCats.has(cat)).map(cat => (
                 <Bar key={cat} dataKey={cat} stackId="stack" fill={catCfg(cat).color} />
               ))}
@@ -1354,7 +1354,7 @@ function ProductPriceTracker({ tickets }: { tickets: Ticket[] }) {
               <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
               <Tooltip
-                formatter={(v: unknown, name: string) => [`${Number(v).toFixed(2)} €`, catalog[name]?.display ?? name]}
+                formatter={(v: unknown, name: string | number | undefined) => { const k = String(name ?? ''); return [`${Number(v).toFixed(2)} €`, catalog[k]?.display ?? k] }}
                 contentStyle={TOOLTIP_STYLE}
               />
               {lines.map((key, i) => (

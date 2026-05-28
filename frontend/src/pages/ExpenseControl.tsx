@@ -459,9 +459,9 @@ export default function ExpenseControl() {
                   <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
                   <Tooltip
-                    formatter={(v: unknown, key: string) => [
+                    formatter={(v: unknown, key: string | number | undefined) => [
                       `${Number(v).toFixed(2)} €`,
-                      typeMap[Number(key)]?.name ?? key,
+                      typeMap[Number(key ?? 0)]?.name ?? String(key ?? ''),
                     ]}
                     contentStyle={TOOLTIP_STYLE}
                   />
@@ -477,9 +477,9 @@ export default function ExpenseControl() {
                   <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
                   <Tooltip
-                    formatter={(v: unknown, key: string) => [
+                    formatter={(v: unknown, key: string | number | undefined) => [
                       `${Number(v).toFixed(2)} €`,
-                      typeMap[Number(key)]?.name ?? key,
+                      typeMap[Number(key ?? 0)]?.name ?? String(key ?? ''),
                     ]}
                     contentStyle={TOOLTIP_STYLE}
                   />
