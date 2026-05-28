@@ -13,6 +13,18 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.7.0', date: 'Mayo 2026',
+    items: [
+      { type: 'feat',    text: 'Control de Gastos: nuevo módulo con evolución mensual por tipo, comparativa multi-año, modos barra/área/línea, apilado y acumulado' },
+      { type: 'feat',    text: 'Control de Gastos: vista tabla (tipos × meses) con comparativa por año (Δ%) y toggle Por mes / Anual' },
+      { type: 'feat',    text: 'Control de Gastos: paletas de colores automáticas (Vivos, Pastel, Tierra, Océano, Bosque) con pickers individuales por tipo' },
+      { type: 'feat',    text: 'Tickets: pestaña Análisis con gráficos de gasto por categoría, evolución mensual y desglose con filtros de fecha' },
+      { type: 'feat',    text: 'Tickets: OCR con Gemini (free tier) y cadena de fallback automática Gemini → Mistral → Tesseract' },
+      { type: 'improve', text: 'Tooltips de gráficos con soporte correcto de modo oscuro (fondo, borde y texto adaptados)' },
+      { type: 'fix',     text: 'Etiqueta de navegación "Control de Gastos" mostraba la clave i18n en vez del texto' },
+    ],
+  },
+  {
     version: 'v1.6.0', date: 'Mayo 2026',
     items: [
       { type: 'feat',    text: 'Multi-cuenta: transferencias entre cuentas, balance combinado y filtro por cuenta en movimientos' },
@@ -125,7 +137,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-white">{t('about.title')}</h2>
-            <span className="text-xs text-gray-400 dark:text-gray-500">v1.6.0</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">v1.7.0</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
