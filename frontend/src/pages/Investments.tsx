@@ -374,6 +374,7 @@ function FundCard({ fund, movementTypes }: { fund: InvestmentFund; movementTypes
                     : t('invest.noSubtype')}
                 </p>
               ) : (
+                <div className="overflow-x-auto">
                 <table className="w-full text-xs">
                   <thead className="bg-gray-50 dark:bg-gray-800/50 text-gray-400 dark:text-gray-500">
                     <tr>
@@ -392,6 +393,7 @@ function FundCard({ fund, movementTypes }: { fund: InvestmentFund; movementTypes
                     ))}
                   </tbody>
                 </table>
+                </div>
               )}
             </div>
           )}

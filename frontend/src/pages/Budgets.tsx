@@ -530,7 +530,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
   return (
     <div className="flex-1 overflow-auto">
       {/* Subheader */}
-      <div className="flex items-center gap-4 px-6 py-3 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
+      <div className="flex items-center gap-4 px-3 md:px-6 py-3 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
         <button onClick={onClose} className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors shrink-0">
           <ChevronLeft className="w-4 h-4"/> {t('common.back')}
         </button>
@@ -748,7 +748,7 @@ export default function Budgets() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0">
+      <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0">
         <div className="flex items-center gap-2.5">
           <ChartCandlestick className="w-4 h-4 text-gray-400" strokeWidth={1.5}/>
           <h1 className="text-base font-bold text-gray-800 dark:text-white">{t('budgets.title')}</h1>
@@ -769,7 +769,7 @@ export default function Budgets() {
           onEdit={() => openEdit(detailBudget)}
         />
       ) : (
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-3 md:p-6">
           {budgets.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-400">
               <ChartCandlestick className="w-10 h-10" strokeWidth={1}/>

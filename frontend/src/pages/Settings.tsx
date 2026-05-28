@@ -2356,7 +2356,7 @@ export default function Settings() {
                   ))}
                 </div>
               </div>
-              <div className="flex items-center justify-between px-4 py-3">
+              <div className="hidden md:flex items-center justify-between px-4 py-3">
                 <span className="text-sm text-gray-700 dark:text-gray-200">{t('settings.uiSize')}</span>
                 <div className="flex items-center gap-2">
                   <button onClick={zoomOut} disabled={zoom <= zoomMin}

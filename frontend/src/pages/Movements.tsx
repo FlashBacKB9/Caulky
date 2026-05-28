@@ -674,7 +674,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
         tree.length === 0
           ? <div className="text-center text-gray-400 py-16">{t('movements.noMovements')}</div>
           : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(22rem, 1fr))' }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(22rem, 100%), 1fr))' }}>
               {sortedTree.map(group => {
                 const groupOpen = expandedGroups.has(group.id)
                 const isDragging = draggingId === group.id
@@ -756,7 +756,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
         columns.length === 0
           ? <div className="text-center text-gray-400 py-16">{t('movements.noMovements')}</div>
           : (
-            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(22rem, 1fr))' }}>
+            <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(22rem, 100%), 1fr))' }}>
               {columns.map(col => {
                 const total = col.movements.reduce((s, mv) => s + mv.dinero, 0)
                 return (
@@ -1284,8 +1284,8 @@ export default function Movements() {
         />
       )}
 
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2 justify-between">
+        <div className="flex items-center gap-2 min-w-0">
           <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
             <button onClick={() => setViewMode('calendar')} className={`p-1.5 rounded-md transition-colors ${viewMode === 'calendar' ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`} title={t('movements.calendarTitle')}>
               <CalendarDays className="w-4 h-4" />
@@ -1297,7 +1297,7 @@ export default function Movements() {
               <LayoutGrid className="w-4 h-4" />
             </button>
           </div>
-          <h1 className="text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
+          <h1 className="text-xl sm:text-2xl font-bold text-gray-800 dark:text-white flex items-center gap-2">
             {t('movements.title')}
             <div ref={yearPickerRef} className="relative">
               <button
@@ -1327,7 +1327,7 @@ export default function Movements() {
             </div>
           </h1>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap justify-end">
           {/* Favoritos guardados */}
           {favorites.map(fav => (
             <button key={fav.id} onClick={() => applyFilter(fav.filter, fav.id)}
@@ -1373,7 +1373,7 @@ export default function Movements() {
                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}>
             <ArrowUpDown className="w-3.5 h-3.5" strokeWidth={1.5} />
-            {t('movements.sortBtn')}
+            <span className="hidden sm:inline">{t('movements.sortBtn')}</span>
             {sorts.length > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-violet-500 text-white text-[10px] flex items-center justify-center font-bold">{sorts.length}</span>
             )}
@@ -1387,7 +1387,7 @@ export default function Movements() {
                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}>
             <Filter className="w-3.5 h-3.5" strokeWidth={1.5} />
-            {t('movements.filtersBtn')}
+            <span className="hidden sm:inline">{t('movements.filtersBtn')}</span>
             {activeFilterCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">{activeFilterCount}</span>
             )}
@@ -1395,7 +1395,7 @@ export default function Movements() {
           <button onClick={() => setShowForm(true)}
             className="flex items-center gap-1.5 px-4 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors">
             <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
-            {t('movements.newBtn')}
+            <span className="hidden sm:inline">{t('movements.newBtn')}</span>
           </button>
         </div>
       </div>
