@@ -549,6 +549,96 @@ async def _extract_text_psm3(file_path: str) -> str:
         return ""
 
 
+async def _analyze_with_mistral(file_path: str, mime_type: str) -> dict | None:
+    """Use Mistral pixtral-12b-2409 (free tier) to extract structured data from a receipt.
+
+    Requires the MISTRAL_API_KEY environment variable (free key at console.mistral.ai).
+    Only handles image files; PDFs fall through to Tesseract/pdfplumber.
+    Uses httpx (already in requirements) — no new packages needed.
+    """
+    api_key = os.environ.get("MISTRAL_API_KEY", "").strip()
+    if not api_key:
+        return None
+
+    # Mistral pixtral handles images; skip PDFs here
+    is_pdf = (mime_type == "application/pdf"
+              or os.path.splitext(file_path)[1].lower() == ".pdf")
+    if is_pdf:
+        return None
+
+    import base64
+    import httpx
+
+    ext = os.path.splitext(file_path)[1].lower()
+    if mime_type and mime_type.startswith("image/"):
+        media_type = mime_type
+    elif ext == ".png":
+        media_type = "image/png"
+    elif ext == ".webp":
+        media_type = "image/webp"
+    else:
+        media_type = "image/jpeg"
+
+    try:
+        with open(file_path, "rb") as fh:
+            file_b64 = base64.b64encode(fh.read()).decode()
+    except Exception as exc:
+        print(f"[Tickets] Mistral: no se puede leer el fichero: {exc}")
+        return None
+
+    prompt = (
+        "Eres un asistente especializado en analizar tickets de compra españoles. "
+        "Analiza la imagen del ticket y devuelve los datos en este JSON exacto "
+        "(sin texto adicional, sin bloques markdown):\n"
+        '{"store_name":"nombre del supermercado","date":"YYYY-MM-DD",'
+        '"total":0.00,"items":[{"name":"PRODUCTO","amount":0.00}]}\n\n'
+        "Reglas:\n"
+        "- store_name: nombre exacto de la tienda (ej: Mercadona, Lidl, Carrefour). "
+        "null si no se ve claramente.\n"
+        "- date: fecha de compra en YYYY-MM-DD. null si no se ve.\n"
+        "- total: importe total pagado (TOTAL, TOTAL A PAGAR, TARJETA, BIZUM). "
+        "null si no se ve.\n"
+        "- items: TODOS los productos con su precio de línea (precio total, no unitario). "
+        "Incluye descuentos como importes negativos. "
+        "Omite IVA, subtotales, formas de pago y datos del establecimiento.\n"
+        "Responde ÚNICAMENTE con el JSON."
+    )
+
+    payload = {
+        "model": "pixtral-12b-2409",
+        "messages": [{
+            "role": "user",
+            "content": [
+                {"type": "image_url", "image_url": {"url": f"data:{media_type};base64,{file_b64}"}},
+                {"type": "text", "text": prompt},
+            ],
+        }],
+        "response_format": {"type": "json_object"},
+        "temperature": 0.1,
+    }
+
+    print(f"[Tickets] Llamando a Mistral pixtral-12b para {os.path.basename(file_path)}")
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            resp = await client.post(
+                "https://api.mistral.ai/v1/chat/completions",
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+                json=payload,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            raw = data["choices"][0]["message"]["content"].strip()
+            raw = re.sub(r'^```[a-z]*\s*', '', raw)
+            raw = re.sub(r'\s*```$', '', raw)
+            result = json.loads(raw)
+            print(f"[Tickets] Mistral OK — tienda={result.get('store_name')} total={result.get('total')} productos={len(result.get('items') or [])}")
+            return result
+    except Exception as exc:
+        msg = str(exc).replace(api_key, "***")
+        print(f"[Tickets] Mistral error: {msg}")
+        return None
+
+
 async def _analyze_with_gemini(file_path: str, mime_type: str) -> dict | None:
     """Use Gemini 2.0 Flash (free tier) to extract structured data from a receipt.
 
@@ -811,12 +901,14 @@ async def analyze_ticket(
     )
     custom_rules = {r.item_name: r.category for r in rules_result.scalars().all()}
 
-    # ── Primary: Gemini 2.0 Flash (free tier, set GEMINI_API_KEY) ────────────
-    gemini = await _analyze_with_gemini(dest, file.content_type or "")
+    # ── Primary: Gemini 2.0 Flash → Mistral pixtral-12b (free tiers) ────────
+    ai_result = await _analyze_with_gemini(dest, file.content_type or "")
+    if not ai_result:
+        ai_result = await _analyze_with_mistral(dest, file.content_type or "")
 
-    if gemini:
-        # Apply our category engine to Gemini-extracted item names
-        raw_items = gemini.get("items") or []
+    if ai_result:
+        # Apply our category engine to AI-extracted item names
+        raw_items = ai_result.get("items") or []
         items: list[dict] = []
         for it in raw_items:
             name = str(it.get("name") or "").strip()
@@ -836,7 +928,7 @@ async def analyze_ticket(
 
         # Parse date
         ticket_date = None
-        raw_date = gemini.get("date")
+        raw_date = ai_result.get("date")
         if raw_date:
             try:
                 from datetime import date as _dt2
@@ -847,13 +939,13 @@ async def analyze_ticket(
         # Parse total
         total = None
         try:
-            v = float(gemini.get("total") or 0)
+            v = float(ai_result.get("total") or 0)
             if v:
                 total = v
         except (TypeError, ValueError):
             pass
 
-        store_name = str(gemini.get("store_name") or "").strip() or "Supermercado"
+        store_name = str(ai_result.get("store_name") or "").strip() or "Supermercado"
 
     else:
         # ── Fallback: Tesseract three-pass strategy ───────────────────────────
