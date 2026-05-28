@@ -677,11 +677,12 @@ export default function ExpenseControl() {
 
   const [selectedTypeIds, setSelectedTypeIds] = useState<Set<number>>(new Set())
   const [initialized, setInitialized]         = useState(false)
-  const [chartKind, setChartKind]       = useState<ChartKind>('bar')
-  const [stackMode, setStackMode]       = useState<StackMode>('stacked')
-  const [activeYears, setActiveYears]   = useState<number[]>([CURRENT_YEAR])
-  const [customColors, setCustomColors] = useState<Record<number, string>>(loadColors)
-  const [typeOrderIds, setTypeOrderIds] = useState<number[]>(loadTypeOrder)
+  const [chartKind, setChartKind]             = useState<ChartKind>('bar')
+  const [stackMode, setStackMode]             = useState<StackMode>('stacked')
+  const [activeYears, setActiveYears]         = useState<number[]>([CURRENT_YEAR])
+  const [customColors, setCustomColors]       = useState<Record<number, string>>(loadColors)
+  const [typeOrderIds, setTypeOrderIds]       = useState<number[]>(loadTypeOrder)
+  const [hiddenChartTypeIds, setHiddenChartTypeIds] = useState<Set<number>>(new Set())
 
   // ── Queries ───────────────────────────────────────────────────────────────────
   const { data: allTypes = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes, staleTime: 5 * 60 * 1000 })
@@ -772,14 +773,19 @@ export default function ExpenseControl() {
     return { chartRows, annualByType }
   }, [movementsByYear, allYears, chartTypes, selectedTypeIds])
 
+  const visibleChartTypes = useMemo(
+    () => chartTypes.filter(t => !hiddenChartTypeIds.has(t.id)),
+    [chartTypes, hiddenChartTypeIds]
+  )
+
   // Series: newest first so opacity gradation works (yi=0 = newest)
   const chartSeries = useMemo(() => {
     const newestFirst = [...allYears].sort((a, b) => b - a)
     return allYears.flatMap(y => {
       const yi = newestFirst.indexOf(y)
-      return chartTypes.map(t => ({ key: `${t.id}_${y}`, color: typeColor(t, customColors), yi, y, t }))
+      return visibleChartTypes.map(t => ({ key: `${t.id}_${y}`, color: typeColor(t, customColors), yi, y, t }))
     })
-  }, [allYears, chartTypes, customColors])
+  }, [allYears, visibleChartTypes, customColors])
 
   // Cumulative transform when stackMode === 'cumulative'
   const displayRows = useMemo(() => {
@@ -830,6 +836,10 @@ export default function ExpenseControl() {
   const handleChartKindChange = (kind: ChartKind) => {
     setChartKind(kind)
     if (kind === 'line' && stackMode === 'stacked') setStackMode('normal')
+  }
+
+  const toggleChartType = (id: number) => {
+    setHiddenChartTypeIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   }
 
   const handleReorderTypes = (newOrder: number[]) => {
@@ -943,15 +953,22 @@ export default function ExpenseControl() {
           {/* Legend + year opacity key */}
           {chartKind !== 'table' && (
             <div className="space-y-2">
-              {/* Type chips — click to toggle visibility */}
+              {/* Type chips — click to show/hide in chart */}
               <div className="flex flex-wrap gap-x-1 gap-y-1">
-                {chartTypes.map(t => (
-                  <button key={t.id} type="button" onClick={() => toggleType(t.id)}
-                    className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400 px-2 py-0.5 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800/40 transition-colors select-none">
-                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: typeColor(t, customColors) }} />
-                    {t.name}
-                  </button>
-                ))}
+                {chartTypes.map(t => {
+                  const hidden = hiddenChartTypeIds.has(t.id)
+                  return (
+                    <button key={t.id} type="button" onClick={() => toggleChartType(t.id)}
+                      className={`flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-md transition-all select-none ${
+                        hidden
+                          ? 'opacity-30 hover:opacity-60 text-gray-400 dark:text-gray-500'
+                          : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800/40'
+                      }`}>
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ background: typeColor(t, customColors), opacity: hidden ? 0.4 : 1 }} />
+                      {t.name}
+                    </button>
+                  )
+                })}
               </div>
 
               {/* Year opacity key — only when multiple years active */}
