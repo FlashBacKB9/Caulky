@@ -510,7 +510,19 @@ function Regla502030({ realExpenseMovements, periodMovements, groups, types, act
     const map: Record<RuleBucket, number> = { necesidades: 0, deseos: 0, ahorro: actualSavings, unassigned: 0 }
     // Expense movements (dinero < 0): assign to bucket
     realExpenseMovements.forEach(m => {
-      if (m.movement_type_id == null) { map.unassigned += Math.abs(m.dinero); return }
+      if (m.movement_type_id == null) {
+        // Transfers: classify by the linked type of the destination account
+        if (m.is_transfer && m.account_id != null) {
+          const linkedType = types.find(t => t.linked_account_id === m.account_id)
+          if (linkedType) {
+            const bucket: RuleBucket = assignment[linkedType.income_expense_group_id] ?? 'unassigned'
+            map[bucket] += Math.abs(m.dinero)
+            return
+          }
+        }
+        map.unassigned += Math.abs(m.dinero)
+        return
+      }
       const tp = types.find(t => t.id === m.movement_type_id)
       if (!tp) { map.unassigned += Math.abs(m.dinero); return }
       const bucket: RuleBucket = assignment[tp.income_expense_group_id] ?? 'unassigned'
