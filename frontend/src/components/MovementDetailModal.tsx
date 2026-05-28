@@ -176,7 +176,18 @@ export default function MovementDetailModal({ movement, types, onClose }: {
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('common.type')}</label>
               {draft.is_transfer
-                ? <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1.5">Sin tipo — es una transferencia</p>
+                ? (() => {
+                    const destId = draft.account_id ? parseInt(draft.account_id) : null
+                    const linkedType = destId ? types.find(t => t.linked_account_id === destId) : null
+                    return linkedType
+                      ? (
+                        <div className="flex items-center gap-2 py-1.5">
+                          <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: linkedType.color }} />
+                          <span className="text-xs text-gray-700 dark:text-gray-200">{linkedType.name}</span>
+                        </div>
+                      )
+                      : <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1.5">Sin tipo — es una transferencia</p>
+                  })()
                 : <>
                     <div className="relative">
                       {selType && <span className="absolute left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full z-10 pointer-events-none" style={{ backgroundColor: selType.color }} />}
