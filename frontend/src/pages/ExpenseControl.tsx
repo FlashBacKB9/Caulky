@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect, useRef, Fragment } from 'react'
+import { useIsDark } from '../hooks/useDarkMode'
 import { useQueries, useQueryClient, useMutation, useQuery } from '@tanstack/react-query'
 import {
   ResponsiveContainer,
@@ -36,7 +37,14 @@ const MONTHS_SHORT  = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', '
 const COLORS_KEY    = 'caulky-expense-type-colors'
 const FILTER_KEY    = 'caulky-expense-type-filter'
 const ORDER_KEY     = 'caulky-expense-type-order'
-const TOOLTIP_STYLE = { fontSize: 12, borderRadius: 8, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.12)' }
+interface Palette { id: string; name: string; colors: string[] }
+const PALETTES: Palette[] = [
+  { id: 'vivid',  name: 'Vivos',   colors: ['#ef4444','#f97316','#eab308','#22c55e','#3b82f6','#8b5cf6','#ec4899','#06b6d4','#84cc16','#f43f5e','#a16207','#0284c7'] },
+  { id: 'pastel', name: 'Pastel',  colors: ['#fca5a5','#fdba74','#fde68a','#86efac','#93c5fd','#c4b5fd','#f9a8d4','#a5f3fc','#bbf7d0','#fef08a','#d9f99d','#e9d5ff'] },
+  { id: 'earth',  name: 'Tierra',  colors: ['#b45309','#d97706','#ca8a04','#65a30d','#16a34a','#0891b2','#7c3aed','#be185d','#c2410c','#92400e','#0f766e','#4338ca'] },
+  { id: 'ocean',  name: 'Océano',  colors: ['#0c4a6e','#0369a1','#0284c7','#0ea5e9','#38bdf8','#164e63','#0e7490','#06b6d4','#22d3ee','#1d4ed8','#2563eb','#60a5fa'] },
+  { id: 'forest', name: 'Bosque',  colors: ['#14532d','#166534','#15803d','#16a34a','#22c55e','#065f46','#047857','#059669','#10b981','#4d7c0f','#65a30d','#84cc16'] },
+]
 
 const CHART_KINDS = [
   { id: 'bar'   as const, Icon: BarChart2,   title: 'Barras' },
@@ -206,16 +214,21 @@ function MovementRow({ movement, type, onRefresh }: {
 
 // ── TypeFilterDropdown ────────────────────────────────────────────────────────
 
-function TypeFilterDropdown({ typesByCategory, selectedTypeIds, customColors, onToggleType, onToggleCategory, onColorChange }: {
+function TypeFilterDropdown({ typesByCategory, selectedTypeIds, customColors, onToggleType, onToggleCategory, onColorChange, onApplyPalette }: {
   typesByCategory: Record<string, MovementType[]>
   selectedTypeIds: Set<number>
   customColors: Record<number, string>
   onToggleType: (id: number) => void
   onToggleCategory: (cat: string) => void
   onColorChange: (id: number, color: string) => void
+  onApplyPalette: (colors: Record<number, string>) => void
 }) {
   const [open, setOpen] = useState(false)
   const totalTypes = Object.values(typesByCategory).reduce((s, a) => s + a.length, 0)
+  const orderedSelected = useMemo(
+    () => Object.values(typesByCategory).flat().filter(t => selectedTypeIds.has(t.id)),
+    [typesByCategory, selectedTypeIds]
+  )
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
@@ -268,6 +281,31 @@ function TypeFilterDropdown({ typesByCategory, selectedTypeIds, customColors, on
               </div>
             )
           })}
+
+          {/* Palette picker */}
+          <div className="pt-4 mt-2 border-t border-gray-100 dark:border-gray-800 space-y-2">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-gray-400">Paleta automática</p>
+            <div className="flex flex-wrap gap-2 items-center">
+              <button type="button" onClick={() => onApplyPalette({})}
+                className="text-[11px] px-2.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 text-gray-500 dark:text-gray-400 hover:border-gray-400 dark:hover:border-gray-500 transition-colors">
+                Auto
+              </button>
+              {PALETTES.map(p => (
+                <button key={p.id} type="button" title={p.name}
+                  onClick={() => {
+                    const colorMap: Record<number, string> = {}
+                    orderedSelected.forEach((t, i) => { colorMap[t.id] = p.colors[i % p.colors.length]! })
+                    onApplyPalette(colorMap)
+                  }}
+                  className="flex items-center gap-0.5 px-1.5 py-1 rounded-lg border border-gray-200 dark:border-gray-700 hover:border-gray-400 dark:hover:border-gray-500 transition-colors group">
+                  {p.colors.slice(0, 6).map((c, i) => (
+                    <span key={i} className="w-3 h-3 rounded-sm inline-block shrink-0" style={{ background: c }} />
+                  ))}
+                  <span className="ml-1 text-[10px] text-gray-400 group-hover:text-gray-600 dark:group-hover:text-gray-300">{p.name}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
     </div>
@@ -674,6 +712,14 @@ function MovementsPanel({ movements, allTypes, groups, typeMap, typeToGroupMap, 
 
 export default function ExpenseControl() {
   const qc = useQueryClient()
+  const isDark = useIsDark()
+  const TOOLTIP_STYLE = {
+    fontSize: 12, borderRadius: 8,
+    border: `1px solid ${isDark ? '#374151' : '#e5e7eb'}`,
+    boxShadow: `0 2px 8px rgba(0,0,0,${isDark ? .35 : .12})`,
+    background: isDark ? '#1f2937' : '#fff',
+    color: isDark ? '#f9fafb' : '#111827',
+  }
 
   const [selectedTypeIds, setSelectedTypeIds] = useState<Set<number>>(new Set())
   const [initialized, setInitialized]         = useState(false)
@@ -827,6 +873,9 @@ export default function ExpenseControl() {
   const handleColorChange = (id: number, color: string) => {
     setCustomColors(prev => { const n = { ...prev, [id]: color }; saveColors(n); return n })
   }
+  const handleApplyPalette = (colors: Record<number, string>) => {
+    setCustomColors(colors); saveColors(colors)
+  }
   const toggleYear = (y: number) => {
     setActiveYears(prev => {
       if (prev.includes(y)) { if (prev.length === 1) return prev; return prev.filter(ay => ay !== y) }
@@ -881,6 +930,7 @@ export default function ExpenseControl() {
       <TypeFilterDropdown
         typesByCategory={typesByCategory} selectedTypeIds={selectedTypeIds} customColors={customColors}
         onToggleType={toggleType} onToggleCategory={toggleCategory} onColorChange={handleColorChange}
+        onApplyPalette={handleApplyPalette}
       />
 
       {/* Summary cards */}

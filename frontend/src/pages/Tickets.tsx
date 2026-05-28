@@ -884,7 +884,16 @@ type ChartView = 'donut' | 'bar' | 'area'
 
 interface ChartDatum { name: string; value: number; pct: number; color: string }
 
-const TOOLTIP_STYLE = { fontSize: 12, borderRadius: 8, border: 'none', boxShadow: '0 2px 8px rgba(0,0,0,.12)' }
+function getTooltipStyle(): React.CSSProperties {
+  const dark = document.documentElement.classList.contains('dark')
+  return {
+    fontSize: 12, borderRadius: 8,
+    border: `1px solid ${dark ? '#374151' : '#e5e7eb'}`,
+    boxShadow: `0 2px 8px rgba(0,0,0,${dark ? .35 : .12})`,
+    background: dark ? '#1f2937' : '#fff',
+    color: dark ? '#f9fafb' : '#111827',
+  }
+}
 
 /** Small pill toggle-group */
 function TGroup<T extends string>({
@@ -924,7 +933,7 @@ function DonutView({ data, grand }: { data: ChartDatum[]; grand: number }) {
             <Pie data={data} cx="50%" cy="50%" innerRadius={46} outerRadius={84} paddingAngle={2} dataKey="value">
               {data.map((_e, i) => <Cell key={i} fill={data[i].color} />)}
             </Pie>
-            <Tooltip formatter={(v) => [`${Number(v).toFixed(2)} €`]} contentStyle={TOOLTIP_STYLE} />
+            <Tooltip formatter={(v) => [`${Number(v).toFixed(2)} €`]} contentStyle={getTooltipStyle()} />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -981,7 +990,7 @@ function VBarView({ data }: { data: ChartDatum[] }) {
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.15)" vertical={false} />
           <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
-          <Tooltip formatter={(v: unknown) => [`${Number(v).toFixed(2)} €`]} contentStyle={TOOLTIP_STYLE} />
+          <Tooltip formatter={(v: unknown) => [`${Number(v).toFixed(2)} €`]} contentStyle={getTooltipStyle()} />
           <Bar dataKey="value" radius={[4, 4, 0, 0]}>
             {data.map((_e, i) => <Cell key={i} fill={data[i].color} />)}
           </Bar>
@@ -1006,7 +1015,7 @@ function AreaView({ data }: { data: ChartDatum[] }) {
           <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.15)" vertical={false} />
           <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
           <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
-          <Tooltip formatter={(v: unknown) => [`${Number(v).toFixed(2)} €`]} contentStyle={TOOLTIP_STYLE} />
+          <Tooltip formatter={(v: unknown) => [`${Number(v).toFixed(2)} €`]} contentStyle={getTooltipStyle()} />
           <Area type="monotone" dataKey="value" stroke="#6366f1" strokeWidth={2} fill="url(#ticketAreaGrad)" dot={{ fill: '#6366f1', r: 3, strokeWidth: 0 }} activeDot={{ r: 5 }} />
         </AreaChart>
       </ResponsiveContainer>
@@ -1214,7 +1223,7 @@ function MonthlyStackedChart({ tickets }: { tickets: Ticket[] }) {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.15)" vertical={false} />
               <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
-              <Tooltip formatter={(v: unknown, name: string | number | undefined) => [`${Number(v).toFixed(2)} €`, String(name ?? '')]} contentStyle={TOOLTIP_STYLE} />
+              <Tooltip formatter={(v: unknown, name: string | number | undefined) => [`${Number(v).toFixed(2)} €`, String(name ?? '')]} contentStyle={getTooltipStyle()} />
               {allCats.filter(cat => activeCats.has(cat)).map(cat => (
                 <Bar key={cat} dataKey={cat} stackId="stack" fill={catCfg(cat).color} />
               ))}
@@ -1355,7 +1364,7 @@ function ProductPriceTracker({ tickets }: { tickets: Ticket[] }) {
               <YAxis tick={{ fontSize: 11, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${v}€`} width={48} />
               <Tooltip
                 formatter={(v: unknown, name: string | number | undefined) => { const k = String(name ?? ''); return [`${Number(v).toFixed(2)} €`, catalog[k]?.display ?? k] }}
-                contentStyle={TOOLTIP_STYLE}
+                contentStyle={getTooltipStyle()}
               />
               {lines.map((key, i) => (
                 <Line
