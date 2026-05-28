@@ -62,7 +62,10 @@ function CategoryPicker({
   // ── Position: computed in useLayoutEffect (after DOM commit, before paint) ───
   // Inline computation during render can read stale getBoundingClientRect values
   // when other state changes cause layout shifts before the render is committed.
-  const [dropStyle, setDropStyle] = useState<React.CSSProperties>({ display: 'none' })
+  const [dropStyle, setDropStyle]     = useState<React.CSSProperties>({ display: 'none' })
+  const [listMaxHeight, setListMaxHeight] = useState(280)
+  // Height of the search bar — measured once after first open
+  const searchBarRef = useRef<HTMLDivElement>(null)
 
   useLayoutEffect(() => {
     if (!open) return
@@ -84,10 +87,16 @@ function CategoryPicker({
       const spaceAbove = rTop - 8
       const openBelow = spaceBelow >= 180 || spaceBelow >= spaceAbove
       const left = Math.max(0, Math.min(rLeft, window.innerWidth - w - 8))
+      // Search bar is ~44px (p-2 + border). Subtract it so the list gets explicit height.
+      const searchBarH = searchBarRef.current?.offsetHeight ?? 44
       if (openBelow) {
-        setDropStyle({ position: 'fixed', top: rBottom + 6, left, width: w, maxHeight: Math.min(320, spaceBelow + 8), zIndex: 999 })
+        const maxH = Math.min(320, spaceBelow + 8)
+        setDropStyle({ position: 'fixed', top: rBottom + 6, left, width: w, zIndex: 999 })
+        setListMaxHeight(maxH - searchBarH)
       } else {
-        setDropStyle({ position: 'fixed', bottom: window.innerHeight - rTop + 6, left, width: w, maxHeight: Math.min(320, spaceAbove), zIndex: 999 })
+        const maxH = Math.min(320, spaceAbove)
+        setDropStyle({ position: 'fixed', bottom: window.innerHeight - rTop + 6, left, width: w, zIndex: 999 })
+        setListMaxHeight(maxH - searchBarH)
       }
     }
     compute()
@@ -167,12 +176,12 @@ function CategoryPicker({
           <div className="fixed inset-0 z-[998]" onMouseDown={() => { setOpen(false); setAdding(false) }} />
           <div
             ref={dropdownRef}
-            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl flex flex-col overflow-hidden"
+            className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-2xl overflow-hidden"
             style={dropStyle}
             onMouseDown={e => e.stopPropagation()}
           >
             {/* Search bar */}
-            <div className="p-2 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1.5 shrink-0">
+            <div ref={searchBarRef} className="p-2 border-b border-gray-100 dark:border-gray-800 flex items-center gap-1.5">
               <Search className="w-3.5 h-3.5 text-gray-400 shrink-0" />
               <input
                 ref={searchRef}
@@ -183,14 +192,14 @@ function CategoryPicker({
               />
             </div>
 
-            {/* List with hidden scrollbar + fade */}
+            {/* List — explicit maxHeight so scroll always works */}
             {!adding && (
-              <div className="relative flex-1 min-h-0 overflow-hidden">
+              <div className="relative">
                 <div
                   ref={listRef}
                   onScroll={handleListScroll}
-                  className="absolute inset-0 overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-track]:bg-transparent"
-                  style={{ scrollbarWidth: 'thin', scrollbarColor: 'rgb(209 213 219) transparent' } as React.CSSProperties}
+                  className="overflow-y-auto [&::-webkit-scrollbar]:w-1 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 dark:[&::-webkit-scrollbar-thumb]:bg-gray-600 [&::-webkit-scrollbar-track]:bg-transparent"
+                  style={{ maxHeight: listMaxHeight, scrollbarWidth: 'thin', scrollbarColor: 'rgb(209 213 219) transparent' } as React.CSSProperties}
                 >
                   {filtered.map(cat => {
                     const cc = catCfg(cat)

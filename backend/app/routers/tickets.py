@@ -186,6 +186,12 @@ SKIP_WORDS = {
 }
 
 
+_VALID_CATEGORIES = sorted(CATEGORIES.keys()) + ["Sin categoría"]
+
+# Comma-separated string for use in AI prompts
+_CATEGORIES_LIST = ", ".join(f'"{c}"' for c in _VALID_CATEGORIES)
+
+
 def _categorize(name: str) -> str:
     name_lower = name.lower()
     for cat, keywords in CATEGORIES.items():
@@ -592,7 +598,7 @@ async def _analyze_with_mistral(file_path: str, mime_type: str, api_key: str = "
         "Analiza la imagen del ticket y devuelve los datos en este JSON exacto "
         "(sin texto adicional, sin bloques markdown):\n"
         '{"store_name":"nombre del supermercado","date":"YYYY-MM-DD",'
-        '"total":0.00,"items":[{"name":"PRODUCTO","amount":0.00}]}\n\n'
+        '"total":0.00,"items":[{"name":"PRODUCTO","amount":0.00,"category":"CATEGORIA"}]}\n\n'
         "Reglas:\n"
         "- store_name: nombre exacto de la tienda (ej: Mercadona, Lidl, Carrefour). "
         "null si no se ve claramente.\n"
@@ -602,6 +608,8 @@ async def _analyze_with_mistral(file_path: str, mime_type: str, api_key: str = "
         "- items: TODOS los productos con su precio de línea (precio total, no unitario). "
         "Incluye descuentos como importes negativos. "
         "Omite IVA, subtotales, formas de pago y datos del establecimiento.\n"
+        f"- category: elige UNA de estas categorías exactas: {_CATEGORIES_LIST}. "
+        'Usa "Sin categoría" si no encaja en ninguna.\n'
         "Responde ÚNICAMENTE con el JSON."
     )
 
@@ -690,7 +698,7 @@ async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = ""
         "Analiza la imagen del ticket y devuelve los datos en este JSON exacto "
         "(sin texto adicional, sin bloques markdown):\n"
         '{"store_name":"nombre del supermercado","date":"YYYY-MM-DD",'
-        '"total":0.00,"items":[{"name":"PRODUCTO","amount":0.00}]}\n\n'
+        '"total":0.00,"items":[{"name":"PRODUCTO","amount":0.00,"category":"CATEGORIA"}]}\n\n'
         "Reglas:\n"
         "- store_name: nombre exacto de la tienda (ej: Mercadona, Lidl, Carrefour). "
         "null si no se ve claramente.\n"
@@ -700,6 +708,8 @@ async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = ""
         "- items: TODOS los productos con su precio de línea (precio total, no unitario). "
         "Incluye descuentos como importes negativos. "
         "Omite IVA, subtotales, formas de pago y datos del establecimiento.\n"
+        f"- category: elige UNA de estas categorías exactas: {_CATEGORIES_LIST}. "
+        'Usa "Sin categoría" si no encaja en ninguna.\n'
         "Responde ÚNICAMENTE con el JSON."
     )
 
@@ -923,8 +933,10 @@ async def analyze_ticket(
     if not ai_result:
         ocr_source = "tesseract"
 
+    _valid_cat_set = set(_VALID_CATEGORIES)
+
     if ai_result:
-        # Apply our category engine to AI-extracted item names
+        # Use AI-provided category when valid; fall back to keyword matcher
         raw_items = ai_result.get("items") or []
         items: list[dict] = []
         for it in raw_items:
@@ -938,7 +950,12 @@ async def analyze_ticket(
             if amount == 0:
                 continue
             low = name.lower()
-            cat = custom_rules.get(low) or _categorize(name)
+            ai_cat = str(it.get("category") or "").strip()
+            cat = (
+                custom_rules.get(low)
+                or (ai_cat if ai_cat in _valid_cat_set else None)
+                or _categorize(name)
+            )
             items.append({"name": name.title(), "amount": round(amount, 2), "category": cat})
 
         categories = _compute_categories(items)
