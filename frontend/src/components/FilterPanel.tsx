@@ -182,13 +182,15 @@ function MultiSelectDropdown({ children, trigger, open }: {
     <>
       {trigger}
       {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl min-w-[220px] relative">
-          <div ref={listRef} onScroll={handleScroll} className="max-h-72 overflow-y-auto scrollbar-none p-1.5">
-            {children}
+        <div className="absolute top-full left-0 mt-1 z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-xl min-w-[220px]">
+          <div className="relative">
+            <div ref={listRef} onScroll={handleScroll} className="max-h-72 overflow-y-auto scrollbar-none p-1.5">
+              {children}
+            </div>
+            {!atBottom && (
+              <div className="absolute bottom-0 left-0 right-0 h-10 rounded-b-xl bg-gradient-to-t from-white dark:from-gray-900 to-transparent pointer-events-none" />
+            )}
           </div>
-          {!atBottom && (
-            <div className="absolute bottom-0 left-0 right-0 h-10 rounded-b-xl bg-gradient-to-t from-white dark:from-gray-900 to-transparent pointer-events-none" />
-          )}
         </div>
       )}
     </>
