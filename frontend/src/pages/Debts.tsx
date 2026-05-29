@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Banknote, Plus, Pencil, Trash2, X, Check,
-  ChevronDown, ChevronRight, TrendingUp, TrendingDown,
+  ChevronDown, ChevronRight, TrendingUp, TrendingDown, Zap,
 } from 'lucide-react'
 import { getAccountsSummary, type Account } from '../api/accounts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
+import { createTemplate, updateTemplate, deleteTemplate } from '../api/templates'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
 import AppIcon from '../components/AppIcon'
@@ -23,6 +24,7 @@ export interface DebtConfig {
   termMonths: number
   startDate: string       // YYYY-MM-DD
   marketValue?: number    // optional current estimate
+  templateId?: number     // auto-generated payment template
 }
 
 const DEBTS_KEY = 'debts-config'
@@ -119,6 +121,60 @@ export function calcDebtSummary(debt: DebtConfig, payments: Movement[]) {
 }
 
 // ── Debt form ─────────────────────────────────────────────────────────────────
+
+// ── Simulation ───────────────────────────────────────────────────────────────
+
+export interface SimResult {
+  newMonths: number
+  interestSaved: number
+  newEndDate: string
+  monthsSaved: number
+}
+
+export function simulateExtra(
+  remaining: number, rate: number, currentMonthly: number, startDate: string,
+  extra: { type: 'monthly'; amount: number } | { type: 'lump'; amount: number },
+  currentMonth: number,
+): SimResult {
+  const r          = rate / 100 / 12
+  const payment    = extra.type === 'monthly' ? currentMonthly + extra.amount : currentMonthly
+  const newBalance = extra.type === 'lump' ? Math.max(0, remaining - extra.amount) : remaining
+
+  const newMonths = r > 0
+    ? Math.ceil(-Math.log(1 - r * newBalance / payment) / Math.log(1 + r))
+    : Math.ceil(newBalance / payment)
+
+  // New interest from this point
+  let bal = newBalance, newInterest = 0
+  for (let i = 0; i < newMonths; i++) {
+    const int = bal * r
+    newInterest += int
+    bal = Math.max(0, bal - (payment - int))
+  }
+
+  // Old interest from this point (same schedule)
+  let oldBal = remaining, oldInterest = 0
+  const oldMonths = r > 0
+    ? Math.ceil(-Math.log(1 - r * remaining / currentMonthly) / Math.log(1 + r))
+    : Math.ceil(remaining / currentMonthly)
+  for (let i = 0; i < oldMonths; i++) {
+    const int = oldBal * r
+    oldInterest += int
+    oldBal = Math.max(0, oldBal - (currentMonthly - int))
+  }
+
+  const d = new Date(startDate + 'T00:00:00')
+  d.setMonth(d.getMonth() + currentMonth + newMonths)
+
+  return {
+    newMonths,
+    interestSaved: Math.max(0, oldInterest - newInterest),
+    newEndDate: d.toLocaleDateString('en-CA'),
+    monthsSaved: Math.max(0, oldMonths - newMonths),
+  }
+}
+
+// ── DebtForm ──────────────────────────────────────────────────────────────────
 
 interface DebtFormProps {
   initial?: DebtConfig
@@ -304,17 +360,31 @@ function DebtDetail({ debt, account, payments, onBack, onEdit, fmt, fmtDate }: {
   fmt: (v: number) => string
   fmtDate: (s: string) => string
 }) {
-  const [showTable, setShowTable] = useState(false)
-  const [mktEdit,   setMktEdit]   = useState(false)
-  const [mktInput,  setMktInput]  = useState(String(debt.marketValue ?? ''))
+  const [showTable,   setShowTable]   = useState(false)
+  const [mktEdit,     setMktEdit]     = useState(false)
+  const [mktInput,    setMktInput]    = useState(String(debt.marketValue ?? ''))
+  const [simMode,     setSimMode]     = useState<'mensual' | 'unico'>('mensual')
+  const [simAmount,   setSimAmount]   = useState('')
 
   const { totalPaid, capitalPaid, interestPaid, remainingCapital, pct, schedule } = useMemo(
     () => calcDebtSummary(debt, payments),
     [debt, payments],
   )
 
-  const monthly   = calcMonthlyPayment(debt.capitalInitial, debt.interestRate, debt.termMonths)
-  const endDate   = (() => { const d = new Date(debt.startDate + 'T00:00:00'); d.setMonth(d.getMonth() + debt.termMonths); return d.toLocaleDateString('en-CA') })()
+  const monthly        = calcMonthlyPayment(debt.capitalInitial, debt.interestRate, debt.termMonths)
+  const totalInterest  = useMemo(() => schedule.reduce((s, r) => s + r.interest, 0), [schedule])
+  const currentMonth   = payments.length  // approx months paid
+  const endDate        = (() => { const d = new Date(debt.startDate + 'T00:00:00'); d.setMonth(d.getMonth() + debt.termMonths); return d.toLocaleDateString('en-CA') })()
+
+  const simResult = useMemo(() => {
+    const amt = parseFloat(simAmount.replace(',', '.'))
+    if (!simAmount || isNaN(amt) || amt <= 0 || remainingCapital <= 0) return null
+    return simulateExtra(
+      remainingCapital, debt.interestRate, monthly, debt.startDate,
+      simMode === 'mensual' ? { type: 'monthly', amount: amt } : { type: 'lump', amount: amt },
+      currentMonth,
+    )
+  }, [simAmount, simMode, remainingCapital, debt.interestRate, monthly, debt.startDate, currentMonth])
   const paymentsSorted = [...payments].sort((a, b) => b.date.localeCompare(a.date))
 
   // Profitability
@@ -368,10 +438,10 @@ function DebtDetail({ debt, account, payments, onBack, onEdit, fmt, fmtDate }: {
       {/* Stats grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total pagado',     value: fmt(totalPaid),    sub: `${paymentsSorted.length} cuotas` },
-          { label: 'Capital pagado',   value: fmt(capitalPaid),  sub: `${pct.toFixed(1)}% del total` },
-          { label: 'Intereses pagados', value: fmt(interestPaid), sub: `${totalPaid > 0 ? ((interestPaid/totalPaid)*100).toFixed(1) : 0}% del total` },
-          { label: 'Interés anual',    value: `${debt.interestRate}%`, sub: `${debt.termMonths} meses` },
+          { label: 'Total pagado',      value: fmt(totalPaid),    sub: `${paymentsSorted.length} cuota${paymentsSorted.length !== 1 ? 's' : ''}` },
+          { label: 'Capital pagado',    value: fmt(capitalPaid),  sub: `${pct.toFixed(1)}% de ${fmt(debt.capitalInitial)}` },
+          { label: 'Intereses pagados', value: fmt(interestPaid), sub: `de ${fmt(totalInterest)} totales` },
+          { label: 'Interés anual',     value: `${debt.interestRate}%`, sub: `${debt.termMonths} meses` },
         ].map(s => (
           <div key={s.label} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-3 py-2.5">
             <p className="text-[11px] text-gray-400 dark:text-gray-500">{s.label}</p>
@@ -379,6 +449,46 @@ function DebtDetail({ debt, account, payments, onBack, onEdit, fmt, fmtDate }: {
             <p className="text-[11px] text-gray-400 dark:text-gray-500">{s.sub}</p>
           </div>
         ))}
+      </div>
+
+      {/* Simulation */}
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4 space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
+          <Zap className="w-3.5 h-3.5" /> Simular amortización anticipada
+        </h3>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+            {(['mensual', 'unico'] as const).map(m => (
+              <button key={m} onClick={() => { setSimMode(m); setSimAmount('') }}
+                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${simMode === m ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>
+                {m === 'mensual' ? 'Extra mensual' : 'Pago único'}
+              </button>
+            ))}
+          </div>
+          <input
+            type="number" step="0.01" value={simAmount} onChange={e => setSimAmount(e.target.value)}
+            placeholder={simMode === 'mensual' ? 'Importe extra/mes €' : 'Importe único €'}
+            className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          />
+        </div>
+        {simResult && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+            {[
+              { label: 'Nueva fecha fin', value: fmtDate(simResult.newEndDate), color: 'text-blue-600 dark:text-blue-400' },
+              { label: 'Meses ahorrados', value: `${simResult.monthsSaved} meses`, color: 'text-green-600 dark:text-green-400' },
+              { label: 'Intereses ahorrados', value: fmt(simResult.interestSaved), color: 'text-green-600 dark:text-green-400' },
+              { label: 'Plazo nuevo', value: `${simResult.newMonths} meses`, color: 'text-gray-700 dark:text-gray-200' },
+            ].map(s => (
+              <div key={s.label} className="bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-2.5">
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">{s.label}</p>
+                <p className={`text-sm font-bold tabular-nums mt-0.5 ${s.color}`}>{s.value}</p>
+              </div>
+            ))}
+          </div>
+        )}
+        {!simResult && simAmount && (
+          <p className="text-xs text-gray-400 dark:text-gray-500 italic">Introduce un importe válido para ver la simulación.</p>
+        )}
       </div>
 
       {/* Profitability */}
@@ -502,10 +612,11 @@ function DebtDetail({ debt, account, payments, onBack, onEdit, fmt, fmtDate }: {
 export default function Debts() {
   const { fmt }     = useCurrency()
   const { fmtDate } = useDateFormat()
+  const qc          = useQueryClient()
 
-  const { data: summary }        = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
-  const { data: allMovements = [] } = useQuery({ queryKey: ['movements'],     queryFn: () => getMovements() })
-  const { data: types = [] }        = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
+  const { data: summary }           = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
+  const { data: allMovements = [] } = useQuery({ queryKey: ['movements'],        queryFn: () => getMovements() })
+  const { data: types = [] }        = useQuery({ queryKey: ['movement-types'],   queryFn: getMovementTypes })
 
   const [debts,      setDebts]      = useState<DebtConfig[]>(loadDebts)
   const [showForm,   setShowForm]   = useState(false)
@@ -514,16 +625,54 @@ export default function Debts() {
 
   const accounts = summary?.accounts ?? []
 
-  const saveDebt = (d: DebtConfig) => {
-    const next = debts.some(x => x.id === d.id) ? debts.map(x => x.id === d.id ? d : x) : [...debts, d]
+  const saveDebt = async (d: DebtConfig) => {
+    const monthly  = calcMonthlyPayment(d.capitalInitial, d.interestRate, d.termMonths)
+    const startDay = new Date(d.startDate + 'T00:00:00').getDate()
+
+    const templatePayload = {
+      label:            d.name,
+      name:             `${d.name} {mes} {año}`,
+      money:            String(-Math.round(monthly * 100) / 100),
+      dateMode:         'manual' as const,
+      bankDateMode:     'manual' as const,
+      movement_type_id: String(d.movementTypeId),
+      paid:             false,
+      no_count:         false,
+      notes:            '',
+      recurrence: {
+        rule: { kind: 'monthly_day' as const, everyN: 1, weekdays: [], monthDay: startDay, monthWeek: 1, weekday: 0 },
+        startDate: d.startDate,
+        autoCreate: false,
+      },
+    }
+
+    let templateId = d.templateId
+    try {
+      if (d.templateId) {
+        await updateTemplate(d.templateId, templatePayload)
+      } else {
+        const tpl = await createTemplate(templatePayload)
+        templateId = tpl.id
+      }
+      qc.invalidateQueries({ queryKey: ['templates'] })
+    } catch { /* template creation not critical */ }
+
+    const debtWithTemplate = { ...d, templateId }
+    const next = debts.some(x => x.id === d.id)
+      ? debts.map(x => x.id === d.id ? debtWithTemplate : x)
+      : [...debts, debtWithTemplate]
     setDebts(next)
     saveDebts(next)
     setShowForm(false)
     setEditDebt(null)
   }
 
-  const deleteDebt = (id: string) => {
+  const deleteDebt = async (id: string) => {
     if (!confirm('¿Eliminar esta deuda?')) return
+    const debt = debts.find(d => d.id === id)
+    if (debt?.templateId) {
+      try { await deleteTemplate(debt.templateId); qc.invalidateQueries({ queryKey: ['templates'] }) } catch { /**/ }
+    }
     const next = debts.filter(d => d.id !== id)
     setDebts(next)
     saveDebts(next)
