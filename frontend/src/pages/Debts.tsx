@@ -2,8 +2,11 @@ import { useMemo, useState } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   Banknote, Plus, Pencil, Trash2, X, Check,
-  ChevronDown, ChevronRight, TrendingUp, TrendingDown, Zap,
+  ChevronDown, ChevronRight, TrendingUp, TrendingDown, Zap, Info,
 } from 'lucide-react'
+import {
+  ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+} from 'recharts'
 import { getAccountsSummary, type Account } from '../api/accounts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
@@ -124,53 +127,130 @@ export function calcDebtSummary(debt: DebtConfig, payments: Movement[]) {
 
 // ── Simulation ───────────────────────────────────────────────────────────────
 
-export interface SimResult {
-  newMonths: number
-  interestSaved: number
-  newEndDate: string
-  monthsSaved: number
+export type ExtraFreq = 'mensual' | 'trimestral' | 'anual' | 'unico'
+
+export interface SimInput {
+  extraAmount:   number
+  freq:          ExtraFreq
+  minLiquidity?: number   // only apply extra if liquid balance stays above this
+  liquidBalance: number   // current liquid balance
+  monthlyNet?:   number   // approx monthly net savings (for liquidity projection)
 }
 
-export function simulateExtra(
-  remaining: number, rate: number, currentMonthly: number, startDate: string,
-  extra: { type: 'monthly'; amount: number } | { type: 'lump'; amount: number },
-  currentMonth: number,
-): SimResult {
-  const r          = rate / 100 / 12
-  const payment    = extra.type === 'monthly' ? currentMonthly + extra.amount : currentMonthly
-  const newBalance = extra.type === 'lump' ? Math.max(0, remaining - extra.amount) : remaining
+export interface SimChartPoint {
+  month: number
+  label: string
+  base:  number   // balance without extra
+  extra: number | null   // balance with extra (null after payoff)
+}
 
-  const newMonths = r > 0
-    ? Math.ceil(-Math.log(1 - r * newBalance / payment) / Math.log(1 + r))
-    : Math.ceil(newBalance / payment)
+export interface SimResult {
+  baseMonths:     number
+  newMonths:      number
+  monthsSaved:    number
+  baseInterest:   number
+  newInterest:    number
+  interestSaved:  number
+  totalExtra:     number
+  newEndDate:     string
+  chart:          SimChartPoint[]
+  liquidityLimited: boolean
+}
 
-  // New interest from this point
-  let bal = newBalance, newInterest = 0
-  for (let i = 0; i < newMonths; i++) {
-    const int = bal * r
+// Months between extra payments
+const FREQ_INTERVAL: Record<ExtraFreq, number> = { mensual: 1, trimestral: 3, anual: 12, unico: 0 }
+
+export function simulateAmortization(
+  remaining: number, rate: number, monthly: number, startDate: string, currentMonth: number,
+  sim: SimInput,
+): SimResult | null {
+  if (remaining <= 0 || monthly <= 0) return null
+  const r = rate / 100 / 12
+
+  // ── Baseline schedule (no extra) ──
+  const baseSeries: number[] = []
+  let bBal = remaining, baseInterest = 0, baseMonths = 0
+  while (bBal > 0.01 && baseMonths < 1200) {
+    const int = bBal * r
+    baseInterest += int
+    bBal = Math.max(0, bBal - (monthly - int))
+    baseSeries.push(Math.round(bBal))
+    baseMonths++
+  }
+
+  // ── Extra schedule ──
+  const interval = FREQ_INTERVAL[sim.freq]
+  const extraSeries: number[] = []
+  let eBal = remaining, newInterest = 0, newMonths = 0, totalExtra = 0
+  let liquid = sim.liquidBalance
+  let liquidityLimited = false
+
+  while (eBal > 0.01 && newMonths < 1200) {
+    const int = eBal * r
     newInterest += int
-    bal = Math.max(0, bal - (payment - int))
+    eBal = Math.max(0, eBal - (monthly - int))
+
+    // Apply extra?
+    const applyThisMonth =
+      sim.extraAmount > 0 && (
+        (sim.freq === 'unico' && newMonths === 0) ||
+        (interval > 0 && newMonths % interval === 0)
+      )
+    if (applyThisMonth && eBal > 0) {
+      // Liquidity condition: only pay extra if liquid balance stays above threshold
+      const canAfford = sim.minLiquidity == null || (liquid - sim.extraAmount) >= sim.minLiquidity
+      if (canAfford) {
+        const pay = Math.min(sim.extraAmount, eBal)
+        eBal -= pay
+        totalExtra += pay
+        liquid -= pay
+      } else {
+        liquidityLimited = true
+      }
+    }
+    // Grow liquidity by approx monthly net savings
+    if (sim.monthlyNet) liquid += sim.monthlyNet
+
+    extraSeries.push(Math.round(eBal))
+    newMonths++
   }
 
-  // Old interest from this point (same schedule)
-  let oldBal = remaining, oldInterest = 0
-  const oldMonths = r > 0
-    ? Math.ceil(-Math.log(1 - r * remaining / currentMonthly) / Math.log(1 + r))
-    : Math.ceil(remaining / currentMonthly)
-  for (let i = 0; i < oldMonths; i++) {
-    const int = oldBal * r
-    oldInterest += int
-    oldBal = Math.max(0, oldBal - (currentMonthly - int))
+  // ── Build chart (sample to keep ~60 points max) ──
+  const maxLen = Math.max(baseSeries.length, extraSeries.length)
+  const step   = Math.max(1, Math.ceil(maxLen / 60))
+  const chart: SimChartPoint[] = []
+  const start  = new Date(startDate + 'T00:00:00')
+  for (let i = 0; i < maxLen; i += step) {
+    const d = new Date(start); d.setMonth(d.getMonth() + currentMonth + i)
+    chart.push({
+      month: i,
+      label: `${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)}`,
+      base:  i < baseSeries.length  ? baseSeries[i]  : 0,
+      extra: i < extraSeries.length ? extraSeries[i] : null,
+    })
+  }
+  // Ensure last point at 0 included
+  if ((maxLen - 1) % step !== 0) {
+    const i = maxLen - 1
+    const d = new Date(start); d.setMonth(d.getMonth() + currentMonth + i)
+    chart.push({
+      month: i, label: `${d.getMonth() + 1}/${String(d.getFullYear()).slice(2)}`,
+      base: i < baseSeries.length ? baseSeries[i] : 0,
+      extra: i < extraSeries.length ? extraSeries[i] : null,
+    })
   }
 
-  const d = new Date(startDate + 'T00:00:00')
-  d.setMonth(d.getMonth() + currentMonth + newMonths)
+  const endD = new Date(start); endD.setMonth(endD.getMonth() + currentMonth + newMonths)
 
   return {
-    newMonths,
-    interestSaved: Math.max(0, oldInterest - newInterest),
-    newEndDate: d.toLocaleDateString('en-CA'),
-    monthsSaved: Math.max(0, oldMonths - newMonths),
+    baseMonths, newMonths,
+    monthsSaved:   Math.max(0, baseMonths - newMonths),
+    baseInterest,  newInterest,
+    interestSaved: Math.max(0, baseInterest - newInterest),
+    totalExtra,
+    newEndDate:    endD.toLocaleDateString('en-CA'),
+    chart,
+    liquidityLimited,
   }
 }
 
@@ -351,10 +431,11 @@ function DebtForm({ initial, accounts, types, onSave, onCancel }: DebtFormProps)
 
 // ── Debt detail ───────────────────────────────────────────────────────────────
 
-function DebtDetail({ debt, account, payments, onBack, onEdit, fmt, fmtDate }: {
+function DebtDetail({ debt, account, payments, liquidBalance, onBack, onEdit, fmt, fmtDate }: {
   debt: DebtConfig
   account: Account | undefined
   payments: Movement[]
+  liquidBalance: number
   onBack: () => void
   onEdit: () => void
   fmt: (v: number) => string
@@ -363,8 +444,11 @@ function DebtDetail({ debt, account, payments, onBack, onEdit, fmt, fmtDate }: {
   const [showTable,   setShowTable]   = useState(false)
   const [mktEdit,     setMktEdit]     = useState(false)
   const [mktInput,    setMktInput]    = useState(String(debt.marketValue ?? ''))
-  const [simMode,     setSimMode]     = useState<'mensual' | 'unico'>('mensual')
   const [simAmount,   setSimAmount]   = useState('')
+  const [simFreq,     setSimFreq]     = useState<ExtraFreq>('mensual')
+  const [useMinLiq,   setUseMinLiq]   = useState(false)
+  const [minLiq,      setMinLiq]      = useState('')
+  const [monthlyNet,  setMonthlyNet]  = useState('')
 
   const { totalPaid, capitalPaid, interestPaid, remainingCapital, pct, schedule } = useMemo(
     () => calcDebtSummary(debt, payments),
@@ -374,17 +458,23 @@ function DebtDetail({ debt, account, payments, onBack, onEdit, fmt, fmtDate }: {
   const monthly        = calcMonthlyPayment(debt.capitalInitial, debt.interestRate, debt.termMonths)
   const totalInterest  = useMemo(() => schedule.reduce((s, r) => s + r.interest, 0), [schedule])
   const currentMonth   = payments.length  // approx months paid
+  const hasPayments    = payments.length > 0
   const endDate        = (() => { const d = new Date(debt.startDate + 'T00:00:00'); d.setMonth(d.getMonth() + debt.termMonths); return d.toLocaleDateString('en-CA') })()
 
   const simResult = useMemo(() => {
     const amt = parseFloat(simAmount.replace(',', '.'))
     if (!simAmount || isNaN(amt) || amt <= 0 || remainingCapital <= 0) return null
-    return simulateExtra(
-      remainingCapital, debt.interestRate, monthly, debt.startDate,
-      simMode === 'mensual' ? { type: 'monthly', amount: amt } : { type: 'lump', amount: amt },
-      currentMonth,
+    return simulateAmortization(
+      remainingCapital, debt.interestRate, monthly, debt.startDate, currentMonth,
+      {
+        extraAmount:   amt,
+        freq:          simFreq,
+        minLiquidity:  useMinLiq && minLiq ? parseFloat(minLiq.replace(',', '.')) : undefined,
+        liquidBalance,
+        monthlyNet:    monthlyNet ? parseFloat(monthlyNet.replace(',', '.')) : undefined,
+      },
     )
-  }, [simAmount, simMode, remainingCapital, debt.interestRate, monthly, debt.startDate, currentMonth])
+  }, [simAmount, simFreq, useMinLiq, minLiq, monthlyNet, remainingCapital, debt.interestRate, monthly, debt.startDate, currentMonth, liquidBalance])
   const paymentsSorted = [...payments].sort((a, b) => b.date.localeCompare(a.date))
 
   // Profitability
@@ -432,7 +522,15 @@ function DebtDetail({ debt, account, payments, onBack, onEdit, fmt, fmtDate }: {
         <div className="h-3 rounded-full bg-gray-100 dark:bg-gray-800 overflow-hidden">
           <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, backgroundColor: accentColor }} />
         </div>
-        <p className="text-xs text-gray-400">Fin estimado: {fmtDate(endDate)} · {fmt(monthly)}/mes</p>
+        <p className="text-xs text-gray-400">Fin estimado: {fmtDate(endDate)} · {fmt(monthly)}/mes · {fmt(totalInterest)} en intereses</p>
+        {!hasPayments && (
+          <div className="flex items-start gap-1.5 bg-blue-50 dark:bg-blue-900/20 rounded-lg px-3 py-2">
+            <Info className="w-3.5 h-3.5 text-blue-500 shrink-0 mt-0.5" />
+            <p className="text-xs text-blue-600 dark:text-blue-400">
+              Aún no hay pagos registrados con el subtipo <strong>"{debt.name}"</strong>, por eso el capital pendiente coincide con el inicial. Conforme registres los pagos mensuales, irá bajando (la parte de intereses no reduce capital).
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Stats grid */}
@@ -452,39 +550,116 @@ function DebtDetail({ debt, account, payments, onBack, onEdit, fmt, fmtDate }: {
       </div>
 
       {/* Simulation */}
-      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4 space-y-3">
+      <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4 space-y-4">
         <h3 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 flex items-center gap-1.5">
           <Zap className="w-3.5 h-3.5" /> Simular amortización anticipada
         </h3>
-        <div className="flex items-center gap-2">
-          <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
-            {(['mensual', 'unico'] as const).map(m => (
-              <button key={m} onClick={() => { setSimMode(m); setSimAmount('') }}
-                className={`px-3 py-1 text-xs rounded-md font-medium transition-colors ${simMode === m ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>
-                {m === 'mensual' ? 'Extra mensual' : 'Pago único'}
-              </button>
-            ))}
-          </div>
-          <input
-            type="number" step="0.01" value={simAmount} onChange={e => setSimAmount(e.target.value)}
-            placeholder={simMode === 'mensual' ? 'Importe extra/mes €' : 'Importe único €'}
-            className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-          />
-        </div>
-        {simResult && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
-            {[
-              { label: 'Nueva fecha fin', value: fmtDate(simResult.newEndDate), color: 'text-blue-600 dark:text-blue-400' },
-              { label: 'Meses ahorrados', value: `${simResult.monthsSaved} meses`, color: 'text-green-600 dark:text-green-400' },
-              { label: 'Intereses ahorrados', value: fmt(simResult.interestSaved), color: 'text-green-600 dark:text-green-400' },
-              { label: 'Plazo nuevo', value: `${simResult.newMonths} meses`, color: 'text-gray-700 dark:text-gray-200' },
-            ].map(s => (
-              <div key={s.label} className="bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-2.5">
-                <p className="text-[11px] text-gray-400 dark:text-gray-500">{s.label}</p>
-                <p className={`text-sm font-bold tabular-nums mt-0.5 ${s.color}`}>{s.value}</p>
+
+        {/* Inputs */}
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 dark:text-gray-400">Importe extra (€)</label>
+              <input type="number" step="0.01" value={simAmount} onChange={e => setSimAmount(e.target.value)}
+                placeholder="ej. 200"
+                className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+            </div>
+            <div className="space-y-1">
+              <label className="text-xs text-gray-500 dark:text-gray-400">Frecuencia</label>
+              <div className="flex items-center bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+                {(['mensual', 'trimestral', 'anual', 'unico'] as const).map(f => (
+                  <button key={f} onClick={() => setSimFreq(f)}
+                    className={`flex-1 px-2 py-1 text-[11px] rounded-md font-medium transition-colors ${simFreq === f ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm' : 'text-gray-500 dark:text-gray-400'}`}>
+                    {f === 'mensual' ? 'Mensual' : f === 'trimestral' ? 'Trim.' : f === 'anual' ? 'Anual' : 'Único'}
+                  </button>
+                ))}
               </div>
-            ))}
+            </div>
           </div>
+
+          {/* Liquidity condition */}
+          <div className="space-y-2">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={useMinLiq} onChange={e => setUseMinLiq(e.target.checked)}
+                className="w-3.5 h-3.5 rounded accent-blue-500" />
+              <span className="text-xs text-gray-600 dark:text-gray-300">Solo amortizar si mantengo un mínimo de líquido</span>
+            </label>
+            {useMinLiq && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pl-5">
+                <div className="space-y-1">
+                  <label className="text-[11px] text-gray-400 dark:text-gray-500">Líquido mínimo (€)</label>
+                  <input type="number" step="0.01" value={minLiq} onChange={e => setMinLiq(e.target.value)}
+                    placeholder="ej. 10000"
+                    className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                  <p className="text-[10px] text-gray-400">Líquido actual: {fmt(liquidBalance)}</p>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[11px] text-gray-400 dark:text-gray-500">Ahorro neto mensual (€)</label>
+                  <input type="number" step="0.01" value={monthlyNet} onChange={e => setMonthlyNet(e.target.value)}
+                    placeholder="ej. 500"
+                    className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                  <p className="text-[10px] text-gray-400">Para proyectar cuánto líquido tienes cada mes</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Results */}
+        {simResult && (
+          <>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+              {[
+                { label: 'Nueva fecha fin',      value: fmtDate(simResult.newEndDate), color: 'text-blue-600 dark:text-blue-400' },
+                { label: 'Tiempo ahorrado',      value: simResult.monthsSaved >= 12 ? `${Math.floor(simResult.monthsSaved/12)}a ${simResult.monthsSaved%12}m` : `${simResult.monthsSaved} meses`, color: 'text-green-600 dark:text-green-400' },
+                { label: 'Intereses ahorrados',  value: fmt(simResult.interestSaved), color: 'text-green-600 dark:text-green-400' },
+                { label: 'Extra aportado',       value: fmt(simResult.totalExtra), color: 'text-gray-700 dark:text-gray-200' },
+              ].map(s => (
+                <div key={s.label} className="bg-gray-50 dark:bg-gray-800 rounded-xl px-3 py-2.5">
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500">{s.label}</p>
+                  <p className={`text-sm font-bold tabular-nums mt-0.5 ${s.color}`}>{s.value}</p>
+                </div>
+              ))}
+            </div>
+
+            {simResult.liquidityLimited && (
+              <div className="flex items-start gap-1.5 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
+                <Info className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  Algunos pagos extra no se aplicaron para mantener tu líquido mínimo. El resultado real puede ser menor.
+                </p>
+              </div>
+            )}
+
+            {/* Comparison chart */}
+            <div>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mb-2">Capital pendiente: con amortización vs sin ella</p>
+              <ResponsiveContainer width="100%" height={220}>
+                <AreaChart data={simResult.chart} margin={{ top: 4, right: 8, left: -8, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="gBase" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#94a3b8" stopOpacity={0.3} />
+                      <stop offset="100%" stopColor="#94a3b8" stopOpacity={0} />
+                    </linearGradient>
+                    <linearGradient id="gExtra" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor={accentColor} stopOpacity={0.4} />
+                      <stop offset="100%" stopColor={accentColor} stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.12)" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} interval="preserveStartEnd" minTickGap={30} />
+                  <YAxis tick={{ fontSize: 10, fill: '#9ca3af' }} axisLine={false} tickLine={false} tickFormatter={v => `${Math.round(v/1000)}k`} width={40} />
+                  <Tooltip
+                    formatter={((v: number, n: string) => [fmt(v), n === 'base' ? 'Sin amortizar' : 'Amortizando']) as never}
+                    contentStyle={{ fontSize: 12, borderRadius: 8 }}
+                  />
+                  <Legend formatter={v => v === 'base' ? 'Sin amortizar' : 'Amortizando'} wrapperStyle={{ fontSize: 11 }} />
+                  <Area type="monotone" dataKey="base"  stroke="#94a3b8" fill="url(#gBase)"  strokeWidth={1.5} />
+                  <Area type="monotone" dataKey="extra" stroke={accentColor} fill="url(#gExtra)" strokeWidth={2} connectNulls={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </>
         )}
         {!simResult && simAmount && (
           <p className="text-xs text-gray-400 dark:text-gray-500 italic">Introduce un importe válido para ver la simulación.</p>
@@ -624,6 +799,10 @@ export default function Debts() {
   const [detailId,   setDetailId]   = useState<string | null>(null)
 
   const accounts = summary?.accounts ?? []
+  const liquidBalance = useMemo(
+    () => accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro').reduce((s, a) => s + a.balance, 0),
+    [accounts],
+  )
 
   const saveDebt = async (d: DebtConfig) => {
     const monthly  = calcMonthlyPayment(d.capitalInitial, d.interestRate, d.termMonths)
@@ -725,6 +904,7 @@ export default function Debts() {
           debt={detailDebt}
           account={detailAccount}
           payments={detailPayments}
+          liquidBalance={liquidBalance}
           onBack={() => setDetailId(null)}
           onEdit={() => setEditDebt(detailDebt)}
           fmt={fmt}
