@@ -13,6 +13,23 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.8', date: 'Mayo 2026',
+    items: [
+      { type: 'feat',    text: 'Nuevo módulo Huchas: cuentas de tipo hucha con objetivo, fecha límite y proyecciones (cuánto aportar al mes o cuándo llegarás)' },
+      { type: 'feat',    text: 'Nuevo módulo Deudas: hipotecas y préstamos con cuadro de amortización, capital pendiente, intereses y vinculación a un inmueble o vehículo' },
+      { type: 'feat',    text: 'Deudas: simulador de amortización anticipada con importe extra, frecuencia, condición de líquido mínimo y gráfico comparativo' },
+      { type: 'feat',    text: 'Deudas: genera automáticamente una plantilla mensual del pago, y la cuenta vinculada muestra su equity (valor menos deuda pendiente)' },
+      { type: 'feat',    text: 'Suscripciones: marca subtipos como suscripción (mensual/anual) en Ajustes y velas en Control de Gastos divididas en activas/inactivas, con historial y coste anual' },
+      { type: 'feat',    text: 'Análisis: heatmap de gastos anual estilo calendario de contribuciones' },
+      { type: 'feat',    text: 'Alertas de presupuesto: campana flotante global con panel desplegable; se descartan al verlas y reaparecen solo si el gasto sube otro 10%' },
+      { type: 'feat',    text: 'Adjuntos: visor integrado para PDF e imágenes con zoom y descarga, sin salir de la app' },
+      { type: 'improve', text: 'Configuración reorganizada en pestañas (Cuentas, Apariencia, Suscripciones, Tickets…)' },
+      { type: 'improve', text: 'Calendario: nombre del mes con mayúscula inicial' },
+      { type: 'improve', text: 'Formulario de movimiento: el selector de tipo incluye los grupos personalizados y tinta cada opción con su color' },
+      { type: 'fix',     text: 'Numerosos ajustes de responsividad móvil en Cuentas, Inversiones, Dashboard, Calendario y Presupuestos' },
+    ],
+  },
+  {
     version: 'v1.7.2', date: 'Mayo 2026',
     items: [
       { type: 'improve', text: 'Configuración: nuevo menú de pestañas superior (Cuentas, Apariencia, Movimientos, Navegación, Backup, Tickets, Plugins, Sistema)' },
@@ -162,7 +179,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-white">{t('about.title')}</h2>
-            <span className="text-xs text-gray-400 dark:text-gray-500">v1.7.2</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">v1.8</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
