@@ -178,7 +178,7 @@ function calcSpending(movements: Movement[], typeIds: Set<number>, start: string
 }
 
 function pctColors(pct: number) {
-  if (pct >= 100) return { bar: 'bg-red-500',      text: 'text-red-600 dark:text-red-400' }
+  if (pct >= 105) return { bar: 'bg-red-500',      text: 'text-red-600 dark:text-red-400' }
   if (pct >= 90)  return { bar: 'bg-orange-500',   text: 'text-orange-600 dark:text-orange-400' }
   if (pct >= 70)  return { bar: 'bg-yellow-500',   text: 'text-yellow-600 dark:text-yellow-400' }
   return               { bar: 'bg-emerald-500',  text: 'text-emerald-600 dark:text-emerald-400' }
