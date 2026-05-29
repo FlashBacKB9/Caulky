@@ -105,6 +105,7 @@ function SidebarLayout() {
 
   return (
     <div className="flex h-full overflow-hidden bg-gray-50 dark:bg-gray-950">
+      <BudgetAlerts />
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40 md:hidden"
@@ -127,8 +128,6 @@ function SidebarLayout() {
           </button>
           <Wallet className="w-5 h-5 text-gray-800 dark:text-white" strokeWidth={1.5} />
           <span className="font-bold text-gray-800 dark:text-white">Caulky</span>
-          <div className="flex-1" />
-          <BudgetAlerts />
         </header>
         {fullscreen
           ? <div className="flex-1 min-h-0 relative overflow-hidden"><PageRoutes /></div>
