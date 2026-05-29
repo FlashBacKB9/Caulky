@@ -6,7 +6,8 @@ import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getSummary as getInvestSummary } from '../api/investments'
 import { useCurrency } from '../hooks/useCurrency'
-import { TrendingUp, TrendingDown, Eye, EyeOff } from 'lucide-react'
+import { TrendingUp, TrendingDown, Eye, EyeOff, Banknote } from 'lucide-react'
+import { loadDebts, calcDebtSummary, calcMonthlyPayment } from './Debts'
 import AppIcon from '../components/AppIcon'
 import {
   ResponsiveContainer,
@@ -130,6 +131,8 @@ export default function AccountsPage() {
 
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear())
   const [viewMode, setViewMode] = useState<'lines' | 'stacked'>('lines')
+  const [debtViewIds, setDebtViewIds] = useState<Set<number>>(new Set())
+  const toggleDebtView = (id: number) => setDebtViewIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   const [excludedBienes, setExcludedBienes] = useState<Set<number>>(() => {
     try { return new Set(JSON.parse(localStorage.getItem('accounts-excluded-bienes') || '[]')) }
     catch { return new Set() }
@@ -144,6 +147,19 @@ export default function AccountsPage() {
   }
 
   const accounts = useMemo(() => summary?.accounts ?? [], [summary])
+
+  // Debts indexed by accountId
+  const debtsByAccount = useMemo(() => {
+    const debts = loadDebts()
+    const map: Record<number, { capitalPaid: number; interestPaid: number; remainingCapital: number; monthly: number; totalPaid: number }> = {}
+    for (const debt of debts) {
+      const mvs = movements.filter(mv => mv.movement_type_id === debt.movementTypeId && mv.dinero < 0)
+      const { capitalPaid, interestPaid, remainingCapital, totalPaid } = calcDebtSummary(debt, mvs)
+      const monthly = calcMonthlyPayment(debt.capitalInitial, debt.interestRate, debt.termMonths)
+      map[debt.accountId] = { capitalPaid, interestPaid, remainingCapital, monthly, totalPaid }
+    }
+    return map
+  }, [movements])
 
   const typeById = useMemo(
     () => Object.fromEntries(movementTypes.map(t => [t.id, t])),
@@ -428,22 +444,44 @@ export default function AccountsPage() {
               </div>
               <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {catAccounts.map(acc => {
-                  const change = periodChange[acc.id] ?? 0
-                  const isVehicle = acc.category === 'vehiculo'
-                  const currentVal = isVehicle ? vehicleCurrentValue(acc) : acc.balance
+                  const change       = periodChange[acc.id] ?? 0
+                  const isVehicle    = acc.category === 'vehiculo'
+                  const currentVal   = isVehicle ? vehicleCurrentValue(acc) : acc.balance
                   const isBienExcluded = isBienes && excludedBienes.has(acc.id)
+                  const debt         = debtsByAccount[acc.id]
+                  const hasDebt      = !!debt
+                  const showDebtView = hasDebt && debtViewIds.has(acc.id)
+
+                  const handleClick = () => {
+                    if (hasDebt) navigate('/deudas')
+                    else navigate(`/movements?account=${acc.id}`)
+                  }
+
                   return (
-                    <div key={acc.id} onClick={() => navigate(`/movements?account=${acc.id}`)} className={`${PANEL} p-4 relative overflow-hidden transition-opacity cursor-pointer hover:ring-1 hover:ring-gray-200 dark:hover:ring-gray-700 ${isBienExcluded ? 'opacity-50' : ''}`}>
+                    <div key={acc.id} onClick={handleClick} className={`${PANEL} p-4 relative overflow-hidden transition-opacity cursor-pointer hover:ring-1 hover:ring-gray-200 dark:hover:ring-gray-700 ${isBienExcluded ? 'opacity-50' : ''}`}>
                       <div className="absolute inset-y-0 left-0 w-1 rounded-l-2xl" style={{ background: acc.color }} />
-                      {isBienes && (
-                        <button
-                          onClick={e => { e.stopPropagation(); toggleBienAccount(acc.id) }}
-                          title={isBienExcluded ? t('accounts.bienesExcluded') : t('accounts.bienesGroup')}
-                          className="absolute top-2.5 right-2.5 p-1 rounded-md text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors z-10"
-                        >
-                          {isBienExcluded ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                        </button>
-                      )}
+                      {/* Top-right buttons */}
+                      <div className="absolute top-2.5 right-2.5 flex items-center gap-0.5 z-10">
+                        {hasDebt && (
+                          <button
+                            onClick={e => { e.stopPropagation(); toggleDebtView(acc.id) }}
+                            title={showDebtView ? 'Ver valor' : 'Ver deuda'}
+                            className="p-1 rounded-md text-gray-300 dark:text-gray-600 hover:text-blue-500 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                          >
+                            <Banknote className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        {isBienes && (
+                          <button
+                            onClick={e => { e.stopPropagation(); toggleBienAccount(acc.id) }}
+                            title={isBienExcluded ? t('accounts.bienesExcluded') : t('accounts.bienesGroup')}
+                            className="p-1 rounded-md text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+                          >
+                            {isBienExcluded ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          </button>
+                        )}
+                      </div>
+
                       <div className="pl-2">
                         <div className="flex items-center gap-2 mb-3">
                           <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
@@ -459,30 +497,49 @@ export default function AccountsPage() {
                             )}
                           </div>
                         </div>
-                        <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white mb-1">
-                          {fmt(currentVal)}
-                        </p>
-                        {isVehicle && acc.depreciation_rate != null ? (
-                          <div className="space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
-                            <div>{t('accounts.vehicleCurrentVal')}</div>
-                            <div>
-                              {t('accounts.deprecPerYear')}: <span className="font-semibold">{acc.depreciation_rate}%</span>
-                              {acc.new_car && <span className="ml-1 text-amber-500">+15%</span>}
-                            </div>
-                            {acc.balance !== currentVal && (
-                              <div className="text-gray-500 dark:text-gray-600">{t('invest.invested')}: {fmt(acc.balance !== 0 ? acc.balance : acc.initial_balance)}</div>
-                            )}
-                          </div>
-                        ) : isInvestCat && investCurrentVal != null ? (
-                          <div className="space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
-                            <div>{t('invest.invested')}: <span className="font-semibold text-gray-600 dark:text-gray-300 tabular-nums">{fmt(acc.balance)}</span></div>
-                            <div>{t('invest.currentValue')}: <span className="font-semibold text-gray-600 dark:text-gray-300 tabular-nums">{fmt(investCurrentVal)}</span></div>
+
+                        {/* Debt view */}
+                        {showDebtView && debt ? (
+                          <div className="space-y-0.5 text-xs">
+                            <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white mb-1">{fmt(debt.remainingCapital)}</p>
+                            <div className="text-gray-400 dark:text-gray-500">Pendiente · {fmt(debt.monthly)}/mes</div>
+                            <div className="text-gray-400 dark:text-gray-500">Capital pagado: <span className="font-semibold text-gray-600 dark:text-gray-300">{fmt(debt.capitalPaid)}</span></div>
+                            <div className="text-red-400">Intereses: <span className="font-semibold">{fmt(debt.interestPaid)}</span></div>
                           </div>
                         ) : (
-                          <div className={`flex items-center gap-1 text-xs font-medium ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
-                            {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
-                            <span>{change >= 0 ? '+' : ''}{fmt(change)}</span>
-                          </div>
+                          <>
+                            <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white mb-1">
+                              {fmt(hasDebt ? Math.max(0, currentVal - (debt?.remainingCapital ?? 0)) : currentVal)}
+                            </p>
+                            {hasDebt && (
+                              <div className="text-xs text-gray-400 dark:text-gray-500 space-y-0.5">
+                                <div>Equity · <span className="tabular-nums">{fmt(debt.capitalPaid)} cap. pagado</span></div>
+                                <div>Total invertido: <span className="tabular-nums font-semibold text-gray-600 dark:text-gray-300">{fmt(debt.totalPaid)}</span></div>
+                              </div>
+                            )}
+                            {!hasDebt && isVehicle && acc.depreciation_rate != null ? (
+                              <div className="space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
+                                <div>{t('accounts.vehicleCurrentVal')}</div>
+                                <div>
+                                  {t('accounts.deprecPerYear')}: <span className="font-semibold">{acc.depreciation_rate}%</span>
+                                  {acc.new_car && <span className="ml-1 text-amber-500">+15%</span>}
+                                </div>
+                                {acc.balance !== currentVal && (
+                                  <div className="text-gray-500 dark:text-gray-600">{t('invest.invested')}: {fmt(acc.balance !== 0 ? acc.balance : acc.initial_balance)}</div>
+                                )}
+                              </div>
+                            ) : !hasDebt && isInvestCat && investCurrentVal != null ? (
+                              <div className="space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
+                                <div>{t('invest.invested')}: <span className="font-semibold text-gray-600 dark:text-gray-300 tabular-nums">{fmt(acc.balance)}</span></div>
+                                <div>{t('invest.currentValue')}: <span className="font-semibold text-gray-600 dark:text-gray-300 tabular-nums">{fmt(investCurrentVal)}</span></div>
+                              </div>
+                            ) : !hasDebt ? (
+                              <div className={`flex items-center gap-1 text-xs font-medium ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+                                {change >= 0 ? <TrendingUp className="w-3 h-3" /> : <TrendingDown className="w-3 h-3" />}
+                                <span>{change >= 0 ? '+' : ''}{fmt(change)}</span>
+                              </div>
+                            ) : null}
+                          </>
                         )}
                       </div>
                     </div>

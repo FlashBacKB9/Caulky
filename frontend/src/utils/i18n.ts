@@ -21,6 +21,7 @@ const ES: Record<string, string> = {
   'nav.tickets':      'Tickets',
   'nav.expenses':     'Control de Gastos',
   'nav.huchas':       'Huchas',
+  'nav.debts':        'Deudas',
 
   'common.save':        'Guardar',
   'common.cancel':      'Cancelar',
@@ -1255,6 +1256,7 @@ const EN: Record<string, string> = {
   'nav.ai':           'AI Consultant',
   'nav.tickets':      'Tickets',
   'nav.huchas':       'Piggy Banks',
+  'nav.debts':        'Debts',
 
   'common.save':        'Save',
   'common.cancel':      'Cancel',
@@ -2490,6 +2492,7 @@ const FR: Record<string, string> = {
   'nav.ai':           'Consultant IA',
   'nav.tickets':      'Tickets',
   'nav.huchas':       'Tirelires',
+  'nav.debts':        'Dettes',
 
   'common.save':        'Enregistrer',
   'common.cancel':      'Annuler',
@@ -3725,6 +3728,7 @@ const DE: Record<string, string> = {
   'nav.ai':           'KI-Berater',
   'nav.tickets':      'Tickets',
   'nav.huchas':       'Sparbüchsen',
+  'nav.debts':        'Schulden',
 
   'common.save':        'Speichern',
   'common.cancel':      'Abbrechen',
@@ -4960,6 +4964,7 @@ const IT: Record<string, string> = {
   'nav.ai':           'Consulente IA',
   'nav.tickets':      'Tickets',
   'nav.huchas':       'Salvadanai',
+  'nav.debts':        'Debiti',
 
   'common.save':        'Salva',
   'common.cancel':      'Annulla',

@@ -22,6 +22,7 @@ import AiConsultant from './pages/AiConsultant'
 import Tickets from './pages/Tickets'
 import ExpenseControl from './pages/ExpenseControl'
 import Huchas from './pages/Huchas'
+import Debts from './pages/Debts'
 import QuickAdd from './pages/QuickAdd'
 import LoginPage from './pages/LoginPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -81,6 +82,7 @@ function PageRoutes() {
       <Route path="/tickets" element={<Tickets />} />
       <Route path="/gastos" element={<ExpenseControl />} />
       <Route path="/huchas" element={<Huchas />} />
+      <Route path="/deudas" element={<Debts />} />
     </Routes>
   )
 }
