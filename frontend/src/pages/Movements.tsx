@@ -369,7 +369,7 @@ function CalendarView({ movements, types, selectedYear, accountFilter }: {
   const todayStr = today.toISOString().split('T')[0]
   const prevMonth = () => calMonth === 0 ? (setCalYear(y => y - 1), setCalMonth(11)) : setCalMonth(m => m - 1)
   const nextMonth = () => calMonth === 11 ? (setCalYear(y => y + 1), setCalMonth(0)) : setCalMonth(m => m + 1)
-  const MAX = 4
+  const MAX = typeof window !== 'undefined' && window.innerWidth < 640 ? 2 : 4
   const btnCls = (active: boolean) => `px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${active ? 'bg-white dark:bg-gray-700 shadow-sm text-gray-800 dark:text-gray-100' : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'}`
 
   return (
@@ -424,7 +424,7 @@ function CalendarView({ movements, types, selectedYear, accountFilter }: {
                   setDraggingId(null); setDragOverDate(null)
                 }}
                 onDoubleClick={() => cell.current && setFormDate(cell.dateStr)}
-                className={`group min-h-[110px] border-r border-b border-gray-100 dark:border-gray-800 p-1.5 transition-colors ${
+                className={`group min-h-[80px] sm:min-h-[110px] overflow-hidden border-r border-b border-gray-100 dark:border-gray-800 p-1 sm:p-1.5 transition-colors ${
                   isDropTarget ? 'bg-blue-50 dark:bg-blue-950/40 ring-1 ring-inset ring-blue-300 dark:ring-blue-700' :
                   isToday ? 'bg-blue-50/60 dark:bg-blue-950/20' :
                   !cell.current ? 'bg-gray-50/50 dark:bg-gray-800/30' : 'cursor-pointer'
@@ -467,7 +467,7 @@ function CalendarView({ movements, types, selectedYear, accountFilter }: {
                         {fmtCal(mvDineroForAccount(mv, accountFilter))}
                       </span>
                       {typ && (
-                        <span className="block text-[10px] px-1 rounded mt-0.5 w-full" style={{ backgroundColor: typ.color + '22', color: typ.color }}>
+                        <span className="hidden sm:block text-[10px] px-1 rounded mt-0.5 w-full" style={{ backgroundColor: typ.color + '22', color: typ.color }}>
                           {typ.name}
                         </span>
                       )}
@@ -486,7 +486,7 @@ function CalendarView({ movements, types, selectedYear, accountFilter }: {
                         {fmtCal(pv.money)}
                       </span>
                       {typ && (
-                        <span className="block text-[10px] px-1 rounded mt-0.5 w-full" style={{ backgroundColor: typ.color + '22', color: typ.color }}>
+                        <span className="hidden sm:block text-[10px] px-1 rounded mt-0.5 w-full" style={{ backgroundColor: typ.color + '22', color: typ.color }}>
                           {typ.name}
                         </span>
                       )}

@@ -625,8 +625,8 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
 
         {/* Table view */}
         {view === 'table' && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-            <table className="w-full">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-x-auto">
+            <table className="w-full min-w-[480px]">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
                   <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide w-6"></th>
