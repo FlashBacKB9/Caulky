@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react'
 import { t, getMonthNames } from '../utils/i18n'
 import { syncPref } from '../utils/prefSync'
 import { useQuery } from '@tanstack/react-query'
-import { Plus, Edit2, Trash2, X, ChevronLeft, ChevronDown, ChevronRight, History, ChartCandlestick, Table2, TrendingUp, AlertTriangle } from 'lucide-react'
+import { Plus, Edit2, Trash2, X, ChevronLeft, ChevronDown, ChevronRight, History, ChartCandlestick, Table2, TrendingUp } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
@@ -47,7 +47,12 @@ const PERIOD_LABELS: Record<BudgetPeriodType, string> = {
   monthly: t('budgets.periodMonthly'), weekly: t('budgets.periodWeekly'), annual: t('budgets.periodAnnual'), custom: t('budgets.periodCustom'),
 }
 
-function getCurrentPeriod(
+export function readBudgets(): Budget[] {
+  try { return JSON.parse(localStorage.getItem('spendly-budgets') ?? '[]') } catch { return [] }
+}
+export type { Budget, BudgetPeriodType }
+
+export function getCurrentPeriod(
   period: BudgetPeriodType,
   customFrom?: string,
   customTo?: string,
@@ -161,7 +166,7 @@ function generatePeriods(
 }
 
 // Latest version whose effectiveFrom <= date; falls back to first version
-function getAmountForDate(versions: BudgetVersion[], date: string): number {
+export function getAmountForDate(versions: BudgetVersion[], date: string): number {
   if (!versions.length) return 0
   let result = versions[0].amount
   for (const v of versions) {
@@ -171,7 +176,7 @@ function getAmountForDate(versions: BudgetVersion[], date: string): number {
   return result
 }
 
-function calcSpending(movements: Movement[], typeIds: Set<number>, start: string, end: string): number {
+export function calcSpending(movements: Movement[], typeIds: Set<number>, start: string, end: string): number {
   return movements
     .filter(mv => mv.movement_type_id != null && typeIds.has(mv.movement_type_id) && mv.date >= start && mv.date <= end)
     .reduce((s, mv) => s + Math.abs(mv.dinero), 0)
@@ -199,26 +204,13 @@ function BudgetCard({ budget, movements, onClick, onEdit, onDelete }: {
   const remaining = currentAmount - spent
   const colors = pctColors(pct)
 
-  const alertLevel = pct >= 105 ? 'over' : pct >= 80 ? 'warn' : null
-
   return (
     <div onClick={onClick}
-      className={`bg-white dark:bg-gray-900 rounded-2xl border shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow group ${
-        alertLevel === 'over' ? 'border-red-200 dark:border-red-900/50' :
-        alertLevel === 'warn' ? 'border-amber-200 dark:border-amber-900/50' :
-        'border-gray-100 dark:border-gray-800'
-      }`}>
+      className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm p-4 cursor-pointer hover:shadow-md transition-shadow group">
       <div className="flex items-start justify-between gap-2 mb-3">
-        <div className="min-w-0 flex items-start gap-1.5">
-          {alertLevel && (
-            <AlertTriangle className={`w-3.5 h-3.5 shrink-0 mt-0.5 ${
-              alertLevel === 'over' ? 'text-red-500' : 'text-amber-500'
-            }`} strokeWidth={2} />
-          )}
-          <div className="min-w-0">
-            <h3 className="text-sm font-semibold text-gray-800 dark:text-white truncate">{budget.name}</h3>
-            <span className="text-[11px] text-gray-400 dark:text-gray-500">{PERIOD_LABELS[budget.period]}</span>
-          </div>
+        <div className="min-w-0">
+          <h3 className="text-sm font-semibold text-gray-800 dark:text-white truncate">{budget.name}</h3>
+          <span className="text-[11px] text-gray-400 dark:text-gray-500">{PERIOD_LABELS[budget.period]}</span>
         </div>
         <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
           onClick={e => e.stopPropagation()}>

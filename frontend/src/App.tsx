@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Menu, Wallet } from 'lucide-react'
 import Sidebar from './components/Sidebar'
+import BudgetAlerts from './components/BudgetAlerts'
 import TopNav from './components/TopNav'
 import Dashboard from './pages/Dashboard'
 import Movements from './pages/Movements'
@@ -126,6 +127,8 @@ function SidebarLayout() {
           </button>
           <Wallet className="w-5 h-5 text-gray-800 dark:text-white" strokeWidth={1.5} />
           <span className="font-bold text-gray-800 dark:text-white">Caulky</span>
+          <div className="flex-1" />
+          <BudgetAlerts />
         </header>
         {fullscreen
           ? <div className="flex-1 min-h-0 relative overflow-hidden"><PageRoutes /></div>

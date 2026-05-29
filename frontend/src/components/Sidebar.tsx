@@ -6,6 +6,7 @@ import { logout } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
 import { t } from '../utils/i18n'
+import BudgetAlerts from './BudgetAlerts'
 
 // ── Changelog data ────────────────────────────────────────────────────────────
 
@@ -357,6 +358,10 @@ export default function Sidebar({
 
         {/* Footer actions */}
         <div className={`pb-4 border-t border-gray-100 dark:border-gray-800 mt-2 pt-2 space-y-0.5 shrink-0 ${collapsed ? 'px-1' : 'px-3'}`}>
+          <div className={`flex items-center ${collapsed ? 'justify-center py-2' : 'gap-3 px-3 py-2'}`}>
+            <BudgetAlerts />
+            {!collapsed && <span className="text-sm font-medium text-gray-500 dark:text-gray-400">Alertas</span>}
+          </div>
           <NavLink
             to="/settings"
             title={collapsed ? t('layout.settings') : undefined}
