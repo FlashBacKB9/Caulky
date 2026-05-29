@@ -14,7 +14,10 @@ import {
   ArrowUp, ArrowDown, ArrowUpDown,
   GripVertical, BarChart2, LineChart as LcLineChart, Table2,
   Layers, Activity, type LucideIcon,
+  CreditCard, CalendarClock, AlertCircle,
 } from 'lucide-react'
+import { useCurrency } from '../hooks/useCurrency'
+import { useDateFormat } from '../hooks/useDateFormat'
 import {
   getMovements, uploadMovementFile, deleteMovementFile,
   movementFileDownloadUrl, type Movement, type MovementFile,
@@ -708,6 +711,142 @@ function MovementsPanel({ movements, allTypes, groups, typeMap, typeToGroupMap, 
   )
 }
 
+// ── Suscripciones helpers ─────────────────────────────────────────────────────
+
+const SUBS_KEY_EC = 'suscripciones-ids'
+function loadSubsIds(): number[] {
+  try { return JSON.parse(localStorage.getItem(SUBS_KEY_EC) ?? '[]') } catch { return [] }
+}
+
+function subFreq(dates: string[]): 'semanal' | 'mensual' | 'trimestral' | 'anual' {
+  if (dates.length < 2) return 'mensual'
+  const sorted = [...dates].sort()
+  const intervals = sorted.slice(1).map((d, i) =>
+    (new Date(d + 'T00:00:00').getTime() - new Date(sorted[i] + 'T00:00:00').getTime()) / 86400000,
+  )
+  const avg = intervals.reduce((s, x) => s + x, 0) / intervals.length
+  if (avg <= 9)   return 'semanal'
+  if (avg <= 45)  return 'mensual'
+  if (avg <= 110) return 'trimestral'
+  return 'anual'
+}
+
+const FREQ_LABEL: Record<string, string> = { semanal: 'Semanal', mensual: 'Mensual', trimestral: 'Trimestral', anual: 'Anual' }
+const FREQ_DAYS:  Record<string, number> = { semanal: 7, mensual: 30, trimestral: 91, anual: 365 }
+const FREQ_MULT:  Record<string, number> = { semanal: 52, mensual: 12, trimestral: 4, anual: 1 }
+
+function addDaysStr(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + days)
+  return d.toLocaleDateString('en-CA')
+}
+
+function SubscripcionesView({ allTypes, allMovements }: { allTypes: MovementType[]; allMovements: Movement[] }) {
+  const { fmt }     = useCurrency()
+  const { fmtDate } = useDateFormat()
+
+  const [subIds] = useState<Set<number>>(() => new Set(loadSubsIds()))
+
+  const subTypes = useMemo(() => allTypes.filter(tp => subIds.has(tp.id)), [allTypes, subIds])
+
+  const stats = useMemo(() => subTypes.map(tp => {
+    const mvs = allMovements
+      .filter(mv => mv.movement_type_id === tp.id && mv.dinero < 0)
+      .sort((a, b) => a.date.localeCompare(b.date))
+    if (mvs.length === 0) return null
+    const dates  = mvs.map(m => m.date)
+    const amounts = mvs.map(m => Math.abs(m.dinero))
+    const latest  = amounts[amounts.length - 1]
+    const lastDate = dates[dates.length - 1]
+    const freq     = subFreq(dates)
+    const nextDate = addDaysStr(lastDate, FREQ_DAYS[freq])
+    const daysUntil = Math.round((new Date(nextDate + 'T00:00:00').getTime() - new Date().getTime()) / 86400000)
+    const annualCost = latest * FREQ_MULT[freq]
+    return { type: tp, latest, lastDate, nextDate, daysUntil, freq, annualCost }
+  }).filter(Boolean) as {
+    type: MovementType; latest: number; lastDate: string
+    nextDate: string; daysUntil: number; freq: string; annualCost: number
+  }[], [subTypes, allMovements])
+
+  const totalMonthly = useMemo(() => stats.reduce((s, st) => s + st.latest / (FREQ_MULT[st.freq] / 12), 0), [stats])
+  const totalAnnual  = useMemo(() => stats.reduce((s, st) => s + st.annualCost, 0), [stats])
+
+  if (subIds.size === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
+        <CreditCard className="w-10 h-10 text-gray-200 dark:text-gray-700" strokeWidth={1} />
+        <p className="text-sm font-medium text-gray-600 dark:text-gray-300">No hay suscripciones configuradas</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 max-w-xs">
+          Ve a Ajustes → Suscripciones y marca los subtipos que son suscripciones.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Summary */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
+          <p className="text-xs text-gray-400 dark:text-gray-500">Total / mes</p>
+          <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-white mt-0.5">{fmt(totalMonthly)}</p>
+        </div>
+        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
+          <p className="text-xs text-gray-400 dark:text-gray-500">Total / año</p>
+          <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-white mt-0.5">{fmt(totalAnnual)}</p>
+        </div>
+      </div>
+
+      {/* Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+        {stats.map(st => {
+          const isOverdue = st.daysUntil < 0
+          const isSoon    = st.daysUntil >= 0 && st.daysUntil <= 7
+          const nextColor = isOverdue ? 'text-red-500 dark:text-red-400' : isSoon ? 'text-amber-500 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'
+          return (
+            <div key={st.type.id}
+              className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-3"
+              style={{ borderLeftColor: st.type.color, borderLeftWidth: 3 }}>
+
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: st.type.color }} />
+                  <span className="text-sm font-semibold text-gray-800 dark:text-white truncate">{st.type.name}</span>
+                </div>
+                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0"
+                  style={{ backgroundColor: st.type.color + '20', color: st.type.color }}>
+                  {FREQ_LABEL[st.freq]}
+                </span>
+              </div>
+
+              <div className="flex items-end justify-between">
+                <div>
+                  <p className="text-xs text-gray-400 dark:text-gray-500">Último cobro</p>
+                  <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">{fmt(st.latest)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-gray-400 dark:text-gray-500">{fmt(st.annualCost)}/año</p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-50 dark:border-gray-800">
+                <span className="text-gray-400 dark:text-gray-500">
+                  Último: {fmtDate(st.lastDate)}
+                </span>
+                <span className={`flex items-center gap-1 font-medium ${nextColor}`}>
+                  {(isOverdue || isSoon) && <AlertCircle className="w-3 h-3" />}
+                  <CalendarClock className="w-3 h-3" />
+                  {isOverdue ? 'Vencido' : isSoon ? `en ${st.daysUntil}d` : fmtDate(st.nextDate)}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function ExpenseControl() {
@@ -721,6 +860,7 @@ export default function ExpenseControl() {
     color: isDark ? '#f9fafb' : '#111827',
   }
 
+  const [viewMode, setViewMode]              = useState<'evolucion' | 'suscripciones'>('evolucion')
   const [selectedTypeIds, setSelectedTypeIds] = useState<Set<number>>(new Set())
   const [initialized, setInitialized]         = useState(false)
   const [chartKind, setChartKind]             = useState<ChartKind>('bar')
@@ -731,8 +871,9 @@ export default function ExpenseControl() {
   const [hiddenChartTypeIds, setHiddenChartTypeIds] = useState<Set<number>>(new Set())
 
   // ── Queries ───────────────────────────────────────────────────────────────────
-  const { data: allTypes = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes, staleTime: 5 * 60 * 1000 })
-  const { data: groups   = [] } = useQuery({ queryKey: ['groups'],         queryFn: getGroups,        staleTime: 5 * 60 * 1000 })
+  const { data: allTypes = [] }     = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes, staleTime: 5 * 60 * 1000 })
+  const { data: groups   = [] }     = useQuery({ queryKey: ['groups'],         queryFn: getGroups,        staleTime: 5 * 60 * 1000 })
+  const { data: allMovements = [] } = useQuery({ queryKey: ['movements'],      queryFn: () => getMovements(), staleTime: 5 * 60 * 1000, enabled: viewMode === 'suscripciones' })
 
   const allYears = useMemo(() => [...activeYears].sort((a, b) => a - b), [activeYears])
 
@@ -926,6 +1067,30 @@ export default function ExpenseControl() {
         {isLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400 ml-1" />}
       </div>
 
+      {/* Tab bar */}
+      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 self-start">
+        {(['evolucion', 'suscripciones'] as const).map(mode => (
+          <button
+            key={mode}
+            onClick={() => setViewMode(mode)}
+            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              viewMode === mode
+                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+            }`}
+          >
+            {mode === 'evolucion' ? 'Evolución' : 'Suscripciones'}
+          </button>
+        ))}
+      </div>
+
+      {/* Suscripciones view */}
+      {viewMode === 'suscripciones' && (
+        <SubscripcionesView allTypes={allTypes} allMovements={allMovements} />
+      )}
+
+      {viewMode === 'evolucion' && <>
+
       {/* Type filter */}
       <TypeFilterDropdown
         typesByCategory={typesByCategory} selectedTypeIds={selectedTypeIds} customColors={customColors}
@@ -1098,6 +1263,7 @@ export default function ExpenseControl() {
         allTypes={allTypes} groups={groups} typeMap={typeMap}
         typeToGroupMap={typeToGroupMap} selectedTypeIds={selectedTypeIds} onRefresh={onRefresh}
       />
+      </>}
     </div>
   )
 }
