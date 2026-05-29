@@ -14,6 +14,11 @@ export function useUiZoom() {
   })
 
   useLayoutEffect(() => {
+    if (window.innerWidth < 768) {
+      document.body.style.zoom = ''
+      document.body.style.minHeight = ''
+      return
+    }
     const actual = zoom * ZOOM_SCALE
     document.body.style.zoom = actual + '%'
     document.body.style.minHeight = actual < 100 ? `${(100 * 100 / actual).toFixed(2)}vh` : ''

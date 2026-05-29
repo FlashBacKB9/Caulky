@@ -1025,7 +1025,7 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
         </div>
 
         {/* ── Right: templates sidebar ─────────────────────────────────────── */}
-        <div className={`w-56 border-l border-gray-100 dark:border-gray-800 flex flex-col shrink-0 bg-gray-50/50 dark:bg-gray-800/30 ${panel === 'template' || panel === 'recurrence' ? 'hidden' : ''}`}>
+        <div className={`w-56 border-l border-gray-100 dark:border-gray-800 flex-col shrink-0 bg-gray-50/50 dark:bg-gray-800/30 ${panel === 'template' || panel === 'recurrence' ? 'hidden' : 'hidden md:flex'}`}>
           <div className="px-4 py-4 border-b border-gray-100 dark:border-gray-800">
             <span className="text-xs font-semibold uppercase tracking-wide text-gray-400 dark:text-gray-500">{t('quickadd.templates')}</span>
           </div>

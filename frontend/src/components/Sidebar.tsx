@@ -13,6 +13,18 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.7.2', date: 'Mayo 2026',
+    items: [
+      { type: 'improve', text: 'Configuración: nuevo menú de pestañas superior (Cuentas, Apariencia, Movimientos, Navegación, Backup, Tickets, Plugins, Sistema)' },
+      { type: 'fix',     text: 'Presupuestos: umbral rojo a partir del 105% (antes 100%), permitiendo llegar al límite sin alarma' },
+      { type: 'fix',     text: 'Móvil – Calendario: celdas con overflow-hidden, altura reducida y máximo 2 eventos visibles por celda' },
+      { type: 'fix',     text: 'Móvil – Cuentas: composición e inversiones se apilan bajo el patrimonio total en lugar de quedar en fila' },
+      { type: 'fix',     text: 'Móvil – Inversiones: badge de ganancia en línea propia bajo el nombre del fondo' },
+      { type: 'fix',     text: 'Móvil – Dashboard: todos los widgets a ancho completo respetando el orden de personalización' },
+      { type: 'fix',     text: 'Móvil – Presupuestos: tabla de historial con scroll horizontal' },
+    ],
+  },
+  {
     version: 'v1.7.1', date: 'Mayo 2026',
     items: [
       { type: 'fix',     text: 'Dashboard: los widgets se actualizan tras crear un movimiento sin recargar la página' },
@@ -150,7 +162,7 @@ function InfoModal({ onClose }: { onClose: () => void }) {
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-white">{t('about.title')}</h2>
-            <span className="text-xs text-gray-400 dark:text-gray-500">v1.7.1</span>
+            <span className="text-xs text-gray-400 dark:text-gray-500">v1.7.2</span>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />

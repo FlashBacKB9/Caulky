@@ -1655,7 +1655,7 @@ export default function Charts() {
         />
       )}
     <div className="p-3 md:p-6 space-y-4" style={draftChart ? { visibility: 'hidden', pointerEvents: 'none' } : undefined}>
-      <div className="flex items-start justify-between">
+      <div className="flex flex-wrap items-start gap-3 justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-800 dark:text-white">{t('charts.title')}</h1>
           <p className="text-sm text-gray-400 dark:text-gray-500 mt-0.5">{t('charts.subtitle')}</p>

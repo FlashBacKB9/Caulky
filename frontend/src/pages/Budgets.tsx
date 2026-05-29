@@ -178,7 +178,7 @@ function calcSpending(movements: Movement[], typeIds: Set<number>, start: string
 }
 
 function pctColors(pct: number) {
-  if (pct >= 100) return { bar: 'bg-red-500',      text: 'text-red-600 dark:text-red-400' }
+  if (pct >= 105) return { bar: 'bg-red-500',      text: 'text-red-600 dark:text-red-400' }
   if (pct >= 90)  return { bar: 'bg-orange-500',   text: 'text-orange-600 dark:text-orange-400' }
   if (pct >= 70)  return { bar: 'bg-yellow-500',   text: 'text-yellow-600 dark:text-yellow-400' }
   return               { bar: 'bg-emerald-500',  text: 'text-emerald-600 dark:text-emerald-400' }
@@ -530,7 +530,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
   return (
     <div className="flex-1 overflow-auto">
       {/* Subheader */}
-      <div className="flex items-center gap-4 px-6 py-3 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
+      <div className="flex items-center gap-4 px-3 md:px-6 py-3 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 sticky top-0 z-10">
         <button onClick={onClose} className="flex items-center gap-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors shrink-0">
           <ChevronLeft className="w-4 h-4"/> {t('common.back')}
         </button>
@@ -625,8 +625,8 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
 
         {/* Table view */}
         {view === 'table' && (
-          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-hidden">
-            <table className="w-full">
+          <div className="bg-white dark:bg-gray-900 rounded-2xl border border-gray-100 dark:border-gray-800 shadow-sm overflow-x-auto">
+            <table className="w-full min-w-[480px]">
               <thead>
                 <tr className="border-b border-gray-100 dark:border-gray-800">
                   <th className="px-4 py-3 text-left text-[11px] font-medium text-gray-400 uppercase tracking-wide w-6"></th>
@@ -748,7 +748,7 @@ export default function Budgets() {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0">
+      <div className="flex items-center justify-between px-3 md:px-6 py-3 md:py-4 bg-white dark:bg-gray-900 border-b border-gray-100 dark:border-gray-800 shrink-0">
         <div className="flex items-center gap-2.5">
           <ChartCandlestick className="w-4 h-4 text-gray-400" strokeWidth={1.5}/>
           <h1 className="text-base font-bold text-gray-800 dark:text-white">{t('budgets.title')}</h1>
@@ -769,7 +769,7 @@ export default function Budgets() {
           onEdit={() => openEdit(detailBudget)}
         />
       ) : (
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-3 md:p-6">
           {budgets.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-24 gap-3 text-gray-400">
               <ChartCandlestick className="w-10 h-10" strokeWidth={1}/>

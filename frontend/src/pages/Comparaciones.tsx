@@ -780,7 +780,7 @@ export default function Comparaciones() {
 
       {/* Chart area */}
       {effectiveMode === 'side' ? (
-        <div className="flex gap-4">
+        <div className="flex flex-col md:flex-row gap-4">
           <YearCard year={yearA} colorDot={dotA} subtitle={distMonthIdx !== undefined ? MONTHS_ES[distMonthIdx].replace(/^\w/, c => c.toUpperCase()) : undefined}>
             {dA ? renderSide(dA) : <div className="h-64 flex items-center justify-center text-gray-300 text-sm">{t('comp.loading')}</div>}
           </YearCard>

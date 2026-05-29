@@ -299,7 +299,7 @@ export default function AccountsPage() {
 
       {/* ── Total card ─────────────────────────────────────────────── */}
       <div className={`${PANEL} p-5`}>
-        <div className="flex items-start gap-6">
+        <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
 
           {/* Col 1: total amount + change */}
           <div className="shrink-0">
@@ -315,7 +315,7 @@ export default function AccountsPage() {
 
           {/* Col 2: composition breakdown */}
           {hasNonLiquid && (
-            <div className="flex-1 border-l border-gray-100 dark:border-gray-800 pl-6">
+            <div className="flex-1 border-t sm:border-t-0 sm:border-l border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 sm:pl-6 w-full sm:w-auto">
               <p className={`${TITLE} mb-3`}>{t('accounts.composition')}</p>
               {(() => {
                 const segments = [
@@ -358,7 +358,7 @@ export default function AccountsPage() {
 
           {/* Col 3: investment gain breakdown */}
           {hasInvestGain && (
-            <div className="shrink-0 text-right space-y-0.5 border-l border-gray-100 dark:border-gray-800 pl-6">
+            <div className="shrink-0 sm:text-right space-y-0.5 border-t sm:border-t-0 sm:border-l border-gray-100 dark:border-gray-800 pt-3 sm:pt-0 sm:pl-6 w-full sm:w-auto">
               <p className={`${TITLE} mb-1.5`}>{t('accounts.investBreakdown')}</p>
               <div className={`text-sm font-semibold tabular-nums ${investGainBruto! >= 0 ? 'text-green-500 dark:text-green-400' : 'text-red-500'}`}>
                 {investGainBruto! >= 0 ? '+' : ''}{fmt(investGainBruto!)}

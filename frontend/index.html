@@ -15,6 +15,7 @@
     <script>
       // Apply zoom before React renders so grid layout measures correct widths
       ;(function(){
+        if (window.innerWidth < 768) return
         var s = localStorage.getItem('ui-zoom-v2')
         var z = s ? Math.max(70, Math.min(130, parseInt(s, 10))) : 100
         document.body.style.zoom = (z * 1.2) + '%'
