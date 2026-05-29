@@ -10,7 +10,7 @@ import {
 import { getAccountsSummary, type Account } from '../api/accounts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
-import { createTemplate, updateTemplate, deleteTemplate } from '../api/templates'
+import { createTemplate, updateTemplate, deleteTemplate, getTemplates } from '../api/templates'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
 import AppIcon from '../components/AppIcon'
@@ -807,11 +807,12 @@ export default function Debts() {
   const saveDebt = async (d: DebtConfig) => {
     const monthly  = calcMonthlyPayment(d.capitalInitial, d.interestRate, d.termMonths)
     const startDay = new Date(d.startDate + 'T00:00:00').getDate()
+    const tplName  = `${d.name} {mes} {año}`
 
     const templatePayload = {
       label:            d.name,
-      name:             `${d.name} {mes} {año}`,
-      money:            String(-Math.round(monthly * 100) / 100),
+      name:             tplName,
+      money:            String(Math.round(monthly * 100) / 100),
       dateMode:         'manual' as const,
       bankDateMode:     'manual' as const,
       movement_type_id: String(d.movementTypeId),
@@ -827,8 +828,15 @@ export default function Debts() {
 
     let templateId = d.templateId
     try {
-      if (d.templateId) {
-        await updateTemplate(d.templateId, templatePayload)
+      // Find existing template: by stored id, or by matching name/label (avoid duplicates)
+      let existing = null
+      const all = await getTemplates()
+      if (d.templateId) existing = all.find(t => t.id === d.templateId) ?? null
+      if (!existing) existing = all.find(t => t.label === d.name || t.name === tplName) ?? null
+
+      if (existing) {
+        await updateTemplate(existing.id, templatePayload)
+        templateId = existing.id
       } else {
         const tpl = await createTemplate(templatePayload)
         templateId = tpl.id
