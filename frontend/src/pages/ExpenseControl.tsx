@@ -10,7 +10,7 @@ import {
 } from 'recharts'
 import {
   ScrollText, Upload, FileText, X, TrendingUp, TrendingDown,
-  Minus, Loader2, ChevronDown, ChevronUp, Filter,
+  Minus, Loader2, ChevronDown, ChevronRight, ChevronUp, Filter,
   ArrowUp, ArrowDown, ArrowUpDown,
   GripVertical, BarChart2, LineChart as LcLineChart, Table2,
   Layers, Activity, type LucideIcon,
@@ -713,65 +713,142 @@ function MovementsPanel({ movements, allTypes, groups, typeMap, typeToGroupMap, 
 
 // ── Suscripciones helpers ─────────────────────────────────────────────────────
 
-const SUBS_KEY_EC = 'suscripciones-ids'
-function loadSubsIds(): number[] {
-  try { return JSON.parse(localStorage.getItem(SUBS_KEY_EC) ?? '[]') } catch { return [] }
-}
+import { loadSubsConfig, type SubPeriod } from './Settings'
 
-function subFreq(dates: string[]): 'semanal' | 'mensual' | 'trimestral' | 'anual' {
-  if (dates.length < 2) return 'mensual'
-  const sorted = [...dates].sort()
-  const intervals = sorted.slice(1).map((d, i) =>
-    (new Date(d + 'T00:00:00').getTime() - new Date(sorted[i] + 'T00:00:00').getTime()) / 86400000,
-  )
-  const avg = intervals.reduce((s, x) => s + x, 0) / intervals.length
-  if (avg <= 9)   return 'semanal'
-  if (avg <= 45)  return 'mensual'
-  if (avg <= 110) return 'trimestral'
-  return 'anual'
-}
-
-const FREQ_LABEL: Record<string, string> = { semanal: 'Semanal', mensual: 'Mensual', trimestral: 'Trimestral', anual: 'Anual' }
-const FREQ_DAYS:  Record<string, number> = { semanal: 7, mensual: 30, trimestral: 91, anual: 365 }
-const FREQ_MULT:  Record<string, number> = { semanal: 52, mensual: 12, trimestral: 4, anual: 1 }
-
-function addDaysStr(dateStr: string, days: number): string {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + days)
+function nextChargeDate(lastDate: string, period: SubPeriod): string {
+  const d = new Date(lastDate + 'T00:00:00')
+  if (period === 'mensual') d.setMonth(d.getMonth() + 1)
+  else d.setFullYear(d.getFullYear() + 1)
   return d.toLocaleDateString('en-CA')
+}
+
+function isSubActive(lastDate: string, period: SubPeriod): boolean {
+  const days = (Date.now() - new Date(lastDate + 'T00:00:00').getTime()) / 86400000
+  return period === 'mensual' ? days <= 40 : days <= 400
+}
+
+interface SubStat {
+  type: MovementType
+  period: SubPeriod
+  latest: number
+  lastDate: string
+  nextDate: string
+  daysUntil: number
+  monthlyRate: number
+  annualCost: number
+  isActive: boolean
+  history: { date: string; amount: number; name: string }[]
+}
+
+function SubCard({ st, fmt, fmtDate }: { st: SubStat; fmt: (v: number) => string; fmtDate: (s: string) => string }) {
+  const [expanded, setExpanded] = useState(false)
+  const isOverdue = st.daysUntil < 0
+  const isSoon    = !isOverdue && st.daysUntil <= 7
+  const nextColor = isOverdue ? 'text-red-500 dark:text-red-400' : isSoon ? 'text-amber-500 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'
+
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden"
+      style={{ borderLeftColor: st.type.color, borderLeftWidth: 3 }}>
+      <div className="p-4 space-y-3">
+        {/* Name + period pill */}
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: st.type.color }} />
+            <span className="text-sm font-semibold text-gray-800 dark:text-white truncate">{st.type.name}</span>
+          </div>
+          <span className="text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0"
+            style={{ backgroundColor: st.type.color + '20', color: st.type.color }}>
+            {st.period === 'mensual' ? 'Mensual' : 'Anual'}
+          </span>
+        </div>
+
+        {/* Amount */}
+        <div className="flex items-end justify-between">
+          <div>
+            <p className="text-xs text-gray-400 dark:text-gray-500">Último cobro</p>
+            <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">{fmt(st.latest)}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{fmt(st.annualCost)}/año</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500 tabular-nums">{fmt(st.monthlyRate)}/mes</p>
+          </div>
+        </div>
+
+        {/* Dates */}
+        <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-50 dark:border-gray-800">
+          <span className="text-gray-400 dark:text-gray-500">Último: {fmtDate(st.lastDate)}</span>
+          {st.isActive ? (
+            <span className={`flex items-center gap-1 font-medium ${nextColor}`}>
+              {(isOverdue || isSoon) && <AlertCircle className="w-3 h-3" />}
+              <CalendarClock className="w-3 h-3" />
+              {isOverdue ? 'Vencido' : isSoon ? `en ${st.daysUntil}d` : fmtDate(st.nextDate)}
+            </span>
+          ) : (
+            <span className="text-gray-300 dark:text-gray-600 text-xs">inactiva</span>
+          )}
+        </div>
+      </div>
+
+      {/* History toggle */}
+      {st.history.length > 0 && (
+        <div className="border-t border-gray-50 dark:border-gray-800">
+          <button onClick={() => setExpanded(e => !e)}
+            className="w-full flex items-center gap-2 px-4 py-2 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
+            {expanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+            {st.history.length} cobro{st.history.length !== 1 ? 's' : ''} registrado{st.history.length !== 1 ? 's' : ''}
+          </button>
+          {expanded && (
+            <div className="divide-y divide-gray-50 dark:divide-gray-800 max-h-48 overflow-y-auto">
+              {st.history.map((h, i) => (
+                <div key={i} className="flex items-center gap-3 px-4 py-1.5">
+                  <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums w-20 shrink-0">{fmtDate(h.date)}</span>
+                  <span className="flex-1 text-xs text-gray-600 dark:text-gray-400 truncate">{h.name}</span>
+                  <span className="text-xs font-mono font-medium text-gray-700 dark:text-gray-200 tabular-nums shrink-0">{fmt(h.amount)}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function SubscripcionesView({ allTypes, allMovements }: { allTypes: MovementType[]; allMovements: Movement[] }) {
   const { fmt }     = useCurrency()
   const { fmtDate } = useDateFormat()
 
-  const [subIds] = useState<Set<number>>(() => new Set(loadSubsIds()))
+  const [subsConfig] = useState(loadSubsConfig)
 
-  const subTypes = useMemo(() => allTypes.filter(tp => subIds.has(tp.id)), [allTypes, subIds])
+  const stats = useMemo((): SubStat[] => {
+    return Object.entries(subsConfig).flatMap(([idStr, entry]) => {
+      const id = Number(idStr)
+      const tp = allTypes.find(t => t.id === id)
+      if (!tp) return []
+      const mvs = allMovements
+        .filter(mv => mv.movement_type_id === id && mv.dinero < 0)
+        .sort((a, b) => a.date.localeCompare(b.date))
+      if (mvs.length === 0) return []
+      const latest   = Math.abs(mvs[mvs.length - 1].dinero)
+      const lastDate = mvs[mvs.length - 1].date
+      const period   = entry.period
+      const nextDate = nextChargeDate(lastDate, period)
+      const daysUntil = Math.round((new Date(nextDate + 'T00:00:00').getTime() - Date.now()) / 86400000)
+      const annualCost  = period === 'mensual' ? latest * 12 : latest
+      const monthlyRate = period === 'mensual' ? latest : latest / 12
+      const active = isSubActive(lastDate, period)
+      const history = [...mvs].reverse().map(mv => ({ date: mv.date, amount: Math.abs(mv.dinero), name: mv.name }))
+      return [{ type: tp, period, latest, lastDate, nextDate, daysUntil, annualCost, monthlyRate, isActive: active, history }]
+    })
+  }, [subsConfig, allTypes, allMovements])
 
-  const stats = useMemo(() => subTypes.map(tp => {
-    const mvs = allMovements
-      .filter(mv => mv.movement_type_id === tp.id && mv.dinero < 0)
-      .sort((a, b) => a.date.localeCompare(b.date))
-    if (mvs.length === 0) return null
-    const dates  = mvs.map(m => m.date)
-    const amounts = mvs.map(m => Math.abs(m.dinero))
-    const latest  = amounts[amounts.length - 1]
-    const lastDate = dates[dates.length - 1]
-    const freq     = subFreq(dates)
-    const nextDate = addDaysStr(lastDate, FREQ_DAYS[freq])
-    const daysUntil = Math.round((new Date(nextDate + 'T00:00:00').getTime() - new Date().getTime()) / 86400000)
-    const annualCost = latest * FREQ_MULT[freq]
-    return { type: tp, latest, lastDate, nextDate, daysUntil, freq, annualCost }
-  }).filter(Boolean) as {
-    type: MovementType; latest: number; lastDate: string
-    nextDate: string; daysUntil: number; freq: string; annualCost: number
-  }[], [subTypes, allMovements])
+  const active   = stats.filter(s => s.isActive)
+  const inactive = stats.filter(s => !s.isActive)
 
-  const totalMonthly = useMemo(() => stats.reduce((s, st) => s + st.latest / (FREQ_MULT[st.freq] / 12), 0), [stats])
-  const totalAnnual  = useMemo(() => stats.reduce((s, st) => s + st.annualCost, 0), [stats])
+  const totalMonthly = active.reduce((s, st) => s + st.monthlyRate, 0)
+  const totalAnnual  = active.reduce((s, st) => s + st.annualCost, 0)
 
-  if (subIds.size === 0) {
+  if (Object.keys(subsConfig).length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 gap-3 text-center">
         <CreditCard className="w-10 h-10 text-gray-200 dark:text-gray-700" strokeWidth={1} />
@@ -784,65 +861,38 @@ function SubscripcionesView({ allTypes, allMovements }: { allTypes: MovementType
   }
 
   return (
-    <div className="space-y-4">
-      {/* Summary */}
+    <div className="space-y-5">
+      {/* Summary — only active */}
       <div className="grid grid-cols-2 gap-3">
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
-          <p className="text-xs text-gray-400 dark:text-gray-500">Total / mes</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Activas / mes</p>
           <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-white mt-0.5">{fmt(totalMonthly)}</p>
         </div>
         <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 px-4 py-3">
-          <p className="text-xs text-gray-400 dark:text-gray-500">Total / año</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500">Activas / año</p>
           <p className="text-xl font-bold tabular-nums text-gray-900 dark:text-white mt-0.5">{fmt(totalAnnual)}</p>
         </div>
       </div>
 
-      {/* Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {stats.map(st => {
-          const isOverdue = st.daysUntil < 0
-          const isSoon    = st.daysUntil >= 0 && st.daysUntil <= 7
-          const nextColor = isOverdue ? 'text-red-500 dark:text-red-400' : isSoon ? 'text-amber-500 dark:text-amber-400' : 'text-gray-500 dark:text-gray-400'
-          return (
-            <div key={st.type.id}
-              className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4 space-y-3"
-              style={{ borderLeftColor: st.type.color, borderLeftWidth: 3 }}>
+      {/* Active */}
+      {active.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Activas</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {active.map(st => <SubCard key={st.type.id} st={st} fmt={fmt} fmtDate={fmtDate} />)}
+          </div>
+        </div>
+      )}
 
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: st.type.color }} />
-                  <span className="text-sm font-semibold text-gray-800 dark:text-white truncate">{st.type.name}</span>
-                </div>
-                <span className="text-[11px] font-medium px-2 py-0.5 rounded-full shrink-0"
-                  style={{ backgroundColor: st.type.color + '20', color: st.type.color }}>
-                  {FREQ_LABEL[st.freq]}
-                </span>
-              </div>
-
-              <div className="flex items-end justify-between">
-                <div>
-                  <p className="text-xs text-gray-400 dark:text-gray-500">Último cobro</p>
-                  <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">{fmt(st.latest)}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-xs text-gray-400 dark:text-gray-500">{fmt(st.annualCost)}/año</p>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between text-xs pt-1 border-t border-gray-50 dark:border-gray-800">
-                <span className="text-gray-400 dark:text-gray-500">
-                  Último: {fmtDate(st.lastDate)}
-                </span>
-                <span className={`flex items-center gap-1 font-medium ${nextColor}`}>
-                  {(isOverdue || isSoon) && <AlertCircle className="w-3 h-3" />}
-                  <CalendarClock className="w-3 h-3" />
-                  {isOverdue ? 'Vencido' : isSoon ? `en ${st.daysUntil}d` : fmtDate(st.nextDate)}
-                </span>
-              </div>
-            </div>
-          )
-        })}
-      </div>
+      {/* Inactive */}
+      {inactive.length > 0 && (
+        <div className="space-y-2">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">No activas</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 opacity-60">
+            {inactive.map(st => <SubCard key={st.type.id} st={st} fmt={fmt} fmtDate={fmtDate} />)}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
