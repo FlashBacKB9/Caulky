@@ -867,27 +867,6 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function CollapsibleSection({ title, children }: { title: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
-  return (
-    <div className="space-y-3">
-      <button
-        onClick={() => setOpen(o => !o)}
-        className="flex items-center gap-2 w-full text-left group"
-      >
-        <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 group-hover:text-gray-500 dark:group-hover:text-gray-400 transition-colors">
-          {title}
-        </h2>
-        {open
-          ? <ChevronUp className="w-3 h-3 text-gray-400 dark:text-gray-500" />
-          : <ChevronDown className="w-3 h-3 text-gray-400 dark:text-gray-500" />
-        }
-      </button>
-      {open && <div>{children}</div>}
-    </div>
-  )
-}
-
 // ── Nav config section ────────────────────────────────────────────────────────
 
 function NavSection({ entries, onChange }: { entries: NavEntry[]; onChange: (e: NavEntry[]) => void }) {
