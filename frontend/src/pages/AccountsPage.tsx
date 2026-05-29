@@ -509,12 +509,12 @@ export default function AccountsPage() {
                         ) : (
                           <>
                             <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white mb-1">
-                              {fmt(hasDebt ? Math.max(0, currentVal - (debt?.remainingCapital ?? 0)) : currentVal)}
+                              {fmt(hasDebt ? acc.balance - (debt?.interestPaid ?? 0) : currentVal)}
                             </p>
                             {hasDebt && (
                               <div className="text-xs text-gray-400 dark:text-gray-500 space-y-0.5">
-                                <div>Equity · <span className="tabular-nums">{fmt(debt.capitalPaid)} cap. pagado</span></div>
-                                <div>Total invertido: <span className="tabular-nums font-semibold text-gray-600 dark:text-gray-300">{fmt(debt.totalPaid)}</span></div>
+                                <div>Intereses excluidos: <span className="tabular-nums text-red-400">{fmt(debt.interestPaid)}</span></div>
+                                <div>Total invertido: <span className="tabular-nums font-semibold text-gray-600 dark:text-gray-300">{fmt(acc.balance)}</span></div>
                               </div>
                             )}
                             {!hasDebt && isVehicle && acc.depreciation_rate != null ? (
