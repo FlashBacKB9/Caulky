@@ -1566,17 +1566,17 @@ export default function Dashboard() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.widgets])
 
-  // On mobile reflow the 4-col layout into 2 cols without modifying saved state
+  // On mobile: all widgets full width (2/2 cols), stacked in configured order
   const displayLayout = useMemo(() => {
     if (!isMobile) return dashLayout
-    let x = 0, y = 0, rowH = 0
-    return dashLayout.map(item => {
-      const w = Math.min(item.w, 2)
-      if (x + w > 2) { x = 0; y += rowH; rowH = 0 }
-      const mapped = { ...item, x, y, w }
-      x += w; rowH = Math.max(rowH, item.h)
-      return mapped
-    })
+    let y = 0
+    return [...dashLayout]
+      .sort((a, b) => a.y !== b.y ? a.y - b.y : a.x - b.x)
+      .map(item => {
+        const mapped = { ...item, x: 0, y, w: 2 }
+        y += item.h
+        return mapped
+      })
   }, [dashLayout, isMobile])
 
   function handleDashLayoutChange(newLayout: readonly LayoutItem[]) {
