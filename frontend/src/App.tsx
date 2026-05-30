@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-route
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Menu, Wallet } from 'lucide-react'
 import Sidebar from './components/Sidebar'
+import BudgetAlerts from './components/BudgetAlerts'
 import TopNav from './components/TopNav'
 import Dashboard from './pages/Dashboard'
 import Movements from './pages/Movements'
@@ -20,6 +21,8 @@ import Analysis from './pages/Analysis'
 import AiConsultant from './pages/AiConsultant'
 import Tickets from './pages/Tickets'
 import ExpenseControl from './pages/ExpenseControl'
+import Huchas from './pages/Huchas'
+import Debts from './pages/Debts'
 import QuickAdd from './pages/QuickAdd'
 import LoginPage from './pages/LoginPage'
 import { AuthProvider, useAuth } from './context/AuthContext'
@@ -78,6 +81,8 @@ function PageRoutes() {
       <Route path="/consultor-ia" element={<ErrorBoundary><AiConsultant /></ErrorBoundary>} />
       <Route path="/tickets" element={<Tickets />} />
       <Route path="/gastos" element={<ExpenseControl />} />
+      <Route path="/huchas" element={<Huchas />} />
+      <Route path="/deudas" element={<Debts />} />
     </Routes>
   )
 }
@@ -104,6 +109,7 @@ function SidebarLayout() {
 
   return (
     <div className="flex h-full overflow-hidden bg-gray-50 dark:bg-gray-950">
+      <BudgetAlerts />
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-40 bg-black/40 md:hidden"

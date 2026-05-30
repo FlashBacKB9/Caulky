@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell,
 } from 'recharts'
 import {
-  Heart, Activity, Target, TrendingUp, Sparkles,
+  Heart, Activity, Target, TrendingUp, Sparkles, CalendarRange,
   Copy, Check, Settings, ChevronDown, ChevronUp, EyeOff, Eye, type LucideIcon,
 } from 'lucide-react'
 import { getMovements, type Movement } from '../api/movements'
@@ -710,7 +710,158 @@ function ProyeccionPatrimonio({ monthlySavings, liquidBalance, fmt }: {
   )
 }
 
-// ── 5. Prompt IA ──────────────────────────────────────────────────────────────
+// ── 5. Heatmap de gastos ──────────────────────────────────────────────────────
+
+const HEATMAP_DAY_LABELS = ['L', '', 'X', '', 'V', '', 'D']
+
+function HeatmapGastos({ allMovements, fmt }: { allMovements: Movement[]; fmt: (v: number) => string }) {
+  const MONTHS_SHORT = getMonthNames('short')
+  const now = new Date()
+
+  const availableYears = useMemo(() => {
+    const ys = new Set(allMovements.map(m => new Date(m.date + 'T00:00:00').getFullYear()))
+    return [...ys].sort((a, b) => b - a)
+  }, [allMovements])
+
+  const [year, setYear] = React.useState(() => availableYears[0] ?? now.getFullYear())
+
+  const byDay = useMemo(() => {
+    const map: Record<string, number> = {}
+    allMovements.forEach(m => {
+      if (m.dinero >= 0) return
+      const d = new Date(m.date + 'T00:00:00')
+      if (d.getFullYear() !== year) return
+      map[m.date] = (map[m.date] ?? 0) + Math.abs(m.dinero)
+    })
+    return map
+  }, [allMovements, year])
+
+  const maxVal = useMemo(() => Math.max(...Object.values(byDay), 1), [byDay])
+
+  // Build week grid starting on the Monday on or before Jan 1
+  const { weeks, monthLabels } = useMemo(() => {
+    const jan1    = new Date(year, 0, 1)
+    const startDow = (jan1.getDay() + 6) % 7           // 0=Mon
+    const gridStart = new Date(year, 0, 1 - startDow)
+    const dec31   = new Date(year, 11, 31)
+    const endDow  = (dec31.getDay() + 6) % 7
+    const gridEnd = new Date(year, 11, 31 + (6 - endDow))
+
+    const weeks: { dateStr: string; inYear: boolean }[][] = []
+    const cur = new Date(gridStart)
+    while (cur <= gridEnd) {
+      const week: { dateStr: string; inYear: boolean }[] = []
+      for (let d = 0; d < 7; d++) {
+        week.push({
+          dateStr: cur.toISOString().split('T')[0],
+          inYear: cur.getFullYear() === year,
+        })
+        cur.setDate(cur.getDate() + 1)
+      }
+      weeks.push(week)
+    }
+
+    const monthLabels: { weekIdx: number; label: string }[] = []
+    for (let m = 0; m < 12; m++) {
+      const first = new Date(year, m, 1)
+      const wIdx  = Math.floor((first.getTime() - gridStart.getTime()) / (7 * 86400000))
+      if (wIdx >= 0 && wIdx < weeks.length)
+        monthLabels.push({ weekIdx: wIdx, label: MONTHS_SHORT[m].replace(/^\w/, c => c.toUpperCase()) })
+    }
+
+    return { weeks, monthLabels }
+  }, [year])
+
+  const cellColor = (val: number | undefined, inYear: boolean) => {
+    if (!inYear) return 'transparent'
+    if (!val)    return undefined   // gray class below
+    const r = val / maxVal
+    if (r < 0.15) return '#fca5a5'
+    if (r < 0.35) return '#f87171'
+    if (r < 0.60) return '#ef4444'
+    if (r < 0.80) return '#dc2626'
+    return '#b91c1c'
+  }
+
+  return (
+    <div className="space-y-3">
+      {availableYears.length > 1 && (
+        <div className="flex items-center gap-1.5 flex-wrap">
+          {availableYears.map(y => (
+            <button key={y} onClick={() => setYear(y)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ${
+                year === y
+                  ? 'bg-gray-800 dark:bg-white text-white dark:text-gray-900'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800'
+              }`}>
+              {y}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="overflow-x-auto pb-1">
+        <div className="inline-flex flex-col gap-0" style={{ minWidth: 'max-content' }}>
+          {/* Month labels */}
+          <div className="flex mb-1 ml-6">
+            {weeks.map((_, wi) => {
+              const ml = monthLabels.find(m => m.weekIdx === wi)
+              return (
+                <div key={wi} className="shrink-0 text-[10px] text-gray-400 dark:text-gray-500" style={{ width: 13 }}>
+                  {ml?.label ?? ''}
+                </div>
+              )
+            })}
+          </div>
+
+          <div className="flex gap-0">
+            {/* Day labels */}
+            <div className="flex flex-col gap-0.5 mr-1.5" style={{ width: 16 }}>
+              {HEATMAP_DAY_LABELS.map((d, i) => (
+                <div key={i} className="text-[9px] text-gray-400 dark:text-gray-500 flex items-center justify-end" style={{ height: 11 }}>
+                  {d}
+                </div>
+              ))}
+            </div>
+
+            {/* Week columns */}
+            {weeks.map((week, wi) => (
+              <div key={wi} className="flex flex-col gap-0.5 mr-0.5">
+                {week.map((day, di) => {
+                  const val = byDay[day.dateStr]
+                  const bg  = cellColor(val, day.inYear)
+                  return (
+                    <div
+                      key={di}
+                      title={day.inYear ? (val ? `${day.dateStr}  ${fmt(val)}` : day.dateStr) : ''}
+                      className={`rounded-sm ${!day.inYear ? '' : !val ? 'bg-gray-100 dark:bg-gray-800' : ''}`}
+                      style={{ width: 11, height: 11, backgroundColor: bg ?? undefined }}
+                    />
+                  )
+                })}
+              </div>
+            ))}
+          </div>
+
+          {/* Legend */}
+          <div className="flex items-center gap-1.5 mt-2.5 ml-6 justify-end">
+            <span className="text-[10px] text-gray-400 dark:text-gray-500 mr-0.5">Menos</span>
+            {['#fca5a5','#f87171','#ef4444','#dc2626','#b91c1c'].map(c => (
+              <div key={c} className="rounded-sm" style={{ width: 11, height: 11, backgroundColor: c }} />
+            ))}
+            <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-0.5">Más</span>
+          </div>
+        </div>
+      </div>
+
+      <p className="text-xs text-gray-400 dark:text-gray-500">
+        {Object.keys(byDay).length} días con gastos · día máximo {fmt(maxVal)}
+      </p>
+    </div>
+  )
+}
+
+// ── 6. Prompt IA ──────────────────────────────────────────────────────────────
 
 function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, excludedMovementIds, fmt }: {
   allMovements: Movement[]
@@ -1014,6 +1165,10 @@ export default function Analysis() {
 
       <SectionCard title={t('analysis.sectionProjection')} icon={TrendingUp}>
         <ProyeccionPatrimonio monthlySavings={monthlySavings} liquidBalance={liquidBalance} fmt={fmt} />
+      </SectionCard>
+
+      <SectionCard title="Heatmap de gastos" icon={CalendarRange}>
+        <HeatmapGastos allMovements={allMovements} fmt={fmt} />
       </SectionCard>
 
       <SectionCard title={t('analysis.sectionPrompt')} icon={Sparkles}>

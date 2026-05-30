@@ -390,7 +390,7 @@ function CalendarView({ movements, types, selectedYear, accountFilter }: {
             <ChevronLeft className="w-4 h-4 text-gray-500" />
           </button>
           <div className="flex items-center gap-3">
-            <span className="text-sm font-semibold text-gray-800 dark:text-white">{MONTHS_ES[calMonth]} {calYear}</span>
+            <span className="text-sm font-semibold text-gray-800 dark:text-white">{MONTHS_ES[calMonth].replace(/^\w/, c => c.toUpperCase())} {calYear}</span>
             <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
               <button className={btnCls(dateField === 'date')} onClick={() => setDateField('date')}>{t('movements.dateField')}</button>
               <button className={btnCls(dateField === 'bank_date')} onClick={() => setDateField('bank_date')}>{t('movements.bankDateField')}</button>

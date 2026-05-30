@@ -47,7 +47,12 @@ const PERIOD_LABELS: Record<BudgetPeriodType, string> = {
   monthly: t('budgets.periodMonthly'), weekly: t('budgets.periodWeekly'), annual: t('budgets.periodAnnual'), custom: t('budgets.periodCustom'),
 }
 
-function getCurrentPeriod(
+export function readBudgets(): Budget[] {
+  try { return JSON.parse(localStorage.getItem('spendly-budgets') ?? '[]') } catch { return [] }
+}
+export type { Budget, BudgetPeriodType }
+
+export function getCurrentPeriod(
   period: BudgetPeriodType,
   customFrom?: string,
   customTo?: string,
@@ -161,7 +166,7 @@ function generatePeriods(
 }
 
 // Latest version whose effectiveFrom <= date; falls back to first version
-function getAmountForDate(versions: BudgetVersion[], date: string): number {
+export function getAmountForDate(versions: BudgetVersion[], date: string): number {
   if (!versions.length) return 0
   let result = versions[0].amount
   for (const v of versions) {
@@ -171,7 +176,7 @@ function getAmountForDate(versions: BudgetVersion[], date: string): number {
   return result
 }
 
-function calcSpending(movements: Movement[], typeIds: Set<number>, start: string, end: string): number {
+export function calcSpending(movements: Movement[], typeIds: Set<number>, start: string, end: string): number {
   return movements
     .filter(mv => mv.movement_type_id != null && typeIds.has(mv.movement_type_id) && mv.date >= start && mv.date <= end)
     .reduce((s, mv) => s + Math.abs(mv.dinero), 0)

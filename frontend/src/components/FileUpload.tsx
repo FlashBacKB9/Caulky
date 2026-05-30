@@ -1,10 +1,14 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../api/client'
-import { Paperclip, Image as ImageIcon, FileText, BarChart2, X, AlertTriangle } from 'lucide-react'
+import {
+  Paperclip, Image as ImageIcon, FileText, BarChart2, X, AlertTriangle,
+  ArrowLeft, ZoomIn, ZoomOut, Download,
+} from 'lucide-react'
 import { t } from '../utils/i18n'
 
-const WARN_BYTES = 20 * 1024 * 1024 // 20 MB
+const WARN_BYTES = 20 * 1024 * 1024
 
 function fmt(bytes: number) {
   return bytes >= 1024 * 1024
@@ -32,10 +36,146 @@ function FileTypeIcon({ mime }: { mime: string }) {
   return <Paperclip className={cls} strokeWidth={1.5} />
 }
 
+// ── File viewer (lightbox) ────────────────────────────────────────────────────
+
+function FileViewer({ file, onClose }: { file: FileRecord; onClose: () => void }) {
+  const [blobUrl, setBlobUrl] = useState<string | null>(null)
+  const [zoom, setZoom] = useState(1)
+  const scrollRef = useRef<HTMLDivElement>(null)
+
+  const isImage = file.mime_type.startsWith('image/')
+  const isPDF   = file.mime_type === 'application/pdf'
+
+  useEffect(() => {
+    let url = ''
+    api.get(`/movements/files/${file.id}/download`, { responseType: 'blob' })
+      .then(res => {
+        url = URL.createObjectURL(new Blob([res.data], { type: file.mime_type }))
+        setBlobUrl(url)
+      })
+    return () => { if (url) URL.revokeObjectURL(url) }
+  }, [file.id, file.mime_type])
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  const zoomIn  = () => setZoom(z => Math.min(4, +(z + 0.5).toFixed(1)))
+  const zoomOut = () => setZoom(z => Math.max(0.25, +(z - 0.5).toFixed(1)))
+
+  return createPortal(
+    <div className="fixed inset-0 z-[300] flex flex-col bg-black/95">
+
+      {/* Top bar */}
+      <div className="flex items-center gap-2 px-3 py-2.5 bg-gray-900 border-b border-white/10 shrink-0">
+        <button
+          onClick={onClose}
+          className="p-1.5 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+          title="Volver"
+        >
+          <ArrowLeft className="w-4 h-4" />
+        </button>
+
+        <span className="flex-1 text-sm text-gray-300 truncate">{file.original_name}</span>
+
+        <div className="flex items-center gap-0.5">
+          {isImage && (
+            <>
+              <button
+                onClick={zoomOut}
+                disabled={zoom <= 0.25}
+                className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 transition-colors rounded-lg hover:bg-white/10"
+                title="Reducir"
+              >
+                <ZoomOut className="w-3.5 h-3.5" />
+              </button>
+              <button
+                onClick={() => setZoom(1)}
+                className="px-2 py-1 text-xs text-gray-400 hover:text-white tabular-nums min-w-[52px] text-center rounded-lg hover:bg-white/10 transition-colors"
+                title="Restablecer zoom"
+              >
+                {zoom === 1 ? 'ajuste' : `${Math.round(zoom * 100)}%`}
+              </button>
+              <button
+                onClick={zoomIn}
+                disabled={zoom >= 4}
+                className="p-1.5 text-gray-400 hover:text-white disabled:opacity-30 transition-colors rounded-lg hover:bg-white/10"
+                title="Ampliar"
+              >
+                <ZoomIn className="w-3.5 h-3.5" />
+              </button>
+              <div className="w-px h-4 bg-white/10 mx-1" />
+            </>
+          )}
+          <a
+            href={`/api/movements/files/${file.id}/download`}
+            download={file.original_name}
+            className="p-1.5 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+            title="Descargar"
+          >
+            <Download className="w-3.5 h-3.5" />
+          </a>
+        </div>
+      </div>
+
+      {/* Content */}
+      <div
+        ref={scrollRef}
+        className="flex-1 overflow-auto"
+      >
+        {!blobUrl ? (
+          <div className="h-full flex items-center justify-center">
+            <span className="text-gray-500 text-sm">Cargando…</span>
+          </div>
+        ) : isImage ? (
+          <div className={`min-h-full flex items-center justify-center ${zoom === 1 ? 'p-4' : 'p-10'}`}>
+            <img
+              src={blobUrl}
+              alt={file.original_name}
+              onClick={() => setZoom(z => z === 1 ? 2 : 1)}
+              style={
+                zoom === 1
+                  ? { maxWidth: '100%', maxHeight: 'calc(100vh - 56px)', objectFit: 'contain', cursor: 'zoom-in' }
+                  : { width: `${zoom * 80}vw`, maxWidth: 'none', height: 'auto', cursor: 'zoom-out' }
+              }
+              draggable={false}
+            />
+          </div>
+        ) : isPDF ? (
+          <iframe
+            src={blobUrl}
+            title={file.original_name}
+            className="w-full border-0"
+            style={{ height: 'calc(100vh - 48px)' }}
+          />
+        ) : (
+          <div className="h-full flex flex-col items-center justify-center gap-3 text-gray-500">
+            <FileText className="w-12 h-12 opacity-20" strokeWidth={1} />
+            <p className="text-sm">Vista previa no disponible para este tipo de archivo</p>
+            <a
+              href={`/api/movements/files/${file.id}/download`}
+              download={file.original_name}
+              className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
+            >
+              Descargar archivo
+            </a>
+          </div>
+        )}
+      </div>
+    </div>,
+    document.body
+  )
+}
+
+// ── FileUpload ────────────────────────────────────────────────────────────────
+
 export default function FileUpload({ movementId, existingFiles }: Props) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
   const [pendingLarge, setPendingLarge] = useState<File[] | null>(null)
+  const [viewing, setViewing] = useState<FileRecord | null>(null)
   const qc = useQueryClient()
 
   const upload = useMutation({
@@ -65,6 +205,8 @@ export default function FileUpload({ movementId, existingFiles }: Props) {
 
   return (
     <div className="space-y-2">
+      {viewing && <FileViewer file={viewing} onClose={() => setViewing(null)} />}
+
       {pendingLarge && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-700 p-4 space-y-3">
           <div className="flex items-start gap-2">
@@ -97,20 +239,19 @@ export default function FileUpload({ movementId, existingFiles }: Props) {
           </div>
         </div>
       )}
+
       {existingFiles.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {existingFiles.map(f => (
             <div key={f.id} className="flex items-center gap-1.5 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-2.5 py-1.5 text-sm group">
               <FileTypeIcon mime={f.mime_type} />
-              <a
-                href={`/api/movements/files/${f.id}/download`}
-                target="_blank"
-                rel="noreferrer"
-                className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white max-w-[160px] truncate"
+              <button
+                onClick={() => setViewing(f)}
+                className="text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white max-w-[160px] truncate text-left"
                 title={f.original_name}
               >
                 {f.original_name}
-              </a>
+              </button>
               <button
                 onClick={() => remove.mutate(f.id)}
                 className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-500 transition-all ml-1"

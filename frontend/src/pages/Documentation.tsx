@@ -37,6 +37,10 @@ Páginas del menú lateral (todas configurables desde Configuración → Navegac
 | Comparaciones | /comparaciones | Comparar dos años entre sí |
 | Presupuestos | /budgets | Límites de gasto con seguimiento |
 | Inversiones | /inversiones | Seguimiento de fondos de inversión (oculto por defecto) |
+| Análisis | /analisis | Salud financiera, patrones, regla 50/30/20, heatmap y prompt IA |
+| Control de Gastos | /gastos | Evolución mensual por categoría y gestión de suscripciones |
+| Huchas | /huchas | Objetivos de ahorro con proyecciones |
+| Deudas | /deudas | Hipotecas y préstamos con amortización |
 | Importar Excel | /import | Importar movimientos desde .xlsx |
 | Documentación | /docs | Esta guía |
 
@@ -82,7 +86,9 @@ Se usan en: vista Finanzas del Año, desglose en Gráficos, vista Kanban, y Comp
 
 Cuentas bancarias o bolsillos. Campos: nombre, color, icono, saldo inicial, categoría.
 
-Categorías disponibles: **corriente**, **ahorro**, **inversión**, **ETF**, **depósito**, **inmueble**, **vehículo**.
+Categorías disponibles: **corriente**, **ahorro**, **inversión**, **ETF**, **depósito**, **inmueble**, **vehículo**, **hucha**.
+
+Las cuentas de categoría **hucha** funcionan como una cuenta de ahorro pero además aparecen en el módulo Huchas (ver sección 10.3), donde puedes fijarles un objetivo y ver proyecciones.
 
 **Saldo actual = Saldo inicial + suma de movimientos pagados asociados a esa cuenta.**
 La cuenta puede ser "cuenta principal" (is_main) — en ese caso todos los movimientos con dinero positivo o negativo la afectan, no solo los de un tipo vinculado.
@@ -181,6 +187,8 @@ Diferencia con las recurrencias de plantillas: "Crear varios" es un proceso punt
 - Edición inline: clic en cualquier celda de la tabla (excepto el nombre) → edita ese campo directamente → botón ✓ para confirmar
 - Modal completo: clic en el nombre del movimiento → edita todos los campos, adjunta archivos, duplica o elimina
 - Menú contextual: clic derecho en cualquier movimiento → Duplicar, Eliminar
+
+**Visor de adjuntos:** al hacer clic en un archivo adjunto (PDF o imagen) se abre dentro de la app a pantalla completa, sin descargarlo. Las imágenes permiten zoom (clic o botones +/−) y los PDF se ven con el visor del navegador. Botón de descarga en la barra superior y "Volver" o Escape para cerrar.
 
 ### 3.4 Edición masiva
 
@@ -427,6 +435,10 @@ Abrir presupuesto → "Nueva versión" → nuevo importe y fecha efectiva. Los p
 - Barra de progreso del periodo actual (gasto real vs límite)
 - Histórico de periodos pasados
 - Gráfico de líneas con la evolución temporal
+- El color es verde/ámbar/rojo según el porcentaje; el rojo aparece a partir del 105% (así un presupuesto pensado para gastarse al 100% no se marca como negativo)
+
+### Alertas de presupuesto
+Una campana flotante en la esquina superior derecha avisa cuando algún presupuesto llega al 80% o más. Al hacer clic se abre un panel con la lista de presupuestos en alerta (importe, porcentaje y barra). Una alerta se descarta al verla (o al entrar en Presupuestos) y solo vuelve a aparecer si el gasto sube otro 10% respecto a cuando la descartaste.
 
 ---
 
@@ -449,6 +461,81 @@ Oculta por defecto. Se activa en Configuración → Apariencia (toggle "Mostrar 
 - Rentabilidad: (precio actual − precio compra) ÷ precio compra × 100%
 
 Clic en una fila → modal de detalle del movimiento. Clic en el valor actual del fondo → sobreescribir manualmente.
+
+---
+
+## 10.1 Análisis (/analisis)
+
+Página de salud financiera. Arriba hay un selector de período global (rango de fechas) que afecta a todas las secciones. Botón de configuración para elegir la cuenta del fondo de emergencia y qué grupos cuentan como ahorro, y para excluir movimientos atípicos del análisis.
+
+Secciones:
+- **Salud financiera**: tasa de ahorro, fondo de emergencia (meses de gasto cubiertos), ingresos vs gastos esenciales, mayor categoría de gasto.
+- **Patrones de gasto**: gasto medio por mes natural.
+- **Regla 50/30/20**: reparte tus gastos en Necesidades / Deseos / Ahorro e indica si cumples los objetivos (verde/rojo).
+- **Proyección de Líquido**: estima tu saldo líquido futuro según el ahorro mensual medio.
+- **Heatmap de gastos**: cuadrícula anual estilo calendario de contribuciones. Cada celda es un día; el color va de claro a rojo intenso según el gasto de ese día. Selector de año si tienes varios. Pasa el ratón por una celda para ver fecha e importe.
+- **Prompt IA**: genera un texto con tu resumen financiero del período listo para pegar en una IA externa.
+
+---
+
+## 10.2 Control de Gastos (/gastos)
+
+Tiene dos pestañas: **Evolución** y **Suscripciones**.
+
+### Evolución
+Análisis de gastos por categoría a lo largo del tiempo:
+- Selector de tipos a incluir, con paletas de color predefinidas y picker individual.
+- Tarjetas resumen por tipo (gasto actual vs período anterior).
+- Gráfico mensual: barras, líneas o área; modos normal, apilado o acumulado; comparativa multi-año.
+- Vista de tabla (tipos × meses) con comparativa por año.
+- Panel de movimientos filtrable al pie.
+
+### Suscripciones
+Muestra los subtipos marcados como suscripción (se marcan en Configuración → Suscripciones).
+- Resumen con el total mensual y anual de las suscripciones **activas**.
+- **Activas**: su último cobro entra dentro del período (≈35 días si es mensual, ≈13 meses si es anual).
+- **No activas**: llevan más tiempo sin cobro; aparecen atenuadas debajo.
+- Cada tarjeta muestra importe del último cobro, frecuencia, coste anual, fecha del último y próximo cobro estimado (en ámbar si es en menos de 7 días, en rojo si está vencido).
+- Botón para desplegar el historial completo de cobros de esa suscripción.
+
+**Cómo marcar suscripciones:** Configuración → pestaña Suscripciones. Activa el toggle de cada subtipo que sea una suscripción y elige si es Mensual o Anual. Debajo aparecen sugerencias automáticas (subtipos que se repiten con regularidad) que puedes añadir con un clic.
+
+---
+
+## 10.3 Huchas (/huchas)
+
+Objetivos de ahorro. Cada hucha es una **cuenta de tipo Hucha** (se crea en Configuración → Cuentas eligiendo la categoría "Hucha"). Los movimientos de ahorro vinculados a esa cuenta la van llenando, igual que una cuenta de ahorro normal.
+
+En la página de Huchas, cada tarjeta es configurable (botón del lápiz):
+- **Objetivo**: importe total que quieres alcanzar.
+- **Fecha objetivo** (opcional): si la pones, calcula cuánto tienes que aportar al mes para llegar a tiempo.
+- **Aportación mensual** (opcional): si la pones, calcula en qué fecha alcanzarás el objetivo.
+
+Los dos campos funcionan de forma inversa: rellena el que prefieras. La tarjeta muestra barra de progreso, lo que falta y el historial de aportaciones. Arriba hay un resumen del total ahorrado entre todas las huchas.
+
+---
+
+## 10.4 Deudas (/deudas)
+
+Hipotecas, préstamos de coche y similares. Cada deuda se vincula a una cuenta (típicamente un Inmueble o Vehículo) y a un subtipo de movimiento (el pago de la cuota).
+
+### Crear una deuda
+1. Deudas → "Nueva deuda".
+2. Rellena: nombre, cuenta vinculada, subtipo de pago, capital prestado, interés anual (TIN).
+3. Indica el **plazo en meses** o la **cuota mensual** (la app calcula el otro automáticamente con amortización francesa).
+4. Fecha de inicio y, opcionalmente, valor de mercado estimado del bien.
+
+Al guardar, se genera **automáticamente una plantilla mensual** del pago, con el nombre de la deuda y los marcadores {mes} {año}, el subtipo configurado y la cuota calculada.
+
+### Detalle de la deuda
+- **Capital pendiente** y porcentaje amortizado. Mientras no registres pagos, el pendiente coincide con el capital inicial; baja conforme registras los pagos reales (la parte de intereses no reduce capital).
+- Stats: total pagado, capital pagado, intereses pagados (sobre el total de intereses de toda la vida del préstamo).
+- **Simulador de amortización anticipada**: introduce un importe extra, elige frecuencia (mensual, trimestral, anual o pago único) y, opcionalmente, una condición de líquido mínimo (solo amortiza si tu saldo líquido se mantiene por encima del umbral, proyectando tu ahorro neto mensual). Muestra nueva fecha de fin, tiempo e intereses ahorrados, y un gráfico comparando el capital pendiente con y sin amortización.
+- **Rentabilidad**: añade el valor de mercado actual y calcula tu equity neto y el ROI de la compra.
+- Historial de pagos reales (con su división capital/interés) y cuadro de amortización completo.
+
+### Integración con Cuentas
+La cuenta vinculada a una deuda muestra su **equity** (valor de la cuenta menos los intereses pagados, ya que los intereses no añaden valor al bien). Un botón en la tarjeta (icono de billete) alterna entre ver el valor del bien y ver la deuda (capital pendiente, cuota, intereses). Al hacer clic en la tarjeta de una cuenta con deuda, vas directo al módulo de Deudas.
 
 ---
 
@@ -625,7 +712,7 @@ R: Configuración → Plugins → "Instalar plugin (.js)" → seleccionar el arc
 
 // ── Section IDs for TOC ────────────────────────────────────────────────────────
 
-const SECTION_IDS = ['ia','intro','conceptos','movimientos','plantillas','graficos','cuentas','comparaciones','annual','dashboard','inversiones','presupuestos','importar','config','plugins','trucos'] as const
+const SECTION_IDS = ['ia','intro','conceptos','movimientos','plantillas','graficos','cuentas','comparaciones','annual','dashboard','inversiones','presupuestos','analisis','gastos','huchas','deudas','importar','config','plugins','trucos'] as const
 
 // ── Typography helpers ─────────────────────────────────────────────────────────
 
@@ -1183,7 +1270,85 @@ export default function Documentation() {
             <LI>{t('docs.bgt.vLi1')}</LI>
             <LI>{t('docs.bgt.vLi2')}</LI>
             <LI>{t('docs.bgt.vLi3')}</LI>
+            <LI>{t('docs.bgt.vLi4')}</LI>
           </UL>
+          <H3>{t('docs.bgt.alertTitle')}</H3>
+          <P>{t('docs.bgt.alertP')}</P>
+          <Divider />
+          </div>
+
+          {/* ── Análisis ───────────────────────────────────────────────── */}
+          <div id="analisis" className="scroll-mt-8">
+          <H2>{t('docs.ana.h2')}</H2>
+          <P>{t('docs.ana.p1')}</P>
+          <UL>
+            <LI>{t('docs.ana.li1')}</LI>
+            <LI>{t('docs.ana.li2')}</LI>
+            <LI>{t('docs.ana.li3')}</LI>
+            <LI>{t('docs.ana.li4')}</LI>
+            <LI>{t('docs.ana.li5')}</LI>
+            <LI>{t('docs.ana.li6')}</LI>
+          </UL>
+          <Divider />
+          </div>
+
+          {/* ── Control de Gastos ──────────────────────────────────────── */}
+          <div id="gastos" className="scroll-mt-8">
+          <H2>{t('docs.exp.h2')}</H2>
+          <P>{t('docs.exp.p1')}</P>
+          <H3>{t('docs.exp.evoTitle')}</H3>
+          <UL>
+            <LI>{t('docs.exp.evoLi1')}</LI>
+            <LI>{t('docs.exp.evoLi2')}</LI>
+            <LI>{t('docs.exp.evoLi3')}</LI>
+            <LI>{t('docs.exp.evoLi4')}</LI>
+          </UL>
+          <H3>{t('docs.exp.subTitle')}</H3>
+          <P>{t('docs.exp.subP')}</P>
+          <UL>
+            <LI>{t('docs.exp.subLi1')}</LI>
+            <LI>{t('docs.exp.subLi2')}</LI>
+            <LI>{t('docs.exp.subLi3')}</LI>
+          </UL>
+          <Divider />
+          </div>
+
+          {/* ── Huchas ─────────────────────────────────────────────────── */}
+          <div id="huchas" className="scroll-mt-8">
+          <H2>{t('docs.huc.h2')}</H2>
+          <P>{t('docs.huc.p1')}</P>
+          <P>{t('docs.huc.p2')}</P>
+          <UL>
+            <LI>{t('docs.huc.li1')}</LI>
+            <LI>{t('docs.huc.li2')}</LI>
+            <LI>{t('docs.huc.li3')}</LI>
+          </UL>
+          <P>{t('docs.huc.p3')}</P>
+          <Divider />
+          </div>
+
+          {/* ── Deudas ─────────────────────────────────────────────────── */}
+          <div id="deudas" className="scroll-mt-8">
+          <H2>{t('docs.deb.h2')}</H2>
+          <P>{t('docs.deb.p1')}</P>
+          <H3>{t('docs.deb.createTitle')}</H3>
+          <Steps>
+            <Step n={1}>{t('docs.deb.s1')}</Step>
+            <Step n={2}>{t('docs.deb.s2')}</Step>
+            <Step n={3}>{t('docs.deb.s3')}</Step>
+            <Step n={4}>{t('docs.deb.s4')}</Step>
+            <Step n={5}>{t('docs.deb.s5')}</Step>
+          </Steps>
+          <H3>{t('docs.deb.detailTitle')}</H3>
+          <UL>
+            <LI>{t('docs.deb.dLi1')}</LI>
+            <LI>{t('docs.deb.dLi2')}</LI>
+            <LI>{t('docs.deb.dLi3')}</LI>
+            <LI>{t('docs.deb.dLi4')}</LI>
+            <LI>{t('docs.deb.dLi5')}</LI>
+          </UL>
+          <H3>{t('docs.deb.intTitle')}</H3>
+          <P>{t('docs.deb.intP')}</P>
           <Divider />
           </div>
 

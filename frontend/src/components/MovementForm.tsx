@@ -72,7 +72,9 @@ function TypeSelect({ value, onChange, types, byCategory }: {
         <option value="">{t('form.noCategory')}</option>
         {Object.entries(byCategory).map(([cat, items]) => (
           <optgroup key={cat} label={cat}>
-            {items.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            {items.map(t => (
+              <option key={t.id} value={t.id} style={{ backgroundColor: t.color + '22' }}>{t.name}</option>
+            ))}
           </optgroup>
         ))}
       </select>
@@ -224,11 +226,21 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
   const { data: types = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
   const { data: accountsSummary } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
   const accounts = accountsSummary?.accounts ?? []
-  const byCategory = CATEGORY_ORDER.reduce<Record<string, MovementType[]>>((acc, cat) => {
-    const items = types.filter(t => t.category === cat)
-    if (items.length) acc[cat] = items
+  const byCategory = (() => {
+    const acc: Record<string, MovementType[]> = {}
+    // Known categories first, in defined order
+    for (const cat of CATEGORY_ORDER) {
+      const items = types.filter(t => t.category === cat)
+      if (items.length) acc[cat] = items
+    }
+    // Any remaining categories not in CATEGORY_ORDER (e.g. custom groups)
+    for (const t of types) {
+      if (!CATEGORY_ORDER.includes(t.category)) {
+        (acc[t.category] ??= []).push(t)
+      }
+    }
     return acc
-  }, {})
+  })()
 
   // ── Mutations ────────────────────────────────────────────────────────────────
   const mutation = useMutation({
