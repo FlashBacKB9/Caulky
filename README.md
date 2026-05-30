@@ -9,14 +9,20 @@ Caulky is a full-stack personal finance application built for self-hosting. It l
 ## Features
 
 - **Dashboard** — Customizable widgets: account balances, monthly/annual income & expenses, net balance, budget progress and custom charts. Drag, resize and rearrange freely.
-- **Movements** — Full transaction log with filters, search, tags, notes and file attachments. Kanban and day-grouped views.
+- **Movements** — Full transaction log with filters, search, tags, notes and file attachments (with an in-app PDF/image viewer that supports zoom). Calendar, table and Kanban views.
+- **Accounts** — Balance analytics and evolution per account, total net worth with composition breakdown, vehicle depreciation and asset/liability tracking.
 - **Annual view** — Monthly breakdown of every category across the year with trend charts.
 - **Charts** — Build your own charts: choose metric, axis, period, sign and advanced filters. Saved per session.
 - **Comparisons** — Compare any two years side by side or overlaid. Line, bar or area display. Clickable legend to hide/show series. Multi-year summary table and evolution charts.
-- **Budgets** — Rolling or fixed-period budgets linked to movement types, with progress bars and dashboard widgets.
+- **Analysis** — Financial health score, savings rate, emergency fund, 50/30/20 rule, spending heatmap and an AI-ready summary prompt.
+- **Expense Control** — Monthly evolution by category with multi-year comparison, plus a subscriptions tab (active/inactive, annual cost, next charge estimate).
+- **Budgets** — Rolling or fixed-period budgets linked to movement types, with progress bars, dashboard widgets and a floating alert bell.
+- **Savings goals (Huchas)** — Goal-based savings accounts with target date and contribution projections.
+- **Debts** — Mortgages and loans with French amortization schedule, real-payment tracking (capital/interest split), early-repayment simulator and equity integration with linked assets.
 - **Investments** — Track investment funds with purchase history, units, price at purchase and current value via Yahoo Finance.
 - **Import** — Upload bank CSV/XLSX files, map columns, auto-match movement types and preview before committing.
 - **Backup & restore** — Full JSON export/import with granular control over which sections to restore. One-click factory reset with default seed data.
+- **Customization** — Tabbed settings, custom languages and plugins, configurable navigation.
 - **Dark mode** — System-aware, toggleable.
 - **Multi-currency** — EUR, USD, GBP and more.
 
