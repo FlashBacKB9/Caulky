@@ -712,7 +712,7 @@ R: Configuración → Plugins → "Instalar plugin (.js)" → seleccionar el arc
 
 // ── Section IDs for TOC ────────────────────────────────────────────────────────
 
-const SECTION_IDS = ['ia','intro','conceptos','movimientos','plantillas','graficos','cuentas','comparaciones','annual','dashboard','inversiones','presupuestos','importar','config','plugins','trucos'] as const
+const SECTION_IDS = ['ia','intro','conceptos','movimientos','plantillas','graficos','cuentas','comparaciones','annual','dashboard','inversiones','presupuestos','analisis','gastos','huchas','deudas','importar','config','plugins','trucos'] as const
 
 // ── Typography helpers ─────────────────────────────────────────────────────────
 
@@ -1270,7 +1270,85 @@ export default function Documentation() {
             <LI>{t('docs.bgt.vLi1')}</LI>
             <LI>{t('docs.bgt.vLi2')}</LI>
             <LI>{t('docs.bgt.vLi3')}</LI>
+            <LI>{t('docs.bgt.vLi4')}</LI>
           </UL>
+          <H3>{t('docs.bgt.alertTitle')}</H3>
+          <P>{t('docs.bgt.alertP')}</P>
+          <Divider />
+          </div>
+
+          {/* ── Análisis ───────────────────────────────────────────────── */}
+          <div id="analisis" className="scroll-mt-8">
+          <H2>{t('docs.ana.h2')}</H2>
+          <P>{t('docs.ana.p1')}</P>
+          <UL>
+            <LI>{t('docs.ana.li1')}</LI>
+            <LI>{t('docs.ana.li2')}</LI>
+            <LI>{t('docs.ana.li3')}</LI>
+            <LI>{t('docs.ana.li4')}</LI>
+            <LI>{t('docs.ana.li5')}</LI>
+            <LI>{t('docs.ana.li6')}</LI>
+          </UL>
+          <Divider />
+          </div>
+
+          {/* ── Control de Gastos ──────────────────────────────────────── */}
+          <div id="gastos" className="scroll-mt-8">
+          <H2>{t('docs.exp.h2')}</H2>
+          <P>{t('docs.exp.p1')}</P>
+          <H3>{t('docs.exp.evoTitle')}</H3>
+          <UL>
+            <LI>{t('docs.exp.evoLi1')}</LI>
+            <LI>{t('docs.exp.evoLi2')}</LI>
+            <LI>{t('docs.exp.evoLi3')}</LI>
+            <LI>{t('docs.exp.evoLi4')}</LI>
+          </UL>
+          <H3>{t('docs.exp.subTitle')}</H3>
+          <P>{t('docs.exp.subP')}</P>
+          <UL>
+            <LI>{t('docs.exp.subLi1')}</LI>
+            <LI>{t('docs.exp.subLi2')}</LI>
+            <LI>{t('docs.exp.subLi3')}</LI>
+          </UL>
+          <Divider />
+          </div>
+
+          {/* ── Huchas ─────────────────────────────────────────────────── */}
+          <div id="huchas" className="scroll-mt-8">
+          <H2>{t('docs.huc.h2')}</H2>
+          <P>{t('docs.huc.p1')}</P>
+          <P>{t('docs.huc.p2')}</P>
+          <UL>
+            <LI>{t('docs.huc.li1')}</LI>
+            <LI>{t('docs.huc.li2')}</LI>
+            <LI>{t('docs.huc.li3')}</LI>
+          </UL>
+          <P>{t('docs.huc.p3')}</P>
+          <Divider />
+          </div>
+
+          {/* ── Deudas ─────────────────────────────────────────────────── */}
+          <div id="deudas" className="scroll-mt-8">
+          <H2>{t('docs.deb.h2')}</H2>
+          <P>{t('docs.deb.p1')}</P>
+          <H3>{t('docs.deb.createTitle')}</H3>
+          <Steps>
+            <Step n={1}>{t('docs.deb.s1')}</Step>
+            <Step n={2}>{t('docs.deb.s2')}</Step>
+            <Step n={3}>{t('docs.deb.s3')}</Step>
+            <Step n={4}>{t('docs.deb.s4')}</Step>
+            <Step n={5}>{t('docs.deb.s5')}</Step>
+          </Steps>
+          <H3>{t('docs.deb.detailTitle')}</H3>
+          <UL>
+            <LI>{t('docs.deb.dLi1')}</LI>
+            <LI>{t('docs.deb.dLi2')}</LI>
+            <LI>{t('docs.deb.dLi3')}</LI>
+            <LI>{t('docs.deb.dLi4')}</LI>
+            <LI>{t('docs.deb.dLi5')}</LI>
+          </UL>
+          <H3>{t('docs.deb.intTitle')}</H3>
+          <P>{t('docs.deb.intP')}</P>
           <Divider />
           </div>
 
