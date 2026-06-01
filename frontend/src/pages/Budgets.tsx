@@ -177,9 +177,11 @@ export function getAmountForDate(versions: BudgetVersion[], date: string): numbe
 }
 
 export function calcSpending(movements: Movement[], typeIds: Set<number>, start: string, end: string): number {
+  // Expenses store dinero negative; refunds invert to positive. Net spend = sum of -dinero,
+  // so refunds (negative importe → positive dinero) subtract from the period total.
   return movements
     .filter(mv => mv.movement_type_id != null && typeIds.has(mv.movement_type_id) && mv.date >= start && mv.date <= end)
-    .reduce((s, mv) => s + Math.abs(mv.dinero), 0)
+    .reduce((s, mv) => s - mv.dinero, 0)
 }
 
 function pctColors(pct: number) {
@@ -692,7 +694,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
                                     </div>
                                     <div className="flex items-center gap-3 shrink-0">
                                       <span className="text-[11px] text-gray-400 dark:text-gray-500 tabular-nums">{mv.date}</span>
-                                      <span className="text-xs font-mono font-medium text-gray-700 dark:text-gray-200 tabular-nums">{fmt(Math.abs(mv.dinero))}</span>
+                                      <span className="text-xs font-mono font-medium text-gray-700 dark:text-gray-200 tabular-nums">{fmt(-mv.dinero)}</span>
                                     </div>
                                   </div>
                                 ))}
