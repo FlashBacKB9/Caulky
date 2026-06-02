@@ -88,7 +88,7 @@ _WELCOME_BANNER = (
 )
 
 
-def _build_claude_md(user_id: str, write_perms: dict) -> str:
+def _build_claude_md(user_id: str, write_perms: dict, hermes_url: str = "", hermes_token: str = "") -> str:
     # Build the list of enabled write ops for the header note
     op_labels = {'create': 'Crear', 'edit': 'Editar', 'delete': 'Borrar'}
     enabled_ops = [op_labels[k] for k in ('create', 'edit', 'delete') if write_perms.get(k)]
@@ -241,7 +241,30 @@ El directorio `context/` puede contener documentos subidos por el usuario (PDFs,
 - Sé conciso y directo.
 - Usa `€` para los importes, redondeado a 2 decimales.
 - Presenta los resultados en texto claro (tabla markdown si hay muchas filas).
-"""
+{f'''
+## Hermes — agenda personal (app hermana)
+
+Puedes consultar los datos de **Hermes** (agenda de citas del usuario) mediante HTTP.
+
+```bash
+# Próximas citas en Hermes
+curl -s -H "X-Cross-Token: {hermes_token}" \\
+  "{hermes_url}/api/cross-app/query?sql=SELECT+id,title,date,start_time+FROM+appointments+WHERE+date+%3E%3D+CURRENT_DATE+ORDER+BY+date+LIMIT+10"
+
+# O con variable SQL:
+TOKEN="{hermes_token}"
+URL="{hermes_url}/api/cross-app/query"
+curl -s -H "X-Cross-Token: $TOKEN" --get --data-urlencode "sql=SELECT title, date, start_time, location FROM appointments WHERE date >= CURRENT_DATE ORDER BY date LIMIT 20" "$URL"
+```
+
+Tablas clave en Hermes:
+- **appointments** — citas (title, date, start_time, end_time, description, location, status, tags, calendar_id)
+- **contacts** — agenda de contactos (name, kind, phone, email)
+- **calendars** — agendas/categorías (name, color)
+- **vehicles** — vehículos (name, kind, brand, model, plate, purchase_date, sold_date)
+- **refuelings** — repostajes (vehicle_id, date, km, liters, price, consumption)
+- El `user_id` en Hermes es diferente; el endpoint ya filtra por token, no es necesario en la query.
+''' if hermes_url and hermes_token else ''}"""
 
 
 @router.websocket("/terminal/ws")
@@ -264,8 +287,31 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
     workspace = f"/app/workspace/{user_id}/sessions/{session_id}"
     os.makedirs(workspace, exist_ok=True)
 
+    # Load cross-app (Hermes) config from preferences
+    from sqlalchemy import select as _select
+    from app.models.user_preference import UserPreference as _UP
+    from app.database import AsyncSessionLocal as _ASL
+    import uuid as _uuid
+    _hermes_url = ""
+    _hermes_token = ""
+    try:
+        async with _ASL() as _db:
+            _r = await _db.execute(
+                _select(_UP).where(
+                    _UP.user_id == _uuid.UUID(user_id),
+                    _UP.key.in_(["hermes_url", "hermes_cross_token"]),
+                )
+            )
+            for _pref in _r.scalars().all():
+                if _pref.key == "hermes_url":
+                    _hermes_url = _pref.value
+                elif _pref.key == "hermes_cross_token":
+                    _hermes_token = _pref.value
+    except Exception:
+        pass
+
     with open(os.path.join(workspace, "CLAUDE.md"), "w") as f:
-        f.write(_build_claude_md(user_id, write_perms))
+        f.write(_build_claude_md(user_id, write_perms, hermes_url=_hermes_url, hermes_token=_hermes_token))
 
     # Per-user Claude home inside the persistent workspace volume (isolated per user)
     claude_home = f"/app/workspace/{user_id}/claude-home"
