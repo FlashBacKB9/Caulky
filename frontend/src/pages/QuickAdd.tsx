@@ -291,6 +291,20 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
     analyzeMut.mutate(await compressTicketImage(file))
   }
 
+  // Pegar imagen desde el portapapeles (Ctrl+V) cuando se muestra la zona de subida
+  const [dragging, setDragging] = useState(false)
+  const uploadVisible = !ticket && !analyzeMut.isPending
+  useEffect(() => {
+    if (!uploadVisible) return
+    const onPaste = (e: ClipboardEvent) => {
+      const f = Array.from(e.clipboardData?.files ?? [])
+        .find(f => f.type.startsWith('image/') || f.type === 'application/pdf')
+      if (f) { e.preventDefault(); handleFile(f) }
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  })
+
   // Per-mode totals
   const foodTotal = ticket
     ? Object.entries(ticket.categories).filter(([c]) => !SUPPLIES_CATS.has(c)).reduce((s, [, v]) => s + v, 0)
@@ -332,8 +346,17 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
   return (
     <div className="flex-1 overflow-y-auto">
       {/* ── Upload area ── */}
-      {!ticket && !analyzeMut.isPending && (
-        <div className="p-5 space-y-4">
+      {uploadVisible && (
+        <div
+          className="p-5 space-y-4"
+          onDragOver={e => { e.preventDefault(); setDragging(true) }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={e => {
+            e.preventDefault(); setDragging(false)
+            const f = e.dataTransfer.files[0]
+            if (f) handleFile(f)
+          }}
+        >
           {error && (
             <div className="flex items-start gap-2 p-3 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-2xl text-sm text-red-600 dark:text-red-400">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
@@ -350,11 +373,15 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
           {/* Camera button */}
           <button
             onClick={() => { fileRef.current?.setAttribute('capture', 'environment'); fileRef.current?.click() }}
-            className="w-full h-28 rounded-2xl border-2 border-dashed border-gray-200 dark:border-gray-700 flex flex-col items-center justify-center gap-2 text-gray-400 dark:text-gray-500 hover:border-blue-400 hover:text-blue-500 transition-colors active:scale-[0.98]"
+            className={`w-full h-28 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors active:scale-[0.98] ${
+              dragging
+                ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/30 text-blue-500'
+                : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-blue-400 hover:text-blue-500'
+            }`}
           >
             <Upload className="w-7 h-7" />
             <span className="text-sm font-medium">Hacer foto o subir imagen / PDF</span>
-            <span className="text-xs text-gray-400">El sistema extraerá productos y precios automáticamente</span>
+            <span className="text-xs text-gray-400">Arrastra aquí o pega con Ctrl+V · se extraerán productos y precios</span>
           </button>
           {/* Gallery / file picker */}
           <button

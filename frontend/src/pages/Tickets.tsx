@@ -320,6 +320,17 @@ function UploadArea({ onFile }: { onFile: (f: File) => void }) {
     if (f) onFile(f)
   }
 
+  // Pegar imagen desde el portapapeles (Ctrl+V)
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const f = Array.from(e.clipboardData?.files ?? [])
+        .find(f => f.type.startsWith('image/') || f.type === 'application/pdf')
+      if (f) { e.preventDefault(); onFile(f) }
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  }, [onFile])
+
   return (
     <div
       className={`border-2 border-dashed rounded-xl p-10 flex flex-col items-center gap-3 cursor-pointer transition-colors select-none
@@ -334,7 +345,7 @@ function UploadArea({ onFile }: { onFile: (f: File) => void }) {
       <Upload className="w-8 h-8 text-gray-400 dark:text-gray-500" strokeWidth={1.5} />
       <div className="text-center">
         <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Sube una foto o PDF del ticket</p>
-        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">JPG, PNG, PDF · máx. 10 MB</p>
+        <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">Arrastra, pega con Ctrl+V o haz clic · JPG, PNG, PDF · máx. 10 MB</p>
       </div>
       <input
         ref={inputRef}

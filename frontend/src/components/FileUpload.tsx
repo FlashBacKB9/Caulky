@@ -192,7 +192,7 @@ export default function FileUpload({ movementId, existingFiles }: Props) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ['movements'] }),
   })
 
-  const handle = (files: FileList | null) => {
+  const handle = (files: FileList | File[] | null) => {
     if (!files || !files.length) return
     const arr = Array.from(files)
     const large = arr.filter(f => f.size > WARN_BYTES)
@@ -202,6 +202,16 @@ export default function FileUpload({ movementId, existingFiles }: Props) {
       upload.mutate(arr)
     }
   }
+
+  // Pegar archivos desde el portapapeles (Ctrl+V)
+  useEffect(() => {
+    const onPaste = (e: ClipboardEvent) => {
+      const files = Array.from(e.clipboardData?.files ?? [])
+      if (files.length) { e.preventDefault(); handle(files) }
+    }
+    window.addEventListener('paste', onPaste)
+    return () => window.removeEventListener('paste', onPaste)
+  })
 
   return (
     <div className="space-y-2">
@@ -277,7 +287,7 @@ export default function FileUpload({ movementId, existingFiles }: Props) {
       >
         <span className="flex items-center justify-center gap-2 text-sm text-gray-400 dark:text-gray-500">
           <Paperclip className="w-4 h-4" strokeWidth={1.5} />
-          {upload.isPending ? 'Subiendo...' : 'Arrastra archivos aquí o haz clic para seleccionar'}
+          {upload.isPending ? 'Subiendo...' : 'Arrastra, pega con Ctrl+V o haz clic para seleccionar'}
         </span>
         <input ref={inputRef} type="file" multiple className="hidden" onChange={e => handle(e.target.files)} />
       </div>
