@@ -33,8 +33,6 @@ services:
       - uploads_data:/app/uploads
       - workspace_data:/app/workspace
       - claude_data:/var/claude-home
-    extra_hosts:
-      - "host.docker.internal:host-gateway"  # reach sibling stacks (e.g. Hermes on :8082)
     restart: unless-stopped
 
   frontend:
