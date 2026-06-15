@@ -318,7 +318,7 @@ function SaludFinanciera({ realExpenseMovements, incomeMovementsCount, income, r
   const topCat = useMemo(() => {
     const map = new Map<string, number>()
     realExpenseMovements.forEach(m => {
-      const catName = m.label ?? (m.movement_type_id ? typeNameMap.get(m.movement_type_id) : null) ?? t('analysis.noCategory')
+      const catName = (m.movement_type_id != null ? typeNameMap.get(m.movement_type_id) : null) ?? m.label ?? t('analysis.noCategory')
       map.set(catName, (map.get(catName) ?? 0) + Math.abs(m.dinero))
     })
     if (map.size === 0) return null
