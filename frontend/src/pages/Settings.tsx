@@ -2572,8 +2572,9 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
       }
       await qc.invalidateQueries({ queryKey: ['real-accounts'] })
       setEditingId(null)
-    } catch {
-      setSaveError('No se pudo guardar. Inténtalo de nuevo.')
+    } catch (e: unknown) {
+      const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      setSaveError(detail ? `Error: ${detail}` : 'No se pudo guardar. Inténtalo de nuevo.')
     } finally {
       setSaving(false)
     }
