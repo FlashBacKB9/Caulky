@@ -2409,6 +2409,111 @@ const PALETTE_COLORS_RA = [
   '#10b981','#14b8a6','#3b82f6','#6366f1','#8b5cf6','#ec4899',
 ]
 
+function RealAccountForm({
+  accounts, editingId, name, entityName, accountNumber, color, linkedIds, saving, error,
+  onName, onEntityName, onAccountNumber, onColor, onToggleLinked, onSave, onCancel,
+}: {
+  accounts: Account[]
+  editingId: number | 'new'
+  name: string
+  entityName: string
+  accountNumber: string
+  color: string
+  linkedIds: number[]
+  saving: boolean
+  error: string
+  onName: (v: string) => void
+  onEntityName: (v: string) => void
+  onAccountNumber: (v: string) => void
+  onColor: (v: string) => void
+  onToggleLinked: (id: number) => void
+  onSave: () => void
+  onCancel: () => void
+}) {
+  const colorRef = useRef<HTMLInputElement>(null)
+  const IN = 'w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500'
+
+  return (
+    <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Nombre</label>
+          <input className={IN} placeholder="ej. Cuenta ahorro" value={name} onChange={e => onName(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Color</label>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {PALETTE_COLORS_RA.map(c => (
+              <button
+                key={c}
+                type="button"
+                onClick={() => onColor(c)}
+                className={`w-5 h-5 rounded-full border-2 transition-all ${color === c ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent'}`}
+                style={{ background: c }}
+              />
+            ))}
+            <button
+              type="button"
+              onClick={() => colorRef.current?.click()}
+              className="w-5 h-5 rounded-full border border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center"
+              title="Color personalizado"
+            >
+              <input ref={colorRef} type="color" value={color} onChange={e => onColor(e.target.value)} className="sr-only" />
+              <span className="text-[8px] text-gray-400">+</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Entidad bancaria</label>
+        <input className={IN} placeholder="ej. Trade Republic" value={entityName} onChange={e => onEntityName(e.target.value)} />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Número de cuenta (opcional)</label>
+        <input className={IN} placeholder="ES12 3456 7890 1234 5678" value={accountNumber} onChange={e => onAccountNumber(e.target.value)} />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Cuentas ficticias asociadas</label>
+        <div className="flex flex-wrap gap-1.5 mt-1">
+          {accounts.map(acc => (
+            <button
+              key={acc.id}
+              type="button"
+              onClick={() => onToggleLinked(acc.id)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                linkedIds.includes(acc.id)
+                  ? 'text-white border-transparent'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 hover:border-gray-300'
+              }`}
+              style={linkedIds.includes(acc.id) ? { background: acc.color } : {}}
+            >
+              {acc.name}
+            </button>
+          ))}
+        </div>
+      </div>
+      {error && <p className="text-xs text-red-500">{error}</p>}
+      <div className="flex gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onSave}
+          disabled={!name.trim() || !entityName.trim() || saving}
+          className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
+        >
+          {saving ? 'Guardando…' : 'Guardar'}
+        </button>
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function RealAccountsSection({ accounts }: { accounts: Account[] }) {
   const qc = useQueryClient()
   const { data: realAccounts = [] } = useQuery({
@@ -2422,8 +2527,8 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
   const [accountNumber, setAccountNumber] = useState('')
   const [color, setColor] = useState('#3b82f6')
   const [linkedIds, setLinkedIds] = useState<number[]>([])
-
-  const colorRef = useRef<HTMLInputElement>(null)
+  const [saving, setSaving] = useState(false)
+  const [saveError, setSaveError] = useState('')
 
   function startNew() {
     setEditingId('new')
@@ -2432,6 +2537,7 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
     setAccountNumber('')
     setColor('#3b82f6')
     setLinkedIds([])
+    setSaveError('')
   }
 
   function startEdit(ra: RealAccount) {
@@ -2441,120 +2547,64 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
     setAccountNumber(ra.account_number ?? '')
     setColor(ra.color)
     setLinkedIds(ra.linked_account_ids)
+    setSaveError('')
   }
 
   function cancel() {
     setEditingId(null)
+    setSaveError('')
   }
 
   async function save() {
-    const payload = {
-      name: name.trim(),
-      entity_name: entityName.trim(),
-      account_number: accountNumber.trim() || null,
-      color,
-      linked_account_ids: linkedIds,
+    setSaving(true)
+    setSaveError('')
+    try {
+      const payload = {
+        name: name.trim(),
+        entity_name: entityName.trim(),
+        account_number: accountNumber.trim() || null,
+        color,
+        linked_account_ids: linkedIds,
+      }
+      if (editingId === 'new') {
+        await createRealAccount(payload)
+      } else if (editingId != null) {
+        await updateRealAccount(editingId, payload)
+      }
+      await qc.invalidateQueries({ queryKey: ['real-accounts'] })
+      setEditingId(null)
+    } catch {
+      setSaveError('No se pudo guardar. Inténtalo de nuevo.')
+    } finally {
+      setSaving(false)
     }
-    if (editingId === 'new') {
-      await createRealAccount(payload)
-    } else if (editingId != null) {
-      await updateRealAccount(editingId, payload)
-    }
-    qc.invalidateQueries({ queryKey: ['real-accounts'] })
-    setEditingId(null)
   }
 
   async function remove(id: number) {
-    await deleteRealAccount(id)
-    qc.invalidateQueries({ queryKey: ['real-accounts'] })
+    try {
+      await deleteRealAccount(id)
+      qc.invalidateQueries({ queryKey: ['real-accounts'] })
+    } catch { /* ignore */ }
   }
 
-  function toggleLinked(id: number) {
-    setLinkedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  const formProps = {
+    accounts, editingId: editingId as number | 'new',
+    name, entityName, accountNumber, color, linkedIds,
+    saving, error: saveError,
+    onName: setName, onEntityName: setEntityName, onAccountNumber: setAccountNumber,
+    onColor: setColor, onToggleLinked: (id: number) => setLinkedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]),
+    onSave: save, onCancel: cancel,
   }
-
-  const IN = 'w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500'
-
-  const form = (
-    <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Nombre</label>
-          <input className={IN} placeholder="ej. Cuenta ahorro" value={name} onChange={e => setName(e.target.value)} />
-        </div>
-        <div>
-          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Color</label>
-          <div className="flex flex-wrap gap-1 mt-1">
-            {PALETTE_COLORS_RA.map(c => (
-              <button
-                key={c}
-                onClick={() => setColor(c)}
-                className={`w-5 h-5 rounded-full border-2 transition-all ${color === c ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent'}`}
-                style={{ background: c }}
-              />
-            ))}
-            <button
-              onClick={() => colorRef.current?.click()}
-              className="w-5 h-5 rounded-full border border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center"
-              title="Color personalizado"
-            >
-              <input ref={colorRef} type="color" value={color} onChange={e => setColor(e.target.value)} className="sr-only" />
-              <span className="text-[8px] text-gray-400">+</span>
-            </button>
-          </div>
-        </div>
-      </div>
-      <div>
-        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Entidad bancaria</label>
-        <input className={IN} placeholder="ej. Trade Republic" value={entityName} onChange={e => setEntityName(e.target.value)} />
-      </div>
-      <div>
-        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Número de cuenta (opcional)</label>
-        <input className={IN} placeholder="ES12 3456 7890 1234 5678" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} />
-      </div>
-      <div>
-        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Cuentas ficticias asociadas</label>
-        <div className="flex flex-wrap gap-1.5 mt-1">
-          {accounts.map(acc => (
-            <button
-              key={acc.id}
-              onClick={() => toggleLinked(acc.id)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                linkedIds.includes(acc.id)
-                  ? 'text-white border-transparent'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 hover:border-gray-300'
-              }`}
-              style={linkedIds.includes(acc.id) ? { background: acc.color } : {}}
-            >
-              {acc.name}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="flex gap-2 pt-1">
-        <button
-          onClick={save}
-          disabled={!name.trim() || !entityName.trim()}
-          className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
-        >
-          Guardar
-        </button>
-        <button onClick={cancel} className="px-4 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-          Cancelar
-        </button>
-      </div>
-    </div>
-  )
 
   return (
     <div className="space-y-3">
       <p className="text-xs text-gray-500 dark:text-gray-400">
-        Las cuentas reales agrupan tus cuentas ficticias por entidad bancaria, permitiéndote comparar con los saldos reales del banco.
+        Agrupa tus cuentas ficticias por entidad bancaria para comparar con los saldos reales.
       </p>
       {realAccounts.map(ra => (
         <div key={ra.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
           {editingId === ra.id ? (
-            <div className="p-3">{form}</div>
+            <div className="p-3"><RealAccountForm {...formProps} editingId={ra.id} /></div>
           ) : (
             <div className="flex items-center gap-3 px-4 py-3">
               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ra.color }} />
@@ -2565,10 +2615,10 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
                   {ra.linked_account_ids.length > 0 && ` · ${ra.linked_account_ids.length} cuenta${ra.linked_account_ids.length !== 1 ? 's' : ''}`}
                 </p>
               </div>
-              <button onClick={() => startEdit(ra)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+              <button type="button" onClick={() => startEdit(ra)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                 <Pencil className="w-3.5 h-3.5" />
               </button>
-              <button onClick={() => remove(ra.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+              <button type="button" onClick={() => remove(ra.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -2576,9 +2626,10 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
         </div>
       ))}
       {editingId === 'new' ? (
-        <div>{form}</div>
+        <RealAccountForm {...formProps} editingId="new" />
       ) : (
         <button
+          type="button"
           onClick={startNew}
           className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
         >
@@ -2592,7 +2643,6 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
 
 const SETTINGS_TABS = [
   { id: 'cuentas',        labelKey: 'settings.accounts'  },
-  { id: 'cuentas-reales', label:    'Cuentas reales'      },
   { id: 'apariencia',     labelKey: 'settings.appearance' },
   { id: 'movimientos',    labelKey: 'settings.movements'  },
   { id: 'navegacion',     labelKey: 'settings.navigation' },
@@ -2657,11 +2707,10 @@ export default function Settings() {
             <Section title={t('settings.movementTypes')}>
               <TypesSection />
             </Section>
+            <Section title="Cuentas reales">
+              <RealAccountsSection accounts={data.accounts} />
+            </Section>
           </>
-        )}
-
-        {activeTab === 'cuentas-reales' && (
-          <RealAccountsSection accounts={data.accounts} />
         )}
 
         {activeTab === 'apariencia' && (
