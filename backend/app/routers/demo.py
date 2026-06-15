@@ -2,7 +2,7 @@
 import datetime
 import uuid
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -10,6 +10,7 @@ from app.models.account import Account
 from app.models.income_expense_group import IncomeExpenseGroup
 from app.models.movement import Movement
 from app.models.movement_type import MovementType
+from app.models.real_account import RealAccount
 from app.models.user import User
 from app.auth.manager import get_user_manager, UserManager
 from app.auth.schemas import UserCreate
@@ -314,28 +315,31 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
     await db.flush()
 
 
+async def _wipe_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
+    """Delete all data for the demo user so it can be reseeded."""
+    await db.execute(delete(Movement).where(Movement.user_id == user_id))
+    await db.execute(delete(MovementType).where(MovementType.user_id == user_id))
+    await db.execute(delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == user_id))
+    await db.execute(delete(Account).where(Account.user_id == user_id))
+    await db.execute(delete(RealAccount).where(RealAccount.user_id == user_id))
+
+
 @router.post("/setup")
 async def setup_demo(
     db: AsyncSession = Depends(get_db),
     user_manager: UserManager = Depends(get_user_manager),
 ):
-    """Ensure the demo user exists with seeded data. Returns demo credentials."""
+    """Create (or reset) demo@caulky.app with fresh seeded data. Returns demo credentials."""
     try:
         user = await user_manager.create(
             UserCreate(email=DEMO_EMAIL, password=DEMO_PASSWORD),
         )
-        await _seed_demo(db, user.id)
-        await db.commit()
     except UserAlreadyExists:
-        # User exists — check if it has any data
         user = await user_manager.get_by_email(DEMO_EMAIL)
         if user is None:
             raise HTTPException(status_code=500, detail="Demo user inconsistency")
-        has_data = (await db.execute(
-            select(Account.id).where(Account.user_id == user.id).limit(1)
-        )).first()
-        if not has_data:
-            await _seed_demo(db, user.id)
-            await db.commit()
+        await _wipe_demo(db, user.id)
 
+    await _seed_demo(db, user.id)
+    await db.commit()
     return {"email": DEMO_EMAIL, "password": DEMO_PASSWORD}
