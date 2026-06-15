@@ -126,7 +126,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
         # --- Alquiler (día 5) ---
         movements.append(Movement(
             name="Alquiler",
-            money=-750,
+            money=750,
             date=datetime.date(y, m, 5),
             movement_type_id=type_objs["Alquiler"].id,
             paid=True,
@@ -139,7 +139,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
         sumi = round(_rng(seed_base + 6, 110 if winter else 75, 160 if winter else 110 if summer else 130), 2)
         movements.append(Movement(
             name="Suministros",
-            money=-sumi,
+            money=sumi,
             date=datetime.date(y, m, _rng_int(seed_base + 7, 8, 10)),
             movement_type_id=type_objs["Suministros"].id,
             paid=True,
@@ -149,7 +149,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
         # --- Suscripciones ---
         movements.append(Movement(
             name="Netflix",
-            money=-17.99,
+            money=17.99,
             date=datetime.date(y, m, 10),
             movement_type_id=type_objs["Netflix"].id,
             paid=True,
@@ -157,7 +157,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
         ))
         movements.append(Movement(
             name="Spotify",
-            money=-10.99,
+            money=10.99,
             date=datetime.date(y, m, 10),
             movement_type_id=type_objs["Spotify"].id,
             paid=True,
@@ -198,7 +198,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
             days_used.add(d)
             movements.append(Movement(
                 name="Supermercado",
-                money=-round(_rng(seed_base + 20 + i, 45, 115), 2),
+                money=round(_rng(seed_base + 20 + i, 45, 115), 2),
                 date=datetime.date(y, m, d),
                 movement_type_id=type_objs["Supermercado"].id,
                 paid=True,
@@ -212,7 +212,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
                 d = _rng_int(seed_base + 27 + i, 1, 28)
                 movements.append(Movement(
                     name="Restaurante" if i == 0 else f"Restaurante {i+1}",
-                    money=-round(_rng(seed_base + 30 + i, 20, 68), 2),
+                    money=round(_rng(seed_base + 30 + i, 20, 68), 2),
                     date=datetime.date(y, m, d),
                     movement_type_id=type_objs["Restaurantes"].id,
                     paid=True,
@@ -222,7 +222,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
         # --- Gasolina ---
         movements.append(Movement(
             name="Gasolina",
-            money=-round(_rng(seed_base + 35, 42, 68), 2),
+            money=round(_rng(seed_base + 35, 42, 68), 2),
             date=datetime.date(y, m, _rng_int(seed_base + 36, 12, 25)),
             movement_type_id=type_objs["Gasolina"].id,
             paid=True,
@@ -233,7 +233,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
         if _rng(seed_base + 37, 0, 1) < 0.60:
             movements.append(Movement(
                 name="Entradas / ocio",
-                money=-round(_rng(seed_base + 38, 15, 55), 2),
+                money=round(_rng(seed_base + 38, 15, 55), 2),
                 date=datetime.date(y, m, _rng_int(seed_base + 39, 1, 28)),
                 movement_type_id=type_objs["Entretenimiento"].id,
                 paid=True,
@@ -245,7 +245,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
             viaje_amt = round(_rng(seed_base + 40, 380, 820), 2)
             movements.append(Movement(
                 name="Vacaciones verano",
-                money=-viaje_amt,
+                money=viaje_amt,
                 date=datetime.date(y, m, _rng_int(seed_base + 41, 1, 20)),
                 movement_type_id=type_objs["Viajes"].id,
                 paid=True,
@@ -254,7 +254,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
         elif m == 12:
             movements.append(Movement(
                 name="Viaje Navidad",
-                money=-round(_rng(seed_base + 42, 180, 350), 2),
+                money=round(_rng(seed_base + 42, 180, 350), 2),
                 date=datetime.date(y, m, _rng_int(seed_base + 43, 20, 28)),
                 movement_type_id=type_objs["Viajes"].id,
                 paid=True,
@@ -263,7 +263,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
         elif m == 4 and _rng(seed_base + 44, 0, 1) < 0.6:
             movements.append(Movement(
                 name="Semana Santa",
-                money=-round(_rng(seed_base + 45, 150, 300), 2),
+                money=round(_rng(seed_base + 45, 150, 300), 2),
                 date=datetime.date(y, m, _rng_int(seed_base + 46, 10, 20)),
                 movement_type_id=type_objs["Viajes"].id,
                 paid=True,
@@ -274,7 +274,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
         if _rng(seed_base + 47, 0, 1) < 0.35:
             movements.append(Movement(
                 name="Farmacia",
-                money=-round(_rng(seed_base + 48, 8, 38), 2),
+                money=round(_rng(seed_base + 48, 8, 38), 2),
                 date=datetime.date(y, m, _rng_int(seed_base + 49, 1, 28)),
                 movement_type_id=type_objs["Farmacia"].id,
                 paid=True,
@@ -285,7 +285,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
         if _rng(seed_base + 50, 0, 1) < 0.10:
             movements.append(Movement(
                 name="Médico",
-                money=-round(_rng(seed_base + 51, 50, 130), 2),
+                money=round(_rng(seed_base + 51, 50, 130), 2),
                 date=datetime.date(y, m, _rng_int(seed_base + 52, 1, 25)),
                 movement_type_id=type_objs["Médico"].id,
                 paid=True,
@@ -296,7 +296,7 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
         if _rng(seed_base + 53, 0, 1) < 0.50:
             movements.append(Movement(
                 name="Otros gastos",
-                money=-round(_rng(seed_base + 54, 5, 45), 2),
+                money=round(_rng(seed_base + 54, 5, 45), 2),
                 date=datetime.date(y, m, _rng_int(seed_base + 55, 1, 28)),
                 movement_type_id=type_objs["Otros gastos"].id,
                 paid=True,
