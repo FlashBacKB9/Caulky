@@ -2410,11 +2410,10 @@ const PALETTE_COLORS_RA = [
 ]
 
 function RealAccountForm({
-  accounts, editingId, name, entityName, accountNumber, color, linkedIds, saving, error,
+  accounts, name, entityName, accountNumber, color, linkedIds, saving, error,
   onName, onEntityName, onAccountNumber, onColor, onToggleLinked, onSave, onCancel,
 }: {
   accounts: Account[]
-  editingId: number | 'new'
   name: string
   entityName: string
   accountNumber: string
@@ -2588,7 +2587,7 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
   }
 
   const formProps = {
-    accounts, editingId: editingId as number | 'new',
+    accounts,
     name, entityName, accountNumber, color, linkedIds,
     saving, error: saveError,
     onName: setName, onEntityName: setEntityName, onAccountNumber: setAccountNumber,
@@ -2604,7 +2603,7 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
       {realAccounts.map(ra => (
         <div key={ra.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
           {editingId === ra.id ? (
-            <div className="p-3"><RealAccountForm {...formProps} editingId={ra.id} /></div>
+            <div className="p-3"><RealAccountForm {...formProps} /></div>
           ) : (
             <div className="flex items-center gap-3 px-4 py-3">
               <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ra.color }} />
@@ -2626,7 +2625,7 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
         </div>
       ))}
       {editingId === 'new' ? (
-        <RealAccountForm {...formProps} editingId="new" />
+        <RealAccountForm {...formProps} />
       ) : (
         <button
           type="button"
