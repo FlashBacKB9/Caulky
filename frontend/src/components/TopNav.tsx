@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
-import { Wallet, Settings, LogOut, Info, X, ExternalLink } from 'lucide-react'
+import { Wallet, Settings, LogOut, Info, X, ExternalLink, EyeOff, Eye } from 'lucide-react'
 import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 import { logout } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
 import { t } from '../utils/i18n'
+import { usePrivacyMode } from '../hooks/usePrivacyMode'
 
 function InfoModal({ onClose }: { onClose: () => void }) {
   return (
@@ -41,6 +42,7 @@ export default function TopNav() {
   const [showInfo, setShowInfo] = useState(false)
   const { setUser } = useAuth()
   const navigate = useNavigate()
+  const { privacyMode, togglePrivacyMode } = usePrivacyMode()
 
   async function handleLogout() {
     await logout().catch(() => {})
@@ -87,8 +89,19 @@ export default function TopNav() {
             ))}
           </nav>
 
-          {/* Right side: settings + info + logout */}
+          {/* Right side: privacy + settings + info + logout */}
           <div className="flex items-center gap-0.5 shrink-0 ml-2">
+            <button
+              onClick={togglePrivacyMode}
+              title={privacyMode ? 'Desactivar modo privado' : 'Activar modo privado'}
+              className={`flex items-center px-2 py-1.5 rounded-lg transition-colors ${
+                privacyMode
+                  ? 'text-amber-500 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                  : 'text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300'
+              }`}
+            >
+              {privacyMode ? <EyeOff className="w-4 h-4" strokeWidth={1.5} /> : <Eye className="w-4 h-4" strokeWidth={1.5} />}
+            </button>
             <NavLink to="/settings" className={({ isActive }) => linkCls(isActive)}>
               <Settings className="w-4 h-4" strokeWidth={1.5} />
             </NavLink>

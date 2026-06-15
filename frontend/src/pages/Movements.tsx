@@ -801,6 +801,12 @@ export default function Movements() {
     const v = searchParams.get('account')
     return v ? (parseInt(v) || null) : null
   })
+  // multi-account filter from real accounts (comma-separated)
+  const accountsFilter = useMemo<number[]>(() => {
+    const v = searchParams.get('accounts')
+    if (!v) return []
+    return v.split(',').map(s => parseInt(s)).filter(n => !isNaN(n))
+  }, [searchParams])
 
   useEffect(() => {
     let cancelled = false
@@ -825,7 +831,7 @@ export default function Movements() {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const [year, setYear] = useState<number | null>(() => {
-    const v = searchParams.get('account')
+    const v = searchParams.get('account') || searchParams.get('accounts')
     return v ? null : currentYear
   })
   const [showForm, setShowForm] = useState(false)
@@ -851,7 +857,7 @@ export default function Movements() {
   const [bulkValue, setBulkValue] = useState('')
   const [isBulkPending, setIsBulkPending] = useState(false)
   const [viewMode, setViewMode] = useState<'table' | 'calendar' | 'kanban'>(
-    () => searchParams.get('account') ? 'table' : 'calendar'
+    () => (searchParams.get('account') || searchParams.get('accounts')) ? 'table' : 'calendar'
   )
   const [showYearPicker, setShowYearPicker] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
@@ -1170,6 +1176,19 @@ export default function Movements() {
   const filteredMovements = useMemo(() => {
     const base = applyAdvancedFilter(sortedMovements, advFilter, typeToGroupMap)
     const searched = !quickSearch.trim() ? base : base.filter(mv => mv.name.toLowerCase().includes(quickSearch.toLowerCase()))
+    // multi-account filter (from real accounts)
+    if (accountsFilter.length > 0) {
+      const idSet = new Set(accountsFilter)
+      const linkedTypeIds = new Set(
+        types.filter(tp => tp.linked_account_id != null && idSet.has(tp.linked_account_id)).map(tp => tp.id)
+      )
+      return searched.filter(mv => {
+        if (mv.is_transfer) return (mv.account_id != null && idSet.has(mv.account_id)) || (mv.from_account_id != null && idSet.has(mv.from_account_id))
+        if (mv.account_id != null && idSet.has(mv.account_id)) return true
+        if (mv.movement_type_id != null && linkedTypeIds.has(mv.movement_type_id)) return true
+        return false
+      })
+    }
     if (accountFilter === null) return searched
     const acc = accounts.find(a => a.id === accountFilter)
     const linkedTypeIds = acc?.is_main
@@ -1182,7 +1201,7 @@ export default function Movements() {
       if (linkedTypeIds && mv.movement_type_id != null && linkedTypeIds.has(mv.movement_type_id)) return true
       return false
     })
-  }, [sortedMovements, advFilter, typeToGroupMap, quickSearch, accountFilter, accounts, types])
+  }, [sortedMovements, advFilter, typeToGroupMap, quickSearch, accountFilter, accountsFilter, accounts, types])
 
   // Dates that have more than one movement in the current view (eligible for drag reorder)
   const sameDayDates = useMemo(() => {

@@ -24,3 +24,6 @@ export const register = (email: string, password: string, displayName?: string) 
   api.post<UserRead>('/auth/register', { email, password, display_name: displayName ?? null })
 
 export const claimData = () => api.post('/admin/claim')
+
+export const setupDemo = () =>
+  api.post<{ email: string; password: string }>('/demo/setup').then(r => r.data)

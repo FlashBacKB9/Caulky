@@ -2,11 +2,12 @@ import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getAccountsSummary, ACCOUNT_CATEGORIES, LIQUID_CATEGORIES, INVESTMENT_CATEGORIES, type Account } from '../api/accounts'
+import { getRealAccounts, type RealAccount } from '../api/realAccounts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getSummary as getInvestSummary } from '../api/investments'
 import { useCurrency } from '../hooks/useCurrency'
-import { TrendingUp, TrendingDown, Eye, EyeOff, Banknote } from 'lucide-react'
+import { TrendingUp, TrendingDown, Eye, EyeOff, Banknote, Building2 } from 'lucide-react'
 import { loadDebts, calcDebtSummary, calcMonthlyPayment } from './Debts'
 import AppIcon from '../components/AppIcon'
 import {
@@ -111,10 +112,15 @@ function CT({ active, payload, label }: {
 export default function AccountsPage() {
   const { fmt, fmtK } = useCurrency()
   const navigate = useNavigate()
+  const [tab, setTab] = useState<'ficticias' | 'reales'>('ficticias')
 
   const { data: summary, isLoading: loadingAccounts } = useQuery({
     queryKey: ['accounts-summary'],
     queryFn: getAccountsSummary,
+  })
+  const { data: realAccounts = [] } = useQuery({
+    queryKey: ['real-accounts'],
+    queryFn: getRealAccounts,
   })
   const { data: movements = [], isLoading: loadingMovements } = useQuery({
     queryKey: ['movements'],
@@ -259,6 +265,21 @@ export default function AccountsPage() {
   const liquidBalance     = accounts.filter(a => LIQUID_CATEGORIES.includes(a.category as typeof LIQUID_CATEGORIES[number])).reduce((s, a) => s + a.balance, 0)
   const liquidChange      = accounts.filter(a => LIQUID_CATEGORIES.includes(a.category as typeof LIQUID_CATEGORIES[number])).reduce((s, a) => s + (periodChange[a.id] ?? 0), 0)
 
+  // ── Cuentas reales computed (must be before early returns to respect hooks order) ──
+  const accountById = useMemo(
+    () => Object.fromEntries(accounts.map(a => [a.id, a])),
+    [accounts]
+  )
+  const entitiesSorted = useMemo(() => {
+    const map = new Map<string, RealAccount[]>()
+    for (const ra of realAccounts) {
+      const list = map.get(ra.entity_name) ?? []
+      list.push(ra)
+      map.set(ra.entity_name, list)
+    }
+    return [...map.entries()]
+  }, [realAccounts])
+
   if (loadingAccounts || loadingMovements) {
     return (
       <div className="p-6 flex items-center justify-center h-96">
@@ -280,12 +301,47 @@ export default function AccountsPage() {
   const GRID  = '#e5e7eb'
   const TICK  = { fontSize: 11, fill: '#9ca3af' }
 
+  const realAccountBalance = (ra: RealAccount) =>
+    ra.linked_account_ids.reduce((s, id) => s + (accountById[id]?.balance ?? 0), 0)
+
+  const entityTotal = (entity: string) =>
+    (entitiesSorted.find(([e]) => e === entity)?.[1] ?? []).reduce(
+      (s, ra) => s + realAccountBalance(ra), 0
+    )
+
+  const grandRealTotal = realAccounts.reduce((s, ra) => s + realAccountBalance(ra), 0)
+
   return (
     <div className="p-3 md:p-6 space-y-4 md:space-y-5">
 
       {/* ── Header ─────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t('accounts.title')}</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">{t('accounts.title')}</h1>
+          {/* Tab switcher */}
+          <div className="flex items-center gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setTab('ficticias')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                tab === 'ficticias'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              Cuentas ficticias
+            </button>
+            <button
+              onClick={() => setTab('reales')}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${
+                tab === 'reales'
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              Cuentas reales
+            </button>
+          </div>
+        </div>
         <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-800 rounded-lg p-1">
           <button
             onClick={() => setSelectedYear(null)}
@@ -312,6 +368,117 @@ export default function AccountsPage() {
           ))}
         </div>
       </div>
+
+      {/* ══ Cuentas reales tab ══════════════════════════════════════ */}
+      {tab === 'reales' && (
+        <div className="space-y-4">
+          {realAccounts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-64 gap-3">
+              <Building2 className="w-10 h-10 text-gray-300 dark:text-gray-700" />
+              <p className="text-sm text-gray-400 dark:text-gray-500">
+                No hay cuentas reales configuradas.
+              </p>
+              <p className="text-xs text-gray-400 dark:text-gray-500">
+                Ve a <strong>Ajustes → Cuentas reales</strong> para añadir tu banco.
+              </p>
+            </div>
+          ) : (
+            <>
+              {/* Barra de composición por entidad */}
+              <div className={`${PANEL} p-5`}>
+                <p className={`${TITLE} mb-3`}>Composición por banco</p>
+                <div className="h-2 rounded-full overflow-hidden flex gap-px bg-gray-100 dark:bg-gray-800 mb-3">
+                  {entitiesSorted.map(([entity, ras]) => {
+                    const val = ras.reduce((s, ra) => s + realAccountBalance(ra), 0)
+                    const pct = grandRealTotal > 0 ? (val / grandRealTotal) * 100 : 0
+                    const color = ras[0]?.color ?? '#6b7280'
+                    return pct > 0 ? (
+                      <div
+                        key={entity}
+                        className="h-full first:rounded-l-full last:rounded-r-full transition-all duration-300"
+                        style={{ width: `${pct}%`, background: color }}
+                      />
+                    ) : null
+                  })}
+                </div>
+                <div className="flex flex-wrap gap-x-5 gap-y-1.5">
+                  {entitiesSorted.map(([entity, ras]) => {
+                    const val = ras.reduce((s, ra) => s + realAccountBalance(ra), 0)
+                    const color = ras[0]?.color ?? '#6b7280'
+                    return (
+                      <div key={entity} className="flex items-center gap-1.5">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                        <span className="text-xs text-gray-500 dark:text-gray-400">{entity}</span>
+                        <span className="text-xs font-semibold tabular-nums text-gray-700 dark:text-gray-200">{fmt(val)}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+
+              {/* Cards por entidad */}
+              {entitiesSorted.map(([entity, ras]) => (
+                <div key={entity} className="space-y-3">
+                  <div className="flex items-baseline justify-between px-1">
+                    <h2 className={TITLE}>{entity}</h2>
+                    <span className="text-base font-semibold tabular-nums text-gray-900 dark:text-white">
+                      {fmt(entityTotal(entity))}
+                    </span>
+                  </div>
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {ras.map(ra => {
+                      const bal = realAccountBalance(ra)
+                      const linkedNames = ra.linked_account_ids
+                        .map(id => accountById[id]?.name)
+                        .filter(Boolean)
+                      return (
+                        <div
+                          key={ra.id}
+                          onClick={() => {
+                            if (ra.linked_account_ids.length > 0) {
+                              navigate(`/movements?accounts=${ra.linked_account_ids.join(',')}`)
+                            }
+                          }}
+                          className={`${PANEL} p-4 relative overflow-hidden transition-opacity cursor-pointer hover:ring-1 hover:ring-gray-200 dark:hover:ring-gray-700`}
+                        >
+                          <div className="absolute inset-y-0 left-0 w-1 rounded-l-2xl" style={{ background: ra.color }} />
+                          <div className="pl-2">
+                            <div className="flex items-center gap-2 mb-3">
+                              <div className="w-6 h-6 rounded-lg flex items-center justify-center shrink-0"
+                                style={{ backgroundColor: ra.color + '20' }}>
+                                <Building2 className="w-3.5 h-3.5" style={{ color: ra.color }} strokeWidth={1.5} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className={`${TITLE} truncate`}>{ra.name}</p>
+                                {ra.account_number && (
+                                  <p className="text-xs text-gray-300 dark:text-gray-600 truncate font-mono">
+                                    {ra.account_number}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            <p className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white mb-1">
+                              {fmt(bal)}
+                            </p>
+                            {linkedNames.length > 0 && (
+                              <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                                {linkedNames.join(' + ')}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ══ Cuentas ficticias tab ════════════════════════════════════ */}
+      {tab === 'ficticias' && <>
 
       {/* ── Total card ─────────────────────────────────────────────── */}
       <div className={`${PANEL} p-5`}>
@@ -693,6 +860,8 @@ export default function AccountsPage() {
         </div>
 
       </div>
+
+      </>}
     </div>
   )
 }

@@ -1,5 +1,6 @@
-﻿import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { syncPref } from '../utils/prefSync'
+import { usePrivacyMode } from './usePrivacyMode'
 
 const KEY = 'spendly-currency'
 const EVENT = 'spendly-currency-change'
@@ -28,6 +29,7 @@ function getCurrent(): string {
 
 export function useCurrency() {
   const [currency, setCurrencyState] = useState(getCurrent)
+  const { privacyMode } = usePrivacyMode()
 
   useEffect(() => {
     const handler = () => setCurrencyState(getCurrent())
@@ -42,19 +44,22 @@ export function useCurrency() {
 
   const fmt = useCallback(
     (v: number, maxDecimals = 2) =>
-      v.toLocaleString('es-ES', { style: 'currency', currency, maximumFractionDigits: maxDecimals })
-        .replace(/[   ]/g, ''),
-    [currency]
+      privacyMode
+        ? '••••'
+        : v.toLocaleString('es-ES', { style: 'currency', currency, maximumFractionDigits: maxDecimals })
+            .replace(/[   ]/g, ''),
+    [currency, privacyMode]
   )
 
   const fmtK = useCallback(
     (v: number) => {
+      if (privacyMode) return '•••'
       const sym = CURRENCIES.find(c => c.code === currency)?.symbol ?? '€'
       return Math.abs(v) >= 1000
         ? `${(v / 1000).toLocaleString('es-ES', { maximumFractionDigits: 1 })}k${sym}`
         : `${v.toLocaleString('es-ES', { maximumFractionDigits: 0 })}${sym}`
     },
-    [currency]
+    [currency, privacyMode]
   )
 
   return { currency, setCurrency, fmt, fmtK, currencies: CURRENCIES }

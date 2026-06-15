@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, Link } from 'react-router-dom'
 import { getMovements } from '../api/movements'
 import { getAccountsSummary, createAccount, updateAccountFull, deleteAccount, reorderAccounts, ACCOUNT_CATEGORIES, type Account, type AccountCategory } from '../api/accounts'
+import { getRealAccounts, createRealAccount, updateRealAccount, deleteRealAccount, type RealAccount } from '../api/realAccounts'
 import { getGroups, createGroup, updateGroup, deleteGroup, type Group } from '../api/groups'
 import {
   getMovementTypes, createMovementType, updateMovementType, deleteMovementType,
@@ -2403,16 +2404,203 @@ function LogsSection() {
   )
 }
 
+const PALETTE_COLORS_RA = [
+  '#6b7280','#ef4444','#f97316','#eab308','#22c55e',
+  '#10b981','#14b8a6','#3b82f6','#6366f1','#8b5cf6','#ec4899',
+]
+
+function RealAccountsSection({ accounts }: { accounts: Account[] }) {
+  const qc = useQueryClient()
+  const { data: realAccounts = [] } = useQuery({
+    queryKey: ['real-accounts'],
+    queryFn: getRealAccounts,
+  })
+
+  const [editingId, setEditingId] = useState<number | 'new' | null>(null)
+  const [name, setName] = useState('')
+  const [entityName, setEntityName] = useState('')
+  const [accountNumber, setAccountNumber] = useState('')
+  const [color, setColor] = useState('#3b82f6')
+  const [linkedIds, setLinkedIds] = useState<number[]>([])
+
+  const colorRef = useRef<HTMLInputElement>(null)
+
+  function startNew() {
+    setEditingId('new')
+    setName('')
+    setEntityName('')
+    setAccountNumber('')
+    setColor('#3b82f6')
+    setLinkedIds([])
+  }
+
+  function startEdit(ra: RealAccount) {
+    setEditingId(ra.id)
+    setName(ra.name)
+    setEntityName(ra.entity_name)
+    setAccountNumber(ra.account_number ?? '')
+    setColor(ra.color)
+    setLinkedIds(ra.linked_account_ids)
+  }
+
+  function cancel() {
+    setEditingId(null)
+  }
+
+  async function save() {
+    const payload = {
+      name: name.trim(),
+      entity_name: entityName.trim(),
+      account_number: accountNumber.trim() || null,
+      color,
+      linked_account_ids: linkedIds,
+    }
+    if (editingId === 'new') {
+      await createRealAccount(payload)
+    } else if (editingId != null) {
+      await updateRealAccount(editingId, payload)
+    }
+    qc.invalidateQueries({ queryKey: ['real-accounts'] })
+    setEditingId(null)
+  }
+
+  async function remove(id: number) {
+    await deleteRealAccount(id)
+    qc.invalidateQueries({ queryKey: ['real-accounts'] })
+  }
+
+  function toggleLinked(id: number) {
+    setLinkedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+
+  const IN = 'w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-sm text-gray-900 dark:text-gray-100 outline-none focus:ring-2 focus:ring-blue-500'
+
+  const form = (
+    <div className="space-y-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-xl border border-gray-100 dark:border-gray-800">
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Nombre</label>
+          <input className={IN} placeholder="ej. Cuenta ahorro" value={name} onChange={e => setName(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Color</label>
+          <div className="flex flex-wrap gap-1 mt-1">
+            {PALETTE_COLORS_RA.map(c => (
+              <button
+                key={c}
+                onClick={() => setColor(c)}
+                className={`w-5 h-5 rounded-full border-2 transition-all ${color === c ? 'border-gray-900 dark:border-white scale-110' : 'border-transparent'}`}
+                style={{ background: c }}
+              />
+            ))}
+            <button
+              onClick={() => colorRef.current?.click()}
+              className="w-5 h-5 rounded-full border border-dashed border-gray-300 dark:border-gray-600 flex items-center justify-center"
+              title="Color personalizado"
+            >
+              <input ref={colorRef} type="color" value={color} onChange={e => setColor(e.target.value)} className="sr-only" />
+              <span className="text-[8px] text-gray-400">+</span>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Entidad bancaria</label>
+        <input className={IN} placeholder="ej. Trade Republic" value={entityName} onChange={e => setEntityName(e.target.value)} />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Número de cuenta (opcional)</label>
+        <input className={IN} placeholder="ES12 3456 7890 1234 5678" value={accountNumber} onChange={e => setAccountNumber(e.target.value)} />
+      </div>
+      <div>
+        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Cuentas ficticias asociadas</label>
+        <div className="flex flex-wrap gap-1.5 mt-1">
+          {accounts.map(acc => (
+            <button
+              key={acc.id}
+              onClick={() => toggleLinked(acc.id)}
+              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                linkedIds.includes(acc.id)
+                  ? 'text-white border-transparent'
+                  : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 hover:border-gray-300'
+              }`}
+              style={linkedIds.includes(acc.id) ? { background: acc.color } : {}}
+            >
+              {acc.name}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex gap-2 pt-1">
+        <button
+          onClick={save}
+          disabled={!name.trim() || !entityName.trim()}
+          className="px-4 py-2 rounded-lg bg-blue-500 text-white text-sm font-medium hover:bg-blue-600 transition-colors disabled:opacity-50"
+        >
+          Guardar
+        </button>
+        <button onClick={cancel} className="px-4 py-2 rounded-lg text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-gray-500 dark:text-gray-400">
+        Las cuentas reales agrupan tus cuentas ficticias por entidad bancaria, permitiéndote comparar con los saldos reales del banco.
+      </p>
+      {realAccounts.map(ra => (
+        <div key={ra.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
+          {editingId === ra.id ? (
+            <div className="p-3">{form}</div>
+          ) : (
+            <div className="flex items-center gap-3 px-4 py-3">
+              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ra.color }} />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-800 dark:text-white truncate">{ra.name}</p>
+                <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                  {ra.entity_name}{ra.account_number ? ` · ${ra.account_number}` : ''}
+                  {ra.linked_account_ids.length > 0 && ` · ${ra.linked_account_ids.length} cuenta${ra.linked_account_ids.length !== 1 ? 's' : ''}`}
+                </p>
+              </div>
+              <button onClick={() => startEdit(ra)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+                <Pencil className="w-3.5 h-3.5" />
+              </button>
+              <button onClick={() => remove(ra.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
+                <Trash2 className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+      {editingId === 'new' ? (
+        <div>{form}</div>
+      ) : (
+        <button
+          onClick={startNew}
+          className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
+        >
+          <Plus className="w-4 h-4" />
+          Añadir cuenta real
+        </button>
+      )}
+    </div>
+  )
+}
+
 const SETTINGS_TABS = [
-  { id: 'cuentas',     labelKey: 'settings.accounts'  },
-  { id: 'apariencia',  labelKey: 'settings.appearance' },
-  { id: 'movimientos', labelKey: 'settings.movements'  },
-  { id: 'navegacion',  labelKey: 'settings.navigation' },
-  { id: 'backup',      labelKey: 'settings.backup'     },
-  { id: 'tickets',        label:    'Tickets'             },
-  { id: 'suscripciones', label:    'Suscripciones'       },
-  { id: 'plugins',        labelKey: 'settings.plugins'    },
-  { id: 'sistema',        label:    'Sistema'             },
+  { id: 'cuentas',        labelKey: 'settings.accounts'  },
+  { id: 'cuentas-reales', label:    'Cuentas reales'      },
+  { id: 'apariencia',     labelKey: 'settings.appearance' },
+  { id: 'movimientos',    labelKey: 'settings.movements'  },
+  { id: 'navegacion',     labelKey: 'settings.navigation' },
+  { id: 'backup',         labelKey: 'settings.backup'     },
+  { id: 'tickets',        label:    'Tickets'              },
+  { id: 'suscripciones',  label:    'Suscripciones'        },
+  { id: 'plugins',        labelKey: 'settings.plugins'     },
+  { id: 'sistema',        label:    'Sistema'              },
 ] as const
 
 export default function Settings() {
@@ -2470,6 +2658,10 @@ export default function Settings() {
               <TypesSection />
             </Section>
           </>
+        )}
+
+        {activeTab === 'cuentas-reales' && (
+          <RealAccountsSection accounts={data.accounts} />
         )}
 
         {activeTab === 'apariencia' && (

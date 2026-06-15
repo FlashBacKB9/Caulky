@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Wallet, Eye, EyeOff } from 'lucide-react'
-import { login, register, getMe, claimData } from '../api/auth'
+import { Wallet, Eye, EyeOff, FlaskConical } from 'lucide-react'
+import { login, register, getMe, claimData, setupDemo } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
 import { t, BUILT_IN_LANGS, getLanguage, setLanguage } from '../utils/i18n'
@@ -17,11 +17,29 @@ export default function LoginPage() {
   const [showPwd, setShowPwd] = useState(false)
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [demoLoading, setDemoLoading] = useState(false)
   const [activeLang, setActiveLang] = useState(getLanguage())
 
   function handleLangChange(id: string) {
     setActiveLang(id)
     setLanguage(id)
+  }
+
+  async function handleDemo() {
+    setError('')
+    setDemoLoading(true)
+    try {
+      const creds = await setupDemo()
+      await login(creds.email, creds.password)
+      queryClient.clear()
+      const u = await getMe()
+      setUser(u)
+      navigate('/', { replace: true })
+    } catch {
+      setError('No se pudo cargar el modo demo. Inténtalo de nuevo.')
+    } finally {
+      setDemoLoading(false)
+    }
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -147,6 +165,17 @@ export default function LoginPage() {
               {loading ? t('auth.loading') : mode === 'login' ? t('auth.submitLogin') : t('auth.submitRegister')}
             </button>
           </form>
+        </div>
+
+        <div className="mt-3">
+          <button
+            onClick={handleDemo}
+            disabled={demoLoading}
+            className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-gray-300 dark:border-gray-700 text-sm font-medium text-gray-500 dark:text-gray-400 hover:border-blue-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors disabled:opacity-50"
+          >
+            <FlaskConical className="w-4 h-4" strokeWidth={1.5} />
+            {demoLoading ? 'Cargando demo…' : 'Modo test — explorar con datos de ejemplo'}
+          </button>
         </div>
 
         <p className="text-center text-xs text-gray-400 dark:text-gray-600 mt-4">
