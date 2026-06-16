@@ -6,6 +6,9 @@ from pydantic import BaseModel, field_validator
 
 class TicketItem(BaseModel):
     name: str
+    qty: float = 1
+    unit: str = "ud"
+    price: Optional[float] = None
     amount: float
     category: str
 
