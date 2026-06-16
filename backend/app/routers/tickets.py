@@ -885,6 +885,9 @@ async def _extract_text(file_path: str, mime_type: str) -> str:
 
 class TicketItemIn(PydanticModel):
     name: str
+    qty: float = 1
+    unit: str = "ud"
+    price: float | None = None
     amount: float
     category: str
 
