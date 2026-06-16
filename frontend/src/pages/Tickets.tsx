@@ -443,6 +443,11 @@ function TicketCard({
       qc.invalidateQueries({ queryKey: ['tickets'] })
       setShowRescanPicker(false)
     },
+    onError: (err: unknown) => {
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      alert(detail ? `Error al reescanear: ${detail}` : 'Error al reescanear el ticket. Comprueba la conexión.')
+      setShowRescanPicker(false)
+    },
   })
 
   useEffect(() => {
@@ -479,11 +484,21 @@ function TicketCard({
   })
 
   const updItem = (i: number, patch: Partial<TicketItem>) =>
-    setEditItems(prev => prev!.map((item, idx) => idx === i ? { ...item, ...patch } : item))
+    setEditItems(prev => prev!.map((item, idx) => {
+      if (idx !== i) return item
+      const next = { ...item, ...patch }
+      // Recalculate line total when qty or price changes
+      if ('qty' in patch || 'price' in patch) {
+        const qty = next.qty ?? 1
+        const price = next.price ?? next.amount
+        next.amount = Math.round(qty * price * 100) / 100
+      }
+      return next
+    }))
   const delItem = (i: number) =>
     setEditItems(prev => prev!.filter((_, idx) => idx !== i))
   const addItem = () =>
-    setEditItems(prev => [...(prev ?? ticket.items.map(it => ({ ...it }))), { name: '', amount: 0, category: 'Sin categoría' }])
+    setEditItems(prev => [...(prev ?? ticket.items.map(it => ({ ...it }))), { name: '', qty: 1, unit: 'ud', price: 0, amount: 0, category: 'Sin categoría' }])
 
   // ── Movement generation ──────────────────────────────────────────────────────
   const suppliesTotal = ticket.items.filter(i => SUPPLIES_CATS.has(i.category)).reduce((s, i) => s + i.amount, 0)
@@ -702,7 +717,9 @@ function TicketCard({
                 <tbody>
                   {displayItems.map((item, i) => {
                     const qty = item.qty ?? 1
-                    const pricePerUnit = qty > 0 ? item.amount / qty : null
+                    // price = unit price (what AI/user sets); amount = line total (calculated)
+                    const unitPrice = item.price ?? (qty > 0 ? item.amount / qty : item.amount)
+                    const lineTotal = item.amount
                     return (
                     <tr key={i} className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
                       <td className="px-4 py-1.5">
@@ -737,6 +754,7 @@ function TicketCard({
                             })()
                         }
                       </td>
+                      {/* Cantidad */}
                       <td className="px-2 py-1.5 text-right text-gray-500 whitespace-nowrap">
                         {isDirty
                           ? <input
@@ -747,27 +765,27 @@ function TicketCard({
                               value={item.qty ?? 1}
                               onChange={e => updItem(i, { qty: parseFloat(e.target.value) || 1 })}
                             />
-                          : <span>{qty} {item.unit ?? 'ud'}</span>
+                          : <span>{qty % 1 === 0 ? qty : qty.toFixed(3).replace(/\.?0+$/, '')} {item.unit ?? 'ud'}</span>
                         }
                       </td>
-                      <td className="px-2 py-1.5 text-right text-gray-400 whitespace-nowrap">
-                        {!isDirty && pricePerUnit != null && qty !== 1
-                          ? `${pricePerUnit.toFixed(2)} €`
-                          : '—'
-                        }
-                      </td>
-                      <td className="px-4 py-1.5 text-right">
+                      {/* P/ud — editable */}
+                      <td className="px-2 py-1.5 text-right whitespace-nowrap">
                         {isDirty
                           ? <input
                               className="w-20 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-right text-gray-700 dark:text-gray-300 outline-none focus:border-blue-400"
                               type="number"
                               step="0.01"
-                              min="0"
-                              value={item.amount}
-                              onChange={e => updItem(i, { amount: parseFloat(e.target.value) || 0 })}
+                              value={item.price ?? unitPrice}
+                              onChange={e => updItem(i, { price: parseFloat(e.target.value) || 0 })}
                             />
-                          : <span className="text-gray-700 dark:text-gray-300 whitespace-nowrap">{item.amount.toFixed(2)} €</span>
+                          : <span className="text-gray-600 dark:text-gray-300">{unitPrice.toFixed(2)} €</span>
                         }
+                      </td>
+                      {/* Importe = qty × price, calculado */}
+                      <td className="px-4 py-1.5 text-right">
+                        <span className={`whitespace-nowrap font-medium ${lineTotal < 0 ? 'text-red-500' : 'text-gray-700 dark:text-gray-300'}`}>
+                          {lineTotal.toFixed(2)} €
+                        </span>
                       </td>
                       {isDirty && (
                         <td className="pr-3 py-1.5">

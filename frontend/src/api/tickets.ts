@@ -4,7 +4,8 @@ export interface TicketItem {
   name: string
   qty?: number
   unit?: string
-  amount: number
+  price?: number   // unit price; amount = qty × price
+  amount: number   // line total (used for financial calculations)
   category: string
 }
 

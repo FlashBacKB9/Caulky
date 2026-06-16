@@ -598,18 +598,18 @@ async def _analyze_with_mistral(file_path: str, mime_type: str, api_key: str = "
         "Analiza la imagen del ticket y devuelve los datos en este JSON exacto "
         "(sin texto adicional, sin bloques markdown):\n"
         '{"store_name":"nombre del supermercado","date":"YYYY-MM-DD",'
-        '"total":0.00,"items":[{"name":"PRODUCTO","qty":1,"unit":"ud","amount":0.00,"category":"CATEGORIA"}]}\n\n'
+        '"total":0.00,"items":[{"name":"PRODUCTO","qty":1,"unit":"ud","price":0.00,"category":"CATEGORIA"}]}\n\n'
         "Reglas:\n"
         "- store_name: nombre exacto de la tienda (ej: Mercadona, Lidl, Carrefour). "
         "null si no se ve claramente.\n"
         "- date: fecha de compra en YYYY-MM-DD. null si no se ve.\n"
         "- total: importe total pagado (TOTAL, TOTAL A PAGAR, TARJETA, BIZUM). "
         "null si no se ve.\n"
-        "- items: TODOS los productos con su precio de línea.\n"
+        "- items: TODOS los productos del ticket.\n"
         "  - qty: cantidad numérica (1 si no se especifica).\n"
         "  - unit: 'ud', 'kg', 'g', 'L', 'ml', 'pack' según corresponda.\n"
-        "  - amount: precio TOTAL de la línea (qty × precio unitario).\n"
-        "  Incluye descuentos como importes negativos. "
+        "  - price: precio UNITARIO del producto (no el total de línea).\n"
+        "  Incluye descuentos como price negativo. "
         "Omite IVA, subtotales, formas de pago y datos del establecimiento.\n"
         f"- category: elige UNA de estas categorías exactas: {_CATEGORIES_LIST}. "
         'Usa "Sin categoría" si no encaja en ninguna.\n'
@@ -651,7 +651,7 @@ async def _analyze_with_mistral(file_path: str, mime_type: str, api_key: str = "
         return None
 
 
-async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = "") -> dict | None:
+async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = "", preferred_model: str = "") -> dict | None:
     """Use Gemini 2.0 Flash (free tier) to extract structured data from a receipt.
 
     api_key: caller-supplied key (from user preferences); falls back to GEMINI_API_KEY env var.
@@ -701,18 +701,18 @@ async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = ""
         "Analiza la imagen del ticket y devuelve los datos en este JSON exacto "
         "(sin texto adicional, sin bloques markdown):\n"
         '{"store_name":"nombre del supermercado","date":"YYYY-MM-DD",'
-        '"total":0.00,"items":[{"name":"PRODUCTO","qty":1,"unit":"ud","amount":0.00,"category":"CATEGORIA"}]}\n\n'
+        '"total":0.00,"items":[{"name":"PRODUCTO","qty":1,"unit":"ud","price":0.00,"category":"CATEGORIA"}]}\n\n'
         "Reglas:\n"
         "- store_name: nombre exacto de la tienda (ej: Mercadona, Lidl, Carrefour). "
         "null si no se ve claramente.\n"
         "- date: fecha de compra en YYYY-MM-DD. null si no se ve.\n"
         "- total: importe total pagado (TOTAL, TOTAL A PAGAR, TARJETA, BIZUM). "
         "null si no se ve.\n"
-        "- items: TODOS los productos con su precio de línea.\n"
+        "- items: TODOS los productos del ticket.\n"
         "  - qty: cantidad numérica (1 si no se especifica).\n"
         "  - unit: 'ud', 'kg', 'g', 'L', 'ml', 'pack' según corresponda.\n"
-        "  - amount: precio TOTAL de la línea (qty × precio unitario).\n"
-        "  Incluye descuentos como importes negativos. "
+        "  - price: precio UNITARIO del producto (no el total de línea).\n"
+        "  Incluye descuentos como price negativo. "
         "Omite IVA, subtotales, formas de pago y datos del establecimiento.\n"
         f"- category: elige UNA de estas categorías exactas: {_CATEGORIES_LIST}. "
         'Usa "Sin categoría" si no encaja en ninguna.\n'
@@ -734,8 +734,7 @@ async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = ""
 
     # Try models in order — availability varies by account/region.
     # GEMINI_MODEL env var lets the user pin a specific model.
-    env_model = os.environ.get("_RESCAN_MODEL", "") or os.environ.get("GEMINI_MODEL", "")
-    env_model = env_model.strip()
+    env_model = preferred_model.strip() or os.environ.get("GEMINI_MODEL", "").strip()
     models_to_try = [m for m in [
         env_model,
         "gemini-2.0-flash",
@@ -968,7 +967,13 @@ async def analyze_ticket(
             except (TypeError, ValueError):
                 qty = 1
             unit = str(it.get("unit") or "ud").strip() or "ud"
-            items.append({"name": name.title(), "qty": qty, "unit": unit, "amount": round(amount, 2), "category": cat})
+            # price = unit price; amount = qty × price (line total for financial calculations)
+            try:
+                price = float(it.get("price") or it.get("amount") or amount)
+            except (TypeError, ValueError):
+                price = amount
+            line_total = round(qty * price, 2)
+            items.append({"name": name.title(), "qty": qty, "unit": unit, "price": round(price, 4), "amount": line_total, "category": cat})
 
         categories = _compute_categories(items)
 
@@ -1163,13 +1168,10 @@ async def rescan_ticket(
         if ai_result:
             ocr_source = "mistral"
     else:
-        # Allow pinning a specific Gemini model via GEMINI_MODEL env override
-        if body.model:
-            os.environ["_RESCAN_MODEL"] = body.model
-        try:
-            ai_result = await _analyze_with_gemini(file_path, t.mime_type, api_key=gemini_key)
-        finally:
-            os.environ.pop("_RESCAN_MODEL", None)
+        ai_result = await _analyze_with_gemini(
+            file_path, t.mime_type, api_key=gemini_key,
+            preferred_model=body.model or "",
+        )
         if ai_result:
             ocr_source = "gemini"
 
