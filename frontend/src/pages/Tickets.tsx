@@ -6,9 +6,9 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis
 import { Leaf, Package, ShoppingCart, Tag } from 'lucide-react'
 import {
   Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
-  Eye, EyeOff, Search, ArrowRightLeft, ExternalLink, AlertTriangle,
+  Eye, EyeOff, Search, ArrowRightLeft, ExternalLink, AlertTriangle, RefreshCw,
 } from 'lucide-react'
-import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicketMeta, ticketFileUrl, attachTicketToMovement, getTicketOcrDebug, type Ticket, type TicketItem, type TicketOcrDebug } from '../api/tickets'
+import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicketMeta, rescanTicket, ticketFileUrl, attachTicketToMovement, getTicketOcrDebug, type Ticket, type TicketItem, type TicketOcrDebug } from '../api/tickets'
 import { compressTicketImage } from '../utils/imageCompressor'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import MovementForm from '../components/MovementForm'
@@ -432,6 +432,18 @@ function TicketCard({
   const [showOcrDebug, setShowOcrDebug] = useState(false)
   const [ocrDebug, setOcrDebug] = useState<TicketOcrDebug | null>(null)
   const [ocrDebugLoading, setOcrDebugLoading] = useState(false)
+  const [showRescanPicker, setShowRescanPicker] = useState(false)
+
+  const rescanMut = useMutation({
+    mutationFn: ({ source, model }: { source: 'gemini' | 'mistral'; model?: string }) =>
+      rescanTicket(ticket.id, source, model),
+    onSuccess: (updated) => {
+      setTicket(updated)
+      setEditItems(null)
+      qc.invalidateQueries({ queryKey: ['tickets'] })
+      setShowRescanPicker(false)
+    },
+  })
 
   useEffect(() => {
     if (!showOcrDebug || ocrDebug) return
@@ -681,12 +693,17 @@ function TicketCard({
                   <tr className="border-b border-gray-100 dark:border-gray-800 text-gray-400 dark:text-gray-500">
                     <th className="px-4 py-2 text-left font-medium">Producto</th>
                     <th className="px-2 py-2 text-left font-medium">Categoría</th>
+                    <th className="px-2 py-2 text-right font-medium">Cant.</th>
+                    <th className="px-2 py-2 text-right font-medium">P/ud</th>
                     <th className="px-4 py-2 text-right font-medium">Importe</th>
                     {isDirty && <th className="w-7" />}
                   </tr>
                 </thead>
                 <tbody>
-                  {displayItems.map((item, i) => (
+                  {displayItems.map((item, i) => {
+                    const qty = item.qty ?? 1
+                    const pricePerUnit = qty > 0 ? item.amount / qty : null
+                    return (
                     <tr key={i} className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
                       <td className="px-4 py-1.5">
                         {isDirty
@@ -720,6 +737,25 @@ function TicketCard({
                             })()
                         }
                       </td>
+                      <td className="px-2 py-1.5 text-right text-gray-500 whitespace-nowrap">
+                        {isDirty
+                          ? <input
+                              className="w-14 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded px-1.5 py-0.5 text-right text-gray-700 dark:text-gray-300 outline-none focus:border-blue-400"
+                              type="number"
+                              step="0.001"
+                              min="0"
+                              value={item.qty ?? 1}
+                              onChange={e => updItem(i, { qty: parseFloat(e.target.value) || 1 })}
+                            />
+                          : <span>{qty} {item.unit ?? 'ud'}</span>
+                        }
+                      </td>
+                      <td className="px-2 py-1.5 text-right text-gray-400 whitespace-nowrap">
+                        {!isDirty && pricePerUnit != null && qty !== 1
+                          ? `${pricePerUnit.toFixed(2)} €`
+                          : '—'
+                        }
+                      </td>
                       <td className="px-4 py-1.5 text-right">
                         {isDirty
                           ? <input
@@ -745,7 +781,8 @@ function TicketCard({
                         </td>
                       )}
                     </tr>
-                  ))}
+                    )
+                  })}
                 </tbody>
               </table>
             </div>
@@ -869,6 +906,40 @@ function TicketCard({
                 >
                   <Pencil className="w-3.5 h-3.5" /> Editar productos
                 </button>
+
+                {/* Rescan button */}
+                <div className="relative">
+                  <button
+                    onClick={() => setShowRescanPicker(v => !v)}
+                    disabled={rescanMut.isPending}
+                    title="Reescanear con IA"
+                    className="flex items-center gap-1 text-xs text-gray-400 hover:text-blue-500 transition-colors disabled:opacity-40"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${rescanMut.isPending ? 'animate-spin' : ''}`} />
+                    {rescanMut.isPending ? 'Reescaneando…' : 'Reescanear'}
+                  </button>
+                  {showRescanPicker && (
+                    <div className="absolute bottom-full left-0 mb-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-20 min-w-44 py-1">
+                      <p className="px-3 py-1.5 text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Modelo</p>
+                      {[
+                        { label: 'Gemini 2.5 Flash', source: 'gemini' as const, model: 'gemini-2.5-flash' },
+                        { label: 'Gemini 2.5 Pro',   source: 'gemini' as const, model: 'gemini-2.5-pro' },
+                        { label: 'Gemini 2.0 Flash', source: 'gemini' as const, model: 'gemini-2.0-flash' },
+                        { label: 'Gemini 1.5 Flash', source: 'gemini' as const, model: 'gemini-1.5-flash-latest' },
+                        { label: 'Mistral Pixtral',  source: 'mistral' as const, model: undefined },
+                      ].map(opt => (
+                        <button
+                          key={opt.label}
+                          onClick={() => rescanMut.mutate({ source: opt.source, model: opt.model })}
+                          className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
+                        >
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
                 <div className="flex-1" />
                 <button
                   onClick={() => setShowOcrDebug(p => !p)}
@@ -890,7 +961,7 @@ function TicketCard({
 // ── Category chart ─────────────────────────────────────────────────────────────
 
 type DateRange = 'all' | 'month' | '3m' | 'year'
-type GroupBy   = 'cat' | 'store' | 'month'
+type GroupBy   = 'cat' | 'store' | 'month' | 'qty'
 type ChartView = 'donut' | 'bar' | 'area'
 
 interface ChartDatum { name: string; value: number; pct: number; color: string }
@@ -935,7 +1006,8 @@ function TGroup<T extends string>({
 }
 
 /** Donut + legend list */
-function DonutView({ data, grand }: { data: ChartDatum[]; grand: number }) {
+function DonutView({ data, grand, unit = '€' }: { data: ChartDatum[]; grand: number; unit?: string }) {
+  const fmt = (v: number) => unit === '€' ? `${v.toFixed(2)} €` : `${v % 1 === 0 ? v : v.toFixed(1)} ud`
   return (
     <div className="flex flex-col lg:flex-row gap-6">
       <div className="w-full lg:w-56 h-52 shrink-0">
@@ -944,7 +1016,7 @@ function DonutView({ data, grand }: { data: ChartDatum[]; grand: number }) {
             <Pie data={data} cx="50%" cy="50%" innerRadius={46} outerRadius={84} paddingAngle={2} dataKey="value">
               {data.map((_e, i) => <Cell key={i} fill={data[i].color} />)}
             </Pie>
-            <Tooltip formatter={(v) => [`${Number(v).toFixed(2)} €`]} contentStyle={getTooltipStyle()} />
+            <Tooltip formatter={(v) => [fmt(Number(v))]} contentStyle={getTooltipStyle()} />
           </PieChart>
         </ResponsiveContainer>
       </div>
@@ -954,14 +1026,14 @@ function DonutView({ data, grand }: { data: ChartDatum[]; grand: number }) {
             <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: d.color }} />
             <span className="text-xs text-gray-600 dark:text-gray-400 truncate flex-1">{d.name}</span>
             <span className="text-xs font-semibold text-gray-800 dark:text-white whitespace-nowrap">{d.pct}%</span>
-            <span className="text-xs text-gray-400 whitespace-nowrap">{d.value.toFixed(2)} €</span>
+            <span className="text-xs text-gray-400 whitespace-nowrap">{fmt(d.value)}</span>
           </div>
         ))}
         {data.length > 0 && (
           <div className="flex items-center gap-2 py-0.5 col-span-full border-t border-gray-100 dark:border-gray-800 mt-1 pt-1">
             <span className="w-2.5 h-2.5 shrink-0" />
             <span className="text-xs font-semibold text-gray-700 dark:text-gray-300 flex-1">Total</span>
-            <span className="text-xs font-bold text-gray-800 dark:text-white whitespace-nowrap">{grand.toFixed(2)} €</span>
+            <span className="text-xs font-bold text-gray-800 dark:text-white whitespace-nowrap">{fmt(grand)}</span>
           </div>
         )}
       </div>
@@ -970,9 +1042,10 @@ function DonutView({ data, grand }: { data: ChartDatum[]; grand: number }) {
 }
 
 /** Horizontal bars (categories / stores) */
-function HBarView({ data }: { data: ChartDatum[] }) {
+function HBarView({ data, unit = '€' }: { data: ChartDatum[]; unit?: string }) {
   const shown = data.slice(0, 15)
   const max = shown[0]?.value ?? 1
+  const fmt = (v: number) => unit === '€' ? `${v.toFixed(2)} €` : `${v % 1 === 0 ? v : v.toFixed(1)} ud`
   return (
     <div className="space-y-1.5">
       {shown.map((d, i) => (
@@ -984,7 +1057,7 @@ function HBarView({ data }: { data: ChartDatum[] }) {
               style={{ width: `${(d.value / max) * 100}%`, background: d.color }}
             />
           </div>
-          <span className="w-18 text-xs text-gray-500 dark:text-gray-400 text-right whitespace-nowrap shrink-0">{d.value.toFixed(2)} €</span>
+          <span className="w-18 text-xs text-gray-500 dark:text-gray-400 text-right whitespace-nowrap shrink-0">{fmt(d.value)}</span>
           <span className="text-[10px] text-gray-400 w-8 text-right shrink-0">{d.pct}%</span>
         </div>
       ))}
@@ -1058,7 +1131,11 @@ function CategoryChart({ tickets }: { tickets: Ticket[] }) {
   const { data, grand } = useMemo(() => {
     const totals: Record<string, number> = {}
 
-    if (groupBy === 'cat') {
+    if (groupBy === 'qty') {
+      for (const t of filtered)
+        for (const item of t.items)
+          totals[item.category] = (totals[item.category] ?? 0) + (item.qty ?? 1)
+    } else if (groupBy === 'cat') {
       for (const t of filtered)
         for (const [cat, amt] of Object.entries(t.categories))
           totals[cat] = (totals[cat] ?? 0) + amt
@@ -1095,7 +1172,7 @@ function CategoryChart({ tickets }: { tickets: Ticket[] }) {
     return { data, grand }
   }, [filtered, groupBy])
 
-  // Derive view: donut not valid for month; area not valid for cat/store
+  // Derive view: donut not valid for month; area not valid for cat/store/qty
   const effectiveView: ChartView =
     (view === 'donut' && groupBy === 'month') ? 'bar' :
     (view === 'area'  && groupBy !== 'month') ? 'donut' :
@@ -1114,7 +1191,7 @@ function CategoryChart({ tickets }: { tickets: Ticket[] }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span className="text-sm font-semibold text-gray-800 dark:text-white">
           Desglose
-          {grand > 0 && <span className="ml-1.5 text-gray-500 font-normal">— {grand.toFixed(2)} €</span>}
+          {grand > 0 && <span className="ml-1.5 text-gray-500 font-normal">— {groupBy === 'qty' ? `${grand % 1 === 0 ? grand : grand.toFixed(1)} ud` : `${grand.toFixed(2)} €`}</span>}
           {filtered.length < tickets.length && (
             <span className="text-xs font-normal text-gray-400 ml-2">({filtered.length} ticket{filtered.length !== 1 ? 's' : ''})</span>
           )}
@@ -1131,6 +1208,7 @@ function CategoryChart({ tickets }: { tickets: Ticket[] }) {
       <div className="flex flex-wrap items-center justify-between gap-2">
         <TGroup value={groupBy} onChange={v => setGroupBy(v as GroupBy)} options={[
           { value: 'cat',   label: 'Categoría' },
+          { value: 'qty',   label: 'Cantidad'  },
           { value: 'store', label: 'Tienda'    },
           { value: 'month', label: 'Mes'       },
         ]} />
@@ -1143,9 +1221,9 @@ function CategoryChart({ tickets }: { tickets: Ticket[] }) {
           No hay datos para el período seleccionado.
         </p>
       ) : effectiveView === 'donut' ? (
-        <DonutView data={data} grand={grand} />
+        <DonutView data={data} grand={grand} unit={groupBy === 'qty' ? 'ud' : '€'} />
       ) : effectiveView === 'bar' && groupBy !== 'month' ? (
-        <HBarView data={data} />
+        <HBarView data={data} unit={groupBy === 'qty' ? 'ud' : '€'} />
       ) : effectiveView === 'bar' ? (
         <VBarView data={data} />
       ) : (

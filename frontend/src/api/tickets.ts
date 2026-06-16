@@ -2,6 +2,8 @@ import api from './client'
 
 export interface TicketItem {
   name: string
+  qty?: number
+  unit?: string
   amount: number
   category: string
 }
@@ -32,6 +34,9 @@ export const getTickets = (): Promise<Ticket[]> =>
 
 export const updateTicketItems = (id: number, items: TicketItem[]): Promise<Ticket> =>
   api.patch<Ticket>(`/tickets/${id}/items`, { items }).then(r => r.data)
+
+export const rescanTicket = (id: number, source: 'gemini' | 'mistral', model?: string): Promise<Ticket> =>
+  api.post<Ticket>(`/tickets/${id}/rescan`, { source, model }).then(r => r.data)
 
 export const deleteTicket = (id: number): Promise<void> =>
   api.delete(`/tickets/${id}`).then(() => undefined)

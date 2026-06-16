@@ -598,15 +598,18 @@ async def _analyze_with_mistral(file_path: str, mime_type: str, api_key: str = "
         "Analiza la imagen del ticket y devuelve los datos en este JSON exacto "
         "(sin texto adicional, sin bloques markdown):\n"
         '{"store_name":"nombre del supermercado","date":"YYYY-MM-DD",'
-        '"total":0.00,"items":[{"name":"PRODUCTO","amount":0.00,"category":"CATEGORIA"}]}\n\n'
+        '"total":0.00,"items":[{"name":"PRODUCTO","qty":1,"unit":"ud","amount":0.00,"category":"CATEGORIA"}]}\n\n'
         "Reglas:\n"
         "- store_name: nombre exacto de la tienda (ej: Mercadona, Lidl, Carrefour). "
         "null si no se ve claramente.\n"
         "- date: fecha de compra en YYYY-MM-DD. null si no se ve.\n"
         "- total: importe total pagado (TOTAL, TOTAL A PAGAR, TARJETA, BIZUM). "
         "null si no se ve.\n"
-        "- items: TODOS los productos con su precio de línea (precio total, no unitario). "
-        "Incluye descuentos como importes negativos. "
+        "- items: TODOS los productos con su precio de línea.\n"
+        "  - qty: cantidad numérica (1 si no se especifica).\n"
+        "  - unit: 'ud', 'kg', 'g', 'L', 'ml', 'pack' según corresponda.\n"
+        "  - amount: precio TOTAL de la línea (qty × precio unitario).\n"
+        "  Incluye descuentos como importes negativos. "
         "Omite IVA, subtotales, formas de pago y datos del establecimiento.\n"
         f"- category: elige UNA de estas categorías exactas: {_CATEGORIES_LIST}. "
         'Usa "Sin categoría" si no encaja en ninguna.\n'
@@ -698,15 +701,18 @@ async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = ""
         "Analiza la imagen del ticket y devuelve los datos en este JSON exacto "
         "(sin texto adicional, sin bloques markdown):\n"
         '{"store_name":"nombre del supermercado","date":"YYYY-MM-DD",'
-        '"total":0.00,"items":[{"name":"PRODUCTO","amount":0.00,"category":"CATEGORIA"}]}\n\n'
+        '"total":0.00,"items":[{"name":"PRODUCTO","qty":1,"unit":"ud","amount":0.00,"category":"CATEGORIA"}]}\n\n'
         "Reglas:\n"
         "- store_name: nombre exacto de la tienda (ej: Mercadona, Lidl, Carrefour). "
         "null si no se ve claramente.\n"
         "- date: fecha de compra en YYYY-MM-DD. null si no se ve.\n"
         "- total: importe total pagado (TOTAL, TOTAL A PAGAR, TARJETA, BIZUM). "
         "null si no se ve.\n"
-        "- items: TODOS los productos con su precio de línea (precio total, no unitario). "
-        "Incluye descuentos como importes negativos. "
+        "- items: TODOS los productos con su precio de línea.\n"
+        "  - qty: cantidad numérica (1 si no se especifica).\n"
+        "  - unit: 'ud', 'kg', 'g', 'L', 'ml', 'pack' según corresponda.\n"
+        "  - amount: precio TOTAL de la línea (qty × precio unitario).\n"
+        "  Incluye descuentos como importes negativos. "
         "Omite IVA, subtotales, formas de pago y datos del establecimiento.\n"
         f"- category: elige UNA de estas categorías exactas: {_CATEGORIES_LIST}. "
         'Usa "Sin categoría" si no encaja en ninguna.\n'
@@ -728,7 +734,8 @@ async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = ""
 
     # Try models in order — availability varies by account/region.
     # GEMINI_MODEL env var lets the user pin a specific model.
-    env_model = os.environ.get("GEMINI_MODEL", "").strip()
+    env_model = os.environ.get("_RESCAN_MODEL", "") or os.environ.get("GEMINI_MODEL", "")
+    env_model = env_model.strip()
     models_to_try = [m for m in [
         env_model,
         "gemini-2.0-flash",
@@ -956,7 +963,12 @@ async def analyze_ticket(
                 or (ai_cat if ai_cat in _valid_cat_set else None)
                 or _categorize(name)
             )
-            items.append({"name": name.title(), "amount": round(amount, 2), "category": cat})
+            try:
+                qty = float(it.get("qty") or 1) or 1
+            except (TypeError, ValueError):
+                qty = 1
+            unit = str(it.get("unit") or "ud").strip() or "ud"
+            items.append({"name": name.title(), "qty": qty, "unit": unit, "amount": round(amount, 2), "category": cat})
 
         categories = _compute_categories(items)
 
@@ -1108,6 +1120,114 @@ async def patch_ticket_meta(
                 t.ticket_date = _dt.fromisoformat(body.ticket_date)
             except ValueError:
                 pass
+    await db.commit()
+    await db.refresh(t)
+    return t
+
+
+class RescanRequest(PydanticModel):
+    source: str = "gemini"   # "gemini" | "mistral"
+    model: str | None = None  # pin a specific Gemini model; ignored for Mistral
+
+
+@router.post("/{ticket_id}/rescan", response_model=TicketRead)
+async def rescan_ticket(
+    ticket_id: int,
+    body: RescanRequest,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    """Re-run AI OCR on an existing ticket (same file, different model/source)."""
+    t = await db.get(Ticket, ticket_id)
+    if not t or t.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    file_path = os.path.join(UPLOAD_DIR, t.filename)
+    if not os.path.exists(file_path):
+        raise HTTPException(status_code=400, detail="Archivo del ticket no encontrado en disco")
+
+    from app.models.user_preference import UserPreference
+    prefs_result = await db.execute(select(UserPreference).where(UserPreference.user_id == user.id))
+    prefs = {p.key: p.value for p in prefs_result.scalars().all()}
+    rules_result = await db.execute(select(ItemCategoryRule).where(ItemCategoryRule.user_id == user.id))
+    custom_rules = {r.item_name: r.category for r in rules_result.scalars().all()}
+
+    gemini_key  = prefs.get("gemini_api_key", "")
+    mistral_key = prefs.get("mistral_api_key", "")
+
+    ai_result = None
+    ocr_source = None
+
+    if body.source == "mistral":
+        ai_result = await _analyze_with_mistral(file_path, t.mime_type, api_key=mistral_key)
+        if ai_result:
+            ocr_source = "mistral"
+    else:
+        # Allow pinning a specific Gemini model via GEMINI_MODEL env override
+        if body.model:
+            os.environ["_RESCAN_MODEL"] = body.model
+        try:
+            ai_result = await _analyze_with_gemini(file_path, t.mime_type, api_key=gemini_key)
+        finally:
+            os.environ.pop("_RESCAN_MODEL", None)
+        if ai_result:
+            ocr_source = "gemini"
+
+    if not ai_result:
+        raise HTTPException(status_code=422, detail="El modelo no pudo extraer datos del ticket")
+
+    _valid_cat_set = set(_VALID_CATEGORIES)
+    raw_items = ai_result.get("items") or []
+    items: list[dict] = []
+    for it in raw_items:
+        name = str(it.get("name") or "").strip()
+        if not name:
+            continue
+        try:
+            amount = float(it.get("amount") or 0)
+        except (TypeError, ValueError):
+            continue
+        if amount == 0:
+            continue
+        low = name.lower()
+        ai_cat = str(it.get("category") or "").strip()
+        cat = (
+            custom_rules.get(low)
+            or (ai_cat if ai_cat in _valid_cat_set else None)
+            or _categorize(name)
+        )
+        try:
+            qty = float(it.get("qty") or 1) or 1
+        except (TypeError, ValueError):
+            qty = 1
+        unit = str(it.get("unit") or "ud").strip() or "ud"
+        items.append({"name": name.title(), "qty": qty, "unit": unit, "amount": round(amount, 2), "category": cat})
+
+    categories = _compute_categories(items)
+
+    raw_date = ai_result.get("date")
+    ticket_date = t.ticket_date
+    if raw_date:
+        try:
+            from datetime import date as _dt2
+            ticket_date = _dt2.fromisoformat(str(raw_date))
+        except ValueError:
+            ticket_date = _extract_date(str(raw_date)) or t.ticket_date
+
+    try:
+        v = float(ai_result.get("total") or 0)
+        total = v if v else t.total
+    except (TypeError, ValueError):
+        total = t.total
+
+    store_name = str(ai_result.get("store_name") or "").strip() or t.store_name or "Supermercado"
+
+    t.items = json.dumps(items, ensure_ascii=False)
+    t.categories = json.dumps(categories, ensure_ascii=False)
+    t.store_name = store_name
+    t.ticket_date = ticket_date
+    t.total = total
+    t.ocr_source = ocr_source
     await db.commit()
     await db.refresh(t)
     return t
