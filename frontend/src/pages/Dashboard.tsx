@@ -22,7 +22,7 @@ import {
 } from '../hooks/useDashboardConfig'
 import { applyAdvancedFilter, type AdvancedFilter } from '../components/FilterPanel'
 import {
-  readBudgets as readBudgetsCanon, getCurrentPeriod, getAmountForDate, calcSpending,
+  readBudgets as readBudgetsCanon, getCurrentPeriod, calcSpending,
   type Budget, type BudgetPeriodType,
 } from './Budgets'
 import {
@@ -1683,11 +1683,11 @@ export default function Dashboard() {
 
     // ── All-budgets combined widget ──
     if (w.id === 'budget-all') {
-      const refDate = new Date(selDate.year, selDate.month, 1)
+      const refDate = new Date(selDate.year, selDate.month, 15)
       const allPeriods = budgets.map(b => {
         const { start, end } = getBudgetPeriod(b, refDate)
         const typeIds = new Set(b.typeIds)
-        const limit   = getAmountForDate(b.versions, start)
+        const limit   = b.versions.length ? b.versions[b.versions.length - 1].amount : 0
         const spent   = calcSpending(movements, typeIds, start, end)
         const pct     = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0
         const colors  = budgetPctColors(pct)
@@ -1742,8 +1742,8 @@ export default function Dashboard() {
       </div>
     )
     const typeIds = new Set(budget.typeIds)
-    const { start, end } = getBudgetPeriod(budget, new Date(selDate.year, selDate.month, 1))
-    const limit  = getAmountForDate(budget.versions, start)
+    const { start, end } = getBudgetPeriod(budget, new Date(selDate.year, selDate.month, 15))
+    const limit  = budget.versions.length ? budget.versions[budget.versions.length - 1].amount : 0
     const spent  = calcSpending(movements, typeIds, start, end)
     const pct    = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0
     const colors = budgetPctColors(pct)
