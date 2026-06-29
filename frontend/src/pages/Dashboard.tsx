@@ -22,6 +22,10 @@ import {
 } from '../hooks/useDashboardConfig'
 import { applyAdvancedFilter, type AdvancedFilter } from '../components/FilterPanel'
 import {
+  readBudgets as readBudgetsCanon, getCurrentPeriod, getAmountForDate, calcSpending,
+  type Budget, type BudgetPeriodType,
+} from './Budgets'
+import {
   ResponsiveContainer,
   LineChart, Line,
   AreaChart, Area,
@@ -495,71 +499,13 @@ function CyclingBalanceHistoryChart({ accounts, movements, movementTypes, height
 }
 
 
-// ── Budget types & helpers ────────────────────────────────────────────────────
-
-interface BudgetVersion { id: string; amount: number; effectiveFrom: string }
-interface StoredBudget {
-  id: string; name: string; typeIds: number[]
-  period: 'monthly' | 'weekly' | 'annual' | 'custom'
-  customFrom?: string; customTo?: string; trackingStart?: string | null
-  monthlyStartDay?: number   // 1–31, default 1
-  weeklyStartDay?: number    // 0=Lun … 6=Dom, default 0
-  annualStartDate?: string   // "MM-DD", default "01-01"
-  versions: BudgetVersion[]
-}
+// ── Budget helpers (canonical logic lives in Budgets.tsx) ─────────────────────
 
 function genId()    { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 function todayStr() { return new Date().toLocaleDateString('en-CA') }
 
-function getBudgetPeriod(b: StoredBudget, ref: Date = new Date()): { start: string; end: string } {
-  if (b.period === 'monthly') {
-    const d = b.monthlyStartDay ?? 1
-    let y = ref.getFullYear(), m = ref.getMonth()
-    if (ref.getDate() < d) { m -= 1; if (m < 0) { m = 11; y -= 1 } }
-    const daysInM = new Date(y, m + 1, 0).getDate()
-    const clamp   = Math.min(d, daysInM)
-    return {
-      start: new Date(y, m, clamp).toLocaleDateString('en-CA'),
-      end:   new Date(y, m + 1, clamp - 1).toLocaleDateString('en-CA'),
-    }
-  }
-  if (b.period === 'annual') {
-    const sd = b.annualStartDate ?? '01-01'
-    const y  = ref.getFullYear()
-    const refStr = ref.toLocaleDateString('en-CA')
-    const thisStart = `${y}-${sd}`
-    if (refStr >= thisStart) {
-      const [mm, dd] = sd.split('-').map(Number)
-      const endDt = new Date(y + 1, mm - 1, dd); endDt.setDate(endDt.getDate() - 1)
-      return { start: thisStart, end: endDt.toLocaleDateString('en-CA') }
-    } else {
-      const [mm, dd] = sd.split('-').map(Number)
-      const endDt = new Date(y, mm - 1, dd); endDt.setDate(endDt.getDate() - 1)
-      return { start: `${y - 1}-${sd}`, end: endDt.toLocaleDateString('en-CA') }
-    }
-  }
-  if (b.period === 'weekly') {
-    const jsWD = ((b.weeklyStartDay ?? 0) + 1) % 7
-    const diff = (ref.getDay() - jsWD + 7) % 7
-    const start = new Date(ref); start.setDate(ref.getDate() - diff)
-    const end   = new Date(start); end.setDate(start.getDate() + 6)
-    return { start: start.toLocaleDateString('en-CA'), end: end.toLocaleDateString('en-CA') }
-  }
-  const today = todayStr()
-  return { start: b.customFrom ?? today, end: b.customTo ?? today }
-}
-
-function getBudgetLimit(versions: BudgetVersion[], date: string): number {
-  if (!versions.length) return 0
-  let r = versions[0].amount
-  for (const v of versions) { if (v.effectiveFrom <= date) r = v.amount; else break }
-  return r
-}
-
-function calcBudgetSpent(movements: Movement[], typeIds: Set<number>, start: string, end: string): number {
-  return movements
-    .filter(mv => mv.movement_type_id != null && typeIds.has(mv.movement_type_id) && mv.date >= start && mv.date <= end)
-    .reduce((s, mv) => s + Math.abs(mv.dinero), 0)
+function getBudgetPeriod(b: Budget, ref?: Date) {
+  return getCurrentPeriod(b.period, b.customFrom, b.customTo, b.monthlyStartDay, b.weeklyStartDay, b.annualStartDate, ref)
 }
 
 function budgetPctColors(pct: number) {
@@ -569,7 +515,7 @@ function budgetPctColors(pct: number) {
   return               { bar: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400' }
 }
 
-function budgetPeriodLabel(b: StoredBudget, start: string, end: string): string {
+function budgetPeriodLabel(b: Budget, start: string, end: string): string {
   if (b.period === 'monthly') {
     const [y, m] = start.split('-').map(Number)
     return `${MONTHS_SHORT[m - 1]} ${y}`
@@ -578,10 +524,8 @@ function budgetPeriodLabel(b: StoredBudget, start: string, end: string): string 
   return `${start.slice(5)} → ${end.slice(5)}`
 }
 
-function readBudgets(): StoredBudget[] {
-  try { return JSON.parse(localStorage.getItem('spendly-budgets') ?? '[]') } catch { return [] }
-}
-function writeBudgets(b: StoredBudget[]) { syncPref('spendly-budgets', JSON.stringify(b)) }
+function readBudgets(): Budget[] { return readBudgetsCanon() }
+function writeBudgets(b: Budget[]) { syncPref('spendly-budgets', JSON.stringify(b)) }
 
 // ── Custom chart support ──────────────────────────────────────────────────────
 
@@ -1055,12 +999,12 @@ const BALANCE_HISTORY_OPTIONS = [
 
 function NewBudgetForm({ types, onSave, onCancel }: {
   types: MovementType[]
-  onSave: (b: StoredBudget) => void
+  onSave: (b: Budget) => void
   onCancel: () => void
 }) {
   const [name,             setName]            = useState('')
   const [amount,           setAmount]          = useState('')
-  const [period,           setPeriod]          = useState<StoredBudget['period']>('monthly')
+  const [period,           setPeriod]          = useState<BudgetPeriodType>('monthly')
   const [monthlyStartDay,  setMonthlyStartDay] = useState(1)
   const [weeklyStartDay,   setWeeklyStartDay]  = useState(0)
   const [annualStartMonth, setAnnualStartMonth] = useState(1)
@@ -1080,7 +1024,7 @@ function NewBudgetForm({ types, onSave, onCancel }: {
   const handleSave = () => {
     const parsed = parseFloat(amount.replace(',', '.'))
     if (!name.trim() || isNaN(parsed) || parsed <= 0 || selIds.size === 0) return
-    const b: StoredBudget = {
+    const b: Budget = {
       id: genId(), name: name.trim(), typeIds: [...selIds], period,
       monthlyStartDay:  period === 'monthly' ? monthlyStartDay  : undefined,
       weeklyStartDay:   period === 'weekly'  ? weeklyStartDay   : undefined,
@@ -1098,7 +1042,7 @@ function NewBudgetForm({ types, onSave, onCancel }: {
         className="w-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
       />
       <div className="flex gap-2">
-        <select value={period} onChange={e => setPeriod(e.target.value as StoredBudget['period'])}
+        <select value={period} onChange={e => setPeriod(e.target.value as BudgetPeriodType)}
           className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-lg px-2 py-2 text-sm focus:outline-none"
         >
           <option value="monthly">{t('budgets.periodMonthly')}</option>
@@ -1269,9 +1213,9 @@ function ModalSection({ label, first }: { label: string; first?: boolean }) {
 }
 
 function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, onClose }: {
-  mode: AddMode; existingIds: Set<string>; budgets: StoredBudget[]
+  mode: AddMode; existingIds: Set<string>; budgets: Budget[]
   types: MovementType[]; accounts: Account[]
-  onAdd: (w: DashboardWidget, newBudget?: StoredBudget) => void; onClose: () => void
+  onAdd: (w: DashboardWidget, newBudget?: Budget) => void; onClose: () => void
 }) {
   const [showNewBudget, setShowNewBudget] = useState(false)
   const navigate = useNavigate()
@@ -1495,7 +1439,7 @@ export default function Dashboard() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [editMode, setEditMode] = useState(() => searchParams.get('edit') === '1')
   const [addMode, setAddMode]   = useState<AddMode | null>(null)
-  const [budgets, setBudgets]     = useState<StoredBudget[]>(() => readBudgets())
+  const [budgets, setBudgets]     = useState<Budget[]>(() => readBudgets())
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
   const [customChartDefs]       = useState<CustomChartDef[]>(() => readCustomCharts())
   const [selDate, setSelDate]   = useState(() => { const n = new Date(); return { year: n.getFullYear(), month: n.getMonth() } })
@@ -1743,8 +1687,8 @@ export default function Dashboard() {
       const allPeriods = budgets.map(b => {
         const { start, end } = getBudgetPeriod(b, refDate)
         const typeIds = new Set(b.typeIds)
-        const limit   = getBudgetLimit(b.versions, start)
-        const spent   = calcBudgetSpent(movements, typeIds, start, end)
+        const limit   = getAmountForDate(b.versions, start)
+        const spent   = calcSpending(movements, typeIds, start, end)
         const pct     = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0
         const colors  = budgetPctColors(pct)
         return { b, start, end, limit, spent, pct, colors }
@@ -1799,8 +1743,8 @@ export default function Dashboard() {
     )
     const typeIds = new Set(budget.typeIds)
     const { start, end } = getBudgetPeriod(budget, new Date(selDate.year, selDate.month, 1))
-    const limit  = getBudgetLimit(budget.versions, start)
-    const spent  = calcBudgetSpent(movements, typeIds, start, end)
+    const limit  = getAmountForDate(budget.versions, start)
+    const spent  = calcSpending(movements, typeIds, start, end)
     const pct    = limit > 0 ? Math.min(Math.round((spent / limit) * 100), 100) : 0
     const colors = budgetPctColors(pct)
     return (

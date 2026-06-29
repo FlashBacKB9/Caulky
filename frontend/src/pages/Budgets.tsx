@@ -59,13 +59,14 @@ export function getCurrentPeriod(
   monthlyStartDay?: number,
   weeklyStartDay?: number,
   annualStartDate?: string,
+  refDate?: Date,
 ): { start: string; end: string } {
-  const now = new Date()
+  const ref = refDate ?? new Date()
 
   if (period === 'monthly') {
     const d = monthlyStartDay ?? 1
-    let y = now.getFullYear(), m = now.getMonth()
-    if (now.getDate() < d) { m -= 1; if (m < 0) { m = 11; y -= 1 } }
+    let y = ref.getFullYear(), m = ref.getMonth()
+    if (ref.getDate() < d) { m -= 1; if (m < 0) { m = 11; y -= 1 } }
     const daysInMonth = new Date(y, m + 1, 0).getDate()
     const clamp = Math.min(d, daysInMonth)
     return { start: localDateStr(new Date(y, m, clamp)), end: localDateStr(new Date(y, m + 1, clamp - 1)) }
@@ -73,10 +74,11 @@ export function getCurrentPeriod(
 
   if (period === 'annual') {
     const sd = annualStartDate ?? '01-01'
-    const y = now.getFullYear()
+    const y = ref.getFullYear()
+    const refStr = localDateStr(ref)
     const thisStart = `${y}-${sd}`
     const [mm, dd] = sd.split('-').map(Number)
-    if (todayStr() >= thisStart) {
+    if (refStr >= thisStart) {
       const endDt = new Date(y + 1, mm - 1, dd); endDt.setDate(endDt.getDate() - 1)
       return { start: thisStart, end: localDateStr(endDt) }
     } else {
@@ -87,8 +89,8 @@ export function getCurrentPeriod(
 
   if (period === 'weekly') {
     const jsWD = ((weeklyStartDay ?? 0) + 1) % 7  // 0=Mon→1, 6=Sun→0
-    const diff = (now.getDay() - jsWD + 7) % 7
-    const start = new Date(now); start.setDate(now.getDate() - diff)
+    const diff = (ref.getDay() - jsWD + 7) % 7
+    const start = new Date(ref); start.setDate(ref.getDate() - diff)
     const end   = new Date(start); end.setDate(start.getDate() + 6)
     return { start: localDateStr(start), end: localDateStr(end) }
   }
