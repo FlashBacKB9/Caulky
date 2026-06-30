@@ -953,10 +953,17 @@ async def analyze_ticket(
             if not name:
                 continue
             try:
-                amount = float(it.get("amount") or 0)
+                qty = float(it.get("qty") or 1) or 1
+            except (TypeError, ValueError):
+                qty = 1
+            unit = str(it.get("unit") or "ud").strip() or "ud"
+            # AI returns unit "price"; "amount" (line total) is computed as qty × price.
+            try:
+                raw_price = it.get("price")
+                price = float(raw_price if raw_price is not None else (it.get("amount") or 0))
             except (TypeError, ValueError):
                 continue
-            if amount == 0:
+            if price == 0:
                 continue
             low = name.lower()
             ai_cat = str(it.get("category") or "").strip()
@@ -965,16 +972,6 @@ async def analyze_ticket(
                 or (ai_cat if ai_cat in _valid_cat_set else None)
                 or _categorize(name)
             )
-            try:
-                qty = float(it.get("qty") or 1) or 1
-            except (TypeError, ValueError):
-                qty = 1
-            unit = str(it.get("unit") or "ud").strip() or "ud"
-            # price = unit price; amount = qty × price (line total for financial calculations)
-            try:
-                price = float(it.get("price") or it.get("amount") or amount)
-            except (TypeError, ValueError):
-                price = amount
             line_total = round(qty * price, 2)
             items.append({"name": name.title(), "qty": qty, "unit": unit, "price": round(price, 4), "amount": line_total, "category": cat})
 
@@ -1189,10 +1186,16 @@ async def rescan_ticket(
         if not name:
             continue
         try:
-            amount = float(it.get("amount") or 0)
+            qty = float(it.get("qty") or 1) or 1
+        except (TypeError, ValueError):
+            qty = 1
+        unit = str(it.get("unit") or "ud").strip() or "ud"
+        try:
+            raw_price = it.get("price")
+            price = float(raw_price if raw_price is not None else (it.get("amount") or 0))
         except (TypeError, ValueError):
             continue
-        if amount == 0:
+        if price == 0:
             continue
         low = name.lower()
         ai_cat = str(it.get("category") or "").strip()
@@ -1201,12 +1204,8 @@ async def rescan_ticket(
             or (ai_cat if ai_cat in _valid_cat_set else None)
             or _categorize(name)
         )
-        try:
-            qty = float(it.get("qty") or 1) or 1
-        except (TypeError, ValueError):
-            qty = 1
-        unit = str(it.get("unit") or "ud").strip() or "ud"
-        items.append({"name": name.title(), "qty": qty, "unit": unit, "amount": round(amount, 2), "category": cat})
+        line_total = round(qty * price, 2)
+        items.append({"name": name.title(), "qty": qty, "unit": unit, "price": round(price, 4), "amount": line_total, "category": cat})
 
     categories = _compute_categories(items)
 
