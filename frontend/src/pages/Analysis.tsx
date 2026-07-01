@@ -863,9 +863,10 @@ function HeatmapGastos({ allMovements, fmt }: { allMovements: Movement[]; fmt: (
 
 // ── 6. Prompt IA ──────────────────────────────────────────────────────────────
 
-function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, excludedMovementIds, fmt }: {
+function PromptIA({ allMovements, typeGroupMap, typeNameMap, savingsGroupIdSet, excludedMovementIds, fmt }: {
   allMovements: Movement[]
   typeGroupMap: Map<number, number>
+  typeNameMap: Map<number, string>
   savingsGroupIdSet: Set<number>
   excludedMovementIds: number[]
   fmt: (v: number) => string
@@ -919,11 +920,11 @@ function PromptIA({ allMovements, typeGroupMap, savingsGroupIdSet, excludedMovem
   const byCategory = useMemo(() => {
     const map = new Map<string, number>()
     realExpenseMovements.forEach(m => {
-      const label = m.label || t('analysis.noCategory')
+      const label = (m.movement_type_id != null ? typeNameMap.get(m.movement_type_id) : null) ?? m.label ?? t('analysis.noCategory')
       map.set(label, (map.get(label) ?? 0) + Math.abs(m.dinero))
     })
     return [...map.entries()].sort((a, b) => b[1] - a[1])
-  }, [realExpenseMovements])
+  }, [realExpenseMovements, typeNameMap])
 
   const topExpenses = useMemo(() =>
     [...realExpenseMovements].sort((a, b) => a.dinero - b.dinero).slice(0, 10),
@@ -1175,6 +1176,7 @@ export default function Analysis() {
         <PromptIA
           allMovements={allMovements}
           typeGroupMap={typeGroupMap}
+          typeNameMap={typeNameMap}
           savingsGroupIdSet={savingsGroupIdSet}
           excludedMovementIds={analysisConfig.excludedMovementIds}
           fmt={fmt}
