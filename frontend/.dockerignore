@@ -1,0 +1,4 @@
+node_modules/
+dist/
+.build_out.txt
+.build_err.txt

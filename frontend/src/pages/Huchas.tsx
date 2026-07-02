@@ -7,6 +7,7 @@ import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
 import { t } from '../utils/i18n'
+import { syncPref } from '../utils/prefSync'
 import AppIcon from '../components/AppIcon'
 
 // ── Config persistence ────────────────────────────────────────────────────────
@@ -23,7 +24,7 @@ function loadConfig(): Record<number, HuchaConfig> {
   try { return JSON.parse(localStorage.getItem(CONFIG_KEY) ?? '{}') } catch { return {} }
 }
 function saveConfig(c: Record<number, HuchaConfig>) {
-  localStorage.setItem(CONFIG_KEY, JSON.stringify(c))
+  syncPref(CONFIG_KEY, JSON.stringify(c))
 }
 
 // ── Date helpers ──────────────────────────────────────────────────────────────

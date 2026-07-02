@@ -713,7 +713,7 @@ function MovementsPanel({ movements, allTypes, groups, typeMap, typeToGroupMap, 
 
 // ── Suscripciones helpers ─────────────────────────────────────────────────────
 
-import { loadSubsConfig, type SubPeriod } from './Settings'
+import { loadSubsConfig, type SubPeriod } from './settings/SuscripcionesTab'
 
 function nextChargeDate(lastDate: string, period: SubPeriod): string {
   const d = new Date(lastDate + 'T00:00:00')

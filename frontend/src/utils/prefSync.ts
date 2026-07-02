@@ -38,6 +38,8 @@ export const PREF_KEYS = new Set([
   'ticket_supplies_type_id',
   'ticket_combined_type_id',
   'ticket-categories-v1',
+  'debts-config',
+  'huchas-config',
 ])
 
 const _timers: Record<string, ReturnType<typeof setTimeout>> = {}

@@ -1,0 +1,15 @@
+venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+.env
+.secret_key
+uploads/
+uvicorn.log
+uvicorn.err
+uvicorn2.err
+seed.py
+seed_accounts.py
+update_account_icons.py
+tests/
+.pytest_cache/

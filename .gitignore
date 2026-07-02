@@ -19,6 +19,8 @@ backend/update_account_icons.py
 # Node
 frontend/node_modules/
 frontend/dist/
+frontend/.build_out.txt
+frontend/.build_err.txt
 
 # PyInstaller output
 dist/

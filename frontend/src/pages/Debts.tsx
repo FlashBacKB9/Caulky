@@ -13,6 +13,7 @@ import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { createTemplate, updateTemplate, deleteTemplate, getTemplates } from '../api/templates'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
+import { syncPref } from '../utils/prefSync'
 import AppIcon from '../components/AppIcon'
 
 // ── Types & storage ───────────────────────────────────────────────────────────
@@ -35,7 +36,7 @@ const DEBTS_KEY = 'debts-config'
 export function loadDebts(): DebtConfig[] {
   try { return JSON.parse(localStorage.getItem(DEBTS_KEY) ?? '[]') } catch { return [] }
 }
-function saveDebts(d: DebtConfig[]) { localStorage.setItem(DEBTS_KEY, JSON.stringify(d)) }
+function saveDebts(d: DebtConfig[]) { syncPref(DEBTS_KEY, JSON.stringify(d)) }
 function genId() { return Math.random().toString(36).slice(2) + Date.now().toString(36) }
 
 // ── Amortization logic ────────────────────────────────────────────────────────
