@@ -168,7 +168,18 @@ function ChartTooltip({ active, payload, label }: {
 }) {
   const { fmt } = useCurrency()
   if (!active || !payload?.length) return null
-  const sorted = [...payload].sort((a, b) => b.value - a.value)
+  // Ocultar series a cero
+  const nonZero = payload.filter(e => Math.abs(e.value) >= 0.005)
+  if (!nonZero.length) return null
+  // Con muchas categorías, agrupar las menores de 20 € en "Otros" para no saturar el tooltip
+  const SMALL = 20
+  const shouldGroup = nonZero.length > 3
+  const big   = shouldGroup ? nonZero.filter(e => Math.abs(e.value) >= SMALL) : nonZero
+  const small = shouldGroup ? nonZero.filter(e => Math.abs(e.value) <  SMALL) : []
+  const sorted = [...big].sort((a, b) => b.value - a.value)
+  if (small.length) {
+    sorted.push({ name: 'Otros', value: small.reduce((s, e) => s + e.value, 0), color: '#9ca3af' })
+  }
   return (
     <div className="bg-white dark:bg-gray-900 border border-gray-100 dark:border-gray-800 rounded-xl shadow-lg px-4 py-3 text-sm min-w-[160px]">
       <p className="font-semibold text-gray-600 dark:text-gray-300 mb-2">{label}</p>
@@ -559,6 +570,21 @@ function mvMonthKeyD(mv: Movement, year: number | null): string {
   return year !== null ? String(+mv.date.slice(5, 7) - 1) : mv.date.slice(0, 7)
 }
 
+// Agrupa las porciones menores de `minPct` del total en una sola "Otros" (y descarta ceros).
+// Solo agrupa si hay al menos 2 porciones pequeñas, para no crear un "Otros" con una sola.
+function groupSmallSlices(
+  data: { name: string; value: number; color: string }[],
+  minPct = 0.10,
+): { name: string; value: number; color: string }[] {
+  const nonZero = data.filter(d => Math.abs(d.value) >= 0.005)
+  const total = nonZero.reduce((s, d) => s + Math.abs(d.value), 0)
+  if (total <= 0) return nonZero
+  const big   = nonZero.filter(d => Math.abs(d.value) / total >= minPct)
+  const small = nonZero.filter(d => Math.abs(d.value) / total <  minPct)
+  if (small.length < 2) return nonZero
+  return [...big, { name: 'Otros', value: small.reduce((s, d) => s + d.value, 0), color: '#9ca3af' }]
+}
+
 function computeChartData(
   def: CustomChartDef, movements: Movement[],
   typeToGroup: Record<number, number>, groupById: Record<number, ApiGroup>,
@@ -583,7 +609,9 @@ function computeChartData(
     const liveColor = (def.splitBy === 'group' || def.splitBy === 'type') ? info.color : (ov?.color ?? info.color)
     return { key, label: ov?.label ?? info.label, color: liveColor, display: ov?.display ?? fallback, stacked: ov?.stacked ?? false }
   }
-  const val = (mv: Movement) => def.metric === 'count' ? 1 : Math.abs(mv.dinero)
+  // Sumar con signo para que las devoluciones (dinero de signo opuesto) se cancelen
+  // dentro de su categoría; el valor final se hace abs() al agregar (igual que Charts.tsx).
+  const val = (mv: Movement) => def.metric === 'count' ? 1 : mv.dinero
   const keyOrder: string[] = []; const keySeen = new Set<string>()
   for (const mv of movements) { const k = seriesKey(mv); if (k && !keySeen.has(k)) { keySeen.add(k); keyOrder.push(k) } }
   if (def.xAxis === 'none') {
@@ -592,7 +620,7 @@ function computeChartData(
     const data = keyOrder.map(key => {
       const info = baseInfo(key); const ov = overrideMap[key]
       const liveColor = (def.splitBy === 'group' || def.splitBy === 'type') ? info.color : (ov?.color ?? info.color)
-      return { name: ov?.label ?? info.label, value: byKey[key] ?? 0, color: liveColor }
+      return { name: ov?.label ?? info.label, value: Math.abs(byKey[key] ?? 0), color: liveColor }
     }).sort((a, b) => (b.value as number) - (a.value as number))
     return { data, series: keyOrder.map(makeSeries) }
   }
@@ -608,7 +636,7 @@ function computeChartData(
     if (!k || !byBucket[bucket]) continue
     byBucket[bucket][k] = (byBucket[bucket][k] ?? 0) + val(mv)
   }
-  const data = xBuckets.map(({ key, label }) => ({ x: label, ...Object.fromEntries(keyOrder.map(k => [k, byBucket[key]?.[k] ?? 0])) }))
+  const data = xBuckets.map(({ key, label }) => ({ x: label, ...Object.fromEntries(keyOrder.map(k => [k, Math.abs(byBucket[key]?.[k] ?? 0)])) }))
   return { data, series: keyOrder.map(makeSeries) }
 }
 
@@ -889,11 +917,12 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
     const d = chartData as { name: string; value: number; color: string }[]
     if (!d.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
     if (def.defaultDisplay === 'donut' || def.defaultDisplay === 'pie') {
+      const pieData = groupSmallSlices(d)
       return (
         <ResponsiveContainer width="100%" height={height}>
           <PieChart>
-            <Pie data={d} cx="50%" cy="50%" innerRadius={def.defaultDisplay === 'donut' ? 55 : 0} outerRadius={85} dataKey="value" paddingAngle={2}>
-              {d.map((item, i) => <Cell key={i} fill={item.color}/>)}
+            <Pie data={pieData} cx="50%" cy="50%" innerRadius={def.defaultDisplay === 'donut' ? 55 : 0} outerRadius={85} dataKey="value" paddingAngle={2}>
+              {pieData.map((item, i) => <Cell key={i} fill={item.color}/>)}
             </Pie>
             <Tooltip content={<ChartTooltip />}/>
             <Legend wrapperStyle={{ fontSize: 11, paddingTop: 6 }}/>

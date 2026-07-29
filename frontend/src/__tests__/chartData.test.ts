@@ -162,6 +162,45 @@ describe('computeChartData – splitBy=group', () => {
   })
 })
 
+// ── Devoluciones: neteo con signo antes del abs() final ──────────────────────
+
+describe('computeChartData – las devoluciones netean el gasto', () => {
+  test('splitBy=none: gasto 250 + devolución 125 → 125 (no 375)', () => {
+    // Un gasto de 250 € (dinero -250) y una devolución de 125 € (dinero +125)
+    // del mismo tipo deben dar un gasto neto de 125, no la suma de absolutos.
+    const { data } = computeChartData(
+      def({ xAxis: 'none', splitBy: 'none', sign: 'all' }),
+      [mv(1, { dinero: -250 }), mv(2, { dinero: 125 })],
+      {}, {}, {}, {},
+    )
+    expect(data[0].value).toBe(125)
+  })
+
+  test('splitBy=group: el neteo ocurre dentro del mismo grupo', () => {
+    const { data } = computeChartData(
+      def({ xAxis: 'none', splitBy: 'group', sign: 'all' }),
+      [mv(1, { dinero: -250, movement_type_id: 1 }), mv(2, { dinero: 125, movement_type_id: 1 })],
+      TYPE_TO_GROUP, GROUPS, TYPES, ACCOUNTS,
+    )
+    expect(data).toHaveLength(1)
+    expect(data[0].name).toBe('Alimentación')
+    expect(data[0].value).toBe(125)
+  })
+
+  test('xAxis=month: neteo dentro del mismo mes y grupo', () => {
+    const { data } = computeChartData(
+      def({ xAxis: 'month', splitBy: 'group', year: 2024, sign: 'all' }),
+      [
+        mv(1, { dinero: -250, date: '2024-07-05', movement_type_id: 1 }),
+        mv(2, { dinero: 125,  date: '2024-07-20', movement_type_id: 1 }),
+      ],
+      TYPE_TO_GROUP, GROUPS, TYPES, ACCOUNTS,
+    )
+    // Año pasado → 12 columnas; julio = índice 6
+    expect(data[6]['10']).toBe(125)
+  })
+})
+
 // ── computeChartData – splitBy=type ──────────────────────────────────────────
 
 describe('computeChartData – splitBy=type', () => {
