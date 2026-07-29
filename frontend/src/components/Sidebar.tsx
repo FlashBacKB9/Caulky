@@ -13,6 +13,24 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.9', date: 'Julio 2026',
+    items: [
+      { type: 'feat',    text: 'Cuentas reales: agrupa tus cuentas por entidad bancaria (Ajustes → Cuentas) para conciliar los saldos de la app con los del banco' },
+      { type: 'feat',    text: 'Modo privado: oculta todos los importes de la app con un solo toque' },
+      { type: 'feat',    text: 'Modo test: acceso con datos de ejemplo (≈3,5 años) para explorar la app sin tocar tus datos' },
+      { type: 'feat',    text: 'Tickets: reescaneo eligiendo el modelo de IA, con precio unitario editable y cantidad por línea (el importe se calcula solo)' },
+      { type: 'improve', text: 'Añadir movimiento rápido: pega (Ctrl+V) o arrastra imágenes para adjuntarlas al movimiento o al ticket' },
+      { type: 'fix',     text: 'Tickets: los productos vuelven a extraerse (el análisis descartaba todas las líneas por un cambio en el formato de la IA)' },
+      { type: 'fix',     text: 'Análisis: el mayor tipo de gasto y el gasto por categoría muestran el nombre del tipo (Moto, Suscripciones…) en vez del grupo genérico «Gasto»' },
+      { type: 'fix',     text: 'Presupuestos: las devoluciones (importe negativo) restan del gasto del periodo' },
+      { type: 'fix',     text: 'Dashboard: los widgets de presupuesto usan el mismo límite y periodo que la página de Presupuestos' },
+      { type: 'fix',     text: 'Dashboard – Gastos por categoría: las devoluciones se descuentan del gasto (250 gastados − 125 devueltos = 125, antes 375); el tooltip oculta las categorías a 0 y agrupa las menores de 20 € en «Otros»; el donut junta las porciones menores del 10% en «Otros»' },
+      { type: 'fix',     text: 'Cuentas reales: corregido el botón de guardar y un error al crear o editar una cuenta real' },
+      { type: 'fix',     text: 'Modo demo: los gastos de ejemplo tienen el signo correcto y los datos se regeneran de forma fiable' },
+      { type: 'fix',     text: 'Deudas y Huchas: la configuración se guarda en el servidor (antes solo en el navegador, se perdía al limpiar la caché o cambiar de dispositivo)' },
+    ],
+  },
+  {
     version: 'v1.8', date: 'Mayo 2026',
     items: [
       { type: 'feat',    text: 'Nuevo módulo Huchas: cuentas de tipo hucha con objetivo, fecha límite y proyecciones (cuánto aportar al mes o cuándo llegarás)' },
