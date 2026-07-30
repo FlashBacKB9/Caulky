@@ -6,9 +6,31 @@ All notable changes to Caulky are documented here.
 
 ## [Unreleased] — dev
 
-### ✨ New: Control de Gastos (`/gastos`)
+### ✨ New: Calculadora flotante
 
-New dedicated expense analysis module:
+Sidebar button (visible outside Configuración) that opens a small draggable calculator:
+
+- Basic arithmetic (+, −, ×, ÷) plus percentage (`1250 % 21` = 21% of 1250), sign toggle and backspace
+- **History panel** on the right; click any entry to reuse its result. Persisted in localStorage
+- Drag by the title bar to any spot on the page; it keeps floating there while you work, across page navigation. Position is remembered
+- Keyboard input only while the panel has focus, so it never steals keystrokes from the app's forms
+- **Acerca de** is now shown only inside Configuración, freeing the slot for the calculator elsewhere
+
+### ✨ New: Control de Gastos e Ingresos (`/gastos`)
+
+Renamed from *Control de Gastos*. A Gastos/Ingresos tab next to the title switches the whole
+module between both sides of the ledger:
+
+- **Ingresos** covers income-type movements plus refunds (negative amounts on any type — the
+  backend flips their sign), excluding transfers. Gastos covers movements with `dinero < 0`,
+  so refunds no longer inflate expense totals
+- Type filter, color palettes and chart modes work the same in both; each mode keeps its own
+  filter selection in localStorage
+- Summary cards invert the delta color in Ingresos (going up is green)
+- **Tooltip** hides series at 0 € and sorts high to low; legend and table list only types with
+  an actual amount in the active mode
+
+Original expense analysis module:
 
 - **Monthly evolution chart** — bar, area and line modes with stacked and cumulative variants
 - **Multi-year comparison** — select any combination of years; series use opacity gradation to distinguish them
