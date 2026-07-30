@@ -1,9 +1,10 @@
 import type { Movement } from '../api/movements'
 
-// Entradas visibles del tooltip: descarta las series a 0 € y ordena de mayor a menor
-export interface TooltipEntry { name?: string | number; value?: number | string; color?: string }
+// Entradas visibles del tooltip: descarta las series a 0 € y ordena de mayor a menor.
+// El payload de Recharts es readonly y su `value` admite arrays, de ahí los tipos laxos.
+export interface TooltipEntry { name?: unknown; value?: unknown; color?: string }
 
-export function visibleTooltipEntries(payload: TooltipEntry[] | undefined): TooltipEntry[] {
+export function visibleTooltipEntries<T extends TooltipEntry>(payload: readonly T[] | undefined): T[] {
   if (!payload?.length) return []
   return payload
     .filter(e => Math.abs(Number(e.value ?? 0)) >= 0.005)

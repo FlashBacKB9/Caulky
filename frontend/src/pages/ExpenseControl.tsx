@@ -7,6 +7,7 @@ import {
   LineChart, Line,
   BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip,
+  type TooltipContentProps,
 } from 'recharts'
 import {
   ScrollText, Upload, FileText, X, TrendingUp, TrendingDown,
@@ -1122,17 +1123,13 @@ export default function ExpenseControl() {
   }
 
   // Tooltip propio: oculta las series a 0 € y ordena de mayor a menor
-  const renderTooltip = ({ active, payload, label }: {
-    active?: boolean
-    payload?: { name?: string | number; value?: number | string; color?: string }[]
-    label?: string | number
-  }) => {
+  const renderTooltip = ({ active, payload, label }: TooltipContentProps) => {
     if (!active) return null
     const entries = visibleTooltipEntries(payload)
     if (!entries.length) return null
     return (
       <div style={{ ...TOOLTIP_STYLE, padding: '8px 12px' }}>
-        <p style={{ fontWeight: 600, marginBottom: 4 }}>{label}</p>
+        <p style={{ fontWeight: 600, marginBottom: 4 }}>{String(label ?? '')}</p>
         {entries.map(e => {
           const [val, name] = fmtTooltip(e.value, e.name)
           return <p key={String(e.name)} style={{ color: e.color, margin: '2px 0' }}>{name} : {val}</p>
