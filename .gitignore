@@ -12,6 +12,7 @@ backend/uploads/
 backend/uvicorn.log
 backend/uvicorn.err
 backend/uvicorn2.err
+backend/*.db
 backend/seed.py
 backend/seed_accounts.py
 backend/update_account_icons.py
