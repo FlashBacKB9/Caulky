@@ -1,6 +1,7 @@
 import { useState } from 'react'
-import { NavLink, useNavigate } from 'react-router-dom'
-import { Wallet, Settings, Info, X, ExternalLink, LogOut, ChevronLeft, ChevronRight, ChevronDown } from 'lucide-react'
+import { NavLink, useNavigate, useLocation } from 'react-router-dom'
+import { Wallet, Settings, Info, X, ExternalLink, LogOut, ChevronLeft, ChevronRight, ChevronDown, Calculator } from 'lucide-react'
+import CalculatorModal from './CalculatorModal'
 import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 import { logout } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
@@ -15,6 +16,10 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     version: 'v1.9', date: 'Julio 2026',
     items: [
+      { type: 'feat',    text: 'Control de Gastos es ahora Control de Gastos e Ingresos: pestaña Gastos/Ingresos junto al título, con el mismo análisis en ambos modos (en Ingresos entran los movimientos de tipo ingreso y las devoluciones de cualquier tipo)' },
+      { type: 'feat',    text: 'Calculadora flotante: botón en la barra lateral que abre una calculadora arrastrable con historial, y se queda flotando mientras navegas por la app' },
+      { type: 'improve', text: 'Control de Gastos e Ingresos: el tooltip de la evolución mensual oculta las categorías a 0 € y ordena de mayor a menor; la leyenda y la tabla solo muestran los tipos con importe' },
+      { type: 'improve', text: '«Acerca de» se muestra solo dentro de Configuración, dejando el hueco a la calculadora en el resto de la app' },
       { type: 'feat',    text: 'Cuentas reales: agrupa tus cuentas por entidad bancaria (Ajustes → Cuentas) para conciliar los saldos de la app con los del banco' },
       { type: 'feat',    text: 'Modo privado: oculta todos los importes de la app con un solo toque' },
       { type: 'feat',    text: 'Modo test: acceso con datos de ejemplo (≈3,5 años) para explorar la app sin tocar tus datos' },
@@ -331,8 +336,11 @@ export default function Sidebar({
 }) {
   const navEntries = useNavConfig()
   const [showInfo, setShowInfo] = useState(false)
+  const [showCalc, setShowCalc] = useState(false)
   const { setUser } = useAuth()
   const navigate = useNavigate()
+  const { pathname } = useLocation()
+  const inSettings = pathname.startsWith('/settings')
 
   async function handleLogout() {
     await logout().catch(() => {})
@@ -357,6 +365,7 @@ export default function Sidebar({
   return (
     <>
       {showInfo && <InfoModal onClose={() => setShowInfo(false)} />}
+      {showCalc && <CalculatorModal onClose={() => setShowCalc(false)} />}
       <aside className={`
         fixed inset-y-0 left-0 z-50 flex-shrink-0 bg-white dark:bg-gray-900 border-r border-gray-100 dark:border-gray-800 overflow-y-auto flex flex-col
         transition-all duration-200
@@ -401,14 +410,28 @@ export default function Sidebar({
             <Settings className="w-4 h-4 shrink-0" strokeWidth={1.5} />
             {!collapsed && t('layout.settings')}
           </NavLink>
-          <button
-            onClick={() => { setShowInfo(true); onClose?.() }}
-            title={collapsed ? t('layout.about') : undefined}
-            className={`${actionCls} text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300`}
-          >
-            <Info className="w-4 h-4 shrink-0" strokeWidth={1.5} />
-            {!collapsed && t('layout.about')}
-          </button>
+          {/* Calculadora — solo fuera de Configuración */}
+          {!inSettings && (
+            <button
+              onClick={() => { setShowCalc(true); onClose?.() }}
+              title={collapsed ? 'Calculadora' : undefined}
+              className={`${actionCls} text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300`}
+            >
+              <Calculator className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+              {!collapsed && 'Calculadora'}
+            </button>
+          )}
+          {/* Acerca de — solo en Configuración */}
+          {inSettings && (
+            <button
+              onClick={() => { setShowInfo(true); onClose?.() }}
+              title={collapsed ? t('layout.about') : undefined}
+              className={`${actionCls} text-gray-400 dark:text-gray-500 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-600 dark:hover:text-gray-300`}
+            >
+              <Info className="w-4 h-4 shrink-0" strokeWidth={1.5} />
+              {!collapsed && t('layout.about')}
+            </button>
+          )}
           <button
             onClick={handleLogout}
             title={collapsed ? t('layout.logout') : undefined}
