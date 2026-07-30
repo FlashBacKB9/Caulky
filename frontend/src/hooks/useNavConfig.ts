@@ -25,7 +25,7 @@ export const PAGE_META: Record<string, NavPageMeta> = {
   '/docs':          { label: 'Documentación',    labelKey: 'nav.docs',        Icon: BookOpen },
   '/consultor-ia':  { label: 'Consultor IA',     labelKey: 'nav.ai',          Icon: BotMessageSquare },
   '/tickets':       { label: 'Tickets',          labelKey: 'nav.tickets',     Icon: Receipt },
-  '/gastos':        { label: 'Control de Gastos', labelKey: 'nav.expenses',    Icon: ScrollText },
+  '/gastos':        { label: 'Control de Gastos e Ingresos', labelKey: 'nav.expenses', Icon: ScrollText },
   '/huchas':        { label: 'Huchas',            labelKey: 'nav.huchas',      Icon: PiggyBank },
   '/deudas':        { label: 'Deudas',            labelKey: 'nav.debts',       Icon: Banknote },
 }

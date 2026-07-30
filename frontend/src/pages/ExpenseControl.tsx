@@ -25,6 +25,7 @@ import {
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getGroups, type Group } from '../api/groups'
 import FilterPanel, { EMPTY_FILTER, applyAdvancedFilter, type AdvancedFilter } from '../components/FilterPanel'
+import { visibleTooltipEntries, matchesControlMode } from '../utils/expenseControl'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -39,6 +40,7 @@ const YEAR_OPTIONS  = Array.from({ length: 5 }, (_, i) => CURRENT_YEAR - i)
 const MONTHS_SHORT  = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
 const COLORS_KEY    = 'caulky-expense-type-colors'
 const FILTER_KEY    = 'caulky-expense-type-filter'
+const INCOME_FILTER_KEY = 'caulky-income-type-filter'
 const ORDER_KEY     = 'caulky-expense-type-order'
 interface Palette { id: string; name: string; colors: string[] }
 const PALETTES: Palette[] = [
@@ -69,15 +71,15 @@ function loadColors(): Record<number, string> {
 function saveColors(c: Record<number, string>) { localStorage.setItem(COLORS_KEY, JSON.stringify(c)) }
 function typeColor(t: MovementType, custom: Record<number, string>): string { return custom[t.id] ?? t.color }
 
-function loadTypeFilter(): number[] | null {
+function loadTypeFilter(key: string): number[] | null {
   try {
-    const s = localStorage.getItem(FILTER_KEY)
+    const s = localStorage.getItem(key)
     if (!s) return null
     const a = JSON.parse(s)
     return Array.isArray(a) ? (a as number[]) : null
   } catch { return null }
 }
-function saveTypeFilter(ids: Set<number>) { localStorage.setItem(FILTER_KEY, JSON.stringify([...ids])) }
+function saveTypeFilter(ids: Set<number>, key: string) { localStorage.setItem(key, JSON.stringify([...ids])) }
 
 function loadTypeOrder(): number[] {
   try {
@@ -106,12 +108,15 @@ function makeCumulative(
 
 // ── SummaryCard ───────────────────────────────────────────────────────────────
 
-function SummaryCard({ type, cur, prev, customColors }: {
-  type: MovementType; cur: number; prev: number; customColors: Record<number, string>
+function SummaryCard({ type, cur, prev, customColors, invertDelta = false }: {
+  type: MovementType; cur: number; prev: number; customColors: Record<number, string>; invertDelta?: boolean
 }) {
   const delta   = cur - prev
   const hasPrev = prev > 0.01
   const color   = typeColor(type, customColors)
+  // Gastos: subir es malo (rojo). Ingresos (invertDelta): subir es bueno (verde).
+  const upCls   = invertDelta ? 'text-emerald-500' : 'text-red-500'
+  const downCls = invertDelta ? 'text-red-500' : 'text-emerald-500'
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 p-4">
       <div className="flex items-center gap-2 mb-2">
@@ -121,7 +126,7 @@ function SummaryCard({ type, cur, prev, customColors }: {
       <p className="text-lg font-bold text-gray-900 dark:text-white">{cur.toFixed(2)} €</p>
       {hasPrev ? (
         <div className={`flex items-center gap-1 mt-1 text-[11px] font-medium ${
-          delta >  0.01 ? 'text-red-500' : delta < -0.01 ? 'text-emerald-500' : 'text-gray-400'
+          delta >  0.01 ? upCls : delta < -0.01 ? downCls : 'text-gray-400'
         }`}>
           {delta >  0.01 ? <TrendingUp  className="w-3 h-3" /> :
            delta < -0.01 ? <TrendingDown className="w-3 h-3" /> :
@@ -217,10 +222,11 @@ function MovementRow({ movement, type, onRefresh }: {
 
 // ── TypeFilterDropdown ────────────────────────────────────────────────────────
 
-function TypeFilterDropdown({ typesByCategory, selectedTypeIds, customColors, onToggleType, onToggleCategory, onColorChange, onApplyPalette }: {
+function TypeFilterDropdown({ typesByCategory, selectedTypeIds, customColors, label, onToggleType, onToggleCategory, onColorChange, onApplyPalette }: {
   typesByCategory: Record<string, MovementType[]>
   selectedTypeIds: Set<number>
   customColors: Record<number, string>
+  label: string
   onToggleType: (id: number) => void
   onToggleCategory: (cat: string) => void
   onColorChange: (id: number, color: string) => void
@@ -239,7 +245,7 @@ function TypeFilterDropdown({ typesByCategory, selectedTypeIds, customColors, on
         className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50/50 dark:hover:bg-gray-800/30 transition-colors rounded-xl">
         <span className="flex items-center gap-2">
           <Filter className="w-3.5 h-3.5 text-gray-400" />
-          Filtrar por tipo de gasto
+          {label}
           <span className="text-[10px] font-normal text-gray-400">{selectedTypeIds.size}/{totalTypes} sel.</span>
         </span>
         {open ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
@@ -910,9 +916,9 @@ export default function ExpenseControl() {
     color: isDark ? '#f9fafb' : '#111827',
   }
 
+  const [controlMode, setControlMode]         = useState<'gastos' | 'ingresos'>('gastos')
   const [viewMode, setViewMode]              = useState<'evolucion' | 'suscripciones'>('evolucion')
   const [selectedTypeIds, setSelectedTypeIds] = useState<Set<number>>(new Set())
-  const [initialized, setInitialized]         = useState(false)
   const [chartKind, setChartKind]             = useState<ChartKind>('bar')
   const [stackMode, setStackMode]             = useState<StackMode>('stacked')
   const [activeYears, setActiveYears]         = useState<number[]>([CURRENT_YEAR])
@@ -945,17 +951,26 @@ export default function ExpenseControl() {
   const primaryYear = Math.max(...allYears)
   const nYears      = allYears.length
 
-  // ── Init filter ───────────────────────────────────────────────────────────────
+  // ── Init filter (per modo: gastos / ingresos) ─────────────────────────────────
+  const filterKey = controlMode === 'gastos' ? FILTER_KEY : INCOME_FILTER_KEY
+
   useEffect(() => {
-    if (initialized || allTypes.length === 0) return
-    setInitialized(true)
-    const saved = loadTypeFilter()
+    if (allTypes.length === 0) return
+    const saved = loadTypeFilter(filterKey)
     setSelectedTypeIds(
       saved !== null
         ? new Set(saved.filter(id => allTypes.some(t => t.id === id)))
-        : new Set(allTypes.filter(t => EXPENSE_CATEGORIES.has(t.category)).map(t => t.id))
+        : controlMode === 'gastos'
+          ? new Set(allTypes.filter(t => EXPENSE_CATEGORIES.has(t.category)).map(t => t.id))
+          // Ingresos: por defecto todos los tipos (las devoluciones pueden venir de cualquiera)
+          : new Set(allTypes.map(t => t.id))
     )
-  }, [allTypes, initialized])
+  }, [allTypes, controlMode, filterKey])
+
+  const matchesMode = useMemo(
+    () => (mv: Movement) => matchesControlMode(mv, controlMode),
+    [controlMode]
+  )
 
   // ── Derived ───────────────────────────────────────────────────────────────────
   const typeMap = useMemo(
@@ -1001,6 +1016,7 @@ export default function ExpenseControl() {
     for (const y of allYears) {
       for (const mv of movementsByYear[y] ?? []) {
         if (mv.movement_type_id == null || !selectedTypeIds.has(mv.movement_type_id) || !annualByType[mv.movement_type_id]) continue
+        if (!matchesMode(mv)) continue
         const mi = new Date(mv.date + 'T00:00:00').getMonth()
         const key = `${mv.movement_type_id}_${y}`
         chartRows[mi][key] = Math.round((Number(chartRows[mi][key]) + Math.abs(mv.money)) * 100) / 100
@@ -1008,11 +1024,18 @@ export default function ExpenseControl() {
       }
     }
     return { chartRows, annualByType }
-  }, [movementsByYear, allYears, chartTypes, selectedTypeIds])
+  }, [movementsByYear, allYears, chartTypes, selectedTypeIds, matchesMode])
+
+  // Solo los tipos con algún importe en el modo activo: evita leyendas y tablas
+  // llenas de tipos a 0 (sobre todo en Ingresos, donde entran todos los tipos)
+  const dataChartTypes = useMemo(
+    () => chartTypes.filter(t => allYears.some(y => (annualByType[t.id]?.[y] ?? 0) > 0.01)),
+    [chartTypes, annualByType, allYears]
+  )
 
   const visibleChartTypes = useMemo(
-    () => chartTypes.filter(t => !hiddenChartTypeIds.has(t.id)),
-    [chartTypes, hiddenChartTypeIds]
+    () => dataChartTypes.filter(t => !hiddenChartTypeIds.has(t.id)),
+    [dataChartTypes, hiddenChartTypeIds]
   )
 
   // Series: newest first so opacity gradation works (yi=0 = newest)
@@ -1039,6 +1062,7 @@ export default function ExpenseControl() {
     const byType: Record<number, { cur: number; prev: number }> = {}
     for (const mv of movementsByYear[primaryYear] ?? []) {
       if (!mv.movement_type_id || !selectedTypeIds.has(mv.movement_type_id)) continue
+      if (!matchesMode(mv)) continue
       const k = mv.date.slice(0, 7)
       if (k !== curKey && k !== prvKey) continue
       if (!byType[mv.movement_type_id]) byType[mv.movement_type_id] = { cur: 0, prev: 0 }
@@ -1050,16 +1074,16 @@ export default function ExpenseControl() {
       .map(([id, { cur, prev }]) => ({ type: typeMap[Number(id)], cur: Math.round(cur * 100) / 100, prev: Math.round(prev * 100) / 100 }))
       .filter(d => d.type)
       .sort((a, b) => b.cur - a.cur)
-  }, [movementsByYear, primaryYear, selectedTypeIds, typeMap])
+  }, [movementsByYear, primaryYear, selectedTypeIds, typeMap, matchesMode])
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
   const toggleType = (id: number) => {
-    setSelectedTypeIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); saveTypeFilter(n); return n })
+    setSelectedTypeIds(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); saveTypeFilter(n, filterKey); return n })
   }
   const toggleCategory = (cat: string) => {
     const ids    = (typesByCategory[cat] ?? []).map(t => t.id)
     const allSel = ids.every(id => selectedTypeIds.has(id))
-    setSelectedTypeIds(prev => { const n = new Set(prev); ids.forEach(id => allSel ? n.delete(id) : n.add(id)); saveTypeFilter(n); return n })
+    setSelectedTypeIds(prev => { const n = new Set(prev); ids.forEach(id => allSel ? n.delete(id) : n.add(id)); saveTypeFilter(n, filterKey); return n })
   }
   const handleColorChange = (id: number, color: string) => {
     setCustomColors(prev => { const n = { ...prev, [id]: color }; saveColors(n); return n })
@@ -1097,6 +1121,26 @@ export default function ExpenseControl() {
     return [`${Number(v).toFixed(2)} €`, nYears > 1 && yr ? `${tName} (${yr})` : tName]
   }
 
+  // Tooltip propio: oculta las series a 0 € y ordena de mayor a menor
+  const renderTooltip = ({ active, payload, label }: {
+    active?: boolean
+    payload?: { name?: string | number; value?: number | string; color?: string }[]
+    label?: string | number
+  }) => {
+    if (!active) return null
+    const entries = visibleTooltipEntries(payload)
+    if (!entries.length) return null
+    return (
+      <div style={{ ...TOOLTIP_STYLE, padding: '8px 12px' }}>
+        <p style={{ fontWeight: 600, marginBottom: 4 }}>{label}</p>
+        {entries.map(e => {
+          const [val, name] = fmtTooltip(e.value, e.name)
+          return <p key={String(e.name)} style={{ color: e.color, margin: '2px 0' }}>{name} : {val}</p>
+        })}
+      </div>
+    )
+  }
+
   const axisProps = { tick: { fontSize: 11, fill: '#9ca3af' } as const, axisLine: false as const, tickLine: false as const }
 
   // Stack mode buttons depend on chart kind
@@ -1111,28 +1155,47 @@ export default function ExpenseControl() {
     <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-5">
 
       {/* Header */}
-      <div className="flex items-center gap-2">
-        <ScrollText className="w-5 h-5 text-gray-600 dark:text-gray-400" strokeWidth={1.5} />
-        <h1 className="text-xl font-bold text-gray-800 dark:text-white">Control de Gastos</h1>
-        {isLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400 ml-1" />}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2">
+          <ScrollText className="w-5 h-5 text-gray-600 dark:text-gray-400" strokeWidth={1.5} />
+          <h1 className="text-xl font-bold text-gray-800 dark:text-white">Control de Gastos e Ingresos</h1>
+          {isLoading && <Loader2 className="w-4 h-4 animate-spin text-gray-400 ml-1" />}
+        </div>
+        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
+          {(['gastos', 'ingresos'] as const).map(m => (
+            <button
+              key={m}
+              onClick={() => { setControlMode(m); if (m === 'ingresos') setViewMode('evolucion') }}
+              className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors ${
+                controlMode === m
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              {m === 'gastos' ? 'Gastos' : 'Ingresos'}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Tab bar */}
-      <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 self-start">
-        {(['evolucion', 'suscripciones'] as const).map(mode => (
-          <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
-              viewMode === mode
-                ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
-                : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
-            }`}
-          >
-            {mode === 'evolucion' ? 'Evolución' : 'Suscripciones'}
-          </button>
-        ))}
-      </div>
+      {/* Tab bar — Suscripciones solo aplica a gastos */}
+      {controlMode === 'gastos' && (
+        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 self-start">
+          {(['evolucion', 'suscripciones'] as const).map(mode => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                viewMode === mode
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}
+            >
+              {mode === 'evolucion' ? 'Evolución' : 'Suscripciones'}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Suscripciones view */}
       {viewMode === 'suscripciones' && (
@@ -1144,6 +1207,7 @@ export default function ExpenseControl() {
       {/* Type filter */}
       <TypeFilterDropdown
         typesByCategory={typesByCategory} selectedTypeIds={selectedTypeIds} customColors={customColors}
+        label={controlMode === 'gastos' ? 'Filtrar por tipo de gasto' : 'Filtrar por tipo de ingreso'}
         onToggleType={toggleType} onToggleCategory={toggleCategory} onColorChange={handleColorChange}
         onApplyPalette={handleApplyPalette}
       />
@@ -1152,7 +1216,8 @@ export default function ExpenseControl() {
       {summaryData.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {summaryData.slice(0, 8).map(({ type, cur, prev }) => (
-            <SummaryCard key={type.id} type={type} cur={cur} prev={prev} customColors={customColors} />
+            <SummaryCard key={type.id} type={type} cur={cur} prev={prev} customColors={customColors}
+              invertDelta={controlMode === 'ingresos'} />
           ))}
         </div>
       )}
@@ -1220,7 +1285,7 @@ export default function ExpenseControl() {
             <div className="space-y-2">
               {/* Type chips — click to show/hide in chart */}
               <div className="flex flex-wrap gap-x-1 gap-y-1">
-                {chartTypes.map(t => {
+                {dataChartTypes.map(t => {
                   const hidden = hiddenChartTypeIds.has(t.id)
                   return (
                     <button key={t.id} type="button" onClick={() => toggleChartType(t.id)}
@@ -1254,7 +1319,7 @@ export default function ExpenseControl() {
 
           {/* Chart or Table */}
           {chartKind === 'table' ? (
-            <TableView chartTypes={chartTypes} chartRows={chartRows} annualByType={annualByType}
+            <TableView chartTypes={dataChartTypes} chartRows={chartRows} annualByType={annualByType}
               allYears={allYears} customColors={customColors} onReorder={handleReorderTypes} />
           ) : (
             <div className="h-72">
@@ -1264,7 +1329,7 @@ export default function ExpenseControl() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.12)" vertical={false} />
                     <XAxis dataKey="month" {...axisProps} />
                     <YAxis {...axisProps} tickFormatter={v => `${v}€`} width={48} />
-                    <Tooltip formatter={fmtTooltip} contentStyle={TOOLTIP_STYLE} />
+                    <Tooltip content={renderTooltip} />
                     {chartSeries.map(s => (
                       <Line key={s.key} type="monotone" dataKey={s.key} stroke={s.color}
                         strokeWidth={s.yi === 0 ? 2 : 1.5}
@@ -1278,7 +1343,7 @@ export default function ExpenseControl() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.12)" vertical={false} />
                     <XAxis dataKey="month" {...axisProps} />
                     <YAxis {...axisProps} tickFormatter={v => `${v}€`} width={48} />
-                    <Tooltip formatter={fmtTooltip} contentStyle={TOOLTIP_STYLE} />
+                    <Tooltip content={renderTooltip} />
                     {chartSeries.map(s => (
                       <Area key={s.key} type="monotone" dataKey={s.key}
                         stroke={s.color} fill={s.color} strokeWidth={1.5}
@@ -1293,7 +1358,7 @@ export default function ExpenseControl() {
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(107,114,128,.12)" vertical={false} />
                     <XAxis dataKey="month" {...axisProps} />
                     <YAxis {...axisProps} tickFormatter={v => `${v}€`} width={48} />
-                    <Tooltip formatter={fmtTooltip} contentStyle={TOOLTIP_STYLE} />
+                    <Tooltip content={renderTooltip} />
                     {chartSeries.map(s => (
                       <Bar key={s.key} dataKey={s.key} fill={s.color}
                         fillOpacity={nYears > 1 ? Math.max(0.35, 1 - s.yi * 0.22) : 1}
@@ -1309,7 +1374,7 @@ export default function ExpenseControl() {
 
       {/* Movements */}
       <MovementsPanel
-        movements={movementsByYear[primaryYear] ?? []}
+        movements={(movementsByYear[primaryYear] ?? []).filter(matchesMode)}
         allTypes={allTypes} groups={groups} typeMap={typeMap}
         typeToGroupMap={typeToGroupMap} selectedTypeIds={selectedTypeIds} onRefresh={onRefresh}
       />
