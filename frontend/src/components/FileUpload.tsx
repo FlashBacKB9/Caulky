@@ -178,18 +178,28 @@ export default function FileUpload({ movementId, existingFiles }: Props) {
   const [viewing, setViewing] = useState<FileRecord | null>(null)
   const qc = useQueryClient()
 
+  // El detalle del movimiento es lo que pinta la lista de adjuntos, así que hay que
+  // refrescarlo además de las listas. 'movements-all' y 'movements-expense' no
+  // comparten prefijo con 'movements', por eso se invalidan una a una.
+  const invalidate = () => {
+    qc.invalidateQueries({ queryKey: ['movement', movementId] })
+    qc.invalidateQueries({ queryKey: ['movements'] })
+    qc.invalidateQueries({ queryKey: ['movements-all'] })
+    qc.invalidateQueries({ queryKey: ['movements-expense'] })
+  }
+
   const upload = useMutation({
     mutationFn: async (files: File[]) => {
       const fd = new FormData()
       files.forEach(f => fd.append('files', f))
       await api.post(`/movements/${movementId}/files`, fd)
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['movements'] }),
+    onSuccess: invalidate,
   })
 
   const remove = useMutation({
     mutationFn: (fileId: number) => api.delete(`/movements/files/${fileId}`),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['movements'] }),
+    onSuccess: invalidate,
   })
 
   const handle = (files: FileList | File[] | null) => {

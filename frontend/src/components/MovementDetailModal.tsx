@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { updateMovement, deleteMovement, createMovement, type Movement } from '../api/movements'
+import { updateMovement, deleteMovement, createMovement, getMovement, type Movement } from '../api/movements'
 import { type MovementType } from '../api/movementTypes'
 import FileUpload from './FileUpload'
 import { X, Trash2, Copy } from 'lucide-react'
@@ -102,6 +102,14 @@ export default function MovementDetailModal({ movement, types, onClose }: {
     }
     return d
   })
+  // Los adjuntos se piden aparte: el `movement` que llega es la instantánea que el
+  // listado tenía al abrir el modal, así que no refleja lo que subas o borres aquí.
+  const { data: freshMovement } = useQuery({
+    queryKey: ['movement', movement.id],
+    queryFn: () => getMovement(movement.id),
+  })
+  const files = freshMovement?.files ?? movement.files
+
   const { data: accountsSummary } = useQuery({ queryKey: ['accounts-summary'], queryFn: () => import('../api/accounts').then(m => m.getAccountsSummary()) })
   const accounts = accountsSummary?.accounts ?? []
   const setField = <K extends keyof DraftRow>(k: K, v: DraftRow[K]) =>
@@ -338,7 +346,7 @@ export default function MovementDetailModal({ movement, types, onClose }: {
           {/* Adjuntos */}
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('form.attachments')}</label>
-            <FileUpload movementId={movement.id} existingFiles={movement.files} />
+            <FileUpload movementId={movement.id} existingFiles={files} />
           </div>
         </div>
 
