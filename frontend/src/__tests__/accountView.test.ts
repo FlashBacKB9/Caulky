@@ -35,6 +35,18 @@ describe('accountDelta', () => {
     expect(accountDelta(traspaso, desdeUso)).toBe(-1879.46)
   })
 
+  it('usa el importe en crudo del tipo vinculado, aunque esté en el grupo Ingreso', () => {
+    // Un subtipo vinculado clasificado como ingreso deja `dinero` en positivo. El saldo que
+    // calcula el backend suma `money`, así que -dinero daría el signo contrario.
+    const aporteComoIngreso = mv({ money: 8367, dinero: 8367, movement_type_id: 10 })
+    expect(accountDelta(aporteComoIngreso, desdeAhorro)).toBe(8367)
+  })
+
+  it('una devolución sobre el tipo vinculado saca dinero de la cuenta', () => {
+    const devolucion = mv({ money: -300, dinero: 300, movement_type_id: 10 })
+    expect(accountDelta(devolucion, desdeAhorro)).toBe(-300)
+  })
+
   it('no invierte lo que llega por account_id, como los intereses', () => {
     const interes = mv({ money: 13.08, dinero: 13.08, movement_type_id: 11, account_id: 2 })
     expect(accountDelta(interes, desdeAhorro)).toBe(13.08)

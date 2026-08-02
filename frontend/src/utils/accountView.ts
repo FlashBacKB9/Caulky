@@ -45,7 +45,10 @@ export function accountDelta(mv: Movement, persp: AccountPerspective | null): nu
   }
   if (mv.account_id === persp.accountId) return mv.dinero
   if (persp.isMain && mv.account_id == null) return mv.dinero
-  if (mv.movement_type_id != null && persp.linkedTypeIds.has(mv.movement_type_id)) return -mv.dinero
+  // Tipo vinculado: el backend calcula el saldo de estas cuentas sumando `money` en crudo
+  // (accounts.py, rama de linked_account_id), así que aquí se usa el mismo criterio. Con un
+  // subtipo del grupo Ahorro coincide con -dinero, pero si está en el grupo Ingreso no.
+  if (mv.movement_type_id != null && persp.linkedTypeIds.has(mv.movement_type_id)) return mv.money
   return null
 }
 
