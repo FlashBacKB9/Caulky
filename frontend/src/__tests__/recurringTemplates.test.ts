@@ -166,7 +166,7 @@ function makeTpl(overrides: Partial<MovementTemplate> & { recurrence: MovementTe
   return {
     id: 1, label: 'Plantilla', name: 'Test', money: '100',
     dateMode: 'today', bankDateMode: 'today',
-    movement_type_id: '1', paid: true, no_count: false, notes: '',
+    movement_type_id: '1', account_id: '', paid: true, no_count: false, notes: '',
     ...overrides,
   }
 }

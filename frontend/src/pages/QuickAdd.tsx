@@ -540,6 +540,8 @@ export default function QuickAdd() {
   const { data: summary }       = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
 
   const mainAccountId = (summary?.accounts ?? []).find(a => a.is_main)?.id
+  // Cuenta heredada de la plantilla aplicada; si no hay, va a la principal
+  const [tplAccountId, setTplAccountId] = useState<number | null>(null)
     ?? (summary?.accounts?.[0]?.id ?? undefined)
 
   const isIncomeKind = kind === 'ingreso'
@@ -572,6 +574,7 @@ export default function QuickAdd() {
     setAmount(Math.abs(money))
     setDescription(tpl.name || tpl.label)
     setTypeId(tpl.movement_type_id ? parseInt(tpl.movement_type_id) : null)
+    setTplAccountId(tpl.account_id ? parseInt(tpl.account_id) : null)
     setShowTemplatePicker(false)
   }
 
@@ -584,7 +587,7 @@ export default function QuickAdd() {
         date,
         bank_date: bankDate,
         movement_type_id: typeId ?? undefined,
-        account_id: mainAccountId,
+        account_id: tplAccountId ?? mainAccountId,
         paid,
         no_count: false,
       })

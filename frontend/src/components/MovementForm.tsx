@@ -206,7 +206,7 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
   const { data: templates = [] } = useQuery({ queryKey: ['templates'], queryFn: getTemplates })
   const emptyTpl = (): Omit<MovementTemplate, 'id'> => ({
     label: '', name: '', money: '', dateMode: 'today', bankDateMode: 'manual',
-    movement_type_id: '', paid: true, no_count: false, notes: '',
+    movement_type_id: '', account_id: '', paid: true, no_count: false, notes: '',
   })
   const [tplDraft, setTplDraft] = useState(emptyTpl)
   const setTpl = (field: string, value: unknown) => setTplDraft(d => ({ ...d, [field]: value }))
@@ -312,7 +312,8 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
       date: prev.date || (tpl.dateMode === 'today' ? today : ''),
       bank_date: prev.bank_date || ((tpl.bankDateMode ?? 'manual') === 'today' ? today : ''),
       movement_type_id: tpl.movement_type_id,
-      account_id: prev.account_id,
+      // La cuenta de la plantilla manda; si no tiene, se respeta la ya elegida
+      account_id: tpl.account_id || prev.account_id,
       is_transfer: false, from_account_id: '',
       paid: tpl.paid, no_count: tpl.no_count, notes: tpl.notes,
       is_shared: false, shared_between: '2', my_share: '',
@@ -330,6 +331,7 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
     setEditingId(tpl.id)
     setTplDraft({ label: tpl.label, name: tpl.name, money: tpl.money, dateMode: tpl.dateMode,
       bankDateMode: tpl.bankDateMode ?? 'manual', movement_type_id: tpl.movement_type_id,
+      account_id: tpl.account_id ?? '',
       paid: tpl.paid, no_count: tpl.no_count, notes: tpl.notes })
     setPanel('template')
   }
@@ -795,6 +797,22 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
                     <SavingsHint typeId={tplDraft.movement_type_id} money={tplDraft.money} />
                   </div>
                 </div>
+                {(() => {
+                  const tplAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro')
+                  if (tplAccounts.length <= 1) return null
+                  const mainAcc = tplAccounts.find(a => a.is_main)
+                  return (
+                    <div>
+                      <label className={LBL}>{t('settings.affectedAccount')}</label>
+                      <select value={tplDraft.account_id} onChange={e => setTpl('account_id', e.target.value)} className={INP}>
+                        <option value="">{mainAcc ? `${mainAcc.name} ${t('settings.defaultSuffix')}` : t('settings.mainAccount')}</option>
+                        {tplAccounts.filter(a => !a.is_main).map(a => (
+                          <option key={a.id} value={a.id}>{a.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )
+                })()}
                 <div className="flex gap-5">
                   <div className="flex items-center gap-2.5">
                     <Toggle value={tplDraft.paid} onChange={v => setTpl('paid', v)} color="#22c55e" />

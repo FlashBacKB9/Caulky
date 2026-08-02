@@ -817,6 +817,7 @@ export default function Debts() {
       dateMode:         'manual' as const,
       bankDateMode:     'manual' as const,
       movement_type_id: String(d.movementTypeId),
+      account_id: '',
       paid:             false,
       no_count:         false,
       notes:            '',

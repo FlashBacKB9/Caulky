@@ -28,6 +28,7 @@ export interface MovementTemplate {
   dateMode: 'today' | 'manual'
   bankDateMode: 'today' | 'manual'
   movement_type_id: string
+  account_id: string
   paid: boolean
   no_count: boolean
   notes: string
@@ -142,7 +143,7 @@ export function computeDates(rule: RecurrenceRule, startDate: Date, count: numbe
 
 type CreateFn = (data: {
   name: string; money: number; date: string; bank_date?: string
-  movement_type_id?: number; paid: boolean; no_count: boolean; notes?: string
+  movement_type_id?: number; account_id?: number; paid: boolean; no_count: boolean; notes?: string
 }) => Promise<unknown>
 
 export async function runAutoRecurring(
@@ -178,6 +179,7 @@ export async function runAutoRecurring(
           date: dateStr,
           bank_date: bankDateStr,
           movement_type_id: tpl.movement_type_id ? parseInt(tpl.movement_type_id) : undefined,
+          account_id: tpl.account_id ? parseInt(tpl.account_id) : undefined,
           paid: tpl.paid,
           no_count: tpl.no_count,
           notes: tpl.notes || undefined,
