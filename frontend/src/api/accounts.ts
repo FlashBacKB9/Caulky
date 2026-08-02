@@ -16,6 +16,9 @@ export interface Account {
   depreciation_rate: number | null
   value_date: string | null
   new_car: boolean
+  interest_enabled: boolean
+  interest_type_id: number | null
+  interest_tax_rate: number | null
 }
 
 export interface AccountsSummary {
@@ -29,7 +32,8 @@ export const getAccountsSummary = () =>
 export const updateAccount = (id: number, initial_balance: number) =>
   api.put<Account>(`/accounts/${id}`, { initial_balance }).then(r => r.data)
 
-export const updateAccountFull = (id: number, patch: Partial<Pick<Account, 'name' | 'color' | 'icon' | 'initial_balance' | 'category' | 'depreciation_rate' | 'value_date' | 'new_car'>>) =>
+export const updateAccountFull = (id: number, patch: Partial<Pick<Account, 'name' | 'color' | 'icon' | 'initial_balance' | 'category' | 'depreciation_rate' | 'value_date' | 'new_car'
+    | 'interest_enabled' | 'interest_type_id' | 'interest_tax_rate'>>) =>
   api.put<Account>(`/accounts/${id}`, patch).then(r => r.data)
 
 export const createAccount = (body: { name: string; color: string; icon: string; initial_balance: number; category: AccountCategory; depreciation_rate?: number | null; value_date?: string | null; new_car?: boolean }) =>

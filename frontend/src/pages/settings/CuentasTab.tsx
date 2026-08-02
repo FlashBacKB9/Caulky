@@ -94,6 +94,11 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
   const [deprRate, setDeprRate]     = useState(String(account.depreciation_rate ?? ''))
   const [valueDate, setValueDate]   = useState(account.value_date ?? '')
   const [newCar, setNewCar]         = useState(account.new_car ?? false)
+  const [interestOn, setInterestOn]     = useState(account.interest_enabled ?? false)
+  const [interestTypeId, setInterestTypeId] = useState(String(account.interest_type_id ?? ''))
+  const [interestTax, setInterestTax]   = useState(
+    account.interest_tax_rate != null ? String(Math.round(account.interest_tax_rate * 10000) / 100) : '19'
+  )
   const [confirming, setConfirming] = useState(false)
   const [movCount, setMovCount]     = useState(0)
   const [showModal, setShowModal]   = useState(false)
@@ -113,6 +118,10 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
         depreciation_rate: category === 'vehiculo' && deprRate !== '' ? parseFloat(deprRate) : null,
         value_date: category === 'vehiculo' && valueDate !== '' ? valueDate : null,
         new_car: category === 'vehiculo' ? newCar : false,
+        interest_enabled: interestOn,
+        interest_type_id: interestOn && interestTypeId !== '' ? parseInt(interestTypeId) : null,
+        // Se guarda como fracción (19 % → 0.19)
+        interest_tax_rate: interestOn && interestTax !== '' ? parseFloat(interestTax) / 100 : null,
       })
       if (!account.is_main) {
         const prevLinked = new Set(allTypes.filter(t => t.linked_account_id === account.id).map(t => t.id))
@@ -160,6 +169,9 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
     setDeprRate(String(account.depreciation_rate ?? ''))
     setValueDate(account.value_date ?? '')
     setNewCar(account.new_car ?? false)
+    setInterestOn(account.interest_enabled ?? false)
+    setInterestTypeId(String(account.interest_type_id ?? ''))
+    setInterestTax(account.interest_tax_rate != null ? String(Math.round(account.interest_tax_rate * 10000) / 100) : '19')
     setLinkedIds(new Set(allTypes.filter(t => t.linked_account_id === account.id).map(t => t.id)))
     setEditing(false)
   }
@@ -241,6 +253,34 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
               </label>
             </>
           )}
+          {/* Cuenta remunerada: alimenta la pestaña de Inversiones → Cuentas remuneradas */}
+          <div className="space-y-2 pt-1 border-t border-gray-50 dark:border-gray-800">
+            <label className="flex items-start gap-2 cursor-pointer pt-2">
+              <input type="checkbox" checked={interestOn} onChange={e => setInterestOn(e.target.checked)}
+                className="mt-0.5 w-3.5 h-3.5 rounded accent-blue-500 shrink-0" />
+              <span className="text-xs text-gray-500 dark:text-gray-400">{t('account.interestEnabled')}</span>
+            </label>
+            {interestOn && (
+              <div className="space-y-2 pl-5">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.interestType')}</span>
+                  <select value={interestTypeId} onChange={e => setInterestTypeId(e.target.value)}
+                    className="flex-1 min-w-0 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="">—</option>
+                    {allTypes.map(mt => <option key={mt.id} value={mt.id}>{mt.name}</option>)}
+                  </select>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.interestTax')}</span>
+                  <input type="number" step="0.1" min="0" max="100" value={interestTax}
+                    onChange={e => setInterestTax(e.target.value)} placeholder="19"
+                    className="w-20 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+                  <span className="text-xs text-gray-400">%</span>
+                </div>
+                <p className="text-[11px] text-gray-400 dark:text-gray-500">{t('account.interestHint')}</p>
+              </div>
+            )}
+          </div>
           {!account.is_main && (
             <div className="space-y-1.5">
               <span className="text-xs text-gray-500 dark:text-gray-400">{t('settings.subtypesFeeding')}</span>

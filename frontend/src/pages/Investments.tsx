@@ -7,6 +7,8 @@ import {
   type InvestmentFund, type InvestmentPurchase,
 } from '../api/investments'
 import { getMovement } from '../api/movements'
+import { getAccountsSummary } from '../api/accounts'
+import InterestAccountCard from '../components/InterestAccountCard'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
@@ -418,6 +420,10 @@ export default function Investments() {
   const { fmt } = useCurrency()
   const qc = useQueryClient()
   const [addingFund, setAddingFund] = useState(false)
+  const [tab, setTab] = useState<'acciones' | 'remuneradas'>('acciones')
+
+  const { data: accountsSummary } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
+  const interestAccounts = (accountsSummary?.accounts ?? []).filter(a => a.interest_enabled)
 
   const { data: funds = [], isLoading } = useQuery({ queryKey: ['investment-funds'], queryFn: getFunds })
   const { data: summary } = useQuery({ queryKey: ['investment-summary'], queryFn: getSummary })
@@ -450,6 +456,34 @@ export default function Investments() {
         </div>
       </div>
 
+      {/* Pestañas: solo si hay cuentas remuneradas configuradas */}
+      {interestAccounts.length > 0 && (
+        <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 self-start w-fit">
+          {([
+            ['acciones', t('invest.tabStocks')],
+            ['remuneradas', t('invest.tabInterest')],
+          ] as const).map(([id, label]) => (
+            <button key={id} onClick={() => setTab(id)}
+              className={`px-4 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+                tab === id
+                  ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200'
+              }`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {tab === 'remuneradas' && interestAccounts.length > 0 && (
+        <div className="space-y-3">
+          {interestAccounts.map(acc => (
+            <InterestAccountCard key={acc.id} account={acc} accounts={accountsSummary?.accounts ?? []} />
+          ))}
+        </div>
+      )}
+
+      {tab === 'acciones' && <>
       {summary && (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {[
@@ -487,6 +521,7 @@ export default function Investments() {
           </button>
         )}
       </div>
+      </>}
     </div>
   )
 }
