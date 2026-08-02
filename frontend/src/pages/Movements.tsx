@@ -10,6 +10,7 @@ import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePay
 import { runAutoRecurring, computeDates, applyFormula, shiftWeekend, type MovementTemplate } from '../utils/recurringTemplates'
 import { getTemplates, updateTemplate } from '../api/templates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
+import { buildPerspective, accountDelta, amountForAccount } from '../utils/accountView'
 import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search, ArrowUpDown } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
@@ -185,11 +186,8 @@ function MovementContextMenu({ menu, onDuplicate, onDelete, onClose }: {
   )
 }
 
-function mvDineroForAccount(mv: Movement, accFilter: number | null): number {
-  if (mv.is_transfer && accFilter !== null)
-    return mv.account_id === accFilter ? Math.abs(mv.money) : -Math.abs(mv.money)
-  return mv.dinero
-}
+// El importe visto desde la cuenta activa vive en utils/accountView, compartido con
+// el cálculo del saldo para que columna y saldo no puedan discrepar.
 
 // ── Calendar preview tracking ─────────────────────────────────────────────────
 
@@ -203,11 +201,11 @@ function savePreviewMap(map: PreviewEntry[]) { localStorage.setItem(PREVIEW_MAP_
 
 // ── Calendar view ────────────────────────────────────────────────────────────
 
-function CalendarView({ movements, types, selectedYear, accountFilter }: {
+function CalendarView({ movements, types, selectedYear, perspective }: {
   movements: Movement[]
   types: MovementType[]
   selectedYear?: number | null
-  accountFilter: number | null
+  perspective: ReturnType<typeof buildPerspective>
 }) {
   const { fmt } = useCurrency()
   const fmtCal = (v: number) => (v >= 0 ? '+' : '') + fmt(v)
@@ -463,8 +461,8 @@ function CalendarView({ movements, types, selectedYear, accountFilter }: {
                       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, mv }) }}
                       className={`mb-1 rounded-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-1.5 py-1 cursor-grab active:cursor-grabbing hover:border-gray-300 dark:hover:border-gray-500 transition-all ${draggingId === mv.id ? 'opacity-40' : ''}`}>
                       <span className="truncate text-[11px] text-gray-700 dark:text-gray-300 leading-tight block">{mv.name}</span>
-                      <span className={`text-[11px] font-mono ${mvDineroForAccount(mv, accountFilter) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                        {fmtCal(mvDineroForAccount(mv, accountFilter))}
+                      <span className={`text-[11px] font-mono ${amountForAccount(mv, perspective) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {fmtCal(amountForAccount(mv, perspective))}
                       </span>
                       {typ && (
                         <span className="hidden sm:block text-[10px] px-1 rounded mt-0.5 w-full" style={{ backgroundColor: typ.color + '22', color: typ.color }}>
@@ -1114,42 +1112,36 @@ export default function Movements() {
   const accounts = accountsSummary?.accounts ?? []
   const accountMap = useMemo(() => Object.fromEntries(accounts.map(a => [a.id, a.name])), [accounts])
 
+  // Cómo se ve el libro desde la cuenta activa: importes y saldo salen de aquí
+  const perspective = useMemo(
+    () => buildPerspective(accountFilter, accounts, types),
+    [accountFilter, accounts, types]
+  )
+  const activeAccount = useMemo(
+    () => accountFilter !== null ? accounts.find(a => a.id === accountFilter) ?? null : null,
+    [accountFilter, accounts]
+  )
+
   // Daily balance: shown only when a specific account is filtered.
-  // Combines three sources: direct account_id, type-linked (inverted), and transfers.
   const dailyBalance = useMemo(() => {
-    if (accountFilter === null) return new Map<string, number>()
-    const acc = accounts.find(a => a.id === accountFilter)
-    if (!acc) return new Map<string, number>()
-    const linkedTypeIds = acc.is_main
-      ? null
-      : new Set(types.filter(tp => tp.linked_account_id === accountFilter).map(tp => tp.id))
+    if (!perspective || !activeAccount) return new Map<string, number>()
 
     const byDate = new Map<string, number>()
-    const add = (date: string, amount: number) =>
-      byDate.set(date, (byDate.get(date) ?? 0) + amount)
-
     for (const mv of allMovementsForYears) {
-      if (mv.is_transfer) {
-        if (mv.account_id === accountFilter)      add(mv.date,  Math.abs(mv.money))  // incoming
-        else if (mv.from_account_id === accountFilter) add(mv.date, -Math.abs(mv.money))  // outgoing
-      } else if (mv.account_id === accountFilter) {
-        add(mv.date, mv.dinero)
-      } else if (acc.is_main && !mv.account_id) {
-        add(mv.date, mv.dinero)
-      } else if (linkedTypeIds && mv.movement_type_id != null && linkedTypeIds.has(mv.movement_type_id)) {
-        add(mv.date, -mv.dinero)  // type-linked: inverted (transfer perspective)
-      }
+      const delta = accountDelta(mv, perspective)
+      if (delta === null) continue
+      byDate.set(mv.date, (byDate.get(mv.date) ?? 0) + delta)
     }
 
     const dates = [...byDate.keys()].sort((a, b) => b.localeCompare(a))
     const map = new Map<string, number>()
-    let bal = acc.balance
+    let bal = activeAccount.balance
     for (const date of dates) {
       map.set(date, bal)
       bal -= byDate.get(date)!
     }
     return map
-  }, [allMovementsForYears, accounts, accountFilter, types])
+  }, [allMovementsForYears, perspective, activeAccount])
 
   const sortedMovements = useMemo(() => {
     if (sorts.length === 0) {
@@ -1614,7 +1606,7 @@ export default function Movements() {
       )}
 
       {viewMode === 'calendar' && (
-        <CalendarView movements={filteredMovements} types={types} selectedYear={year} accountFilter={accountFilter} />
+        <CalendarView movements={filteredMovements} types={types} selectedYear={year} perspective={perspective} />
       )}
 
       {viewMode === 'kanban' && (
@@ -1715,7 +1707,9 @@ export default function Movements() {
                 </th>
                 {showBalance && (
                   <th className="py-3 px-4 text-right text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">
-                    {t('movements.colBalance')}
+                    {activeAccount
+                      ? t('movements.colBalanceOf').replace('{name}', activeAccount.name)
+                      : t('movements.colBalance')}
                   </th>
                 )}
               </tr>
@@ -1817,8 +1811,8 @@ export default function Movements() {
                             </td>
                           )
                           case 'amount': return (
-                            <td key="amount" className={cellCls + ` font-mono font-semibold text-right ${mvDineroForAccount(mv, accountFilter) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`} style={st} onClick={e => enterEdit(e, mv)}>
-                              {isEditing ? <input type="number" step="0.01" value={d!.money} className={INPUT + ' text-right'} onChange={e => setField('money', e.target.value)} onClick={e => e.stopPropagation()} /> : fmt(mvDineroForAccount(mv, accountFilter))}
+                            <td key="amount" className={cellCls + ` font-mono font-semibold text-right ${amountForAccount(mv, perspective) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`} style={st} onClick={e => enterEdit(e, mv)}>
+                              {isEditing ? <input type="number" step="0.01" value={d!.money} className={INPUT + ' text-right'} onChange={e => setField('money', e.target.value)} onClick={e => e.stopPropagation()} /> : fmt(amountForAccount(mv, perspective))}
                             </td>
                           )
                           case 'paid': return (
