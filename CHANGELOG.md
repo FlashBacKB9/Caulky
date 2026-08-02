@@ -6,6 +6,33 @@ All notable changes to Caulky are documented here.
 
 ## [Unreleased] — dev
 
+### ✨ New: Cuentas remuneradas
+
+Mark an account as interest-bearing in Ajustes → Cuentas (subtype used for the interest
+payment + withholding rate, 19% by default). Inversiones then splits into two tabs,
+**Acciones** (the existing view) and **Cuentas remuneradas**:
+
+- One card per account: balance-vs-monthly-interest chart, a row per payment and the list
+  of the subtype's movements
+- Interest for a month pays on the **previous month-end balance** — August interest pays for
+  what you held at the end of July
+- The bank credits interest net of withholding, so the gross is `net / (1 - rate)` and the
+  annual rate is derived from the gross, to compare against the rate your bank advertises
+
+### ✨ New: Account on templates
+
+Templates can now carry the account the movement belongs to. It is honoured when applying
+the template by hand, from Añadir rápido and from automatic recurrences.
+
+### 🐛 Fixed: per-account movement view
+
+Opening an account from Cuentas now shows every amount from that account's point of view:
+a transfer into Ahorro adds there and subtracts in the spending account. Before, the balance
+column was already correct but the amount kept the global sign, so a savings transfer read
+as negative while the balance went up. Amount, balance, calendar and filtering now share a
+single helper (`utils/accountView`), so they cannot drift apart. The balance column header
+also carries the account name instead of the fixed «Saldo de uso».
+
 ### ✨ New: Calculadora flotante
 
 Sidebar button (visible outside Configuración) that opens a small draggable calculator:

@@ -16,6 +16,9 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     version: 'v1.9', date: 'Julio 2026',
     items: [
+      { type: 'feat',    text: 'Cuentas remuneradas: marca una cuenta como remunerada en Ajustes → Cuentas, elige el subtipo del abono de intereses y la retención, y en Inversiones aparece una pestaña con el saldo mes a mes, los intereses de cada mes y el tipo anual real (bruto sobre el saldo del mes anterior) para contrastarlo con el de tu banco' },
+      { type: 'feat',    text: 'Plantillas: ahora puedes elegir la cuenta a la que corresponde el movimiento, y se respeta al aplicarla y en las recurrencias automáticas' },
+      { type: 'fix',     text: 'Movimientos de una cuenta: los importes se muestran desde la perspectiva de esa cuenta (el traspaso a Ahorro suma en Ahorro y resta en la de uso) y la columna de saldo lleva el nombre de la cuenta en vez de «Saldo de uso»' },
       { type: 'feat',    text: 'Control de Gastos es ahora Control de Gastos e Ingresos: pestaña Gastos/Ingresos junto al título, con el mismo análisis en ambos modos (en Ingresos entran los movimientos de tipo ingreso y las devoluciones de cualquier tipo)' },
       { type: 'feat',    text: 'Calculadora flotante: botón en la barra lateral que abre una calculadora arrastrable con historial, y se queda flotando mientras navegas por la app' },
       { type: 'improve', text: 'Control de Gastos e Ingresos: el tooltip de la evolución mensual oculta las categorías a 0 € y ordena de mayor a menor; la leyenda y la tabla solo muestran los tipos con importe' },
