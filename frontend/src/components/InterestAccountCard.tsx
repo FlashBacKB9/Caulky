@@ -162,7 +162,7 @@ export default function InterestAccountCard({ account, accounts }: {
                     <tr key={p.month} className="border-b border-gray-50 dark:border-gray-800/60 last:border-0">
                       <td className="py-1.5 text-gray-700 dark:text-gray-300">{monthLabel(p.month)}</td>
                       <td className="py-1.5 text-right tabular-nums text-gray-500 dark:text-gray-400">
-                        {p.baseBalance != null ? fmt(p.baseBalance) : '—'}
+                        {p.avgBalance != null ? fmt(p.avgBalance) : '—'}
                       </td>
                       <td className="py-1.5 text-right tabular-nums text-gray-700 dark:text-gray-200">{fmt(p.net)}</td>
                       <td className="py-1.5 text-right tabular-nums text-gray-500 dark:text-gray-400">{fmt(p.gross)}</td>

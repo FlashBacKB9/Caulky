@@ -6,73 +6,113 @@ import type { Movement } from '../api/movements'
 const AHORRO: AccountPerspective = { accountId: 2, isMain: false, linkedTypeIds: new Set([10]) }
 const INTERES_TYPE = 11
 
+let seq = 0
 const mv = (p: Partial<Movement>): Movement => ({
-  id: Math.random(), name: 'x', money: 0, date: '2026-07-01', paid: true, no_count: false,
+  id: ++seq, name: 'x', money: 0, date: '2026-07-01', paid: true, no_count: false,
   dinero: 0, label: 'Ingreso', color: '#000', files: [], ...p,
 })
 
-// Aporte de 1000 en junio (registrado desde la cuenta de uso, tipo vinculado)
-const aporteJunio = mv({ date: '2026-06-30', money: 1000, dinero: -1000, movement_type_id: 10 })
-// Intereses de julio: 10 € netos, abonados en la propia cuenta
-const interesJulio = mv({ date: '2026-07-01', money: 10, dinero: 10, movement_type_id: INTERES_TYPE, account_id: 2 })
+// Traspaso desde la cuenta de uso: se registra allí en negativo y entra aquí en positivo
+const aporte = (date: string, amount: number) =>
+  mv({ date, money: amount, dinero: -amount, movement_type_id: 10 })
+const interes = (date: string, net: number) =>
+  mv({ date, money: net, dinero: net, movement_type_id: INTERES_TYPE, account_id: 2 })
 
 describe('computeInterestStats', () => {
-  it('remunera el saldo del cierre del mes anterior', () => {
-    // Saldo actual 1010 = 1000 aportados + 10 de intereses
-    const st = computeInterestStats([aporteJunio, interesJulio], AHORRO, 1010, INTERES_TYPE, null)
+  it('usa el saldo medio diario, no el de cierre (caso del traspaso a fin de mes)', () => {
+    // 8367 durante casi todo julio; el día 30 entra un traspaso de 1879.46
+    // El 1 de agosto se abonan 13.08 netos, que solo devengaron 2 días sobre el saldo alto.
+    const movs = [
+      aporte('2026-06-15', 8367),
+      aporte('2026-07-30', 1879.46),
+      interes('2026-08-01', 13.08),
+    ]
+    const saldoActual = 8367 + 1879.46 + 13.08
+    const st = computeInterestStats(movs, AHORRO, saldoActual, INTERES_TYPE, 0.19)
+    const agosto = st.months.find(m => m.month === '2026-08')!
+
+    // Media de julio: 29 días a 8367 y 2 días a 10246.46
+    const esperada = Math.round(((8367 * 29 + 10246.46 * 2) / 31) * 100) / 100
+    expect(agosto.avgBalance).toBe(esperada)
+    expect(esperada).toBeCloseTo(8488.26, 2)
+    expect(agosto.accrualDays).toBe(31)
+
+    // El cierre de julio (10246.46) daría un tipo mucho más bajo: esa era la regresión
+    const bruto = 13.08 / 0.81
+    expect(agosto.gross).toBeCloseTo(bruto, 2)
+    expect(agosto.annualRate).toBeCloseTo((bruto / esperada) * (365 / 31) * 100, 1)
+    // Sanidad: con el cierre saldría ~1.9%, con la media ~2.2%
+    expect(agosto.annualRate!).toBeGreaterThan(2.1)
+  })
+
+  it('con saldo estable el tipo es el nominal', () => {
+    // 12000 constantes durante junio; en julio abonan 20 netos sin retención
+    const st = computeInterestStats(
+      [aporte('2026-05-01', 12000), interes('2026-07-01', 20)],
+      AHORRO, 12020, INTERES_TYPE, null,
+    )
     const julio = st.months.find(m => m.month === '2026-07')!
-    expect(julio.net).toBe(10)
-    expect(julio.baseBalance).toBe(1000)   // cierre de junio
-    expect(julio.balance).toBe(1010)
-    // 10 sobre 1000 al mes = 12% anual
-    expect(julio.annualRate).toBe(12)
+    expect(julio.avgBalance).toBe(12000)
+    expect(julio.gross).toBe(20)
+    // 20/12000 en 30 días → anualizado a 365
+    expect(julio.annualRate).toBeCloseTo((20 / 12000) * (365 / 30) * 100, 2)
   })
 
   it('eleva a bruto el abono con retención', () => {
-    // 10 netos con 19% de retención → 12.35 brutos
-    const st = computeInterestStats([aporteJunio, interesJulio], AHORRO, 1010, INTERES_TYPE, 0.19)
+    const st = computeInterestStats(
+      [aporte('2026-05-01', 10000), interes('2026-07-01', 10)],
+      AHORRO, 10010, INTERES_TYPE, 0.19,
+    )
     const julio = st.months.find(m => m.month === '2026-07')!
     expect(julio.net).toBe(10)
     expect(julio.gross).toBe(12.35)
-    expect(julio.annualRate).toBe(14.82)   // 12.35/1000*12
-    expect(st.totalGross).toBe(12.35)
     expect(st.totalNet).toBe(10)
+    expect(st.totalGross).toBe(12.35)
   })
 
-  it('rellena los meses sin abono y mantiene el saldo', () => {
-    const st = computeInterestStats([aporteJunio, interesJulio], AHORRO, 1010, INTERES_TYPE, null)
-    expect(st.months.map(m => m.month)).toEqual(['2026-06', '2026-07'])
-    const junio = st.months[0]
+  it('el saldo de cierre de cada mes cuadra con el saldo actual', () => {
+    const st = computeInterestStats(
+      [aporte('2026-06-10', 5000), aporte('2026-07-10', 1000), interes('2026-08-01', 8)],
+      AHORRO, 6008, INTERES_TYPE, null,
+    )
+    expect(st.months.find(m => m.month === '2026-06')!.balance).toBe(5000)
+    expect(st.months.find(m => m.month === '2026-07')!.balance).toBe(6000)
+    expect(st.months.find(m => m.month === '2026-08')!.balance).toBe(6008)
+  })
+
+  it('no marca base ni tipo en los meses sin abono', () => {
+    const st = computeInterestStats([aporte('2026-06-10', 5000)], AHORRO, 5000, INTERES_TYPE, null)
+    const junio = st.months.find(m => m.month === '2026-06')!
     expect(junio.net).toBe(0)
+    expect(junio.avgBalance).toBeNull()
     expect(junio.annualRate).toBeNull()
-    expect(st.payments).toHaveLength(1)
+    expect(st.payments).toHaveLength(0)
+  })
+
+  it('ordena los abonos del más reciente al más antiguo y promedia el tipo', () => {
+    const st = computeInterestStats(
+      [aporte('2026-05-01', 10000), interes('2026-07-01', 20), interes('2026-08-01', 20)],
+      AHORRO, 10040, INTERES_TYPE, null,
+    )
+    expect(st.payments.map(p => p.month)).toEqual(['2026-08', '2026-07'])
+    expect(st.avgAnnualRate).toBeGreaterThan(0)
   })
 
   it('ignora los movimientos de otras cuentas', () => {
     const ajeno = mv({ date: '2026-07-05', money: 500, dinero: 500, account_id: 99 })
-    const st = computeInterestStats([aporteJunio, interesJulio, ajeno], AHORRO, 1010, INTERES_TYPE, null)
-    expect(st.months.find(m => m.month === '2026-07')!.balance).toBe(1010)
+    const st = computeInterestStats(
+      [aporte('2026-05-01', 10000), interes('2026-07-01', 10), ajeno],
+      AHORRO, 10010, INTERES_TYPE, null,
+    )
+    expect(st.months.find(m => m.month === '2026-07')!.balance).toBe(10010)
   })
 
-  it('promedia el tipo de varios meses', () => {
-    const interesAgosto = mv({ date: '2026-08-01', money: 10.1, dinero: 10.1, movement_type_id: INTERES_TYPE, account_id: 2 })
-    const st = computeInterestStats([aporteJunio, interesJulio, interesAgosto], AHORRO, 1020.1, INTERES_TYPE, null)
-    expect(st.payments.map(p => p.month)).toEqual(['2026-08', '2026-07'])  // más reciente primero
-    // Agosto remunera el cierre de julio (1010): 10.1/1010*12 = 12%
-    expect(st.payments[0].baseBalance).toBe(1010)
-    expect(st.payments[0].annualRate).toBe(12)
-    expect(st.avgAnnualRate).toBe(12)
-  })
-
-  it('sin movimientos devuelve vacío', () => {
-    const st = computeInterestStats([], AHORRO, 0, INTERES_TYPE, null)
-    expect(st.months).toEqual([])
-    expect(st.avgAnnualRate).toBeNull()
-  })
-
-  it('sin subtipo de intereses no calcula tipos', () => {
-    const st = computeInterestStats([aporteJunio, interesJulio], AHORRO, 1010, null, null)
-    expect(st.payments).toHaveLength(0)
-    expect(st.totalNet).toBe(0)
+  it('sin movimientos o sin subtipo no calcula nada', () => {
+    expect(computeInterestStats([], AHORRO, 0, INTERES_TYPE, null).months).toEqual([])
+    const sinTipo = computeInterestStats(
+      [aporte('2026-05-01', 100), interes('2026-07-01', 1)], AHORRO, 101, null, null,
+    )
+    expect(sinTipo.payments).toHaveLength(0)
+    expect(sinTipo.totalNet).toBe(0)
   })
 })
