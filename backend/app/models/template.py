@@ -18,6 +18,7 @@ class MovementTemplate(Base):
     date_mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="today")
     bank_date_mode: Mapped[str] = mapped_column(String(20), nullable=False, server_default="manual")
     movement_type_id: Mapped[int | None] = mapped_column(nullable=True)
+    account_id: Mapped[int | None] = mapped_column(nullable=True)
     paid: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="true")
     no_count: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
     notes: Mapped[str] = mapped_column(String(2000), nullable=False, server_default="")

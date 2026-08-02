@@ -21,6 +21,10 @@ class Account(Base):
     depreciation_rate: Mapped[float | None] = mapped_column(Numeric(6, 4), nullable=True)
     value_date: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
     new_car: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Cuenta remunerada: subtipo con el que se abonan los intereses y retención aplicada
+    interest_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    interest_type_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    interest_tax_rate: Mapped[float | None] = mapped_column(Numeric(5, 4), nullable=True)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )

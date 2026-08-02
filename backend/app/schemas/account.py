@@ -16,6 +16,9 @@ class AccountRead(BaseModel):
     depreciation_rate: float | None = None
     value_date: datetime.date | None = None
     new_car: bool = False
+    interest_enabled: bool = False
+    interest_type_id: int | None = None
+    interest_tax_rate: float | None = None
 
     model_config = {"from_attributes": True}
 
@@ -29,6 +32,9 @@ class AccountCreate(BaseModel):
     depreciation_rate: float | None = None
     value_date: datetime.date | None = None
     new_car: bool = False
+    interest_enabled: bool = False
+    interest_type_id: int | None = None
+    interest_tax_rate: float | None = None
 
 
 class AccountPatch(BaseModel):
@@ -40,6 +46,9 @@ class AccountPatch(BaseModel):
     depreciation_rate: float | None = None
     value_date: datetime.date | None = None
     new_car: bool | None = None
+    interest_enabled: bool | None = None
+    interest_type_id: int | None = None
+    interest_tax_rate: float | None = None
 
 
 class AccountUpdate(BaseModel):

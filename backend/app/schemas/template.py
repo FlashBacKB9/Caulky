@@ -10,6 +10,7 @@ class TemplateBase(BaseModel):
     date_mode: str = "today"
     bank_date_mode: str = "manual"
     movement_type_id: Optional[int] = None
+    account_id: Optional[int] = None
     paid: bool = True
     no_count: bool = False
     notes: str = ""
