@@ -11,8 +11,26 @@ export function visibleTooltipEntries<T extends TooltipEntry>(payload: readonly 
     .sort((a, b) => Number(b.value) - Number(a.value))
 }
 
-// Un movimiento pertenece a Gastos si dinero < 0; a Ingresos si dinero > 0
-// (tipos de ingreso y devoluciones de cualquier tipo), excluyendo transferencias.
-export function matchesControlMode(mv: Movement, mode: 'gastos' | 'ingresos'): boolean {
+// Importe negativo en un tipo de gasto = devolución de ese gasto (un reintegro, un
+// bizum de un amigo por su parte). El backend le da dinero > 0, pero no es un ingreso:
+// es un gasto negativo, así que resta del gasto de su propia categoría.
+export function isExpenseRefund(mv: Movement, incomeTypeIds: ReadonlySet<number>): boolean {
+  return mv.money < 0 && mv.movement_type_id != null && !incomeTypeIds.has(mv.movement_type_id)
+}
+
+// Un movimiento pertenece a Gastos si dinero < 0 (o es una devolución de un gasto);
+// a Ingresos si dinero > 0, excluyendo transferencias y esas mismas devoluciones.
+export function matchesControlMode(
+  mv: Movement,
+  mode: 'gastos' | 'ingresos',
+  incomeTypeIds: ReadonlySet<number> = new Set(),
+): boolean {
+  if (isExpenseRefund(mv, incomeTypeIds)) return mode === 'gastos'
   return mode === 'gastos' ? mv.dinero < 0 : mv.dinero > 0 && !mv.is_transfer
+}
+
+// Importe con signo que aporta el movimiento al modo activo: en Gastos los gastos
+// suman y las devoluciones restan; en Ingresos siempre suma.
+export function controlModeAmount(mv: Movement, mode: 'gastos' | 'ingresos'): number {
+  return mode === 'gastos' ? -mv.dinero : mv.dinero
 }

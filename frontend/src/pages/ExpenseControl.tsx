@@ -26,7 +26,7 @@ import {
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getGroups, type Group } from '../api/groups'
 import FilterPanel, { EMPTY_FILTER, applyAdvancedFilter, type AdvancedFilter } from '../components/FilterPanel'
-import { visibleTooltipEntries, matchesControlMode } from '../utils/expenseControl'
+import { visibleTooltipEntries, matchesControlMode, controlModeAmount } from '../utils/expenseControl'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -113,7 +113,7 @@ function SummaryCard({ type, cur, prev, customColors, invertDelta = false }: {
   type: MovementType; cur: number; prev: number; customColors: Record<number, string>; invertDelta?: boolean
 }) {
   const delta   = cur - prev
-  const hasPrev = prev > 0.01
+  const hasPrev = Math.abs(prev) > 0.01
   const color   = typeColor(type, customColors)
   // Gastos: subir es malo (rojo). Ingresos (invertDelta): subir es bueno (verde).
   const upCls   = invertDelta ? 'text-emerald-500' : 'text-red-500'
@@ -201,8 +201,12 @@ function MovementRow({ movement, type, onRefresh }: {
             {expanded ? <ChevronUp className="w-2.5 h-2.5" /> : <ChevronDown className="w-2.5 h-2.5" />}
           </button>
         )}
-        <span className="text-xs font-semibold text-gray-800 dark:text-white whitespace-nowrap shrink-0 w-20 text-right">
-          {Math.abs(movement.money).toFixed(2)} €
+        <span
+          title={movement.money < 0 ? movement.label : undefined}
+          className={`text-xs font-semibold whitespace-nowrap shrink-0 w-20 text-right ${
+            movement.money < 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-800 dark:text-white'
+          }`}>
+          {movement.money < 0 ? '-' : ''}{Math.abs(movement.money).toFixed(2)} €
         </span>
         <div className="shrink-0">
           <input ref={fileInputRef} type="file" accept="image/*,application/pdf" className="hidden" onChange={handleUpload} />
@@ -408,12 +412,12 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
                       </span>
                     </td>
                     {values.map((v, i) => (
-                      <td key={i} className={`text-right px-2 py-2 tabular-nums ${v > 0.01 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
-                        {v > 0.01 ? v.toFixed(0) : '—'}
+                      <td key={i} className={`text-right px-2 py-2 tabular-nums ${Math.abs(v) > 0.01 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
+                        {Math.abs(v) > 0.01 ? v.toFixed(0) : '—'}
                       </td>
                     ))}
                     <td className="text-right px-3 py-2 font-semibold text-gray-800 dark:text-white tabular-nums">
-                      {total > 0.01 ? `${total.toFixed(0)} €` : '—'}
+                      {Math.abs(total) > 0.01 ? `${total.toFixed(0)} €` : '—'}
                     </td>
                   </tr>
                 )
@@ -423,8 +427,8 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
                 {MONTHS_SHORT.map((_, mi) => {
                   const total = chartTypes.reduce((s, t) => s + Number(chartRows[mi]?.[`${t.id}_${singleYear}`] ?? 0), 0)
                   return (
-                    <td key={mi} className={`text-right px-2 py-2 tabular-nums ${total > 0.01 ? 'text-gray-800 dark:text-white' : 'text-gray-300 dark:text-gray-600'}`}>
-                      {total > 0.01 ? total.toFixed(0) : '—'}
+                    <td key={mi} className={`text-right px-2 py-2 tabular-nums ${Math.abs(total) > 0.01 ? 'text-gray-800 dark:text-white' : 'text-gray-300 dark:text-gray-600'}`}>
+                      {Math.abs(total) > 0.01 ? total.toFixed(0) : '—'}
                     </td>
                   )
                 })}
@@ -479,12 +483,12 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
                       <tr key={y} className="border-b border-gray-50 dark:border-gray-800/40">
                         <td className="pl-5 pr-3 py-1.5 text-gray-500 dark:text-gray-400 sticky left-0 bg-white dark:bg-gray-900 tabular-nums">{y}</td>
                         {vals.map((v, i) => (
-                          <td key={i} className={`text-right px-2 py-1.5 tabular-nums ${v > 0.01 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
-                            {v > 0.01 ? v.toFixed(0) : '—'}
+                          <td key={i} className={`text-right px-2 py-1.5 tabular-nums ${Math.abs(v) > 0.01 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
+                            {Math.abs(v) > 0.01 ? v.toFixed(0) : '—'}
                           </td>
                         ))}
                         <td className="text-right px-3 py-1.5 font-semibold tabular-nums text-gray-800 dark:text-white">
-                          {total > 0.01 ? `${total.toFixed(0)} €` : '—'}
+                          {Math.abs(total) > 0.01 ? `${total.toFixed(0)} €` : '—'}
                         </td>
                       </tr>
                     ))}
@@ -495,7 +499,7 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
                       </td>
                       {topVals.map((tv, i) => {
                         const bv = (baseVals[i] ?? 0)
-                        const d  = bv > 0.01 ? ((tv - bv) / bv) * 100 : null
+                        const d  = Math.abs(bv) > 0.01 ? ((tv - bv) / bv) * 100 : null
                         return (
                           <td key={i} className={`text-right px-2 py-1 text-[10px] tabular-nums font-medium ${
                             d == null ? 'text-gray-300 dark:text-gray-600' : d > 0 ? 'text-red-500' : d < 0 ? 'text-emerald-500' : 'text-gray-400'
@@ -505,7 +509,7 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
                         )
                       })}
                       {(() => {
-                        const d = baseTotal > 0.01 ? ((topTotal - baseTotal) / baseTotal) * 100 : null
+                        const d = Math.abs(baseTotal) > 0.01 ? ((topTotal - baseTotal) / baseTotal) * 100 : null
                         return (
                           <td className={`text-right px-3 py-1 text-[10px] tabular-nums font-medium ${
                             d == null ? 'text-gray-300 dark:text-gray-600' : d > 0 ? 'text-red-500' : d < 0 ? 'text-emerald-500' : 'text-gray-400'
@@ -537,7 +541,7 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
                 const color  = typeColor(t, customColors)
                 const base   = annualByType[t.id]?.[baseYear]   ?? 0
                 const latest = annualByType[t.id]?.[latestYear] ?? 0
-                const delta  = base > 0.01 ? ((latest - base) / base) * 100 : null
+                const delta  = Math.abs(base) > 0.01 ? ((latest - base) / base) * 100 : null
                 return (
                   <tr key={t.id} draggable
                     onDragStart={e => tblDragStart(e, t.id)} onDragOver={e => tblDragOver(e, t.id)}
@@ -553,8 +557,8 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
                     {sortedYears.map(y => {
                       const v = annualByType[t.id]?.[y] ?? 0
                       return (
-                        <td key={y} className={`text-right px-3 py-2 tabular-nums ${v > 0.01 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
-                          {v > 0.01 ? `${v.toFixed(0)} €` : '—'}
+                        <td key={y} className={`text-right px-3 py-2 tabular-nums ${Math.abs(v) > 0.01 ? 'text-gray-700 dark:text-gray-300' : 'text-gray-300 dark:text-gray-600'}`}>
+                          {Math.abs(v) > 0.01 ? `${v.toFixed(0)} €` : '—'}
                         </td>
                       )
                     })}
@@ -570,12 +574,12 @@ function TableView({ chartTypes, chartRows, annualByType, allYears, customColors
                 <td className="px-3 py-2 text-gray-700 dark:text-gray-300 sticky left-0 bg-gray-50 dark:bg-gray-800/30">Total</td>
                 {sortedYears.map(y => {
                   const total = chartTypes.reduce((s, t) => s + (annualByType[t.id]?.[y] ?? 0), 0)
-                  return <td key={y} className="text-right px-3 py-2 tabular-nums text-gray-800 dark:text-white">{total > 0.01 ? `${total.toFixed(0)} €` : '—'}</td>
+                  return <td key={y} className="text-right px-3 py-2 tabular-nums text-gray-800 dark:text-white">{Math.abs(total) > 0.01 ? `${total.toFixed(0)} €` : '—'}</td>
                 })}
                 {(() => {
                   const tb = chartTypes.reduce((s, t) => s + (annualByType[t.id]?.[baseYear]   ?? 0), 0)
                   const tl = chartTypes.reduce((s, t) => s + (annualByType[t.id]?.[latestYear] ?? 0), 0)
-                  const d  = tb > 0.01 ? ((tl - tb) / tb) * 100 : null
+                  const d  = Math.abs(tb) > 0.01 ? ((tl - tb) / tb) * 100 : null
                   return (
                     <td className={`text-right px-3 py-2 tabular-nums font-medium ${d == null ? 'text-gray-400' : d > 0 ? 'text-red-500' : d < 0 ? 'text-emerald-500' : 'text-gray-400'}`}>
                       {d == null ? '—' : `${d > 0 ? '+' : ''}${d.toFixed(1)}%`}
@@ -968,9 +972,16 @@ export default function ExpenseControl() {
     )
   }, [allTypes, controlMode, filterKey])
 
+  // Tipos cuyo grupo es "Ingreso": el resto son gastos, y un importe negativo en
+  // ellos es una devolución que resta del gasto de su categoría (no un ingreso).
+  const incomeTypeIds = useMemo(() => {
+    const incomeGroupIds = new Set(groups.filter(g => g.name === 'Ingreso').map(g => g.id))
+    return new Set(allTypes.filter(t => incomeGroupIds.has(t.income_expense_group_id)).map(t => t.id))
+  }, [allTypes, groups])
+
   const matchesMode = useMemo(
-    () => (mv: Movement) => matchesControlMode(mv, controlMode),
-    [controlMode]
+    () => (mv: Movement) => matchesControlMode(mv, controlMode, incomeTypeIds),
+    [controlMode, incomeTypeIds]
   )
 
   // ── Derived ───────────────────────────────────────────────────────────────────
@@ -1020,17 +1031,18 @@ export default function ExpenseControl() {
         if (!matchesMode(mv)) continue
         const mi = new Date(mv.date + 'T00:00:00').getMonth()
         const key = `${mv.movement_type_id}_${y}`
-        chartRows[mi][key] = Math.round((Number(chartRows[mi][key]) + Math.abs(mv.money)) * 100) / 100
-        annualByType[mv.movement_type_id][y] = (annualByType[mv.movement_type_id][y] ?? 0) + Math.abs(mv.money)
+        const amount = controlModeAmount(mv, controlMode)
+        chartRows[mi][key] = Math.round((Number(chartRows[mi][key]) + amount) * 100) / 100
+        annualByType[mv.movement_type_id][y] = (annualByType[mv.movement_type_id][y] ?? 0) + amount
       }
     }
     return { chartRows, annualByType }
-  }, [movementsByYear, allYears, chartTypes, selectedTypeIds, matchesMode])
+  }, [movementsByYear, allYears, chartTypes, selectedTypeIds, matchesMode, controlMode])
 
   // Solo los tipos con algún importe en el modo activo: evita leyendas y tablas
   // llenas de tipos a 0 (sobre todo en Ingresos, donde entran todos los tipos)
   const dataChartTypes = useMemo(
-    () => chartTypes.filter(t => allYears.some(y => (annualByType[t.id]?.[y] ?? 0) > 0.01)),
+    () => chartTypes.filter(t => allYears.some(y => Math.abs(annualByType[t.id]?.[y] ?? 0) > 0.01)),
     [chartTypes, annualByType, allYears]
   )
 
@@ -1067,7 +1079,7 @@ export default function ExpenseControl() {
       const k = mv.date.slice(0, 7)
       if (k !== curKey && k !== prvKey) continue
       if (!byType[mv.movement_type_id]) byType[mv.movement_type_id] = { cur: 0, prev: 0 }
-      const a = Math.abs(mv.money)
+      const a = controlModeAmount(mv, controlMode)
       if (k === curKey) byType[mv.movement_type_id].cur  += a
       else              byType[mv.movement_type_id].prev += a
     }
@@ -1075,7 +1087,7 @@ export default function ExpenseControl() {
       .map(([id, { cur, prev }]) => ({ type: typeMap[Number(id)], cur: Math.round(cur * 100) / 100, prev: Math.round(prev * 100) / 100 }))
       .filter(d => d.type)
       .sort((a, b) => b.cur - a.cur)
-  }, [movementsByYear, primaryYear, selectedTypeIds, typeMap, matchesMode])
+  }, [movementsByYear, primaryYear, selectedTypeIds, typeMap, matchesMode, controlMode])
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
   const toggleType = (id: number) => {
