@@ -30,6 +30,7 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: 'improve', text: 'Añadir movimiento rápido: pega (Ctrl+V) o arrastra imágenes para adjuntarlas al movimiento o al ticket' },
       { type: 'fix',     text: 'Tickets: los productos vuelven a extraerse (el análisis descartaba todas las líneas por un cambio en el formato de la IA)' },
       { type: 'fix',     text: 'Análisis: el mayor tipo de gasto y el gasto por categoría muestran el nombre del tipo (Moto, Suscripciones…) en vez del grupo genérico «Gasto»' },
+      { type: 'fix',     text: 'Análisis – Heatmap de gastos: ya no suma el ahorro, las inversiones, los movimientos «no contar» ni los excluidos manualmente; usa los mismos gastos reales que el resto de la sección' },
       { type: 'fix',     text: 'Presupuestos: las devoluciones (importe negativo) restan del gasto del periodo' },
       { type: 'fix',     text: 'Dashboard: los widgets de presupuesto usan el mismo límite y periodo que la página de Presupuestos' },
       { type: 'fix',     text: 'Dashboard – Gastos por categoría: las devoluciones se descuentan del gasto (250 gastados − 125 devueltos = 125, antes 375); el tooltip oculta las categorías a 0 y agrupa las menores de 20 € en «Otros»; el donut junta las porciones menores del 10% en «Otros»' },

@@ -714,27 +714,27 @@ function ProyeccionPatrimonio({ monthlySavings, liquidBalance, fmt }: {
 
 const HEATMAP_DAY_LABELS = ['L', '', 'X', '', 'V', '', 'D']
 
-function HeatmapGastos({ allMovements, fmt }: { allMovements: Movement[]; fmt: (v: number) => string }) {
+// Receives only real expense movements (savings/investments, no_count and excluded already filtered out).
+function HeatmapGastos({ expenseMovements, fmt }: { expenseMovements: Movement[]; fmt: (v: number) => string }) {
   const MONTHS_SHORT = getMonthNames('short')
   const now = new Date()
 
   const availableYears = useMemo(() => {
-    const ys = new Set(allMovements.map(m => new Date(m.date + 'T00:00:00').getFullYear()))
+    const ys = new Set(expenseMovements.map(m => new Date(m.date + 'T00:00:00').getFullYear()))
     return [...ys].sort((a, b) => b - a)
-  }, [allMovements])
+  }, [expenseMovements])
 
   const [year, setYear] = React.useState(() => availableYears[0] ?? now.getFullYear())
 
   const byDay = useMemo(() => {
     const map: Record<string, number> = {}
-    allMovements.forEach(m => {
-      if (m.dinero >= 0) return
+    expenseMovements.forEach(m => {
       const d = new Date(m.date + 'T00:00:00')
       if (d.getFullYear() !== year) return
       map[m.date] = (map[m.date] ?? 0) + Math.abs(m.dinero)
     })
     return map
-  }, [allMovements, year])
+  }, [expenseMovements, year])
 
   const maxVal = useMemo(() => Math.max(...Object.values(byDay), 1), [byDay])
 
@@ -1067,6 +1067,17 @@ export default function Analysis() {
     [allExpenseMovements, excludedIdSet]
   )
 
+  // Real expenses across ALL years (not limited to the selected range) for the heatmap:
+  // same rules as realExpenseMovements — no savings/investments, no no_count, no manual exclusions.
+  const allYearsExpenseMovements = useMemo(
+    () => buildRealExpenseMovements(
+      allMovements.filter(m => !m.no_count),
+      typeGroupMap,
+      savingsGroupIdSet,
+    ).filter(m => !excludedIdSet.has(m.id)),
+    [allMovements, typeGroupMap, savingsGroupIdSet, excludedIdSet]
+  )
+
   const typeNameMap = useMemo(() => {
     const map = new Map<number, string>()
     types.forEach(t => map.set(t.id, t.name))
@@ -1169,7 +1180,7 @@ export default function Analysis() {
       </SectionCard>
 
       <SectionCard title="Heatmap de gastos" icon={CalendarRange}>
-        <HeatmapGastos allMovements={allMovements} fmt={fmt} />
+        <HeatmapGastos expenseMovements={allYearsExpenseMovements} fmt={fmt} />
       </SectionCard>
 
       <SectionCard title={t('analysis.sectionPrompt')} icon={Sparkles}>
