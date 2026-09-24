@@ -1,8 +1,9 @@
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin, templates, preferences, audit_log, terminal, tickets, real_accounts, demo
+from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin, templates, preferences, audit_log, terminal, tickets, real_accounts, demo, api_keys
 from app.auth.setup import fastapi_users, auth_backend
 from app.auth.schemas import UserRead, UserCreate, UserUpdate
 from app.config import settings
@@ -17,7 +18,9 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-app = FastAPI(title="Caulky API", version="2.0.0", lifespan=lifespan)
+# Docs bajo /api: es lo único que el proxy (nginx / Vite) manda al backend, y /docs es una ruta de la SPA
+app = FastAPI(title="Caulky API", version="2.0.0", lifespan=lifespan,
+              docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
 
 
 class NoCacheMiddleware(BaseHTTPMiddleware):
@@ -28,7 +31,23 @@ class NoCacheMiddleware(BaseHTTPMiddleware):
         return response
 
 
+class ApiKeyScopeMiddleware(BaseHTTPMiddleware):
+    """Una clave API no puede tocar la cuenta de usuario (contraseña, email, login).
+
+    Esos routers vienen de fastapi-users y aceptan cualquier backend, así que el
+    corte se hace aquí por ruta.
+    """
+    BLOCKED = ("/api/auth", "/api/users")
+
+    async def dispatch(self, request: Request, call_next):
+        if (request.headers.get("authorization", "").lower().startswith("bearer ")
+                and request.url.path.startswith(self.BLOCKED)):
+            return JSONResponse({"detail": "Not allowed with an API key"}, status_code=403)
+        return await call_next(request)
+
+
 app.add_middleware(NoCacheMiddleware)
+app.add_middleware(ApiKeyScopeMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -72,6 +91,7 @@ app.include_router(terminal.router, prefix="/api")
 app.include_router(tickets.router, prefix="/api")
 app.include_router(real_accounts.router, prefix="/api")
 app.include_router(demo.router, prefix="/api")
+app.include_router(api_keys.router, prefix="/api")
 
 
 @app.get("/health")

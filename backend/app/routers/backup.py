@@ -21,7 +21,7 @@ from app.models.movement_file import MovementFile
 from app.models.movement_type import MovementType
 from app.models.template import MovementTemplate as TemplateModel
 from app.models.user_preference import UserPreference
-from app.auth.setup import current_active_user
+from app.auth.setup import current_active_user, current_session_user
 from app.models.user import User
 
 router = APIRouter(prefix="/backup", tags=["backup"])
@@ -302,7 +302,7 @@ async def _seed_defaults(db: AsyncSession, user_id: uuid.UUID) -> None:
 
 
 @router.post("/reset", status_code=204)
-async def reset_system(db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+async def reset_system(db: AsyncSession = Depends(get_db), user: User = Depends(current_session_user)):
     uid = user.id
     mv_ids_res = await db.execute(select(Movement.id).where(Movement.user_id == uid))
     mv_ids = [r[0] for r in mv_ids_res.all()]

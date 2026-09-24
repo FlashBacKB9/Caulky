@@ -12,6 +12,7 @@ import TicketsTab from './settings/TicketsTab'
 import SuscripcionesTab from './settings/SuscripcionesTab'
 import PluginsTab from './settings/PluginsTab'
 import SistemaTab from './settings/SistemaTab'
+import ApiTab from './settings/ApiTab'
 
 const SETTINGS_TABS = [
   { id: 'cuentas',        labelKey: 'settings.accounts'  },
@@ -22,6 +23,7 @@ const SETTINGS_TABS = [
   { id: 'tickets',        label:    'Tickets'              },
   { id: 'suscripciones',  label:    'Suscripciones'        },
   { id: 'plugins',        labelKey: 'settings.plugins'     },
+  { id: 'api',            label:    'API'                  },
   { id: 'sistema',        label:    'Sistema'              },
 ] as const
 
@@ -67,6 +69,7 @@ export default function Settings() {
         {activeTab === 'tickets'       && <TicketsTab />}
         {activeTab === 'suscripciones' && <SuscripcionesTab />}
         {activeTab === 'plugins'       && <PluginsTab />}
+        {activeTab === 'api'           && <ApiTab />}
         {activeTab === 'sistema'       && <SistemaTab />}
       </div>
     </div>

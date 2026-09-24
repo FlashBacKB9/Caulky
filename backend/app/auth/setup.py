@@ -4,6 +4,7 @@ from fastapi_users.authentication import AuthenticationBackend, CookieTransport,
 from app.auth.manager import get_user_manager
 from app.models.user import User
 from app.config import settings
+from app.auth.api_key import api_key_backend
 
 cookie_transport = CookieTransport(
     cookie_name="caulkyauth",
@@ -26,7 +27,16 @@ auth_backend = AuthenticationBackend(
 
 fastapi_users = FastAPIUsers[User, uuid.UUID](
     get_user_manager,
-    [auth_backend],
+    [auth_backend, api_key_backend],
 )
 
 current_active_user = fastapi_users.current_user(active=True)
+
+
+def _session_backends():
+    return [auth_backend]
+
+
+# Solo sesión del navegador: para lo que una clave API filtrada no debe poder hacer
+# (gestionar claves, borrar todo)
+current_session_user = fastapi_users.current_user(active=True, get_enabled_backends=_session_backends)
