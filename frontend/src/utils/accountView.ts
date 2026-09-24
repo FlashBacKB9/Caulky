@@ -52,6 +52,16 @@ export function accountDelta(mv: Movement, persp: AccountPerspective | null): nu
   return null
 }
 
+/**
+ * Lo que el movimiento aporta al saldo de la cuenta, o null si no cuenta. Aplica el mismo
+ * filtro que `_compute_balances` en el backend (no_count == False), de modo que cualquier
+ * saldo reconstruido hacia atrás desde `account.balance` cuadra con él.
+ */
+export function balanceDelta(mv: Movement, persp: AccountPerspective | null): number | null {
+  if (mv.no_count) return null
+  return accountDelta(mv, persp)
+}
+
 /** Importe a mostrar en un listado: desde la cuenta activa si aplica, si no el global. */
 export function amountForAccount(mv: Movement, persp: AccountPerspective | null): number {
   return accountDelta(mv, persp) ?? mv.dinero

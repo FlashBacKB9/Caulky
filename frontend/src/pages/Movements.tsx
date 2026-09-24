@@ -10,7 +10,7 @@ import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePay
 import { runAutoRecurring, computeDates, applyFormula, shiftWeekend, type MovementTemplate } from '../utils/recurringTemplates'
 import { getTemplates, updateTemplate } from '../api/templates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
-import { buildPerspective, accountDelta, amountForAccount } from '../utils/accountView'
+import { buildPerspective, balanceDelta, amountForAccount } from '../utils/accountView'
 import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search, ArrowUpDown } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
@@ -1128,7 +1128,7 @@ export default function Movements() {
 
     const byDate = new Map<string, number>()
     for (const mv of allMovementsForYears) {
-      const delta = accountDelta(mv, perspective)
+      const delta = balanceDelta(mv, perspective)
       if (delta === null) continue
       byDate.set(mv.date, (byDate.get(mv.date) ?? 0) + delta)
     }

@@ -1,5 +1,5 @@
 import type { Movement } from '../api/movements'
-import { accountDelta, type AccountPerspective } from './accountView'
+import { balanceDelta, type AccountPerspective } from './accountView'
 
 /** Un mes de la cuenta remunerada: saldo de cierre y, si lo hubo, el abono de intereses. */
 export interface InterestMonth {
@@ -105,7 +105,7 @@ export function computeInterestStats(
   let maxDate: string | null = null
 
   for (const mv of movements) {
-    const delta = accountDelta(mv, perspective)
+    const delta = balanceDelta(mv, perspective)
     if (delta === null) continue
     deltaByDay.set(mv.date, (deltaByDay.get(mv.date) ?? 0) + delta)
     if (minDate === null || mv.date < minDate) minDate = mv.date

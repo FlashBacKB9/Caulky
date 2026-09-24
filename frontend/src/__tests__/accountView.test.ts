@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildPerspective, accountDelta, amountForAccount } from '../utils/accountView'
+import { buildPerspective, accountDelta, balanceDelta, amountForAccount } from '../utils/accountView'
 import type { Movement } from '../api/movements'
 import type { Account } from '../api/accounts'
 import type { MovementType } from '../api/movementTypes'
@@ -85,5 +85,18 @@ describe('amountForAccount', () => {
     const ajeno = mv({ money: -20, dinero: -20, account_id: 7 })
     expect(amountForAccount(ajeno, desdeAhorro)).toBe(-20)
     expect(amountForAccount(ajeno, null)).toBe(-20)
+  })
+})
+
+describe('balanceDelta', () => {
+  it('un movimiento no_count no mueve el saldo, igual que en el backend', () => {
+    const cuota = mv({ money: -126.66, dinero: -126.66, account_id: 2, paid: false, no_count: true })
+    expect(accountDelta(cuota, desdeAhorro)).toBe(-126.66)
+    expect(balanceDelta(cuota, desdeAhorro)).toBeNull()
+  })
+
+  it('los que cuentan aportan lo mismo que accountDelta', () => {
+    const gasto = mv({ money: -23.98, dinero: -23.98, account_id: 2 })
+    expect(balanceDelta(gasto, desdeAhorro)).toBe(-23.98)
   })
 })
