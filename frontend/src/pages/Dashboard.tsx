@@ -1431,23 +1431,24 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
 // is inside <main> and has zero dimensions during the same commit phase).
 // useLayoutEffect fires before paint, so the grid gets the right width on
 // first render with no visible blank frame.
+// The ref is a callback ref: while data loads the Dashboard renders a
+// placeholder without the grid div, so measuring must wait until it mounts —
+// otherwise the wrapper's padding is unknown and the grid overflows by it.
 
 function useDashWidth() {
-  const ref = useRef<HTMLDivElement>(null)
+  const [el, setEl] = useState<HTMLDivElement | null>(null)
   const [width, setWidth] = useState(0)
 
   useLayoutEffect(() => {
     const main = document.querySelector<HTMLElement>('main')
-    if (!main) return
+    const parent = el?.parentElement
+    if (!main || !parent) return
 
     const measure = () => {
       const mainW = main.clientWidth
       if (mainW <= 0) return
-      const parent = ref.current?.parentElement
-      const style = parent ? getComputedStyle(parent) : null
-      const pad = style
-        ? parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
-        : 0
+      const style = getComputedStyle(parent)
+      const pad = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
       setWidth(Math.max(100, mainW - pad))
     }
 
@@ -1455,9 +1456,9 @@ function useDashWidth() {
     const ro = new ResizeObserver(measure)
     ro.observe(main)
     return () => ro.disconnect()
-  }, [])
+  }, [el])
 
-  return { ref, width }
+  return { ref: setEl, width }
 }
 
 // ── Dashboard ─────────────────────────────────────────────────────────────────
