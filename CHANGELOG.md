@@ -4,6 +4,14 @@ All notable changes to Caulky are documented here.
 
 ---
 
+## [v1.9.3] — 2026-10-08
+
+### 🔧 Improved
+- Card payments are shown as neutral transfers in the calendar, table and kanban (grey, `⇄`,
+  no sign) and the calendar's daily total ignores them, so they don't read as one more expense
+  next to the card purchases. Inside the card or the paying account they keep their sign
+  (`isNeutralSettlement`)
+
 ## [v1.9.2] — 2026-10-08
 
 ### ✨ Added

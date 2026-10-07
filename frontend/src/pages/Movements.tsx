@@ -11,8 +11,8 @@ import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePay
 import { runAutoRecurring, computeDates, applyFormula, shiftWeekend, type MovementTemplate } from '../utils/recurringTemplates'
 import { getTemplates, updateTemplate } from '../api/templates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
-import { buildPerspective, balanceDelta, amountForAccount, displayAmount } from '../utils/accountView'
-import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search, ArrowUpDown } from 'lucide-react'
+import { buildPerspective, balanceDelta, amountForAccount, displayAmount, isNeutralSettlement } from '../utils/accountView'
+import { ArrowLeftRight, MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search, ArrowUpDown } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
 import { t, getDayNames, getMonthNames } from '../utils/i18n'
@@ -456,7 +456,8 @@ function CalendarView({ movements, types, selectedYear, perspective }: {
                   !cell.current ? 'bg-gray-50/50 dark:bg-gray-800/30' : 'cursor-pointer'
                 }`}>
                 <div className="flex items-center justify-between mb-1">
-                  {mvs.length > 0 ? (
+                  {/* El total del día no incluye liquidaciones de tarjeta: no son gasto ni ingreso */}
+                  {mvs.some(mv => !mv.credit_cycle_end) ? (
                     <span className={`text-[10px] font-mono font-semibold leading-tight ${
                       mvs.reduce((s, mv) => s + mv.dinero, 0) >= 0
                         ? 'text-green-600 dark:text-green-400'
@@ -489,9 +490,15 @@ function CalendarView({ movements, types, selectedYear, perspective }: {
                       onContextMenu={e => { e.preventDefault(); e.stopPropagation(); setCtxMenu({ x: e.clientX, y: e.clientY, mv }) }}
                       className={`mb-1 rounded-md bg-white dark:bg-gray-800 border border-gray-100 dark:border-gray-700 px-1.5 py-1 cursor-grab active:cursor-grabbing hover:border-gray-300 dark:hover:border-gray-500 transition-all ${draggingId === mv.id ? 'opacity-40' : ''}`}>
                       <span className="truncate text-[11px] text-gray-700 dark:text-gray-300 leading-tight block">{mv.name}</span>
-                      <span className={`text-[11px] font-mono ${amountForAccount(mv, perspective) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                        {fmtCal(amountForAccount(mv, perspective))}
-                      </span>
+                      {isNeutralSettlement(mv, perspective) ? (
+                        <span className="text-[11px] font-mono text-gray-400 dark:text-gray-500 inline-flex items-center gap-0.5">
+                          <ArrowLeftRight className="w-3 h-3 shrink-0" />{fmt(Math.abs(mv.money))}
+                        </span>
+                      ) : (
+                        <span className={`text-[11px] font-mono ${amountForAccount(mv, perspective) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                          {fmtCal(amountForAccount(mv, perspective))}
+                        </span>
+                      )}
                       {typ && (
                         <span className="hidden sm:block text-[10px] px-1 rounded mt-0.5 w-full" style={{ backgroundColor: typ.color + '22', color: typ.color }}>
                           {typ.name}
@@ -778,7 +785,9 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
                                       className="flex items-center gap-3 pl-16 pr-4 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                       <span className="text-xs text-gray-400 shrink-0 w-16">{fmtDate(mv.date)}</span>
                                       <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 min-w-0 truncate">{mv.name}</span>
-                                      <span className={`text-sm font-mono shrink-0 ${amtCls(displayAmount(mv))}`}>{fmtCal(displayAmount(mv))}</span>
+                                      {mv.credit_cycle_end
+                                        ? <span className="text-sm font-mono shrink-0 text-gray-400 dark:text-gray-500 inline-flex items-center gap-1"><ArrowLeftRight className="w-3.5 h-3.5" />{fmt(Math.abs(mv.money))}</span>
+                                        : <span className={`text-sm font-mono shrink-0 ${amtCls(displayAmount(mv))}`}>{fmtCal(displayAmount(mv))}</span>}
                                     </div>
                                   ))}
                                 </div>
@@ -819,7 +828,9 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
                           className="flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                           <span className="text-xs text-gray-400 shrink-0 w-12">{fmtDate(mv.date)}</span>
                           <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 min-w-0 truncate">{mv.name}</span>
-                          <span className={`text-sm font-mono shrink-0 ${amtCls(displayAmount(mv))}`}>{fmtCal(displayAmount(mv))}</span>
+                          {mv.credit_cycle_end
+                                        ? <span className="text-sm font-mono shrink-0 text-gray-400 dark:text-gray-500 inline-flex items-center gap-1"><ArrowLeftRight className="w-3.5 h-3.5" />{fmt(Math.abs(mv.money))}</span>
+                                        : <span className={`text-sm font-mono shrink-0 ${amtCls(displayAmount(mv))}`}>{fmtCal(displayAmount(mv))}</span>}
                         </div>
                       ))}
                     </div>
@@ -1857,8 +1868,11 @@ export default function Movements() {
                             </td>
                           )
                           case 'amount': return (
-                            <td key="amount" className={cellCls + ` font-mono font-semibold text-right ${amountForAccount(mv, perspective) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`} style={st} onClick={e => enterEdit(e, mv)}>
-                              {isEditing ? <input type="number" step="0.01" value={d!.money} className={INPUT + ' text-right'} onChange={e => setField('money', e.target.value)} onClick={e => e.stopPropagation()} /> : fmt(amountForAccount(mv, perspective))}
+                            <td key="amount" className={cellCls + ` font-mono font-semibold text-right ${isNeutralSettlement(mv, perspective) ? 'text-gray-400 dark:text-gray-500' : amountForAccount(mv, perspective) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`} style={st} onClick={e => enterEdit(e, mv)}>
+                              {isEditing ? <input type="number" step="0.01" value={d!.money} className={INPUT + ' text-right'} onChange={e => setField('money', e.target.value)} onClick={e => e.stopPropagation()} />
+                                : isNeutralSettlement(mv, perspective)
+                                  ? <span className="inline-flex items-center gap-1"><ArrowLeftRight className="w-3.5 h-3.5" />{fmt(Math.abs(mv.money))}</span>
+                                  : fmt(amountForAccount(mv, perspective))}
                             </td>
                           )
                           case 'paid': return (

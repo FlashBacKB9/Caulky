@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildPerspective, accountDelta, balanceDelta, amountForAccount, displayAmount } from '../utils/accountView'
+import { buildPerspective, accountDelta, balanceDelta, amountForAccount, displayAmount, isNeutralSettlement } from '../utils/accountView'
 import type { Movement } from '../api/movements'
 import type { Account } from '../api/accounts'
 import type { MovementType } from '../api/movementTypes'
@@ -93,6 +93,13 @@ describe('amountForAccount', () => {
     const liq = mv({ money: 66.05, dinero: 0, is_transfer: true, account_id: 38, from_account_id: 1, credit_cycle_end: '2026-09-30' })
     expect(amountForAccount(liq, null)).toBe(-66.05)
     expect(displayAmount(mv({ money: 10, dinero: -10 }))).toBe(-10)
+  })
+
+  it('la liquidación es neutra en la vista general y con signo desde sus cuentas', () => {
+    const liq = mv({ money: 66.05, dinero: 0, is_transfer: true, account_id: 2, from_account_id: 1, credit_cycle_end: '2026-09-30' })
+    expect(isNeutralSettlement(liq, null)).toBe(true)
+    expect(isNeutralSettlement(liq, desdeAhorro)).toBe(false)
+    expect(isNeutralSettlement(mv({ money: 10, dinero: -10 }), null)).toBe(false)
   })
 })
 

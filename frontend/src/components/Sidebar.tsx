@@ -14,6 +14,12 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.9.3', date: 'Octubre 2026',
+    items: [
+      { type: 'improve', text: 'Tarjetas de crédito: la liquidación se ve neutra (gris, con ⇄ y sin signo) en calendario, tabla y kanban, y el total del día no la suma, para no confundirla con las compras; desde la tarjeta o la cuenta pagadora sigue viéndose como entrada o salida' },
+    ],
+  },
+  {
     version: 'v1.9.2', date: 'Octubre 2026',
     items: [
       { type: 'feat',    text: 'Configuración → Cuentas: las cuentas reales del banco se despliegan y dentro van sus cuentas ficticias, tarjetas, bienes e inversiones. Las que no dependen de ningún banco siguen abajo, como hasta ahora' },

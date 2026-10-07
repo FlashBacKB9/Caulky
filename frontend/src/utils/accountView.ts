@@ -71,6 +71,15 @@ export function displayAmount(mv: Movement): number {
   return mv.credit_cycle_end ? -Math.abs(mv.money) : mv.dinero
 }
 
+/**
+ * Liquidación de tarjeta vista fuera de sus cuentas: es un traspaso, no un gasto (las compras
+ * ya contaron), así que se pinta neutra y sin signo. Desde la tarjeta o la cuenta pagadora
+ * sí se ve como entrada o salida.
+ */
+export function isNeutralSettlement(mv: Movement, persp: AccountPerspective | null): boolean {
+  return !!mv.credit_cycle_end && accountDelta(mv, persp) === null
+}
+
 /** Importe a mostrar en un listado: desde la cuenta activa si aplica, si no el global. */
 export function amountForAccount(mv: Movement, persp: AccountPerspective | null): number {
   return accountDelta(mv, persp) ?? displayAmount(mv)
