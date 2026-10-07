@@ -1,6 +1,6 @@
 import { useState, useLayoutEffect, useEffect, Component, type ReactNode } from 'react'
 import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Menu, Wallet } from 'lucide-react'
 import Sidebar from './components/Sidebar'
 import BudgetAlerts from './components/BudgetAlerts'
@@ -53,7 +53,15 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | 
 const _skin = getActiveSkin()
 applySkinCSS(_skin?.css)
 
-export const queryClient = new QueryClient({
+export const queryClient: QueryClient = new QueryClient({
+  // Los cargos previstos de tarjeta y sus compras dependen de cualquier movimiento o cuenta:
+  // en vez de invalidarlos en cada formulario, se refrescan tras cualquier cambio guardado
+  mutationCache: new MutationCache({
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['credit-cycles'] })
+      queryClient.invalidateQueries({ queryKey: ['credit-link'] })
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 60_000,

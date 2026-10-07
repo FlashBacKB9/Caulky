@@ -14,6 +14,14 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.9.1', date: 'Octubre 2026',
+    items: [
+      { type: 'fix',     text: 'Tarjetas de crédito: el cargo previsto del calendario y los gastos de una liquidación se actualizan al guardar cualquier movimiento, sin recargar la página' },
+      { type: 'fix',     text: 'Docker: el navegador ya no se queda con la versión anterior de la app tras actualizar' },
+      { type: 'improve', text: 'API: se puede retrasar el último corte cobrado de una tarjeta para que se generen las liquidaciones de ciclos pasados como en el uso normal, sin duplicar las que ya existen' },
+    ],
+  },
+  {
     version: 'v1.9', date: 'Octubre 2026',
     items: [
       { type: 'feat',    text: 'Liquidación de tarjeta: debajo de las notas aparecen los gastos que incluye; al pulsar uno se abre su detalle con una flecha para volver, y cada gasto ya cobrado tiene un botón para ir a su liquidación' },

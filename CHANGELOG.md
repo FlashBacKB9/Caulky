@@ -4,6 +4,20 @@ All notable changes to Caulky are documented here.
 
 ---
 
+## [v1.9.1] — 2026-10-08
+
+### 🐛 Fixed
+- The upcoming card payment in the calendar and the purchases of a payment refresh after any
+  saved change (global `MutationCache` invalidation of `credit-cycles` / `credit-link`), so a
+  new card purchase shows up without reloading
+- Docker (`frontend/nginx.conf`): `index.html` is served with `Cache-Control: no-cache` and the
+  hashed `/assets/` with a long immutable cache, so browsers pick up a new release right away
+
+### 🔧 Improved
+- `PUT /api/accounts/{id}` accepts `credit_last_cycle_end` (not in the future). Moving it back
+  makes the app generate the payments of the following cycles exactly as in normal use;
+  a cycle that already has its payment is not duplicated
+
 ## [v1.9] — 2026-10-08
 
 ### 🐛 Fixed: standalone upgrades

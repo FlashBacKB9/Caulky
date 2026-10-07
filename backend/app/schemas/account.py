@@ -1,5 +1,5 @@
 import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 
 class AccountRead(BaseModel):
@@ -67,6 +67,16 @@ class AccountPatch(BaseModel):
     credit_charge_day: int | None = None
     credit_pay_account_id: int | None = None
     credit_auto_charge: bool | None = None
+    # Último corte ya cobrado. Retrasarlo hace que la app genere las liquidaciones de los
+    # ciclos posteriores como en el uso normal (útil para dar de alta una tarjeta con historia)
+    credit_last_cycle_end: datetime.date | None = None
+
+    @field_validator("credit_last_cycle_end")
+    @classmethod
+    def _not_future(cls, v: datetime.date | None) -> datetime.date | None:
+        if v is not None and v > datetime.date.today():
+            raise ValueError("El último corte cobrado no puede ser una fecha futura")
+        return v
 
 
 class AccountUpdate(BaseModel):

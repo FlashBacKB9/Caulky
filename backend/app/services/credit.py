@@ -155,9 +155,19 @@ async def pending_cycles(db: AsyncSession, acc: Account, today: date) -> list[Cr
 
 
 async def create_charge(db: AsyncSession, acc: Account, cycle: CreditCycle, amount: float) -> Movement | None:
-    """Registra el cargo del ciclo y lo marca como cobrado. Sin importe no crea movimiento."""
+    """
+    Registra el cargo del ciclo y lo marca como cobrado. Sin importe no crea movimiento, y
+    tampoco si el ciclo ya tiene su liquidación (al retrasar credit_last_cycle_end).
+    """
     mv = None
-    if amount > 0 and cycle.pay_account_id is not None:
+    existing = (await db.execute(
+        select(Movement.id).where(
+            Movement.user_id == acc.user_id,
+            Movement.account_id == acc.id,
+            Movement.credit_cycle_end == cycle.cycle_end,
+        ).limit(1)
+    )).scalar_one_or_none()
+    if existing is None and amount > 0 and cycle.pay_account_id is not None:
         mv = Movement(
             name=f"Liquidación {acc.name}",
             money=amount,

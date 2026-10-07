@@ -172,3 +172,28 @@ async def test_credit_link_both_ways(db, user):
     assert paid["settlement"].id == charge.id
     unpaid = await get_credit_link(purchases[2].id, db=db, user=user)
     assert unpaid["settlement"] is None and unpaid["items"] == []
+
+
+async def test_rewind_generates_past_charges_once(db, user):
+    _, card, t = await _setup(db, user)
+    await _buy(db, user, card, t, 100, date(2026, 9, 3))
+    await sync_credit_charges(db, user.id, today=date(2026, 10, 5))
+    await _buy(db, user, card, t, 40, date(2026, 8, 10))   # compra de agosto dada de alta tarde
+
+    # Retrasar el punto de partida: se genera agosto y septiembre no se duplica
+    card.credit_last_cycle_end = date(2026, 7, 31)
+    assert await sync_credit_charges(db, user.id, today=date(2026, 10, 6)) == 1
+    charges = sorted((c.credit_cycle_end, float(c.money), c.date) for c in await _charges(db, user))
+    assert charges == [
+        (date(2026, 8, 31), 40.0, date(2026, 9, 5)),
+        (date(2026, 9, 30), 100.0, date(2026, 10, 5)),
+    ]
+    assert card.credit_last_cycle_end == date(2026, 9, 30)
+
+
+def test_patch_rejects_future_last_cycle_end():
+    from pydantic import ValidationError
+    from app.schemas.account import AccountPatch
+    with pytest.raises(ValidationError):
+        AccountPatch(credit_last_cycle_end=date(2999, 1, 31))
+    assert AccountPatch(credit_last_cycle_end=date(2026, 8, 31)).credit_last_cycle_end == date(2026, 8, 31)
