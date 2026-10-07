@@ -14,11 +14,15 @@ All notable changes to Caulky are documented here.
   Settings until you add another); it follows the real account's name and colour
 
 ### 🐛 Fixed
+- Card payments showed `+0` in the calendar, table and kanban: their `dinero` is 0 so they don't
+  count as an expense, but listings now show what leaves the paying account (`displayAmount`)
 - Backups now include real accounts and their links; restore, reset and demo mode clear them too
 - SQLite: deleting accounts left orphan links in `real_account_accounts`, and since SQLite reuses
   IDs a new account could show up inside an old real account (or fail to be created)
 
 ### 🔧 Improved
+- Card purchases get the payment day of their cycle as bank date, when created or edited and
+  when their payment is generated (the money leaves the bank on that day)
 - A virtual account belongs to a single real account: linking it to another moves it
 - `POST /api/real-accounts` accepts `initial_balance` for the account created when none is linked
 - Dev: the Vite `/api` proxy target can be changed with `VITE_PROXY_TARGET`

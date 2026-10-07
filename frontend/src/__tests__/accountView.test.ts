@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildPerspective, accountDelta, balanceDelta, amountForAccount } from '../utils/accountView'
+import { buildPerspective, accountDelta, balanceDelta, amountForAccount, displayAmount } from '../utils/accountView'
 import type { Movement } from '../api/movements'
 import type { Account } from '../api/accounts'
 import type { MovementType } from '../api/movementTypes'
@@ -87,6 +87,12 @@ describe('amountForAccount', () => {
     const ajeno = mv({ money: -20, dinero: -20, account_id: 7 })
     expect(amountForAccount(ajeno, desdeAhorro)).toBe(-20)
     expect(amountForAccount(ajeno, null)).toBe(-20)
+  })
+
+  it('la liquidación de una tarjeta muestra lo que sale de la cuenta pagadora aunque su dinero sea 0', () => {
+    const liq = mv({ money: 66.05, dinero: 0, is_transfer: true, account_id: 38, from_account_id: 1, credit_cycle_end: '2026-09-30' })
+    expect(amountForAccount(liq, null)).toBe(-66.05)
+    expect(displayAmount(mv({ money: 10, dinero: -10 }))).toBe(-10)
   })
 })
 

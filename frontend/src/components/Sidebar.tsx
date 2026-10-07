@@ -20,6 +20,8 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: 'feat',    text: 'Una cuenta real sin cuentas ficticias usa una con su mismo nombre, que no se muestra hasta que añades otra' },
       { type: 'fix',     text: 'La copia de seguridad ahora guarda las cuentas reales y sus cuentas vinculadas' },
       { type: 'fix',     text: 'Una cuenta nueva ya no puede aparecer dentro de una cuenta real antigua borrada' },
+      { type: 'fix',     text: 'Tarjetas de crédito: la liquidación muestra el importe que sale de la cuenta pagadora en vez de +0 (sigue sin contar como gasto)' },
+      { type: 'improve', text: 'Tarjetas de crédito: la fecha banco de cada compra se pone sola en el día de pago de su ciclo, al crearla, al editarla y al generarse la liquidación' },
     ],
   },
   {

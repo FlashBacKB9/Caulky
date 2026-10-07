@@ -11,7 +11,7 @@ import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePay
 import { runAutoRecurring, computeDates, applyFormula, shiftWeekend, type MovementTemplate } from '../utils/recurringTemplates'
 import { getTemplates, updateTemplate } from '../api/templates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
-import { buildPerspective, balanceDelta, amountForAccount } from '../utils/accountView'
+import { buildPerspective, balanceDelta, amountForAccount, displayAmount } from '../utils/accountView'
 import { MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search, ArrowUpDown } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
@@ -778,7 +778,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
                                       className="flex items-center gap-3 pl-16 pr-4 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                                       <span className="text-xs text-gray-400 shrink-0 w-16">{fmtDate(mv.date)}</span>
                                       <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 min-w-0 truncate">{mv.name}</span>
-                                      <span className={`text-sm font-mono shrink-0 ${amtCls(mv.dinero)}`}>{fmtCal(mv.dinero)}</span>
+                                      <span className={`text-sm font-mono shrink-0 ${amtCls(displayAmount(mv))}`}>{fmtCal(displayAmount(mv))}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -819,7 +819,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
                           className="flex items-center gap-3 px-4 py-2 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                           <span className="text-xs text-gray-400 shrink-0 w-12">{fmtDate(mv.date)}</span>
                           <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 min-w-0 truncate">{mv.name}</span>
-                          <span className={`text-sm font-mono shrink-0 ${amtCls(mv.dinero)}`}>{fmtCal(mv.dinero)}</span>
+                          <span className={`text-sm font-mono shrink-0 ${amtCls(displayAmount(mv))}`}>{fmtCal(displayAmount(mv))}</span>
                         </div>
                       ))}
                     </div>

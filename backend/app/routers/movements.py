@@ -11,7 +11,7 @@ from app.models.account import Account
 from app.schemas.movement import MovementCreate, MovementRead, MovementUpdate
 from app.services.calculations import compute_dinero, compute_label
 from app.services.audit import write_log
-from app.services.credit import settlement_for, settlement_items, sync_credit_charges
+from app.services.credit import apply_card_bank_date, settlement_for, settlement_items, sync_credit_charges
 from app.auth.setup import current_active_user
 from app.models.user import User
 
@@ -129,6 +129,7 @@ async def list_movements(
 async def create_movement(body: MovementCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     acc_name, bal_before = await _balance_for(db, user.id, body.account_id)
     mv = Movement(**body.model_dump(), user_id=user.id)
+    await apply_card_bank_date(db, mv)
     db.add(mv)
     await db.flush()
     after = _mv_snap(mv)
@@ -202,6 +203,7 @@ async def update_movement(movement_id: int, body: MovementUpdate, db: AsyncSessi
     before_snap = {k: _mv_snap(mv)[k] for k in changes if k in _mv_snap(mv)}
     for k, v in changes.items():
         setattr(mv, k, v)
+    await apply_card_bank_date(db, mv)
     after_snap = {k: _mv_snap(mv)[k] for k in changes if k in _mv_snap(mv)}
     await write_log(user.id, "movement", mv.id, "update",
                    f"Movimiento editado: {mv.name}",

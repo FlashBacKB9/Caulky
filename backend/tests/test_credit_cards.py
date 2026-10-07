@@ -197,3 +197,26 @@ def test_patch_rejects_future_last_cycle_end():
     with pytest.raises(ValidationError):
         AccountPatch(credit_last_cycle_end=date(2999, 1, 31))
     assert AccountPatch(credit_last_cycle_end=date(2026, 8, 31)).credit_last_cycle_end == date(2026, 8, 31)
+
+
+async def test_card_purchase_bank_date_is_charge_day(db, user):
+    from app.routers.movements import create_movement, update_movement
+    from app.schemas.movement import MovementCreate, MovementUpdate
+
+    _, card, t = await _setup(db, user)   # corte 31, cargo 5
+    mv = await create_movement(MovementCreate(name="Taxi", money=30, date=date(2026, 10, 7),
+                                              bank_date=date(2026, 10, 7), movement_type_id=t.id,
+                                              account_id=card.id), db=db, user=user)
+    assert mv.bank_date == date(2026, 11, 5)
+    # Al moverla al ciclo siguiente, la fecha banco la sigue
+    mv = await update_movement(mv.id, MovementUpdate(date=date(2026, 11, 2)), db=db, user=user)
+    assert mv.bank_date == date(2026, 12, 5)
+
+
+async def test_generated_charge_sets_purchases_bank_date(db, user):
+    _, card, t = await _setup(db, user)
+    await _buy(db, user, card, t, 100, date(2026, 9, 3))
+    await sync_credit_charges(db, user.id, today=date(2026, 10, 5))
+    purchase = (await db.execute(select(Movement).where(
+        Movement.account_id == card.id, Movement.is_transfer == False))).scalar_one()  # noqa: E712
+    assert purchase.bank_date == date(2026, 10, 5)

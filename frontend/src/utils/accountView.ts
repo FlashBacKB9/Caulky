@@ -62,7 +62,16 @@ export function balanceDelta(mv: Movement, persp: AccountPerspective | null): nu
   return accountDelta(mv, persp)
 }
 
+/**
+ * Importe a mostrar de un movimiento sin cuenta activa. Es `dinero`, salvo en la liquidación
+ * de una tarjeta: su `dinero` es 0 para que no cuente como gasto (las compras ya contaron),
+ * pero en pantalla debe verse lo que sale de la cuenta pagadora.
+ */
+export function displayAmount(mv: Movement): number {
+  return mv.credit_cycle_end ? -Math.abs(mv.money) : mv.dinero
+}
+
 /** Importe a mostrar en un listado: desde la cuenta activa si aplica, si no el global. */
 export function amountForAccount(mv: Movement, persp: AccountPerspective | null): number {
-  return accountDelta(mv, persp) ?? mv.dinero
+  return accountDelta(mv, persp) ?? displayAmount(mv)
 }

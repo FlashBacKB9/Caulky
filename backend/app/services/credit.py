@@ -14,7 +14,7 @@ import uuid
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from sqlalchemy import case, func, select
+from sqlalchemy import case, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.account import Account
@@ -70,6 +70,24 @@ def initial_last_cycle_end(today: date, cutoff_day: int, charge_day: int) -> dat
     while charge_date_for(ce, charge_day) >= today:
         ce = last_before(ce, cutoff_day)
     return ce
+
+
+def card_bank_date(acc: Account, purchase_date: date) -> date:
+    """Fecha banco de una compra con tarjeta: el día de cargo del ciclo en el que cae."""
+    cycle_end = first_on_or_after(purchase_date, acc.credit_cutoff_day)
+    return charge_date_for(cycle_end, acc.credit_charge_day)
+
+
+async def apply_card_bank_date(db: AsyncSession, mv: Movement) -> None:
+    """
+    Una compra con tarjeta sale del banco el día de cargo, no el de la compra: se fija su
+    fecha banco a ese día. La liquidación y los traspasos no se tocan.
+    """
+    if mv.account_id is None or mv.is_transfer or mv.credit_cycle_end is not None or mv.date is None:
+        return
+    acc = await db.get(Account, mv.account_id)
+    if acc is not None and is_credit(acc):
+        mv.bank_date = card_bank_date(acc, mv.date)
 
 
 def is_credit(acc: Account) -> bool:
@@ -184,6 +202,17 @@ async def create_charge(db: AsyncSession, acc: Account, cycle: CreditCycle, amou
             user_id=acc.user_id,
         )
         db.add(mv)
+    # Las compras del ciclo salen del banco el día del cargo
+    await db.execute(
+        update(Movement).where(
+            Movement.user_id == acc.user_id,
+            Movement.account_id == acc.id,
+            Movement.is_transfer == False,  # noqa: E712
+            Movement.credit_cycle_end.is_(None),
+            Movement.date >= cycle.cycle_start,
+            Movement.date <= cycle.cycle_end,
+        ).values(bank_date=cycle.charge_date)
+    )
     acc.credit_last_cycle_end = cycle.cycle_end
     return mv
 
