@@ -19,6 +19,7 @@ from app.models.investment import InvestmentFund, InvestmentPurchase
 from app.models.movement import Movement
 from app.models.movement_file import MovementFile
 from app.models.movement_type import MovementType
+from app.models.real_account import RealAccount, real_account_accounts
 from app.models.template import MovementTemplate as TemplateModel
 from app.models.user_preference import UserPreference
 from app.auth.setup import current_active_user, current_session_user
@@ -64,6 +65,7 @@ async def _fix_sequences(db: AsyncSession) -> None:
         ("investment_funds", "id"),
         ("investment_purchases", "id"),
         ("movement_templates", "id"),
+        ("real_accounts", "id"),
     ]:
         await db.execute(text(
             f"SELECT setval(pg_get_serial_sequence('{table}', '{col}'), "
@@ -88,6 +90,7 @@ async def export_backup(db: AsyncSession = Depends(get_db), user: User = Depends
             select(InvestmentPurchase).where(InvestmentPurchase.movement_id.in_(mv_ids)).order_by(InvestmentPurchase.id)
         )).scalars().all()
     prefs = (await db.execute(select(UserPreference).where(UserPreference.user_id == uid))).scalars().all()
+    real_accs = (await db.execute(select(RealAccount).where(RealAccount.user_id == uid).order_by(RealAccount.id))).scalars().all()
 
     return {
         "version": "2",
@@ -101,6 +104,11 @@ async def export_backup(db: AsyncSession = Depends(get_db), user: User = Depends
             "investment_purchases": [_clean(p) for p in inv_purchases],
             "templates":            [_clean(t) for t in tpls],
             "preferences":          {p.key: p.value for p in prefs},
+            "real_accounts": [
+                {"name": r.name, "entity_name": r.entity_name, "account_number": r.account_number,
+                 "color": r.color, "linked_account_ids": [a.id for a in r.linked_accounts]}
+                for r in real_accs
+            ],
         },
     }
 
@@ -145,6 +153,10 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
         if rt or ra or rg:
             await db.execute(sa_delete(MovementType).where(MovementType.user_id == uid))
         if ra or rg:
+            # Las cuentas reales cuelgan de las ficticias; SQLite no borra los vínculos en cascada
+            ra_ids = select(RealAccount.id).where(RealAccount.user_id == uid)
+            await db.execute(sa_delete(real_account_accounts).where(real_account_accounts.c.real_account_id.in_(ra_ids)))
+            await db.execute(sa_delete(RealAccount).where(RealAccount.user_id == uid))
             await db.execute(sa_delete(Account).where(Account.user_id == uid))
         if rg:
             await db.execute(sa_delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == uid))
@@ -184,6 +196,19 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
             for _, obj in pending:
                 if obj.credit_pay_account_id is not None:
                     obj.credit_pay_account_id = account_id_map.get(obj.credit_pay_account_id, obj.credit_pay_account_id)
+            # Backups anteriores no traen cuentas reales: entonces se quedan sin ninguna
+            for r in payload.db.get("real_accounts") or []:
+                real = RealAccount(
+                    name=r["name"], entity_name=r["entity_name"], account_number=r.get("account_number"),
+                    color=r.get("color") or "#6b7280", user_id=uid,
+                )
+                db.add(real)
+                await db.flush()
+                new_ids = [account_id_map[i] for i in r.get("linked_account_ids", []) if i in account_id_map]
+                if new_ids:
+                    await db.execute(real_account_accounts.insert(), [
+                        {"real_account_id": real.id, "account_id": aid} for aid in new_ids
+                    ])
 
         if rt:
             pending = []
@@ -325,6 +350,9 @@ async def reset_system(db: AsyncSession = Depends(get_db), user: User = Depends(
     await db.execute(sa_delete(InvestmentFund).where(InvestmentFund.user_id == uid))
     await db.execute(sa_delete(Movement).where(Movement.user_id == uid))
     await db.execute(sa_delete(MovementType).where(MovementType.user_id == uid))
+    ra_ids = select(RealAccount.id).where(RealAccount.user_id == uid)
+    await db.execute(sa_delete(real_account_accounts).where(real_account_accounts.c.real_account_id.in_(ra_ids)))
+    await db.execute(sa_delete(RealAccount).where(RealAccount.user_id == uid))
     await db.execute(sa_delete(Account).where(Account.user_id == uid))
     await db.execute(sa_delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == uid))
     await db.execute(sa_delete(TemplateModel).where(TemplateModel.user_id == uid))

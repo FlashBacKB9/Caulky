@@ -862,12 +862,14 @@ function TypesSection() {
   )
 }
 
-// ── Accounts section ──────────────────────────────────────────────────────────
+// ── New account form ──────────────────────────────────────────────────────────
 
-function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: number) => string }) {
-  const qc = useQueryClient()
+function NewAccountForm({ payAccounts, onCreated, onCancel }: {
+  payAccounts: Account[]
+  onCreated: (account: Account) => Promise<void> | void
+  onCancel: () => void
+}) {
   const colorRef = useRef<HTMLInputElement>(null)
-  const [adding, setAdding]         = useState(false)
   const [newName, setNewName]       = useState('')
   const [newColor, setNewColor]     = useState('#3b82f6')
   const [newIcon, setNewIcon]       = useState('wallet')
@@ -877,184 +879,178 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
   const [newValueDate, setNewValueDate] = useState('')
   const [newCarFlag, setNewCarFlag] = useState(false)
   const [newCredit, setNewCredit]   = useState<CreditDraft>(() => creditDraftFrom())
-  // Cuentas que pueden pagar el cargo de una tarjeta
-  const payAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro')
-
-  const { data: allTypes = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
-
-  const invalidate = () => qc.invalidateQueries({ queryKey: ['accounts-summary'] })
 
   const mutCreate = useMutation({
-    mutationFn: () => createAccount({
-      name: newName.trim(),
-      color: newColor,
-      icon: newIcon,
-      category: newCategory,
-      initial_balance: isNaN(parseFloat(newBal.replace(',', '.'))) ? 0 : parseFloat(newBal.replace(',', '.')),
-      depreciation_rate: newCategory === 'vehiculo' && newDeprRate !== '' ? parseFloat(newDeprRate) : null,
-      value_date: newCategory === 'vehiculo' && newValueDate !== '' ? newValueDate : null,
-      new_car: newCategory === 'vehiculo' ? newCarFlag : false,
-      ...creditPayload(newCategory, newCredit),
-    }),
-    onSuccess: () => {
-      invalidate()
-      setAdding(false); setNewName(''); setNewColor('#3b82f6'); setNewIcon('wallet'); setNewBal('0'); setNewCategory('corriente')
-      setNewDeprRate(''); setNewValueDate(''); setNewCarFlag(false); setNewCredit(creditDraftFrom())
+    mutationFn: async () => {
+      const account = await createAccount({
+        name: newName.trim(),
+        color: newColor,
+        icon: newIcon,
+        category: newCategory,
+        initial_balance: isNaN(parseFloat(newBal.replace(',', '.'))) ? 0 : parseFloat(newBal.replace(',', '.')),
+        depreciation_rate: newCategory === 'vehiculo' && newDeprRate !== '' ? parseFloat(newDeprRate) : null,
+        value_date: newCategory === 'vehiculo' && newValueDate !== '' ? newValueDate : null,
+        new_car: newCategory === 'vehiculo' ? newCarFlag : false,
+        ...creditPayload(newCategory, newCredit),
+      })
+      await onCreated(account)
     },
   })
 
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden"
+      style={{ borderLeftColor: newColor, borderLeftWidth: 3 }}>
+      <div className="px-4 py-3 space-y-3">
+        <div className="flex items-center gap-2">
+          <button onClick={() => colorRef.current?.click()}
+            className="w-6 h-6 rounded-full shrink-0 border-2 border-white dark:border-gray-700 shadow ring-1 ring-gray-200 dark:ring-gray-600 hover:scale-110 transition-transform"
+            style={{ backgroundColor: newColor }} />
+          <input ref={colorRef} type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="sr-only" />
+          <input
+            value={newName} onChange={e => setNewName(e.target.value)} autoFocus
+            onKeyDown={e => { if (e.key === 'Escape') onCancel() }}
+            className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+            placeholder="Nombre de la cuenta"
+          />
+        </div>
+        <div className="flex gap-1.5 flex-wrap">
+          {PALETTE_COLORS.map(c => (
+            <button key={c} onClick={() => setNewColor(c)}
+              className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
+              style={{ backgroundColor: c, borderColor: newColor === c ? '#1e40af' : 'transparent' }} />
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-1.5">
+          {ICON_KEYS.map(k => (
+            <button key={k} onClick={() => setNewIcon(k)}
+              className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${newIcon === k ? 'ring-2' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+              style={newIcon === k ? { backgroundColor: newColor + '20' } : {}}>
+              <AppIcon name={k} className="w-4 h-4" style={newIcon === k ? { color: newColor } : undefined} strokeWidth={1.5} />
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('settings.category')}</span>
+          <select
+            value={newCategory}
+            onChange={e => setNewCategory(e.target.value as AccountCategory)}
+            className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+          >
+            {ACCOUNT_CATEGORIES.map(c => (
+              <option key={c.value} value={c.value}>{t(c.labelKey)}</option>
+            ))}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('settings.initialBalance')}</span>
+          <input
+            type="number" step="0.01" value={newBal} onChange={e => setNewBal(e.target.value)}
+            className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+        </div>
+        {newCategory === 'vehiculo' && (
+          <>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.vehicleValueDate')}</span>
+              <input
+                type="date" value={newValueDate} onChange={e => setNewValueDate(e.target.value)}
+                className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.vehicleDepRate')}</span>
+              <input
+                type="number" step="0.1" min="0" max="100" value={newDeprRate} onChange={e => setNewDeprRate(e.target.value)}
+                placeholder="ej. 15"
+                className="w-24 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+              />
+            </div>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" checked={newCarFlag} onChange={e => setNewCarFlag(e.target.checked)}
+                className="mt-0.5 w-3.5 h-3.5 rounded accent-blue-500 shrink-0" />
+              <span className="text-xs text-gray-500 dark:text-gray-400">{t('account.newCar')}</span>
+            </label>
+          </>
+        )}
+        {newCategory === 'credito' && (
+          <CreditFieldsEditor draft={newCredit} onChange={setNewCredit} payAccounts={payAccounts} />
+        )}
+        <div className="flex justify-end gap-2">
+          <button onClick={onCancel} className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
+            {t('common.cancel')}
+          </button>
+          <button onClick={() => newName.trim() && mutCreate.mutate()} disabled={!newName.trim() || mutCreate.isPending}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 transition-colors">
+            {mutCreate.isPending ? '...' : t('settings.createAccount')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ── Account list (cards with reorder) ────────────────────────────────────────
+
+/**
+ * Tarjetas de un grupo (una cuenta real o las sueltas). Subir, bajar y arrastrar
+ * solo mueven dentro del grupo, sobre el orden global de `allAccounts`.
+ */
+function AccountList({ list, allAccounts, allTypes, payAccounts, fmt }: {
+  list: Account[]; allAccounts: Account[]; allTypes: MovementType[]; payAccounts: Account[]; fmt: (v: number) => string
+}) {
+  const qc = useQueryClient()
+  const invalidate = () => qc.invalidateQueries({ queryKey: ['accounts-summary'] })
   const mutReorder = useMutation({
     mutationFn: (ids: number[]) => reorderAccounts(ids),
     onSuccess: invalidate,
   })
-
-  const move = (id: number, dir: -1 | 1) => {
-    const ids = accounts.map(a => a.id)
-    const i = ids.indexOf(id)
-    if (i < 0 || i + dir < 0 || i + dir >= ids.length) return
-    const next = [...ids]
-    ;[next[i], next[i + dir]] = [next[i + dir], next[i]]
-    mutReorder.mutate(next)
-  }
-
   const [dragId, setDragId] = useState<number | null>(null)
   const [dropTargetId, setDropTargetId] = useState<number | null>(null)
 
-  const reorderByDrop = (targetId: number) => {
-    if (dragId == null || dragId === targetId) return
-    const ids = accounts.map(a => a.id)
-    const fromIdx = ids.indexOf(dragId)
+  /** Pone `id` en el sitio de `targetId` dentro del orden global. */
+  const moveTo = (id: number, targetId: number) => {
+    if (id === targetId) return
+    const ids = allAccounts.map(a => a.id)
+    const fromIdx = ids.indexOf(id)
     const toIdx   = ids.indexOf(targetId)
     if (fromIdx < 0 || toIdx < 0) return
     const next = [...ids]
     next.splice(fromIdx, 1)
-    next.splice(toIdx, 0, dragId)
+    next.splice(toIdx, 0, id)
     mutReorder.mutate(next)
   }
 
   return (
-    <div className="space-y-2">
-      {accounts.map((account, idx) => (
+    <>
+      {list.map((account, idx) => (
         <AccountCard
           key={account.id} account={account} allTypes={allTypes} payAccounts={payAccounts} fmt={fmt}
-          onDeleted={invalidate}
-          onMoveUp={() => move(account.id, -1)}
-          onMoveDown={() => move(account.id, 1)}
+          onDeleted={() => { invalidate(); qc.invalidateQueries({ queryKey: ['real-accounts'] }) }}
+          onMoveUp={() => idx > 0 && moveTo(account.id, list[idx - 1].id)}
+          onMoveDown={() => idx < list.length - 1 && moveTo(account.id, list[idx + 1].id)}
           canMoveUp={idx > 0}
-          canMoveDown={idx < accounts.length - 1}
+          canMoveDown={idx < list.length - 1}
           isDragging={dragId === account.id}
           isDropTarget={dropTargetId === account.id && dragId !== account.id}
           dragHandlers={{
             onDragStart: (e) => { setDragId(account.id); e.dataTransfer.effectAllowed = 'move' },
             onDragEnd:   ()  => { setDragId(null); setDropTargetId(null) },
-            onDragOver:  (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (dropTargetId !== account.id) setDropTargetId(account.id) },
+            onDragOver:  (e) => {
+              // Cada lista tiene su propio estado de arrastre: solo se suelta dentro del mismo grupo
+              if (dragId == null) return
+              e.preventDefault(); e.dataTransfer.dropEffect = 'move'
+              if (dropTargetId !== account.id) setDropTargetId(account.id)
+            },
             onDragLeave: ()  => { if (dropTargetId === account.id) setDropTargetId(null) },
-            onDrop:      (e) => { e.preventDefault(); reorderByDrop(account.id); setDragId(null); setDropTargetId(null) },
+            onDrop:      (e) => { e.preventDefault(); if (dragId != null) moveTo(dragId, account.id); setDragId(null); setDropTargetId(null) },
           }}
         />
       ))}
-
-      {adding ? (
-        <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden"
-          style={{ borderLeftColor: newColor, borderLeftWidth: 3 }}>
-          <div className="px-4 py-3 space-y-3">
-            <div className="flex items-center gap-2">
-              <button onClick={() => colorRef.current?.click()}
-                className="w-6 h-6 rounded-full shrink-0 border-2 border-white dark:border-gray-700 shadow ring-1 ring-gray-200 dark:ring-gray-600 hover:scale-110 transition-transform"
-                style={{ backgroundColor: newColor }} />
-              <input ref={colorRef} type="color" value={newColor} onChange={e => setNewColor(e.target.value)} className="sr-only" />
-              <input
-                value={newName} onChange={e => setNewName(e.target.value)} autoFocus
-                onKeyDown={e => { if (e.key === 'Escape') setAdding(false) }}
-                className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                placeholder="Nombre de la cuenta"
-              />
-            </div>
-            <div className="flex gap-1.5 flex-wrap">
-              {PALETTE_COLORS.map(c => (
-                <button key={c} onClick={() => setNewColor(c)}
-                  className="w-5 h-5 rounded-full border-2 transition-transform hover:scale-110"
-                  style={{ backgroundColor: c, borderColor: newColor === c ? '#1e40af' : 'transparent' }} />
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {ICON_KEYS.map(k => (
-                <button key={k} onClick={() => setNewIcon(k)}
-                  className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${newIcon === k ? 'ring-2' : 'text-gray-500 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800'}`}
-                  style={newIcon === k ? { backgroundColor: newColor + '20' } : {}}>
-                  <AppIcon name={k} className="w-4 h-4" style={newIcon === k ? { color: newColor } : undefined} strokeWidth={1.5} />
-                </button>
-              ))}
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('settings.category')}</span>
-              <select
-                value={newCategory}
-                onChange={e => setNewCategory(e.target.value as AccountCategory)}
-                className="flex-1 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-              >
-                {ACCOUNT_CATEGORIES.map(c => (
-                  <option key={c.value} value={c.value}>{t(c.labelKey)}</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('settings.initialBalance')}</span>
-              <input
-                type="number" step="0.01" value={newBal} onChange={e => setNewBal(e.target.value)}
-                className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-              />
-            </div>
-            {newCategory === 'vehiculo' && (
-              <>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.vehicleValueDate')}</span>
-                  <input
-                    type="date" value={newValueDate} onChange={e => setNewValueDate(e.target.value)}
-                    className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.vehicleDepRate')}</span>
-                  <input
-                    type="number" step="0.1" min="0" max="100" value={newDeprRate} onChange={e => setNewDeprRate(e.target.value)}
-                    placeholder="ej. 15"
-                    className="w-24 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  />
-                </div>
-                <label className="flex items-start gap-2 cursor-pointer">
-                  <input type="checkbox" checked={newCarFlag} onChange={e => setNewCarFlag(e.target.checked)}
-                    className="mt-0.5 w-3.5 h-3.5 rounded accent-blue-500 shrink-0" />
-                  <span className="text-xs text-gray-500 dark:text-gray-400">{t('account.newCar')}</span>
-                </label>
-              </>
-            )}
-            {newCategory === 'credito' && (
-              <CreditFieldsEditor draft={newCredit} onChange={setNewCredit} payAccounts={payAccounts} />
-            )}
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setAdding(false)} className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">
-                {t('common.cancel')}
-              </button>
-              <button onClick={() => newName.trim() && mutCreate.mutate()} disabled={!newName.trim() || mutCreate.isPending}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg bg-gray-900 dark:bg-white text-white dark:text-gray-900 hover:bg-gray-700 dark:hover:bg-gray-100 disabled:opacity-40 transition-colors">
-                {mutCreate.isPending ? '...' : t('settings.createAccount')}
-              </button>
-            </div>
-          </div>
-        </div>
-      ) : (
-        <button onClick={() => setAdding(true)}
-          className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
-          <Plus className="w-4 h-4" />
-          Nueva cuenta
-        </button>
-      )}
-    </div>
+    </>
   )
 }
 
-// ── Real accounts section ─────────────────────────────────────────────────────
+// ── Real account form ─────────────────────────────────────────────────────────
 
 const PALETTE_COLORS_RA = [
   '#6b7280','#ef4444','#f97316','#eab308','#22c55e',
@@ -1062,8 +1058,8 @@ const PALETTE_COLORS_RA = [
 ]
 
 function RealAccountForm({
-  accounts, name, entityName, accountNumber, color, linkedIds, saving, error,
-  onName, onEntityName, onAccountNumber, onColor, onToggleLinked, onSave, onCancel,
+  accounts, name, entityName, accountNumber, color, linkedIds, balance, showBalance, hint, saving, error,
+  onName, onEntityName, onAccountNumber, onColor, onToggleLinked, onBalance, onSave, onCancel,
 }: {
   accounts: Account[]
   name: string
@@ -1071,6 +1067,9 @@ function RealAccountForm({
   accountNumber: string
   color: string
   linkedIds: number[]
+  balance: string
+  showBalance: boolean
+  hint: string
   saving: boolean
   error: string
   onName: (v: string) => void
@@ -1078,6 +1077,7 @@ function RealAccountForm({
   onAccountNumber: (v: string) => void
   onColor: (v: string) => void
   onToggleLinked: (id: number) => void
+  onBalance: (v: string) => void
   onSave: () => void
   onCancel: () => void
 }) {
@@ -1089,7 +1089,7 @@ function RealAccountForm({
       <div className="flex gap-2">
         <div className="flex-1">
           <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Nombre</label>
-          <input className={IN} placeholder="ej. Cuenta ahorro" value={name} onChange={e => onName(e.target.value)} />
+          <input className={IN} placeholder="ej. Cuenta ahorro" value={name} onChange={e => onName(e.target.value)} autoFocus />
         </div>
         <div>
           <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Color</label>
@@ -1123,26 +1123,38 @@ function RealAccountForm({
         <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Número de cuenta (opcional)</label>
         <input className={IN} placeholder="ES12 3456 7890 1234 5678" value={accountNumber} onChange={e => onAccountNumber(e.target.value)} />
       </div>
-      <div>
-        <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Cuentas ficticias asociadas</label>
-        <div className="flex flex-wrap gap-1.5 mt-1">
-          {accounts.map(acc => (
-            <button
-              key={acc.id}
-              type="button"
-              onClick={() => onToggleLinked(acc.id)}
-              className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
-                linkedIds.includes(acc.id)
-                  ? 'text-white border-transparent'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 hover:border-gray-300'
-              }`}
-              style={linkedIds.includes(acc.id) ? { background: acc.color } : {}}
-            >
-              {acc.name}
-            </button>
-          ))}
+      {accounts.length > 0 && (
+        <div>
+          <label className="text-xs font-medium text-gray-500 dark:text-gray-400 mb-1 block">Cuentas ficticias asociadas</label>
+          <div className="flex flex-wrap gap-1.5 mt-1">
+            {accounts.map(acc => (
+              <button
+                key={acc.id}
+                type="button"
+                onClick={() => onToggleLinked(acc.id)}
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors ${
+                  linkedIds.includes(acc.id)
+                    ? 'text-white border-transparent'
+                    : 'border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 bg-white dark:bg-gray-800 hover:border-gray-300'
+                }`}
+                style={linkedIds.includes(acc.id) ? { background: acc.color } : {}}
+              >
+                {acc.name}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
+      {showBalance && (
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('settings.initialBalance')}</span>
+          <input
+            type="number" step="0.01" value={balance} onChange={e => onBalance(e.target.value)}
+            className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+          />
+        </div>
+      )}
+      {hint && <p className="text-[11px] text-gray-400 dark:text-gray-500">{hint}</p>}
       {error && <p className="text-xs text-red-500">{error}</p>}
       <div className="flex gap-2 pt-1">
         <button
@@ -1165,44 +1177,68 @@ function RealAccountForm({
   )
 }
 
-function RealAccountsSection({ accounts }: { accounts: Account[] }) {
-  const qc = useQueryClient()
-  const { data: realAccounts = [] } = useQuery({
-    queryKey: ['real-accounts'],
-    queryFn: getRealAccounts,
-  })
+// ── Accounts section (real accounts with their accounts inside + loose ones) ─
 
+/** La ficticia "invisible": la única de su cuenta real y con su mismo nombre. */
+function implicitAccount(ra: RealAccount, children: Account[]): Account | null {
+  return children.length === 1 && ra.linked_account_ids.length === 1 && children[0].name === ra.name ? children[0] : null
+}
+
+const parseMoney = (v: string) => parseFloat(v.replace(',', '.'))
+
+function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: number) => string }) {
+  const qc = useQueryClient()
+  const { data: realAccounts = [] } = useQuery({ queryKey: ['real-accounts'], queryFn: getRealAccounts })
+  const { data: allTypes = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
+  // Cuentas que pueden pagar el cargo de una tarjeta
+  const payAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro')
+
+  // Cada ficticia cuelga como mucho de una cuenta real (la primera que la reclama)
+  const parentOf = new Map<number, number>()
+  for (const ra of realAccounts) for (const id of ra.linked_account_ids) if (!parentOf.has(id)) parentOf.set(id, ra.id)
+  const childrenOf = (raId: number) => accounts.filter(a => parentOf.get(a.id) === raId)
+  const looseAccounts = accounts.filter(a => !parentOf.has(a.id))
+
+  const [openIds, setOpenIds]       = useState<Set<number>>(new Set())
+  const [addingIn, setAddingIn]     = useState<number | 'loose' | null>(null)
+  const [deletingId, setDeletingId] = useState<number | null>(null)
+
+  // Formulario de cuenta real
   const [editingId, setEditingId] = useState<number | 'new' | null>(null)
   const [name, setName] = useState('')
   const [entityName, setEntityName] = useState('')
   const [accountNumber, setAccountNumber] = useState('')
   const [color, setColor] = useState('#3b82f6')
   const [linkedIds, setLinkedIds] = useState<number[]>([])
+  const [balance, setBalance] = useState('0')
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState('')
 
+  const toggleOpen = (id: number) => setOpenIds(prev => {
+    const s = new Set(prev)
+    if (s.has(id)) s.delete(id); else s.add(id)
+    return s
+  })
+  const refresh = async () => {
+    await Promise.all([
+      qc.invalidateQueries({ queryKey: ['real-accounts'] }),
+      qc.invalidateQueries({ queryKey: ['accounts-summary'] }),
+    ])
+  }
+
   function startNew() {
     setEditingId('new')
-    setName('')
-    setEntityName('')
-    setAccountNumber('')
-    setColor('#3b82f6')
-    setLinkedIds([])
-    setSaveError('')
+    setName(''); setEntityName(''); setAccountNumber(''); setColor('#3b82f6')
+    setLinkedIds([]); setBalance('0'); setSaveError('')
   }
 
   function startEdit(ra: RealAccount) {
+    const implicit = implicitAccount(ra, childrenOf(ra.id))
     setEditingId(ra.id)
-    setName(ra.name)
-    setEntityName(ra.entity_name)
-    setAccountNumber(ra.account_number ?? '')
-    setColor(ra.color)
-    setLinkedIds(ra.linked_account_ids)
-    setSaveError('')
-  }
-
-  function cancel() {
-    setEditingId(null)
+    setName(ra.name); setEntityName(ra.entity_name); setAccountNumber(ra.account_number ?? ''); setColor(ra.color)
+    // La invisible no se ofrece como chip: va implícita
+    setLinkedIds(ra.linked_account_ids.filter(id => id !== implicit?.id))
+    setBalance(String(implicit?.initial_balance ?? 0))
     setSaveError('')
   }
 
@@ -1210,19 +1246,27 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
     setSaving(true)
     setSaveError('')
     try {
-      const payload = {
+      const base = {
         name: name.trim(),
         entity_name: entityName.trim(),
         account_number: accountNumber.trim() || null,
         color,
-        linked_account_ids: linkedIds,
       }
+      const bal = parseMoney(balance)
       if (editingId === 'new') {
-        await createRealAccount(payload)
+        await createRealAccount({ ...base, linked_account_ids: linkedIds, initial_balance: isNaN(bal) ? 0 : bal })
       } else if (editingId != null) {
-        await updateRealAccount(editingId, payload)
+        const ra = realAccounts.find(r => r.id === editingId)!
+        const implicit = implicitAccount(ra, childrenOf(ra.id))
+        await updateRealAccount(editingId, {
+          ...base,
+          linked_account_ids: implicit ? [implicit.id, ...linkedIds] : linkedIds,
+        })
+        if (implicit && linkedIds.length === 0 && !isNaN(bal) && bal !== implicit.initial_balance) {
+          await updateAccountFull(implicit.id, { initial_balance: bal })
+        }
       }
-      await qc.invalidateQueries({ queryKey: ['real-accounts'] })
+      await refresh()
       setEditingId(null)
     } catch (e: unknown) {
       const detail = (e as { response?: { data?: { detail?: string } } })?.response?.data?.detail
@@ -1235,60 +1279,131 @@ function RealAccountsSection({ accounts }: { accounts: Account[] }) {
   async function remove(id: number) {
     try {
       await deleteRealAccount(id)
-      qc.invalidateQueries({ queryKey: ['real-accounts'] })
+      await refresh()
     } catch { /* ignore */ }
+    setDeletingId(null)
   }
 
-  const formProps = {
-    accounts,
-    name, entityName, accountNumber, color, linkedIds,
-    saving, error: saveError,
-    onName: setName, onEntityName: setEntityName, onAccountNumber: setAccountNumber,
-    onColor: setColor, onToggleLinked: (id: number) => setLinkedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]),
-    onSave: save, onCancel: cancel,
+  /** Vincula la cuenta recién creada a la cuenta real `ra`. */
+  const linkInto = (ra: RealAccount) => async (account: Account) => {
+    await updateRealAccount(ra.id, { linked_account_ids: [...ra.linked_account_ids, account.id] })
+    await refresh()
+    setAddingIn(null)
   }
+
+  const formProps = (editing: RealAccount | null) => {
+    const implicit = editing ? implicitAccount(editing, childrenOf(editing.id)) : null
+    // Se pueden vincular las sueltas y las que ya son de esta cuenta real
+    const selectable = accounts.filter(a => a.id !== implicit?.id && (!parentOf.has(a.id) || parentOf.get(a.id) === editing?.id))
+    const isNew = editing == null
+    return {
+      accounts: selectable,
+      name, entityName, accountNumber, color, linkedIds, balance,
+      showBalance: linkedIds.length === 0 && (isNew || implicit != null),
+      hint: isNew && linkedIds.length === 0 ? t('settings.newRealAccountHint') : '',
+      saving, error: saveError,
+      onName: setName, onEntityName: setEntityName, onAccountNumber: setAccountNumber, onColor: setColor,
+      onToggleLinked: (id: number) => setLinkedIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]),
+      onBalance: setBalance,
+      onSave: save, onCancel: () => { setEditingId(null); setSaveError('') },
+    }
+  }
+
+  const addButton = (label: string, onClick: () => void) => (
+    <button onClick={onClick}
+      className="flex items-center gap-2 w-full px-3 py-2.5 text-sm text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 bg-white dark:bg-gray-900 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600 transition-colors">
+      <Plus className="w-4 h-4" />
+      {label}
+    </button>
+  )
 
   return (
-    <div className="space-y-3">
-      <p className="text-xs text-gray-500 dark:text-gray-400">
-        Agrupa tus cuentas ficticias por entidad bancaria para comparar con los saldos reales.
-      </p>
-      {realAccounts.map(ra => (
-        <div key={ra.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800">
-          {editingId === ra.id ? (
-            <div className="p-3"><RealAccountForm {...formProps} /></div>
-          ) : (
+    <div className="space-y-2">
+      <p className="text-xs text-gray-500 dark:text-gray-400">{t('settings.accountsHint')}</p>
+
+      {realAccounts.map(ra => {
+        const children = childrenOf(ra.id)
+        const implicit = implicitAccount(ra, children)
+        const visible  = implicit ? [] : children
+        const isOpen   = openIds.has(ra.id)
+        const total    = children.reduce((s, a) => s + a.initial_balance, 0)
+
+        if (editingId === ra.id) {
+          return <RealAccountForm key={ra.id} {...formProps(ra)} />
+        }
+
+        return (
+          <div key={ra.id} className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 overflow-hidden"
+            style={{ borderLeftColor: ra.color, borderLeftWidth: 3 }}>
             <div className="flex items-center gap-3 px-4 py-3">
-              <div className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: ra.color }} />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-800 dark:text-white truncate">{ra.name}</p>
-                <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
-                  {ra.entity_name}{ra.account_number ? ` · ${ra.account_number}` : ''}
-                  {ra.linked_account_ids.length > 0 && ` · ${ra.linked_account_ids.length} cuenta${ra.linked_account_ids.length !== 1 ? 's' : ''}`}
-                </p>
-              </div>
-              <button type="button" onClick={() => startEdit(ra)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
+              <button type="button" onClick={() => toggleOpen(ra.id)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0" style={{ backgroundColor: ra.color + '20' }}>
+                  <AppIcon name="landmark" className="w-4 h-4" style={{ color: ra.color }} strokeWidth={1.5} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-gray-800 dark:text-white truncate">{ra.name}</p>
+                  <p className="text-xs text-gray-400 dark:text-gray-500 truncate">
+                    {ra.entity_name}{ra.account_number ? ` · ${ra.account_number}` : ''}
+                    {visible.length > 0 && ` · ${visible.length} cuenta${visible.length !== 1 ? 's' : ''}`}
+                  </p>
+                </div>
+                <span className="text-sm font-mono text-gray-400 dark:text-gray-500">{fmt(total)}</span>
+                {isOpen ? <ChevronDown className="w-3.5 h-3.5 text-gray-400 shrink-0" /> : <ChevronRight className="w-3.5 h-3.5 text-gray-400 shrink-0" />}
+              </button>
+              <button type="button" onClick={() => startEdit(ra)} className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-300 rounded transition-colors">
                 <Pencil className="w-3.5 h-3.5" />
               </button>
-              <button type="button" onClick={() => remove(ra.id)} className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors">
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {deletingId === ra.id ? (
+                <div className="flex items-center gap-1">
+                  <button onClick={() => remove(ra.id)}
+                    className="px-2 py-1 text-xs rounded-lg bg-red-50 dark:bg-red-900/20 text-red-500 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors">
+                    {t('common.delete')}
+                  </button>
+                  <button onClick={() => setDeletingId(null)} className="p-1 text-gray-300 hover:text-gray-500">
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setDeletingId(ra.id)} className="p-1.5 text-gray-300 dark:text-gray-600 hover:text-red-400 rounded transition-colors">
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
             </div>
-          )}
+            {deletingId === ra.id && children.length > 0 && (
+              <p className="px-4 pb-2.5 -mt-1 text-[11px] text-gray-400 dark:text-gray-500">{t('settings.realAccountDeleteHint')}</p>
+            )}
+
+            {isOpen && (
+              <div className="border-t border-gray-50 dark:border-gray-800 bg-gray-50/60 dark:bg-gray-800/30 p-2 pl-5 space-y-2">
+                {implicit && (
+                  <p className="text-[11px] text-gray-400 dark:text-gray-500 px-1">{t('settings.hiddenAccountHint')}</p>
+                )}
+                <AccountList list={visible} allAccounts={accounts} allTypes={allTypes} payAccounts={payAccounts} fmt={fmt} />
+                {addingIn === ra.id
+                  ? <NewAccountForm payAccounts={payAccounts} onCreated={linkInto(ra)} onCancel={() => setAddingIn(null)} />
+                  : addButton(t('settings.addInsideRealAccount'), () => setAddingIn(ra.id))}
+              </div>
+            )}
+          </div>
+        )
+      })}
+
+      {editingId === 'new'
+        ? <RealAccountForm {...formProps(null)} />
+        : addButton(t('settings.addRealAccount'), startNew)}
+
+      <div className="pt-4 space-y-2">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">{t('settings.looseAccounts')}</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{t('settings.looseAccountsHint')}</p>
         </div>
-      ))}
-      {editingId === 'new' ? (
-        <RealAccountForm {...formProps} />
-      ) : (
-        <button
-          type="button"
-          onClick={startNew}
-          className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl border border-dashed border-gray-200 dark:border-gray-700 text-sm text-gray-500 dark:text-gray-400 hover:border-gray-300 dark:hover:border-gray-600 hover:text-gray-700 dark:hover:text-gray-300 transition-colors"
-        >
-          <Plus className="w-4 h-4" />
-          Añadir cuenta real
-        </button>
-      )}
+        <AccountList list={looseAccounts} allAccounts={accounts} allTypes={allTypes} payAccounts={payAccounts} fmt={fmt} />
+        {addingIn === 'loose'
+          ? <NewAccountForm payAccounts={payAccounts}
+              onCreated={async () => { await refresh(); setAddingIn(null) }}
+              onCancel={() => setAddingIn(null)} />
+          : addButton(t('settings.newLooseAccount'), () => setAddingIn('loose'))}
+      </div>
     </div>
   )
 }
@@ -1303,9 +1418,6 @@ export default function CuentasTab({ accounts, fmt }: { accounts: Account[]; fmt
       </Section>
       <Section title={t('settings.movementTypes')}>
         <TypesSection />
-      </Section>
-      <Section title="Cuentas reales">
-        <RealAccountsSection accounts={accounts} />
       </Section>
     </>
   )

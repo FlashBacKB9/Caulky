@@ -10,7 +10,7 @@ from app.models.account import Account
 from app.models.income_expense_group import IncomeExpenseGroup
 from app.models.movement import Movement
 from app.models.movement_type import MovementType
-from app.models.real_account import RealAccount
+from app.models.real_account import RealAccount, real_account_accounts
 from app.models.user import User
 from app.auth.manager import get_user_manager, UserManager
 from app.auth.schemas import UserCreate
@@ -320,6 +320,9 @@ async def _wipe_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
     await db.execute(delete(Movement).where(Movement.user_id == user_id))
     await db.execute(delete(MovementType).where(MovementType.user_id == user_id))
     await db.execute(delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == user_id))
+    # SQLite no borra los vínculos en cascada y reutiliza los IDs: se quitan a mano
+    ra_ids = select(RealAccount.id).where(RealAccount.user_id == user_id)
+    await db.execute(delete(real_account_accounts).where(real_account_accounts.c.real_account_id.in_(ra_ids)))
     await db.execute(delete(Account).where(Account.user_id == user_id))
     await db.execute(delete(RealAccount).where(RealAccount.user_id == user_id))
 

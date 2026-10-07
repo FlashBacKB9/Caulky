@@ -18,6 +18,8 @@ class RealAccountCreate(BaseModel):
     account_number: str | None = None
     color: str = "#6b7280"
     linked_account_ids: list[int] = []
+    # Saldo inicial de la ficticia que se crea cuando no se vincula ninguna
+    initial_balance: float = 0
 
 
 class RealAccountPatch(BaseModel):

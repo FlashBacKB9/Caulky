@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, delete as sa_delete, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.orm import attributes as sa_attrs
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
-from app.models.real_account import RealAccount
+from app.models.real_account import RealAccount, real_account_accounts
 from app.models.account import Account
 from app.schemas.real_account import RealAccountRead, RealAccountCreate, RealAccountPatch
 from app.auth.setup import current_active_user
@@ -22,6 +22,26 @@ def _to_read(ra: RealAccount) -> RealAccountRead:
         color=ra.color,
         linked_account_ids=[a.id for a in ra.linked_accounts],
     )
+
+
+async def _detach_from_others(db: AsyncSession, user: User, account_ids: list[int], keep_ra_id: int) -> None:
+    """Una cuenta ficticia cuelga de una sola cuenta real: al vincularla aquí se suelta de las demás."""
+    if not account_ids:
+        return
+    user_ra_ids = select(RealAccount.id).where(RealAccount.user_id == user.id, RealAccount.id != keep_ra_id)
+    await db.execute(
+        sa_delete(real_account_accounts).where(
+            real_account_accounts.c.account_id.in_(account_ids),
+            real_account_accounts.c.real_account_id.in_(user_ra_ids),
+        )
+    )
+
+
+def _implicit_account(ra: RealAccount) -> Account | None:
+    """La ficticia "invisible": única vinculada y con el mismo nombre que la cuenta real."""
+    if len(ra.linked_accounts) == 1 and ra.linked_accounts[0].name == ra.name:
+        return ra.linked_accounts[0]
+    return None
 
 
 @router.get("", response_model=list[RealAccountRead])
@@ -58,13 +78,30 @@ async def create_real_account(
     )
     db.add(ra)
     await db.flush()
+    # Vínculos huérfanos de una cuenta real borrada con el mismo ID (SQLite reutiliza IDs)
+    await db.execute(sa_delete(real_account_accounts).where(real_account_accounts.c.real_account_id == ra.id))
     # Inform SQLAlchemy the committed value is [] so it won't lazy-load async
     sa_attrs.set_committed_value(ra, 'linked_accounts', [])
+    accs = []
     if body.linked_account_ids:
-        accs = (await db.execute(
+        accs = list((await db.execute(
             select(Account).where(Account.id.in_(body.linked_account_ids), Account.user_id == user.id)
-        )).scalars().all()
-        ra.linked_accounts = list(accs)
+        )).scalars().all())
+    if not accs:
+        # Sin ficticias: se crea una con el mismo nombre, que Configuración no muestra
+        max_order = (await db.execute(
+            select(func.max(Account.sort_order)).where(Account.user_id == user.id)
+        )).scalar() or 0
+        acc = Account(
+            name=body.name, color=body.color, icon="landmark", category="corriente",
+            initial_balance=body.initial_balance, sort_order=max_order + 1,
+            is_main=False, user_id=user.id,
+        )
+        db.add(acc)
+        await db.flush()
+        accs = [acc]
+    await _detach_from_others(db, user, [a.id for a in accs], ra.id)
+    ra.linked_accounts = accs
     await db.commit()
     return _to_read(await _get_with_links(db, ra.id))
 
@@ -79,6 +116,13 @@ async def update_real_account(
     ra = await _get_with_links(db, ra_id)
     if not ra or ra.user_id != user.id:
         raise HTTPException(status_code=404, detail="Not found")
+    implicit = _implicit_account(ra)
+    if implicit is not None and body.linked_account_ids in (None, [implicit.id]):
+        # La ficticia invisible sigue el nombre y color de su cuenta real
+        if body.name is not None:
+            implicit.name = body.name
+        if body.color is not None:
+            implicit.color = body.color
     if body.name is not None:
         ra.name = body.name
     if body.entity_name is not None:
@@ -91,6 +135,7 @@ async def update_real_account(
         accs = (await db.execute(
             select(Account).where(Account.id.in_(body.linked_account_ids), Account.user_id == user.id)
         )).scalars().all()
+        await _detach_from_others(db, user, [a.id for a in accs], ra.id)
         ra.linked_accounts = list(accs)
     await db.commit()
     return _to_read(await _get_with_links(db, ra_id))

@@ -14,6 +14,15 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.9.2', date: 'Octubre 2026',
+    items: [
+      { type: 'feat',    text: 'Configuración → Cuentas: las cuentas reales del banco se despliegan y dentro van sus cuentas ficticias, tarjetas, bienes e inversiones. Las que no dependen de ningún banco siguen abajo, como hasta ahora' },
+      { type: 'feat',    text: 'Una cuenta real sin cuentas ficticias usa una con su mismo nombre, que no se muestra hasta que añades otra' },
+      { type: 'fix',     text: 'La copia de seguridad ahora guarda las cuentas reales y sus cuentas vinculadas' },
+      { type: 'fix',     text: 'Una cuenta nueva ya no puede aparecer dentro de una cuenta real antigua borrada' },
+    ],
+  },
+  {
     version: 'v1.9.1', date: 'Octubre 2026',
     items: [
       { type: 'fix',     text: 'Tarjetas de crédito: el cargo previsto del calendario y los gastos de una liquidación se actualizan al guardar cualquier movimiento, sin recargar la página' },

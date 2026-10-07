@@ -6,7 +6,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      '/api': 'http://localhost:8000',
+      // VITE_PROXY_TARGET permite levantar un segundo backend en otro puerto
+      '/api': process.env.VITE_PROXY_TARGET ?? 'http://localhost:8000',
     },
   },
   test: {

@@ -4,6 +4,7 @@ from sqlalchemy import select, func, case, delete as sa_delete, update as sa_upd
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.models.account import Account
+from app.models.real_account import real_account_accounts
 from app.models.movement import Movement
 from app.models.movement_type import MovementType
 from app.models.income_expense_group import IncomeExpenseGroup
@@ -149,6 +150,8 @@ async def create_account(body: AccountCreate, db: AsyncSession = Depends(get_db)
     ensure_last_cycle_end(account)
     db.add(account)
     await db.flush()
+    # Una cuenta nueva nunca cuelga de una cuenta real: limpia vínculos huérfanos con su mismo ID
+    await db.execute(sa_delete(real_account_accounts).where(real_account_accounts.c.account_id == account.id))
     await write_log(user.id, "account", account.id, "create",
               f"Cuenta creada: {account.name}",
               after=_acc_snap(account))
@@ -285,6 +288,8 @@ async def delete_account(
             .where(MovementType.linked_account_id == account_id)
             .values(linked_account_id=None)
         )
+    # SQLite no aplica el ON DELETE CASCADE: se quita a mano de su cuenta real
+    await db.execute(sa_delete(real_account_accounts).where(real_account_accounts.c.account_id == account_id))
 
     await write_log(user.id, "account", account.id, "delete",
               f"Cuenta eliminada: {account.name}",

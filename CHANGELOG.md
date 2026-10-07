@@ -4,6 +4,25 @@ All notable changes to Caulky are documented here.
 
 ---
 
+## [v1.9.2] — 2026-10-08
+
+### ✨ Added
+- Settings → Accounts is organised by real (bank) account: each one opens as a dropdown with
+  the virtual accounts, cards, assets or investments inside it. Accounts that don't belong to
+  any bank stay below, under "Accounts without a real account", and work as before
+- A real account created without virtual accounts gets one with the same name (hidden in
+  Settings until you add another); it follows the real account's name and colour
+
+### 🐛 Fixed
+- Backups now include real accounts and their links; restore, reset and demo mode clear them too
+- SQLite: deleting accounts left orphan links in `real_account_accounts`, and since SQLite reuses
+  IDs a new account could show up inside an old real account (or fail to be created)
+
+### 🔧 Improved
+- A virtual account belongs to a single real account: linking it to another moves it
+- `POST /api/real-accounts` accepts `initial_balance` for the account created when none is linked
+- Dev: the Vite `/api` proxy target can be changed with `VITE_PROXY_TARGET`
+
 ## [v1.9.1] — 2026-10-08
 
 ### 🐛 Fixed
