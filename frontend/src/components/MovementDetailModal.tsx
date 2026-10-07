@@ -233,7 +233,7 @@ export default function MovementDetailModal({ movement, types, onClose }: {
 
           {/* Account / transfer accounts */}
           {(() => {
-            const allAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro')
+            const allAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro' || a.category === 'credito')
             if (allAccounts.length === 0) return null
             if (draft.is_transfer) {
               return (

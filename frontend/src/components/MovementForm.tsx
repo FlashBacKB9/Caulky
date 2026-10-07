@@ -566,7 +566,7 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
                   </div>
                 </div>
                 {(() => {
-                  const allAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro')
+                  const allAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro' || a.category === 'credito')
                   if (allAccounts.length === 0) return null
                   if (form.is_transfer) {
                     return (
@@ -798,7 +798,7 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
                   </div>
                 </div>
                 {(() => {
-                  const tplAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro')
+                  const tplAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro' || a.category === 'credito')
                   if (tplAccounts.length <= 1) return null
                   const mainAcc = tplAccounts.find(a => a.is_main)
                   return (
