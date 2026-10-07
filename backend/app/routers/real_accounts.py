@@ -7,13 +7,14 @@ from app.database import get_db
 from app.models.real_account import RealAccount, real_account_accounts
 from app.models.account import Account
 from app.schemas.real_account import RealAccountRead, RealAccountCreate, RealAccountPatch
+from app.services.credit import CREDIT_CATEGORY
 from app.auth.setup import current_active_user
 from app.models.user import User
 
 router = APIRouter(prefix="/real-accounts", tags=["real-accounts"])
 
 
-def _to_read(ra: RealAccount) -> RealAccountRead:
+def _to_read(ra: RealAccount, cards: dict[int, list[int]] | None = None) -> RealAccountRead:
     return RealAccountRead(
         id=ra.id,
         name=ra.name,
@@ -21,7 +22,34 @@ def _to_read(ra: RealAccount) -> RealAccountRead:
         account_number=ra.account_number,
         color=ra.color,
         linked_account_ids=[a.id for a in ra.linked_accounts],
+        card_account_ids=(cards or {}).get(ra.id, []),
     )
+
+
+async def _cards_by_real_account(db: AsyncSession, user: User) -> dict[int, list[int]]:
+    """
+    Cada tarjeta de crédito cuelga de la cuenta real que contiene su cuenta pagadora (la
+    principal si no tiene). Si la tarjeta ya está vinculada a mano a alguna, manda eso.
+    """
+    links = (await db.execute(
+        select(real_account_accounts.c.real_account_id, real_account_accounts.c.account_id)
+        .join(RealAccount, RealAccount.id == real_account_accounts.c.real_account_id)
+        .where(RealAccount.user_id == user.id)
+        .order_by(real_account_accounts.c.real_account_id)
+    )).all()
+    owner: dict[int, int] = {}
+    for ra_id, acc_id in links:
+        owner.setdefault(acc_id, ra_id)
+    accounts = (await db.execute(select(Account).where(Account.user_id == user.id))).scalars().all()
+    main_id = next((a.id for a in accounts if a.is_main), None)
+    out: dict[int, list[int]] = {}
+    for a in accounts:
+        if a.category != CREDIT_CATEGORY or a.id in owner:
+            continue
+        ra_id = owner.get(a.credit_pay_account_id or main_id)
+        if ra_id is not None:
+            out.setdefault(ra_id, []).append(a.id)
+    return out
 
 
 async def _detach_from_others(db: AsyncSession, user: User, account_ids: list[int], keep_ra_id: int) -> None:
@@ -52,7 +80,8 @@ async def list_real_accounts(
     result = await db.execute(
         select(RealAccount).where(RealAccount.user_id == user.id).order_by(RealAccount.id)
     )
-    return [_to_read(ra) for ra in result.scalars().all()]
+    cards = await _cards_by_real_account(db, user)
+    return [_to_read(ra, cards) for ra in result.scalars().all()]
 
 
 async def _get_with_links(db: AsyncSession, ra_id: int) -> RealAccount | None:
@@ -103,7 +132,7 @@ async def create_real_account(
     await _detach_from_others(db, user, [a.id for a in accs], ra.id)
     ra.linked_accounts = accs
     await db.commit()
-    return _to_read(await _get_with_links(db, ra.id))
+    return _to_read(await _get_with_links(db, ra.id), await _cards_by_real_account(db, user))
 
 
 @router.put("/{ra_id}", response_model=RealAccountRead)
@@ -138,7 +167,7 @@ async def update_real_account(
         await _detach_from_others(db, user, [a.id for a in accs], ra.id)
         ra.linked_accounts = list(accs)
     await db.commit()
-    return _to_read(await _get_with_links(db, ra_id))
+    return _to_read(await _get_with_links(db, ra_id), await _cards_by_real_account(db, user))
 
 
 @router.delete("/{ra_id}", status_code=204)

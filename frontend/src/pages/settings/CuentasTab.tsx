@@ -1179,9 +1179,11 @@ function RealAccountForm({
 
 // ── Accounts section (real accounts with their accounts inside + loose ones) ─
 
-/** La ficticia "invisible": la única de su cuenta real y con su mismo nombre. */
+/** La ficticia "invisible": la única vinculada a su cuenta real y con su mismo nombre. */
 function implicitAccount(ra: RealAccount, children: Account[]): Account | null {
-  return children.length === 1 && ra.linked_account_ids.length === 1 && children[0].name === ra.name ? children[0] : null
+  // Las tarjetas que paga no cuentan: cuelgan de ella sin estar vinculadas
+  const linked = children.filter(a => ra.linked_account_ids.includes(a.id))
+  return linked.length === 1 && ra.linked_account_ids.length === 1 && linked[0].name === ra.name ? linked[0] : null
 }
 
 const parseMoney = (v: string) => parseFloat(v.replace(',', '.'))
@@ -1196,6 +1198,11 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
   // Cada ficticia cuelga como mucho de una cuenta real (la primera que la reclama)
   const parentOf = new Map<number, number>()
   for (const ra of realAccounts) for (const id of ra.linked_account_ids) if (!parentOf.has(id)) parentOf.set(id, ra.id)
+  // Las tarjetas de crédito cuelgan de la cuenta real que las paga, como una ficticia más
+  const derivedCards = new Set<number>()
+  for (const ra of realAccounts) for (const id of ra.card_account_ids ?? []) {
+    if (!parentOf.has(id)) { parentOf.set(id, ra.id); derivedCards.add(id) }
+  }
   const childrenOf = (raId: number) => accounts.filter(a => parentOf.get(a.id) === raId)
   const looseAccounts = accounts.filter(a => !parentOf.has(a.id))
 
@@ -1293,8 +1300,10 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
 
   const formProps = (editing: RealAccount | null) => {
     const implicit = editing ? implicitAccount(editing, childrenOf(editing.id)) : null
-    // Se pueden vincular las sueltas y las que ya son de esta cuenta real
-    const selectable = accounts.filter(a => a.id !== implicit?.id && (!parentOf.has(a.id) || parentOf.get(a.id) === editing?.id))
+    // Se pueden vincular las sueltas, las que ya son de esta cuenta real y las tarjetas que
+    // cuelgan de otra solo por ser su cuenta pagadora (vincularlas aquí las mueve)
+    const selectable = accounts.filter(a => a.id !== implicit?.id
+      && (!parentOf.has(a.id) || parentOf.get(a.id) === editing?.id || derivedCards.has(a.id)))
     const isNew = editing == null
     return {
       accounts: selectable,
@@ -1324,7 +1333,7 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
       {realAccounts.map(ra => {
         const children = childrenOf(ra.id)
         const implicit = implicitAccount(ra, children)
-        const visible  = implicit ? [] : children
+        const visible  = children.filter(a => a.id !== implicit?.id)
         const isOpen   = openIds.has(ra.id)
         const total    = children.reduce((s, a) => s + a.initial_balance, 0)
 

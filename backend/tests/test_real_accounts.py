@@ -124,3 +124,28 @@ async def test_orphan_links_do_not_break_new_ids(db, user):
     ra = await create_real_account(RealAccountCreate(name="Nueva", entity_name="X"), db=db, user=user)
     assert ra.id == 1
     assert len(ra.linked_account_ids) == 1 and ra.linked_account_ids != [acc.id]
+
+
+async def test_credit_card_hangs_from_paying_real_account(db, user):
+    from app.routers.real_accounts import list_real_accounts
+
+    main = await _account(db, user, "De Uso", is_main=True)
+    savings = await _account(db, user, "Ahorro", category="ahorro")
+    visa = await _account(db, user, "Visa", category="credito", credit_cutoff_day=31, credit_charge_day=5)
+    amex = await _account(db, user, "Amex", category="credito", credit_cutoff_day=31, credit_charge_day=5,
+                          credit_pay_account_id=savings.id)
+    ing = await create_real_account(RealAccountCreate(name="ING", entity_name="ING", linked_account_ids=[main.id]), db=db, user=user)
+    tr = await create_real_account(RealAccountCreate(name="TR", entity_name="TR", linked_account_ids=[savings.id]), db=db, user=user)
+
+    # Sin cuenta pagadora, la Visa la paga la principal; la Amex, la de ahorro
+    assert ing.card_account_ids == [visa.id]  # la respuesta al crear ya la incluye
+    by_id = {ra.id: ra for ra in await list_real_accounts(db=db, user=user)}
+    assert by_id[ing.id].card_account_ids == [visa.id]
+    assert by_id[tr.id].card_account_ids == [amex.id]
+    assert visa.id not in by_id[ing.id].linked_account_ids  # no se guarda como vínculo
+
+    # Vinculada a mano a otra cuenta real, manda el vínculo
+    await update_real_account(tr.id, RealAccountPatch(linked_account_ids=[savings.id, visa.id]), db=db, user=user)
+    by_id = {ra.id: ra for ra in await list_real_accounts(db=db, user=user)}
+    assert by_id[ing.id].card_account_ids == []
+    assert visa.id in by_id[tr.id].linked_account_ids

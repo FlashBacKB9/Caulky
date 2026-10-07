@@ -4,6 +4,23 @@ All notable changes to Caulky are documented here.
 
 ---
 
+## [v1.9.4] — 2026-10-08
+
+### ✨ Added
+- Credit cards hang from the real account that pays them (the one containing their paying
+  account, or the main account) as one more virtual account, without linking them by hand.
+  The real account's balance includes the card's pending debt and opens its movements too.
+  A card linked by hand to a real account keeps that link. `GET /api/real-accounts` returns
+  the derived `card_account_ids`
+
+### 🐛 Fixed
+- Dashboard: the expenses-by-category donut, the top expense subtypes and the monthly expense
+  bar no longer count the Ahorro, Gastos Anuales and Inversión groups. Money set aside is not
+  spent: the real expense counts when it is paid (e.g. an insurance paid from the annual
+  expenses account), so it no longer shows twice. Same rule as the backend and the
+  expenses-by-group line chart
+- Dashboard – savings vs expenses: Gastos Anuales and Inversión count as savings
+
 ## [v1.9.3] — 2026-10-08
 
 ### 🔧 Improved

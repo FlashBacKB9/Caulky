@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { getAccountsSummary, getCreditCycles, ACCOUNT_CATEGORIES, LIQUID_CATEGORIES, INVESTMENT_CATEGORIES, type Account, type CreditCycle } from '../api/accounts'
 import { useDateFormat } from '../hooks/useDateFormat'
-import { getRealAccounts, type RealAccount } from '../api/realAccounts'
+import { getRealAccounts, realAccountMemberIds, type RealAccount } from '../api/realAccounts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { buildPerspective, balanceDelta } from '../utils/accountView'
@@ -308,8 +308,9 @@ export default function AccountsPage() {
   const GRID  = '#e5e7eb'
   const TICK  = { fontSize: 11, fill: '#9ca3af' }
 
+  // Incluye las tarjetas que paga: su deuda pendiente sale de esta cuenta el día de cargo
   const realAccountBalance = (ra: RealAccount) =>
-    ra.linked_account_ids.reduce((s, id) => s + (accountById[id]?.balance ?? 0), 0)
+    realAccountMemberIds(ra).reduce((s, id) => s + (accountById[id]?.balance ?? 0), 0)
 
   const entityTotal = (entity: string) =>
     (entitiesSorted.find(([e]) => e === entity)?.[1] ?? []).reduce(
@@ -435,15 +436,16 @@ export default function AccountsPage() {
                   <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {ras.map(ra => {
                       const bal = realAccountBalance(ra)
-                      const linkedNames = ra.linked_account_ids
+                      const memberIds = realAccountMemberIds(ra)
+                      const linkedNames = memberIds
                         .map(id => accountById[id]?.name)
                         .filter(Boolean)
                       return (
                         <div
                           key={ra.id}
                           onClick={() => {
-                            if (ra.linked_account_ids.length > 0) {
-                              navigate(`/movements?accounts=${ra.linked_account_ids.join(',')}`)
+                            if (memberIds.length > 0) {
+                              navigate(`/movements?accounts=${memberIds.join(',')}`)
                             }
                           }}
                           className={`${PANEL} p-4 relative overflow-hidden transition-opacity cursor-pointer hover:ring-1 hover:ring-gray-200 dark:hover:ring-gray-700`}

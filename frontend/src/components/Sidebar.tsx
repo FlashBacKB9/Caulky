@@ -14,6 +14,14 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.9.4', date: 'Octubre 2026',
+    items: [
+      { type: 'feat',    text: 'Cuentas reales: cada tarjeta de crédito aparece dentro de la cuenta real que la paga, como una ficticia más, sin vincularla a mano; su deuda pendiente cuenta en el saldo de esa cuenta real' },
+      { type: 'fix',     text: 'Dashboard: el donut de gastos por categoría, los mayores subtipos de gasto y la barra de gasto mensual ya no cuentan Ahorro, Gastos Anuales ni Inversión; el gasto real se cuenta cuando se paga (por ejemplo el seguro desde la cuenta de gastos anuales), así no sale dos veces' },
+      { type: 'fix',     text: 'Dashboard – Ahorro vs gasto: Gastos Anuales e Inversión cuentan como ahorro' },
+    ],
+  },
+  {
     version: 'v1.9.3', date: 'Octubre 2026',
     items: [
       { type: 'improve', text: 'Tarjetas de crédito: la liquidación se ve neutra (gris, con ⇄ y sin signo) en calendario, tabla y kanban, y el total del día no la suma, para no confundirla con las compras; desde la tarjeta o la cuenta pagadora sigue viéndose como entrada o salida' },

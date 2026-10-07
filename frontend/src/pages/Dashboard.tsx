@@ -649,6 +649,14 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
   const typeToGroup = useMemo(() => Object.fromEntries(types.map(t => [t.id, t.income_expense_group_id])), [types])
   const groupById   = useMemo(() => Object.fromEntries(apiGroups.map(g => [g.id, g])), [apiGroups])
   const typeById    = useMemo(() => Object.fromEntries(types.map(t => [t.id, t])), [types])
+  // Ahorro, Gastos Anuales e Inversión apartan dinero, no lo gastan: el gasto real se cuenta
+  // cuando se paga (el seguro desde la cuenta de gastos anuales), como hace el backend
+  const savingsGroupIds = useMemo(
+    () => new Set(apiGroups.filter(g => BALANCE_EXCLUDE.has(g.name) && g.name !== 'Total').map(g => g.id)),
+    [apiGroups],
+  )
+  const isSavings     = (mv: Movement) => savingsGroupIds.has(typeToGroup[mv.movement_type_id ?? -1])
+  const isRealExpense = (mv: Movement) => mv.dinero < 0 && !isSavings(mv)
 
   const filtered = useMemo(() => {
     if (period === 'month') {
@@ -664,7 +672,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
   if (chartId === 'charts-monthly') {
     const m: Record<string, { income: number; expense: number }> = {}
     for (const { key } of series) m[key] = { income: 0, expense: 0 }
-    for (const mv of filtered) { const k = mvMonthKeyD(mv, year); if (m[k]) { if (mv.dinero >= 0) m[k].income += mv.dinero; else m[k].expense += Math.abs(mv.dinero) } }
+    for (const mv of filtered) { const k = mvMonthKeyD(mv, year); if (m[k]) { if (mv.dinero >= 0) m[k].income += mv.dinero; else if (isRealExpense(mv)) m[k].expense += Math.abs(mv.dinero) } }
     const data = series.map(({ key, label }) => ({ month: label, ...m[key] }))
     return (
       <ResponsiveContainer width="100%" height={height}>
@@ -722,7 +730,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
 
   if (chartId === 'charts-expdnt') {
     const s: Record<number, number> = {}
-    for (const mv of filtered) { if (mv.dinero >= 0) continue; const gid = typeToGroup[mv.movement_type_id ?? -1]; if (gid) s[gid] = (s[gid] ?? 0) + Math.abs(mv.dinero) }
+    for (const mv of filtered) { if (!isRealExpense(mv)) continue; const gid = typeToGroup[mv.movement_type_id ?? -1]; if (gid) s[gid] = (s[gid] ?? 0) + Math.abs(mv.dinero) }
     const data = Object.entries(s).map(([gid, v]) => ({ name: groupById[+gid]?.name ?? '?', value: v, color: groupById[+gid]?.color ?? '#6b7280' })).sort((a, b) => b.value - a.value)
     if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
     return (
@@ -758,7 +766,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
 
   if (chartId === 'charts-top') {
     const s: Record<number, { name: string; value: number; color: string }> = {}
-    for (const mv of filtered) { if (mv.dinero >= 0 || !mv.movement_type_id) continue; const tid = mv.movement_type_id; if (!s[tid]) { const t = typeById[tid]; s[tid] = { name: t?.name ?? '?', value: 0, color: t?.color ?? '#6b7280' } }; s[tid].value += Math.abs(mv.dinero) }
+    for (const mv of filtered) { if (!isRealExpense(mv) || !mv.movement_type_id) continue; const tid = mv.movement_type_id; if (!s[tid]) { const t = typeById[tid]; s[tid] = { name: t?.name ?? '?', value: 0, color: t?.color ?? '#6b7280' } }; s[tid].value += Math.abs(mv.dinero) }
     const data = Object.values(s).sort((a, b) => b.value - a.value).slice(0, 10)
     if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
     return (
@@ -776,10 +784,9 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
   }
 
   if (chartId === 'charts-savings') {
-    const ahorroId = Object.values(groupById).find(g => g.name === 'Ahorro')?.id
     const m: Record<string, { ahorro: number; gasto: number }> = {}
     for (const { key } of series) m[key] = { ahorro: 0, gasto: 0 }
-    for (const mv of filtered) { if (mv.dinero >= 0) continue; const k = mvMonthKeyD(mv, year); if (!(k in m)) continue; const gid = typeToGroup[mv.movement_type_id ?? -1]; if (ahorroId && gid === ahorroId) m[k].ahorro += Math.abs(mv.dinero); else m[k].gasto += Math.abs(mv.dinero) }
+    for (const mv of filtered) { if (mv.dinero >= 0) continue; const k = mvMonthKeyD(mv, year); if (!(k in m)) continue; if (isSavings(mv)) m[k].ahorro += Math.abs(mv.dinero); else m[k].gasto += Math.abs(mv.dinero) }
     const data = series.map(({ key, label }) => ({ month: label, ...m[key] }))
     return (
       <ResponsiveContainer width="100%" height={height}>

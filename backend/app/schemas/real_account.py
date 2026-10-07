@@ -8,6 +8,9 @@ class RealAccountRead(BaseModel):
     account_number: str | None
     color: str
     linked_account_ids: list[int] = []
+    # Tarjetas de crédito que se pagan desde una de sus cuentas: cuelgan de ella como una
+    # ficticia más sin vincularlas (se calcula, no se guarda)
+    card_account_ids: list[int] = []
 
     model_config = {"from_attributes": True}
 
