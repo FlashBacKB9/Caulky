@@ -171,11 +171,19 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
         if ra:
             pending = []
             for a in payload.db.get("accounts", []):
-                obj = Account(**{k: v for k, v in a.items() if k not in ("user_id", "id")}, user_id=uid)
+                d = {k: v for k, v in a.items() if k not in ("user_id", "id")}
+                for k in ("value_date", "credit_last_cycle_end"):
+                    if k in d:
+                        d[k] = _parse_date(d[k])
+                obj = Account(**d, user_id=uid)
                 db.add(obj)
                 pending.append((a["id"], obj))
             await db.flush()
             account_id_map = {oid: obj.id for oid, obj in pending}
+            # La cuenta pagadora de una tarjeta apunta a otra cuenta del mismo backup
+            for _, obj in pending:
+                if obj.credit_pay_account_id is not None:
+                    obj.credit_pay_account_id = account_id_map.get(obj.credit_pay_account_id, obj.credit_pay_account_id)
 
         if rt:
             pending = []
@@ -198,10 +206,14 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
                 d = {k: v for k, v in m.items() if k not in _mv_skip}
                 d["date"]      = _parse_date(d.get("date"))
                 d["bank_date"] = _parse_date(d.get("bank_date"))
+                if "credit_cycle_end" in d:
+                    d["credit_cycle_end"] = _parse_date(d["credit_cycle_end"])
                 if d.get("movement_type_id") is not None:
                     d["movement_type_id"] = type_id_map.get(d["movement_type_id"], d["movement_type_id"])
                 if d.get("account_id") is not None:
                     d["account_id"] = account_id_map.get(d["account_id"], d["account_id"])
+                if d.get("from_account_id") is not None:
+                    d["from_account_id"] = account_id_map.get(d["from_account_id"], d["from_account_id"])
                 obj = Movement(**d, user_id=uid)
                 db.add(obj)
                 pending.append((m["id"], obj))

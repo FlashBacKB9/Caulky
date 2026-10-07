@@ -7,6 +7,7 @@ import { getDashboard, getAnnualStats } from '../api/stats'
 import { getAccountsSummary, type Account } from '../api/accounts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
+import { buildPerspective, balanceDelta } from '../utils/accountView'
 import { getGroups, type Group as ApiGroup } from '../api/groups'
 import {
   CreditCard, ArrowUpRight, ArrowDownRight, type LucideIcon,
@@ -358,9 +359,12 @@ function BalanceEvolutionChart({ groups, year, initialTotal, height = 260 }: { g
 function buildAccountHistory(
   acc: Account,
   sorted: Movement[],
-  typeById: Record<number, MovementType>,
+  accounts: Account[],
+  types: MovementType[],
 ): { label: string; balance: number }[] {
   if (sorted.length === 0) return []
+  // Mismo criterio que el saldo del backend (accountView.balanceDelta)
+  const persp = buildPerspective(acc.id, accounts, types)
   const firstDate = new Date((sorted[0].bank_date ?? sorted[0].date) + 'T00:00:00')
   const now = new Date()
   let bal = acc.initial_balance
@@ -374,12 +378,7 @@ function buildAccountHistory(
         const mv = sorted[mi]
         const d = new Date((mv.bank_date ?? mv.date) + 'T00:00:00')
         if (d.getFullYear() > y || (d.getFullYear() === y && d.getMonth() > m)) break
-        if (acc.is_main) {
-          bal += mv.dinero
-        } else {
-          const t = mv.movement_type_id != null ? typeById[mv.movement_type_id] : null
-          if (t?.linked_account_id === acc.id) bal += mv.money
-        }
+        bal += balanceDelta(mv, persp) ?? 0
         mi++
       }
       result.push({ label: `${MONTHS_SHORT[m]} ${String(y).slice(2)}`, balance: Math.round(bal * 100) / 100 })
@@ -422,12 +421,11 @@ function AccountBalanceHistoryChart({ accounts, movements, movementTypes, height
   movementTypes: MovementType[]
   height?: number
 }) {
-  const typeById = useMemo(() => Object.fromEntries(movementTypes.map(t => [t.id, t])), [movementTypes])
   const sorted   = useMemo(() => [...movements].sort((a, b) => (a.bank_date ?? a.date).localeCompare(b.bank_date ?? b.date)), [movements])
 
   const { data, lines } = useMemo(() => {
     if (accounts.length === 0 || sorted.length === 0) return { data: [], lines: [] }
-    const histories = accounts.map(acc => ({ acc, rows: buildAccountHistory(acc, sorted, typeById) }))
+    const histories = accounts.map(acc => ({ acc, rows: buildAccountHistory(acc, sorted, accounts, movementTypes) }))
     const labels = histories[0].rows.map(r => r.label)
     const chartData = labels.map((label, i) => {
       const entry: Record<string, number | string> = { label }
@@ -435,7 +433,7 @@ function AccountBalanceHistoryChart({ accounts, movements, movementTypes, height
       return entry
     })
     return { data: chartData, lines: accounts.map(a => ({ key: a.name, color: a.color })) }
-  }, [accounts, sorted, typeById])
+  }, [accounts, sorted, movementTypes])
 
   return <BalanceLineChart data={data} lines={lines} height={height} />
 }
@@ -447,19 +445,18 @@ function CombinedBalanceHistoryChart({ accounts, movements, movementTypes, heigh
   movementTypes: MovementType[]
   height?: number
 }) {
-  const typeById = useMemo(() => Object.fromEntries(movementTypes.map(t => [t.id, t])), [movementTypes])
   const sorted   = useMemo(() => [...movements].sort((a, b) => (a.bank_date ?? a.date).localeCompare(b.bank_date ?? b.date)), [movements])
 
   const { data } = useMemo(() => {
     if (accounts.length === 0 || sorted.length === 0) return { data: [] }
-    const histories = accounts.map(acc => buildAccountHistory(acc, sorted, typeById))
+    const histories = accounts.map(acc => buildAccountHistory(acc, sorted, accounts, movementTypes))
     const labels = histories[0].map(r => r.label)
     const chartData = labels.map((label, i) => ({
       label,
       Total: Math.round(histories.reduce((s, h) => s + (h[i]?.balance ?? 0), 0) * 100) / 100,
     }))
     return { data: chartData }
-  }, [accounts, sorted, typeById])
+  }, [accounts, sorted, movementTypes])
 
   return <BalanceLineChart data={data} lines={[{ key: 'Total', color: '#3b82f6' }]} height={height} />
 }
@@ -473,7 +470,6 @@ function CyclingBalanceHistoryChart({ accounts, movements, movementTypes, height
 }) {
   const { fmt } = useCurrency()
   const [idx, setIdx] = useState(0)
-  const typeById = useMemo(() => Object.fromEntries(movementTypes.map(t => [t.id, t])), [movementTypes])
   const sorted   = useMemo(() => [...movements].sort((a, b) => (a.bank_date ?? a.date).localeCompare(b.bank_date ?? b.date)), [movements])
 
   const safeIdx = Math.min(idx, Math.max(0, accounts.length - 1))
@@ -481,8 +477,8 @@ function CyclingBalanceHistoryChart({ accounts, movements, movementTypes, height
 
   const chartData = useMemo(() => {
     if (!acc || sorted.length === 0) return []
-    return buildAccountHistory(acc, sorted, typeById).map(r => ({ label: r.label, [acc.name]: r.balance }))
-  }, [acc, sorted, typeById])
+    return buildAccountHistory(acc, sorted, accounts, movementTypes).map(r => ({ label: r.label, [acc.name]: r.balance }))
+  }, [acc, accounts, sorted, movementTypes])
 
   if (!acc) return null
 

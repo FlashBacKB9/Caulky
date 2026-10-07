@@ -10,6 +10,8 @@ const acc = (id: number, name: string, is_main = false): Account => ({
   category: is_main ? 'corriente' : 'ahorro',
   depreciation_rate: null, value_date: null, new_car: false,
   interest_enabled: false, interest_type_id: null, interest_tax_rate: null,
+  credit_limit: null, credit_cutoff_day: null, credit_charge_day: null, credit_pay_account_id: null,
+  credit_auto_charge: true, credit_last_cycle_end: null, credit_available: null,
 })
 
 const type = (id: number, name: string, linked_account_id: number | null): MovementType => ({

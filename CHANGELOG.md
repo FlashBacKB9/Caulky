@@ -6,6 +6,30 @@ All notable changes to Caulky are documented here.
 
 ## [Unreleased] — dev
 
+### ✨ New: Tarjetas de crédito
+
+New account category **Tarjeta de crédito** (Ajustes → Cuentas) with credit limit,
+statement (cutoff) day, payment day and paying account (main account by default):
+
+- Every purchase made with the card is a normal expense on its own date, so budgets and
+  charts stay current
+- On the payment day the cycle's purchases (refunds subtracted) are grouped into a single
+  transfer from the paying account to the card, marked with `credit_cycle_end`. It moves
+  money between accounts but is not an expense (`dinero = 0`), so nothing counts twice
+- The upcoming payment shows as a faded preview in the Movimientos calendar. Per card you
+  choose whether it is created automatically when the day arrives (default; overdue ones are
+  caught up on the next visit) or stays as a preview until you click it
+- The card shows the available credit (limit + balance); total net worth only subtracts the
+  debt. A deleted payment is not regenerated (`credit_last_cycle_end` tracks what is settled)
+- Endpoints: `GET /accounts/credit-cycles`, `POST /accounts/{id}/credit-charges`
+- Backup import now remaps `from_account_id` and the card's paying account
+
+### 🐛 Fixed: account balance history
+
+The balance evolution in Cuentas and the Dashboard now uses the same rule as the current
+balance (`accountView.balanceDelta`): movements count for their assigned account and
+transfers move money between both sides, instead of everything landing in the main account.
+
 ### ✨ New: Cuentas remuneradas
 
 Mark an account as interest-bearing in Ajustes → Cuentas (subtype used for the interest

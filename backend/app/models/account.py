@@ -25,6 +25,13 @@ class Account(Base):
     interest_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     interest_type_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     interest_tax_rate: Mapped[float | None] = mapped_column(Numeric(5, 4), nullable=True)
+    # Tarjeta de crédito: las compras se liquidan de golpe el día de cargo desde la cuenta pagadora
+    credit_limit: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    credit_cutoff_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    credit_charge_day: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    credit_pay_account_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    credit_auto_charge: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
+    credit_last_cycle_end: Mapped[datetime.date | None] = mapped_column(Date, nullable=True)
     user_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True
     )

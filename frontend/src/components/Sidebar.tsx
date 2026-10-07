@@ -16,6 +16,8 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     version: 'v1.9', date: 'Julio 2026',
     items: [
+      { type: 'feat',    text: 'Tarjetas de crédito: nueva categoría de cuenta con límite, día de corte, día de cargo y cuenta pagadora. Cada compra cuenta como gasto el día que la haces; el día de cargo se agrupan en un único traspaso que no cuenta como gasto, previsto en transparente en el calendario y creado solo (o confirmado por ti, a elegir). La tarjeta muestra el crédito disponible y el patrimonio resta solo la deuda' },
+      { type: 'fix',     text: 'Cuentas y Dashboard: la evolución del saldo de cada cuenta usa el mismo cálculo que el saldo actual (cuenta asignada y traspasos), en vez de cargar todo a la cuenta principal' },
       { type: 'feat',    text: 'Cuentas remuneradas: marca una cuenta como remunerada en Ajustes → Cuentas, elige el subtipo del abono de intereses y la retención, y en Inversiones aparece una pestaña con el saldo mes a mes, los intereses de cada mes y el tipo anual real (bruto sobre el saldo del mes anterior) para contrastarlo con el de tu banco' },
       { type: 'feat',    text: 'Plantillas: ahora puedes elegir la cuenta a la que corresponde el movimiento, y se respeta al aplicarla y en las recurrencias automáticas' },
       { type: 'fix',     text: 'Movimientos de una cuenta: los importes se muestran desde la perspectiva de esa cuenta (el traspaso a Ahorro suma en Ahorro y resta en la de uso) y la columna de saldo lleva el nombre de la cuenta en vez de «Saldo de uso»' },

@@ -19,6 +19,14 @@ class AccountRead(BaseModel):
     interest_enabled: bool = False
     interest_type_id: int | None = None
     interest_tax_rate: float | None = None
+    credit_limit: float | None = None
+    credit_cutoff_day: int | None = None
+    credit_charge_day: int | None = None
+    credit_pay_account_id: int | None = None
+    credit_auto_charge: bool = True
+    credit_last_cycle_end: datetime.date | None = None
+    # Crédito disponible: tope + saldo (el saldo de una tarjeta es la deuda, en negativo)
+    credit_available: float | None = None
 
     model_config = {"from_attributes": True}
 
@@ -35,6 +43,11 @@ class AccountCreate(BaseModel):
     interest_enabled: bool = False
     interest_type_id: int | None = None
     interest_tax_rate: float | None = None
+    credit_limit: float | None = None
+    credit_cutoff_day: int | None = None
+    credit_charge_day: int | None = None
+    credit_pay_account_id: int | None = None
+    credit_auto_charge: bool = True
 
 
 class AccountPatch(BaseModel):
@@ -49,10 +62,21 @@ class AccountPatch(BaseModel):
     interest_enabled: bool | None = None
     interest_type_id: int | None = None
     interest_tax_rate: float | None = None
+    credit_limit: float | None = None
+    credit_cutoff_day: int | None = None
+    credit_charge_day: int | None = None
+    credit_pay_account_id: int | None = None
+    credit_auto_charge: bool | None = None
 
 
 class AccountUpdate(BaseModel):
     initial_balance: float
+
+
+class CreditChargeCreate(BaseModel):
+    cycle_end: datetime.date
+    # Si no se indica, se usa la suma de las compras del ciclo
+    amount: float | None = None
 
 
 class AccountsReorder(BaseModel):

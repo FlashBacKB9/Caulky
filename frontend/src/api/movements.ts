@@ -16,6 +16,8 @@ export interface Movement {
   movement_type_id?: number
   account_id?: number
   is_transfer?: boolean
+  /** Liquidación de tarjeta: corte del ciclo que cobra. Su dinero es 0 (no es gasto). */
+  credit_cycle_end?: string | null
   from_account_id?: number
   paid: boolean
   no_count: boolean

@@ -5,6 +5,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMovements, updateMovement, deleteMovement, createMovement, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getGroups } from '../api/groups'
+import { getAccountsSummary, getCreditCycles, createCreditCharge, type CreditCycle } from '../api/accounts'
 import MovementForm from '../components/MovementForm'
 import MovementDetailModal, { type DraftRow, toDraft, draftPayload, duplicatePayload } from '../components/MovementDetailModal'
 import { runAutoRecurring, computeDates, applyFormula, shiftWeekend, type MovementTemplate } from '../utils/recurringTemplates'
@@ -364,6 +365,33 @@ function CalendarView({ movements, types, selectedYear, perspective }: {
       qc.invalidateQueries({ queryKey: ['accounts-summary'] })
     },
   })
+  // Cargos de tarjeta pendientes: transparentes como las plantillas. Los automáticos se crean
+  // solos al llegar el día; los manuales siguen aquí (aunque estén vencidos) hasta confirmarlos.
+  const { data: creditCycles = [] } = useQuery({ queryKey: ['credit-cycles'], queryFn: getCreditCycles })
+  const { data: accSummary } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
+  const creditByDate = useMemo(() => {
+    const map: Record<string, CreditCycle[]> = {}
+    for (const c of creditCycles) {
+      if (c.amount <= 0) continue
+      if (perspective && perspective.accountId !== c.account_id && perspective.accountId !== c.pay_account_id) continue
+      ;(map[c.charge_date] ??= []).push(c)
+    }
+    return map
+  }, [creditCycles, perspective])
+  const accName = (id: number) => accSummary?.accounts.find(a => a.id === id)?.name ?? ''
+  const creditClickMut = useMutation({
+    mutationFn: (c: CreditCycle) => createCreditCharge(c.account_id, c.cycle_end),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['movements'] })
+      qc.invalidateQueries({ queryKey: ['credit-cycles'] })
+      qc.invalidateQueries({ queryKey: ['accounts-summary'] })
+      qc.invalidateQueries({ queryKey: ['dashboard'] })
+    },
+    onError: (err: unknown) => {
+      const e = err as { response?: { data?: { detail?: string } } }
+      alert(e?.response?.data?.detail ?? String(err))
+    },
+  })
   const todayStr = today.toISOString().split('T')[0]
   const prevMonth = () => calMonth === 0 ? (setCalYear(y => y - 1), setCalMonth(11)) : setCalMonth(m => m - 1)
   const nextMonth = () => calMonth === 11 ? (setCalYear(y => y + 1), setCalMonth(0)) : setCalMonth(m => m + 1)
@@ -488,6 +516,24 @@ function CalendarView({ movements, types, selectedYear, perspective }: {
                           {typ.name}
                         </span>
                       )}
+                    </div>
+                  )
+                })}
+                {cell.current && (creditByDate[cell.dateStr] ?? []).map(c => {
+                  // Desde la tarjeta el cargo entra; desde cualquier otra vista sale de la cuenta pagadora
+                  const signed = perspective?.accountId === c.account_id ? c.amount : -c.amount
+                  const hint = !c.closed ? t('movements.creditPreviewOpen')
+                    : c.auto && !c.due ? t('movements.creditPreviewAuto')
+                    : t('movements.creditPreviewManual')
+                  return (
+                    <div key={`credit-${c.account_id}-${c.cycle_end}`}
+                      onClick={e => { e.stopPropagation(); if (c.closed && !creditClickMut.isPending) creditClickMut.mutate(c) }}
+                      title={hint}
+                      className={`mb-1 rounded-md border border-dashed border-gray-300 dark:border-gray-600 px-1.5 py-1 opacity-45 hover:opacity-80 transition-opacity ${c.closed ? 'cursor-pointer' : 'cursor-default'}`}>
+                      <span className="truncate text-[11px] text-gray-500 dark:text-gray-400 leading-tight block">{t('account.creditChargeName')} {accName(c.account_id)}</span>
+                      <span className={`text-[11px] font-mono ${signed >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                        {fmtCal(signed)}
+                      </span>
                     </div>
                   )
                 })}

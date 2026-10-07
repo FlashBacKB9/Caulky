@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Pencil, Trash2, X, Check, ChevronRight, ChevronDown, ChevronUp, Lock, Plus,
 } from 'lucide-react'
-import { getAccountsSummary, createAccount, updateAccountFull, deleteAccount, reorderAccounts, ACCOUNT_CATEGORIES, type Account, type AccountCategory } from '../../api/accounts'
+import { getAccountsSummary, createAccount, updateAccountFull, deleteAccount, reorderAccounts, ACCOUNT_CATEGORIES, type Account, type AccountCategory, type CreditFields } from '../../api/accounts'
 import { getRealAccounts, createRealAccount, updateRealAccount, deleteRealAccount, type RealAccount } from '../../api/realAccounts'
 import { getGroups, createGroup, updateGroup, deleteGroup, type Group } from '../../api/groups'
 import {
@@ -13,6 +13,71 @@ import {
 import { t } from '../../utils/i18n'
 import AppIcon, { ICON_KEYS } from '../../components/AppIcon'
 import { Section, PALETTE_COLORS, FadingScrollList, InlineInput, ColorPicker } from './shared'
+
+// ── Credit card fields ────────────────────────────────────────────────────────
+
+interface CreditDraft { limit: string; cutoff: string; charge: string; payId: string; auto: boolean }
+
+const creditDraftFrom = (a?: Account): CreditDraft => ({
+  limit:  a?.credit_limit != null ? String(a.credit_limit) : '',
+  cutoff: String(a?.credit_cutoff_day ?? 31),
+  charge: String(a?.credit_charge_day ?? 5),
+  payId:  a?.credit_pay_account_id != null ? String(a.credit_pay_account_id) : '',
+  auto:   a?.credit_auto_charge ?? true,
+})
+
+const clampDay = (v: string) => Math.min(31, Math.max(1, parseInt(v) || 1))
+
+/** Campos de tarjeta listos para la API; fuera de la categoría crédito se limpian. */
+function creditPayload(category: AccountCategory, d: CreditDraft): CreditFields {
+  if (category !== 'credito') {
+    return { credit_limit: null, credit_cutoff_day: null, credit_charge_day: null, credit_pay_account_id: null, credit_auto_charge: true }
+  }
+  const limit = parseFloat(d.limit.replace(',', '.'))
+  return {
+    credit_limit: isNaN(limit) ? null : limit,
+    credit_cutoff_day: clampDay(d.cutoff),
+    credit_charge_day: clampDay(d.charge),
+    credit_pay_account_id: d.payId !== '' ? parseInt(d.payId) : null,
+    credit_auto_charge: d.auto,
+  }
+}
+
+function CreditFieldsEditor({ draft, onChange, payAccounts }: {
+  draft: CreditDraft; onChange: (d: CreditDraft) => void; payAccounts: Account[]
+}) {
+  const set = (patch: Partial<CreditDraft>) => onChange({ ...draft, ...patch })
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.creditLimit')}</span>
+        <input type="number" step="0.01" min="0" value={draft.limit} onChange={e => set({ limit: e.target.value })}
+          placeholder="1500" className="w-32 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+      </div>
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.creditCutoff')}</span>
+        <input type="number" min="1" max="31" value={draft.cutoff} onChange={e => set({ cutoff: e.target.value })}
+          className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0 ml-2">{t('account.creditCharge')}</span>
+        <input type="number" min="1" max="31" value={draft.charge} onChange={e => set({ charge: e.target.value })}
+          className="w-16 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm text-right font-mono focus:outline-none focus:ring-2 focus:ring-blue-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" />
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs text-gray-500 dark:text-gray-400 shrink-0">{t('account.creditPayFrom')}</span>
+        <select value={draft.payId} onChange={e => set({ payId: e.target.value })} className="flex-1 min-w-0 border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-800 dark:text-gray-100 rounded-lg px-2.5 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400">
+          <option value="">{t('account.creditMainAccount')}</option>
+          {payAccounts.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+        </select>
+      </div>
+      <label className="flex items-start gap-2 cursor-pointer">
+        <input type="checkbox" checked={draft.auto} onChange={e => set({ auto: e.target.checked })}
+          className="mt-0.5 w-3.5 h-3.5 rounded accent-blue-500 shrink-0" />
+        <span className="text-xs text-gray-500 dark:text-gray-400">{t('account.creditAuto')}</span>
+      </label>
+      <p className="text-[11px] text-gray-400 dark:text-gray-500">{t('account.creditHint')}</p>
+    </div>
+  )
+}
 
 // ── Account Card ──────────────────────────────────────────────────────────────
 
@@ -70,8 +135,8 @@ function DeleteMovementsModal({ accountName, movCount, isPending, onDeleteMoveme
   )
 }
 
-function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, canMoveUp, canMoveDown, dragHandlers, isDragging, isDropTarget }: {
-  account: Account; allTypes: MovementType[]; fmt: (v: number) => string; onDeleted: () => void
+function AccountCard({ account, allTypes, payAccounts, fmt, onDeleted, onMoveUp, onMoveDown, canMoveUp, canMoveDown, dragHandlers, isDragging, isDropTarget }: {
+  account: Account; allTypes: MovementType[]; payAccounts: Account[]; fmt: (v: number) => string; onDeleted: () => void
   onMoveUp: () => void; onMoveDown: () => void; canMoveUp: boolean; canMoveDown: boolean
   dragHandlers: {
     onDragStart: (e: React.DragEvent) => void
@@ -99,6 +164,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
   const [interestTax, setInterestTax]   = useState(
     account.interest_tax_rate != null ? String(Math.round(account.interest_tax_rate * 10000) / 100) : '19'
   )
+  const [credit, setCredit]         = useState<CreditDraft>(() => creditDraftFrom(account))
   const [confirming, setConfirming] = useState(false)
   const [movCount, setMovCount]     = useState(0)
   const [showModal, setShowModal]   = useState(false)
@@ -122,6 +188,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
         interest_type_id: interestOn && interestTypeId !== '' ? parseInt(interestTypeId) : null,
         // Se guarda como fracción (19 % → 0.19)
         interest_tax_rate: interestOn && interestTax !== '' ? parseFloat(interestTax) / 100 : null,
+        ...creditPayload(category, credit),
       })
       if (!account.is_main) {
         const prevLinked = new Set(allTypes.filter(t => t.linked_account_id === account.id).map(t => t.id))
@@ -173,6 +240,7 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
     setInterestTypeId(String(account.interest_type_id ?? ''))
     setInterestTax(account.interest_tax_rate != null ? String(Math.round(account.interest_tax_rate * 10000) / 100) : '19')
     setLinkedIds(new Set(allTypes.filter(t => t.linked_account_id === account.id).map(t => t.id)))
+    setCredit(creditDraftFrom(account))
     setEditing(false)
   }
 
@@ -252,6 +320,10 @@ function AccountCard({ account, allTypes, fmt, onDeleted, onMoveUp, onMoveDown, 
                 <span className="text-xs text-gray-500 dark:text-gray-400">{t('account.newCar')}</span>
               </label>
             </>
+          )}
+          {category === 'credito' && (
+            <CreditFieldsEditor draft={credit} onChange={setCredit}
+              payAccounts={payAccounts.filter(a => a.id !== account.id)} />
           )}
           {/* Cuenta remunerada: alimenta la pestaña de Inversiones → Cuentas remuneradas */}
           <div className="space-y-2 pt-1 border-t border-gray-50 dark:border-gray-800">
@@ -804,6 +876,9 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
   const [newDeprRate, setNewDeprRate] = useState('')
   const [newValueDate, setNewValueDate] = useState('')
   const [newCarFlag, setNewCarFlag] = useState(false)
+  const [newCredit, setNewCredit]   = useState<CreditDraft>(() => creditDraftFrom())
+  // Cuentas que pueden pagar el cargo de una tarjeta
+  const payAccounts = accounts.filter(a => a.category === 'corriente' || a.category === 'ahorro')
 
   const { data: allTypes = [] } = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
 
@@ -819,11 +894,12 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
       depreciation_rate: newCategory === 'vehiculo' && newDeprRate !== '' ? parseFloat(newDeprRate) : null,
       value_date: newCategory === 'vehiculo' && newValueDate !== '' ? newValueDate : null,
       new_car: newCategory === 'vehiculo' ? newCarFlag : false,
+      ...creditPayload(newCategory, newCredit),
     }),
     onSuccess: () => {
       invalidate()
       setAdding(false); setNewName(''); setNewColor('#3b82f6'); setNewIcon('wallet'); setNewBal('0'); setNewCategory('corriente')
-      setNewDeprRate(''); setNewValueDate(''); setNewCarFlag(false)
+      setNewDeprRate(''); setNewValueDate(''); setNewCarFlag(false); setNewCredit(creditDraftFrom())
     },
   })
 
@@ -860,7 +936,7 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
     <div className="space-y-2">
       {accounts.map((account, idx) => (
         <AccountCard
-          key={account.id} account={account} allTypes={allTypes} fmt={fmt}
+          key={account.id} account={account} allTypes={allTypes} payAccounts={payAccounts} fmt={fmt}
           onDeleted={invalidate}
           onMoveUp={() => move(account.id, -1)}
           onMoveDown={() => move(account.id, 1)}
@@ -952,6 +1028,9 @@ function AccountsSection({ accounts, fmt }: { accounts: Account[]; fmt: (v: numb
                   <span className="text-xs text-gray-500 dark:text-gray-400">{t('account.newCar')}</span>
                 </label>
               </>
+            )}
+            {newCategory === 'credito' && (
+              <CreditFieldsEditor draft={newCredit} onChange={setNewCredit} payAccounts={payAccounts} />
             )}
             <div className="flex justify-end gap-2">
               <button onClick={() => setAdding(false)} className="px-3 py-1.5 text-xs text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">

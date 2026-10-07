@@ -11,6 +11,7 @@ from app.models.account import Account
 from app.schemas.movement import MovementCreate, MovementRead, MovementUpdate
 from app.services.calculations import compute_dinero, compute_label
 from app.services.audit import write_log
+from app.services.credit import sync_credit_charges
 from app.auth.setup import current_active_user
 from app.models.user import User
 
@@ -71,6 +72,10 @@ def _enrich(mv: Movement) -> MovementRead:
         color = mv.movement_type.income_expense_group.color
     dinero = compute_dinero(float(mv.money), group_name)
     label = compute_label(float(mv.money), group_name)
+    if mv.credit_cycle_end is not None:
+        # Liquidación de tarjeta: las compras ya contaron como gasto el día que se hicieron,
+        # así que el cargo solo mueve dinero entre cuentas y no suma ni resta en estadísticas.
+        dinero, label = 0.0, "Liquidación"
     data = MovementRead.model_validate(mv)
     data.dinero = dinero
     data.label = label
@@ -105,6 +110,7 @@ async def list_movements(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(current_active_user),
 ):
+    await sync_credit_charges(db, user.id)
     q = select(Movement).where(Movement.user_id == user.id).options(
         selectinload(Movement.movement_type).selectinload(MovementType.income_expense_group)
     )

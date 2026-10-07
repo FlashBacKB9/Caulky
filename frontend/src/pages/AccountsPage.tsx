@@ -1,10 +1,12 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { getAccountsSummary, ACCOUNT_CATEGORIES, LIQUID_CATEGORIES, INVESTMENT_CATEGORIES, type Account } from '../api/accounts'
+import { getAccountsSummary, getCreditCycles, ACCOUNT_CATEGORIES, LIQUID_CATEGORIES, INVESTMENT_CATEGORIES, type Account, type CreditCycle } from '../api/accounts'
+import { useDateFormat } from '../hooks/useDateFormat'
 import { getRealAccounts, type RealAccount } from '../api/realAccounts'
 import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
+import { buildPerspective, balanceDelta } from '../utils/accountView'
 import { getSummary as getInvestSummary } from '../api/investments'
 import { useCurrency } from '../hooks/useCurrency'
 import { TrendingUp, TrendingDown, Eye, EyeOff, Banknote, Building2 } from 'lucide-react'
@@ -53,9 +55,12 @@ function vehicleCurrentValue(acc: Account): number {
 function buildAccountHistory(
   acc: Account,
   sorted: Movement[],
-  typeById: Record<number, MovementType>,
+  accounts: Account[],
+  types: MovementType[],
 ): { label: string; balance: number; year: number; month: number }[] {
   if (sorted.length === 0) return []
+  // Mismo criterio que el saldo del backend (accountView.balanceDelta)
+  const persp = buildPerspective(acc.id, accounts, types)
   const firstDate = new Date((sorted[0].bank_date ?? sorted[0].date) + 'T00:00:00')
   const now = new Date()
   let bal = acc.initial_balance
@@ -69,12 +74,7 @@ function buildAccountHistory(
         const mv = sorted[mi]
         const d = new Date((mv.bank_date ?? mv.date) + 'T00:00:00')
         if (d.getFullYear() > y || (d.getFullYear() === y && d.getMonth() > m)) break
-        if (acc.is_main) {
-          bal += mv.dinero
-        } else {
-          const t = mv.movement_type_id != null ? typeById[mv.movement_type_id] : null
-          if (t?.linked_account_id === acc.id) bal += mv.money
-        }
+        bal += balanceDelta(mv, persp) ?? 0
         mi++
       }
       result.push({
@@ -118,6 +118,17 @@ export default function AccountsPage() {
     queryKey: ['accounts-summary'],
     queryFn: getAccountsSummary,
   })
+  const { data: creditCycles = [] } = useQuery({
+    queryKey: ['credit-cycles'],
+    queryFn: getCreditCycles,
+  })
+  // Próximo cargo de cada tarjeta: el ciclo pendiente más antiguo
+  const nextCharge = useMemo(() => {
+    const map: Record<number, CreditCycle> = {}
+    for (const c of creditCycles) if (!map[c.account_id]) map[c.account_id] = c
+    return map
+  }, [creditCycles])
+  const { fmtDate } = useDateFormat()
   const { data: realAccounts = [] } = useQuery({
     queryKey: ['real-accounts'],
     queryFn: getRealAccounts,
@@ -167,18 +178,14 @@ export default function AccountsPage() {
     return map
   }, [movements])
 
-  const typeById = useMemo(
-    () => Object.fromEntries(movementTypes.map(t => [t.id, t])),
-    [movementTypes],
-  )
   const sorted = useMemo(
     () => [...movements].sort((a, b) => (a.bank_date ?? a.date).localeCompare(b.bank_date ?? b.date)),
     [movements],
   )
 
   const histories = useMemo(
-    () => accounts.map(acc => ({ acc, rows: buildAccountHistory(acc, sorted, typeById) })),
-    [accounts, sorted, typeById],
+    () => accounts.map(acc => ({ acc, rows: buildAccountHistory(acc, sorted, accounts, movementTypes) })),
+    [accounts, sorted, movementTypes],
   )
 
   const availableYears = useMemo(() => {
@@ -613,7 +620,10 @@ export default function AccountsPage() {
                 {catAccounts.map(acc => {
                   const change       = periodChange[acc.id] ?? 0
                   const isVehicle    = acc.category === 'vehiculo'
-                  const currentVal   = isVehicle ? vehicleCurrentValue(acc) : acc.balance
+                  const isCredit     = acc.category === 'credito'
+                  const charge       = isCredit ? nextCharge[acc.id] : undefined
+                  // En una tarjeta se muestra lo que queda por gastar; la deuda va debajo
+                  const currentVal   = isVehicle ? vehicleCurrentValue(acc) : isCredit && acc.credit_available != null ? acc.credit_available : acc.balance
                   const isBienExcluded = isBienes && excludedBienes.has(acc.id)
                   const debt         = debtsByAccount[acc.id]
                   const hasDebt      = !!debt
@@ -699,6 +709,16 @@ export default function AccountsPage() {
                               <div className="space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
                                 <div>{t('invest.invested')}: <span className="font-semibold text-gray-600 dark:text-gray-300 tabular-nums">{fmt(acc.balance)}</span></div>
                                 <div>{t('invest.currentValue')}: <span className="font-semibold text-gray-600 dark:text-gray-300 tabular-nums">{fmt(investCurrentVal)}</span></div>
+                              </div>
+                            ) : !hasDebt && isCredit ? (
+                              <div className="space-y-0.5 text-xs text-gray-400 dark:text-gray-500">
+                                {acc.credit_limit != null && (
+                                  <div>{t('account.creditAvailable')} · {t('account.creditLimit')}: <span className="tabular-nums">{fmt(acc.credit_limit)}</span></div>
+                                )}
+                                <div>{t('account.creditSpent')}: <span className="font-semibold text-gray-600 dark:text-gray-300 tabular-nums">{fmt(Math.max(0, -acc.balance))}</span></div>
+                                {charge && (
+                                  <div>{t('account.creditNextCharge')}: <span className="font-semibold text-gray-600 dark:text-gray-300 tabular-nums">{fmt(charge.amount)}</span> · {fmtDate(charge.charge_date)}</div>
+                                )}
                               </div>
                             ) : !hasDebt ? (
                               <div className={`flex items-center gap-1 text-xs font-medium ${change >= 0 ? 'text-green-500' : 'text-red-500'}`}>
