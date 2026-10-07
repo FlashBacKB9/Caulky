@@ -11,7 +11,7 @@ from app.models.account import Account
 from app.schemas.movement import MovementCreate, MovementRead, MovementUpdate
 from app.services.calculations import compute_dinero, compute_label
 from app.services.audit import write_log
-from app.services.credit import sync_credit_charges
+from app.services.credit import settlement_for, settlement_items, sync_credit_charges
 from app.auth.setup import current_active_user
 from app.models.user import User
 
@@ -157,6 +157,35 @@ async def get_movement(movement_id: int, db: AsyncSession = Depends(get_db), use
     if not mv:
         raise HTTPException(status_code=404, detail="Movement not found")
     return _enrich(mv)
+
+
+async def _load_enriched(db: AsyncSession, ids: list[int]) -> list[MovementRead]:
+    if not ids:
+        return []
+    res = await db.execute(
+        select(Movement).where(Movement.id.in_(ids)).options(
+            selectinload(Movement.movement_type).selectinload(MovementType.income_expense_group)
+        )
+    )
+    by_id = {mv.id: mv for mv in res.scalars().all()}
+    return [_enrich(by_id[i]) for i in ids if i in by_id]
+
+
+@router.get("/{movement_id}/credit-link")
+async def get_credit_link(movement_id: int, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    """
+    Enlace entre una liquidación de tarjeta y sus compras: para la liquidación devuelve las
+    compras que cobra (`items`); para una compra ya cobrada, su liquidación (`settlement`).
+    """
+    mv = await db.get(Movement, movement_id)
+    if not mv or mv.user_id != user.id:
+        raise HTTPException(status_code=404, detail="Movement not found")
+    if mv.credit_cycle_end is not None:
+        items = await settlement_items(db, mv)
+        return {"items": await _load_enriched(db, [m.id for m in items]), "settlement": None}
+    settlement = await settlement_for(db, mv)
+    found = await _load_enriched(db, [settlement.id]) if settlement else []
+    return {"items": [], "settlement": found[0] if found else None}
 
 
 @router.put("/{movement_id}", response_model=MovementRead)

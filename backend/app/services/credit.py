@@ -169,12 +169,59 @@ async def create_charge(db: AsyncSession, acc: Account, cycle: CreditCycle, amou
             account_id=acc.id,
             from_account_id=cycle.pay_account_id,
             credit_cycle_end=cycle.cycle_end,
+            credit_cycle_start=cycle.cycle_start,
             notes=f"Compras del {cycle.cycle_start:%d/%m/%Y} al {cycle.cycle_end:%d/%m/%Y}",
             user_id=acc.user_id,
         )
         db.add(mv)
     acc.credit_last_cycle_end = cycle.cycle_end
     return mv
+
+
+async def settlement_items(db: AsyncSession, settlement: Movement) -> list[Movement]:
+    """Compras que cobra una liquidación: las de la tarjeta con fecha dentro de su ciclo."""
+    acc = await db.get(Account, settlement.account_id)
+    if acc is None or settlement.credit_cycle_end is None:
+        return []
+    start = settlement.credit_cycle_start
+    if start is None:
+        # Liquidaciones anteriores a credit_cycle_start: el ciclo empieza tras el corte previo
+        cutoff_day = acc.credit_cutoff_day or settlement.credit_cycle_end.day
+        start = last_before(settlement.credit_cycle_end, cutoff_day) + timedelta(days=1)
+    res = await db.execute(
+        select(Movement).where(
+            Movement.user_id == settlement.user_id,
+            Movement.account_id == acc.id,
+            Movement.is_transfer == False,  # noqa: E712
+            Movement.no_count == False,  # noqa: E712
+            Movement.date >= start,
+            Movement.date <= settlement.credit_cycle_end,
+        ).order_by(Movement.date, Movement.id)
+    )
+    return list(res.scalars().all())
+
+
+async def settlement_for(db: AsyncSession, mv: Movement) -> Movement | None:
+    """Liquidación que cobró una compra con tarjeta, si ya se registró."""
+    if mv.account_id is None or mv.is_transfer or mv.credit_cycle_end is not None:
+        return None
+    acc = await db.get(Account, mv.account_id)
+    if acc is None or acc.category != CREDIT_CATEGORY:
+        return None
+    res = await db.execute(
+        select(Movement).where(
+            Movement.user_id == mv.user_id,
+            Movement.account_id == acc.id,
+            Movement.credit_cycle_end.is_not(None),
+            Movement.credit_cycle_end >= mv.date,
+        ).order_by(Movement.credit_cycle_end).limit(1)
+    )
+    settlement = res.scalar_one_or_none()
+    if settlement is None:
+        return None
+    if settlement.credit_cycle_start is not None and settlement.credit_cycle_start > mv.date:
+        return None
+    return settlement
 
 
 async def sync_credit_charges(db: AsyncSession, user_id: uuid.UUID, today: date | None = None) -> int:

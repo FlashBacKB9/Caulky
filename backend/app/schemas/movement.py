@@ -64,5 +64,6 @@ class MovementRead(MovementBase):
     files: list[MovementFileRead] = []
     from_account_id: Optional[int] = None
     credit_cycle_end: Optional[_Date] = None
+    credit_cycle_start: Optional[_Date] = None
 
     model_config = {"from_attributes": True}

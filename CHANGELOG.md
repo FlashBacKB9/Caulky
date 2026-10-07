@@ -4,7 +4,24 @@ All notable changes to Caulky are documented here.
 
 ---
 
-## [Unreleased] — dev
+## [v1.9] — 2026-10-08
+
+### 🐛 Fixed: standalone upgrades
+
+The standalone executable built its SQLite database with `create_all`, which never adds
+columns to existing tables, so upgrading from an older version failed as soon as the app read
+a newer column. On startup it now runs `schema_sync`: it creates missing tables and adds the
+missing columns (`ALTER TABLE … ADD COLUMN`, with the model's default for `NOT NULL` ones).
+It is idempotent: an up-to-date database is left untouched.
+
+### ✨ New: card payment ↔ purchases
+
+- A card payment lists the purchases it covers below its notes; each one opens its own detail
+  with a back arrow
+- A purchase that has already been charged shows a button to jump to its card payment
+- Payments now store `credit_cycle_start`; `GET /movements/{id}/credit-link` returns the
+  purchases of a payment (`items`) or the payment of a purchase (`settlement`)
+- The movement detail modal fits the screen with UI zoom and scrolls its content
 
 ### ✨ New: Tarjetas de crédito
 

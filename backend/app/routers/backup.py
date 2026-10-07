@@ -206,8 +206,9 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
                 d = {k: v for k, v in m.items() if k not in _mv_skip}
                 d["date"]      = _parse_date(d.get("date"))
                 d["bank_date"] = _parse_date(d.get("bank_date"))
-                if "credit_cycle_end" in d:
-                    d["credit_cycle_end"] = _parse_date(d["credit_cycle_end"])
+                for k in ("credit_cycle_end", "credit_cycle_start"):
+                    if k in d:
+                        d[k] = _parse_date(d[k])
                 if d.get("movement_type_id") is not None:
                     d["movement_type_id"] = type_id_map.get(d["movement_type_id"], d["movement_type_id"])
                 if d.get("account_id") is not None:

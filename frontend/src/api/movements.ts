@@ -18,6 +18,7 @@ export interface Movement {
   is_transfer?: boolean
   /** Liquidación de tarjeta: corte del ciclo que cobra. Su dinero es 0 (no es gasto). */
   credit_cycle_end?: string | null
+  credit_cycle_start?: string | null
   from_account_id?: number
   paid: boolean
   no_count: boolean
@@ -33,6 +34,12 @@ export interface Movement {
 
 export const getMovements = (params?: { year?: number; month?: number; unassigned?: boolean }) =>
   api.get<Movement[]>('/movements', { params }).then(r => r.data)
+
+/** Liquidación de tarjeta ↔ compras: `items` si es una liquidación, `settlement` si es una compra ya cobrada. */
+export interface CreditLink { items: Movement[]; settlement: Movement | null }
+
+export const getCreditLink = (id: number) =>
+  api.get<CreditLink>(`/movements/${id}/credit-link`).then(r => r.data)
 
 export const getMovement = (id: number) =>
   api.get<Movement>(`/movements/${id}`).then(r => r.data)

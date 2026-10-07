@@ -148,3 +148,27 @@ async def test_manual_confirm_endpoint_in_order(db, user):
     [mv] = await _charges(db, user)
     assert mv.date == date(2020, 3, 5) and float(mv.money) == 31.5
     assert card.credit_last_cycle_end == date(2020, 2, 29)
+
+
+async def test_credit_link_both_ways(db, user):
+    from app.routers.movements import get_credit_link
+
+    _, card, t = await _setup(db, user)
+    await _buy(db, user, card, t, 100, date(2026, 9, 3))
+    await _buy(db, user, card, t, 50, date(2026, 9, 30))
+    await _buy(db, user, card, t, 70, date(2026, 10, 2))    # siguiente ciclo, aún sin cobrar
+    await sync_credit_charges(db, user.id, today=date(2026, 10, 5))
+    [charge] = await _charges(db, user)
+    assert charge.credit_cycle_start == date(2026, 9, 1)
+
+    link = await get_credit_link(charge.id, db=db, user=user)
+    assert [i.money for i in link["items"]] == [100, 50]
+    assert link["settlement"] is None
+
+    purchases = (await db.execute(
+        select(Movement).where(Movement.account_id == card.id, Movement.is_transfer == False)  # noqa: E712
+        .order_by(Movement.date))).scalars().all()
+    paid = await get_credit_link(purchases[0].id, db=db, user=user)
+    assert paid["settlement"].id == charge.id
+    unpaid = await get_credit_link(purchases[2].id, db=db, user=user)
+    assert unpaid["settlement"] is None and unpaid["items"] == []

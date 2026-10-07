@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { updateMovement, deleteMovement, createMovement, getMovement, type Movement } from '../api/movements'
+import { updateMovement, deleteMovement, createMovement, getMovement, getCreditLink, type Movement } from '../api/movements'
 import { type MovementType } from '../api/movementTypes'
 import FileUpload from './FileUpload'
-import { X, Trash2, Copy } from 'lucide-react'
+import { X, Trash2, Copy, ArrowLeft, CreditCard, ChevronRight } from 'lucide-react'
 import { useSharedMovements } from '../hooks/useSharedMovements'
 import { t } from '../utils/i18n'
+import { useCurrency } from '../hooks/useCurrency'
+import { useDateFormat } from '../hooks/useDateFormat'
 
 export interface DraftRow {
   id: number
@@ -87,12 +89,43 @@ function Toggle({ value, onChange, color = '#3b82f6' }: {
   )
 }
 
+/**
+ * Detalle de un movimiento. Desde una liquidación de tarjeta se puede abrir cada compra, y
+ * desde una compra cobrada su liquidación: se apilan y la flecha vuelve al anterior.
+ */
 export default function MovementDetailModal({ movement, types, onClose }: {
   movement: Movement
   types: MovementType[]
   onClose: () => void
 }) {
+  const [stack, setStack] = useState<Movement[]>([movement])
+  const current = stack[stack.length - 1]
+  const back = stack.length > 1 ? () => setStack(s => s.slice(0, -1)) : undefined
+  return (
+    <MovementDetailBody
+      key={current.id} movement={current} types={types} onClose={onClose}
+      onBack={back} onOpen={mv => setStack(s => [...s, mv])}
+    />
+  )
+}
+
+function MovementDetailBody({ movement, types, onClose, onBack, onOpen }: {
+  movement: Movement
+  types: MovementType[]
+  onClose: () => void
+  onBack?: () => void
+  onOpen: (mv: Movement) => void
+}) {
   const qc = useQueryClient()
+  const { fmt } = useCurrency()
+  const { fmtDate } = useDateFormat()
+  // Al guardar o borrar un movimiento abierto desde otro, se vuelve a ese en vez de cerrar todo
+  const done = onBack ?? onClose
+  const { data: creditLink } = useQuery({
+    queryKey: ['credit-link', movement.id],
+    queryFn: () => getCreditLink(movement.id),
+    enabled: movement.credit_cycle_end != null || (movement.account_id != null && !movement.is_transfer),
+  })
   const { sharedEnabled } = useSharedMovements()
   const [draft, setDraft] = useState<DraftRow>(() => {
     const d = toDraft(movement)
@@ -131,15 +164,17 @@ export default function MovementDetailModal({ movement, types, onClose }: {
     qc.invalidateQueries({ queryKey: ['dashboard'], refetchType: 'all' })
     qc.invalidateQueries({ queryKey: ['annual'], refetchType: 'all' })
     qc.invalidateQueries({ queryKey: ['accounts-summary'], refetchType: 'all' })
+    qc.invalidateQueries({ queryKey: ['credit-link'] })
+    qc.invalidateQueries({ queryKey: ['credit-cycles'] })
   }
 
   const updateMut = useMutation({
     mutationFn: (data: object) => updateMovement(movement.id, data),
-    onSuccess: () => { invalidate(); onClose() },
+    onSuccess: () => { invalidate(); done() },
   })
   const deleteMut = useMutation({
     mutationFn: () => deleteMovement(movement.id),
-    onSuccess: () => { invalidate(); onClose() },
+    onSuccess: () => { invalidate(); done() },
   })
   const duplicateMut = useMutation({
     mutationFn: () => createMovement(duplicatePayload(movement)),
@@ -157,17 +192,25 @@ export default function MovementDetailModal({ movement, types, onClose }: {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onMouseDown={onClose}>
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md" onMouseDown={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-md max-h-full flex flex-col" onMouseDown={e => e.stopPropagation()}>
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
-          <h2 className="text-base font-semibold text-gray-800 dark:text-white">{t('detail.title')}</h2>
+          <div className="flex items-center gap-2 min-w-0">
+            {onBack && (
+              <button onClick={onBack} title={t('detail.back')}
+                className="p-1.5 -ml-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600">
+                <ArrowLeft className="w-4 h-4" />
+              </button>
+            )}
+            <h2 className="text-base font-semibold text-gray-800 dark:text-white truncate">{t('detail.title')}</h2>
+          </div>
           <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-gray-400 hover:text-gray-600">
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Fields */}
-        <div className="px-5 py-4 space-y-3">
+        <div className="px-5 py-4 space-y-3 overflow-y-auto flex-1 min-h-0">
           {/* Name */}
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('common.name')}</label>
@@ -343,6 +386,43 @@ export default function MovementDetailModal({ movement, types, onClose }: {
             <textarea rows={2} className={IN + ' resize-none'} value={draft.notes} onChange={e => setField('notes', e.target.value)} placeholder={t('detail.noNotes')} />
           </div>
 
+          {/* Liquidación de tarjeta: las compras que cobra */}
+          {creditLink && creditLink.items.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">
+                {t('detail.creditItems')} ({creditLink.items.length})
+              </label>
+              <div className="rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-800 max-h-48 overflow-y-auto">
+                {creditLink.items.map(item => (
+                  <button key={item.id} type="button" onClick={() => onOpen(item)}
+                    className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                    <span className="text-xs text-gray-400 dark:text-gray-500 tabular-nums shrink-0">{fmtDate(item.date)}</span>
+                    <span className="flex-1 min-w-0 truncate text-sm text-gray-700 dark:text-gray-200">{item.name}</span>
+                    <span className={`text-sm font-mono tabular-nums shrink-0 ${item.dinero >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                      {fmt(item.dinero)}
+                    </span>
+                    <ChevronRight className="w-3.5 h-3.5 text-gray-300 dark:text-gray-600 shrink-0" />
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Compra con tarjeta ya cobrada: acceso a su liquidación */}
+          {creditLink?.settlement && (
+            <button type="button" onClick={() => onOpen(creditLink.settlement!)}
+              className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-violet-50 dark:bg-violet-950/30 border border-violet-100 dark:border-violet-900 text-left hover:bg-violet-100 dark:hover:bg-violet-950/50 transition-colors">
+              <CreditCard className="w-4 h-4 text-violet-500 shrink-0" />
+              <span className="flex-1 min-w-0">
+                <span className="block text-sm font-medium text-violet-700 dark:text-violet-300">{t('detail.goToCharge')}</span>
+                <span className="block text-xs text-violet-500/80 dark:text-violet-400/70 truncate">
+                  {t('detail.paidWith')} {fmtDate(creditLink.settlement.date)} · {fmt(Math.abs(creditLink.settlement.money))}
+                </span>
+              </span>
+              <ChevronRight className="w-4 h-4 text-violet-400 shrink-0" />
+            </button>
+          )}
+
           {/* Adjuntos */}
           <div>
             <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('form.attachments')}</label>
@@ -351,7 +431,7 @@ export default function MovementDetailModal({ movement, types, onClose }: {
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-between px-5 pb-5">
+        <div className="flex items-center justify-between px-5 pt-3 pb-5 shrink-0">
           <button onClick={handleDelete} disabled={deleteMut.isPending}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-colors disabled:opacity-50">
             <Trash2 className="w-3.5 h-3.5" />

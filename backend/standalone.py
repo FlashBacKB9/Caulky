@@ -37,7 +37,7 @@ os.environ.setdefault("COOKIE_SECURE",      "false")
 
 # ── App import (after env setup) ──────────────────────────────────────────────
 from app.main import app          # noqa: E402  (env must be set first)
-from app.database import engine, Base  # noqa: E402
+from app.database import engine  # noqa: E402
 from fastapi.responses import FileResponse  # noqa: E402
 import uvicorn  # noqa: E402
 
@@ -66,8 +66,13 @@ if STATIC_DIR.exists():
 
 # ── DB init ───────────────────────────────────────────────────────────────────
 async def _init_db() -> None:
+    from app.services.schema_sync import sync_schema
     async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+        # create_all no añade columnas a tablas existentes: al actualizar desde una versión
+        # anterior hay que añadir las que falten o la app falla al leerlas
+        added = await conn.run_sync(sync_schema)
+    if added:
+        print(f"  Base de datos actualizada ({len(added)} columnas nuevas)")
 
 # ── Main ──────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":

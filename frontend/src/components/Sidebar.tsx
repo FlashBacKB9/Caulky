@@ -14,8 +14,11 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
-    version: 'v1.9', date: 'Julio 2026',
+    version: 'v1.9', date: 'Octubre 2026',
     items: [
+      { type: 'feat',    text: 'Liquidación de tarjeta: debajo de las notas aparecen los gastos que incluye; al pulsar uno se abre su detalle con una flecha para volver, y cada gasto ya cobrado tiene un botón para ir a su liquidación' },
+      { type: 'fix',     text: 'Ejecutable: al arrancar añade a la base de datos las tablas y columnas nuevas, así que actualizar desde una versión anterior ya no rompe la app' },
+      { type: 'fix',     text: 'Detalle del movimiento: el modal cabe en pantalla con el zoom de interfaz y su contenido se desplaza' },
       { type: 'feat',    text: 'Tarjetas de crédito: nueva categoría de cuenta con límite, día de corte, día de cargo y cuenta pagadora. Cada compra cuenta como gasto el día que la haces; el día de cargo se agrupan en un único traspaso que no cuenta como gasto, previsto en transparente en el calendario y creado solo (o confirmado por ti, a elegir). La tarjeta muestra el crédito disponible y el patrimonio resta solo la deuda' },
       { type: 'fix',     text: 'Cuentas y Dashboard: la evolución del saldo de cada cuenta usa el mismo cálculo que el saldo actual (cuenta asignada y traspasos), en vez de cargar todo a la cuenta principal' },
       { type: 'feat',    text: 'Cuentas remuneradas: marca una cuenta como remunerada en Ajustes → Cuentas, elige el subtipo del abono de intereses y la retención, y en Inversiones aparece una pestaña con el saldo mes a mes, los intereses de cada mes y el tipo anual real (bruto sobre el saldo del mes anterior) para contrastarlo con el de tu banco' },

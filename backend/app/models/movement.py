@@ -29,6 +29,7 @@ class Movement(Base):
     )
     # Liquidación de tarjeta: fecha de corte del ciclo que cobra este traspaso
     credit_cycle_end: Mapped[date | None] = mapped_column(Date, nullable=True)
+    credit_cycle_start: Mapped[date | None] = mapped_column(Date, nullable=True)
     is_shared: Mapped[bool] = mapped_column(Boolean, default=False)
     shared_between: Mapped[int | None] = mapped_column(Integer, nullable=True)
     my_share: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
