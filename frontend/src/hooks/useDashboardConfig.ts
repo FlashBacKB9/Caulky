@@ -7,6 +7,9 @@ export interface DashboardWidget {
   rowSpan?: number  // grid row span (undefined = 1)
   height?: number  // chart height in px (undefined = default)
   period?: 'month' | 'year'  // period filter for chart widgets
+  accountIds?: number[]  // stat-balance-sel-*: cuentas que suman en la línea
+  range?: 'year' | 'all' | 'from'  // stat-balance-sel-*: tramo visible
+  fromDate?: string  // stat-balance-sel-*: YYYY-MM-DD cuando range === 'from'
 }
 
 export interface DashboardConfig {

@@ -361,7 +361,7 @@ function buildAccountHistory(
   sorted: Movement[],
   accounts: Account[],
   types: MovementType[],
-): { label: string; balance: number }[] {
+): { key: string; label: string; balance: number }[] {
   if (sorted.length === 0) return []
   // Mismo criterio que el saldo del backend (accountView.balanceDelta)
   const persp = buildPerspective(acc.id, accounts, types)
@@ -369,7 +369,7 @@ function buildAccountHistory(
   const now = new Date()
   let bal = acc.initial_balance
   let mi = 0
-  const result: { label: string; balance: number }[] = []
+  const result: { key: string; label: string; balance: number }[] = []
   for (let y = firstDate.getFullYear(); y <= now.getFullYear(); y++) {
     const mStart = y === firstDate.getFullYear() ? firstDate.getMonth() : 0
     const mEnd   = y === now.getFullYear() ? now.getMonth() : 11
@@ -381,7 +381,7 @@ function buildAccountHistory(
         bal += balanceDelta(mv, persp) ?? 0
         mi++
       }
-      result.push({ label: `${MONTHS_SHORT[m]} ${String(y).slice(2)}`, balance: Math.round(bal * 100) / 100 })
+      result.push({ key: `${y}-${String(m + 1).padStart(2, '0')}`, label: `${MONTHS_SHORT[m]} ${String(y).slice(2)}`, balance: Math.round(bal * 100) / 100 })
     }
   }
   return result
@@ -459,6 +459,71 @@ function CombinedBalanceHistoryChart({ accounts, movements, movementTypes, heigh
   }, [accounts, sorted, movementTypes])
 
   return <BalanceLineChart data={data} lines={[{ key: 'Total', color: '#3b82f6' }]} height={height} />
+}
+
+// Combined total of the chosen accounts, with year / all / since-date range
+type BalanceRange = 'year' | 'all' | 'from'
+const BALANCE_RANGES: { id: BalanceRange; label: string }[] = [
+  { id: 'year', label: 'Año' }, { id: 'all', label: 'Todo' }, { id: 'from', label: 'Desde' },
+]
+
+function SelectedBalanceHistoryChart({ accounts, accountIds, movements, movementTypes, year, range, fromDate, onChange, height = 260 }: {
+  accounts: Account[]
+  accountIds: number[]
+  movements: Movement[]
+  movementTypes: MovementType[]
+  year: number
+  range: BalanceRange
+  fromDate: string
+  onChange: (patch: { range?: BalanceRange; fromDate?: string }) => void
+  height?: number
+}) {
+  const sorted   = useMemo(() => [...movements].sort((a, b) => (a.bank_date ?? a.date).localeCompare(b.bank_date ?? b.date)), [movements])
+  // Las cuentas borradas desaparecen solas; el resto del cálculo usa todas (traspasos entre cuentas)
+  const selected = useMemo(() => accounts.filter(a => accountIds.includes(a.id)), [accounts, accountIds])
+
+  const data = useMemo(() => {
+    if (selected.length === 0 || sorted.length === 0) return []
+    const histories = selected.map(acc => buildAccountHistory(acc, sorted, accounts, movementTypes))
+    const fromKey = fromDate.slice(0, 7)
+    return histories[0]
+      .map((r, i) => ({
+        key: r.key, label: r.label,
+        Total: Math.round(histories.reduce((s, h) => s + (h[i]?.balance ?? 0), 0) * 100) / 100,
+      }))
+      .filter(r => range === 'all' ? true : range === 'year' ? r.key.startsWith(String(year)) : !fromKey || r.key >= fromKey)
+  }, [selected, accounts, sorted, movementTypes, range, year, fromDate])
+
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="min-w-0">
+          <h2 className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500">Balance total</h2>
+          <p className="text-[11px] text-gray-400 dark:text-gray-500 truncate" title={selected.map(a => a.name).join(', ')}>
+            {selected.length === accounts.length ? 'Todas las cuentas' : selected.map(a => a.name).join(' · ') || 'Ninguna cuenta'}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {range === 'from' && (
+            <input type="date" value={fromDate} onChange={e => onChange({ fromDate: e.target.value })}
+              className="border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 rounded-lg px-2 py-0.5 text-[11px] focus:outline-none" />
+          )}
+          <div className="flex gap-0.5 bg-gray-100 dark:bg-gray-800 rounded-lg p-0.5">
+            {BALANCE_RANGES.map(r => (
+              <button key={r.id} onClick={() => onChange({ range: r.id })}
+                className={`px-2 py-0.5 text-[11px] rounded-md font-medium transition-colors ${range === r.id ? 'bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-100 shadow-sm' : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300'}`}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+      {data.length === 0
+        ? <div className="flex items-center justify-center text-gray-300 dark:text-gray-600 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
+        : <BalanceLineChart data={data} lines={[{ key: 'Total', color: '#3b82f6' }]} height={height - 20} />}
+    </div>
+  )
 }
 
 // Cycling: one account at a time, arrows to switch
@@ -1250,6 +1315,8 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
   onAdd: (w: DashboardWidget, newBudget?: Budget) => void; onClose: () => void
 }) {
   const [showNewBudget, setShowNewBudget] = useState(false)
+  // Selector de cuentas del widget «Balance total (cuentas elegidas)»; null = cerrado
+  const [balanceAccs, setBalanceAccs] = useState<Set<number> | null>(null)
   const navigate = useNavigate()
 
   const allChartOptions = useMemo(() => {
@@ -1309,8 +1376,30 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
           )}
 
           {/* Stat options */}
-          {mode === 'stat' && (
-            availMetrics.length === 0 && availAccounts.length === 0 && availSpecial.length === 0 && availBalanceHist.length === 0 ? (
+          {mode === 'stat' && balanceAccs && (
+            <>
+              <ModalSection label="Cuentas que suman en el balance" first />
+              <div className="grid grid-cols-2 gap-1">
+                {accounts.map(a => (
+                  <label key={a.id} className="flex items-center gap-2.5 px-3 py-2 rounded-xl hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer">
+                    <input type="checkbox" checked={balanceAccs.has(a.id)} className="accent-blue-500"
+                      onChange={() => setBalanceAccs(p => { const n = new Set(p); if (n.has(a.id)) n.delete(a.id); else n.add(a.id); return n })} />
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: a.color }} />
+                    <span className="text-sm text-gray-700 dark:text-gray-200 truncate">{a.name}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2 pt-4">
+                <button onClick={() => setBalanceAccs(null)}
+                  className="px-3 py-1.5 text-sm rounded-lg text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">{t('common.cancel')}</button>
+                <button disabled={balanceAccs.size === 0}
+                  onClick={() => { onAdd({ id: `stat-balance-sel-${genId()}`, colSpan: 4, accountIds: accounts.filter(a => balanceAccs.has(a.id)).map(a => a.id), range: 'year' }); onClose() }}
+                  className="px-3 py-1.5 text-sm rounded-lg bg-blue-500 hover:bg-blue-600 disabled:opacity-40 text-white font-medium">Añadir</button>
+              </div>
+            </>
+          )}
+          {mode === 'stat' && !balanceAccs && (
+            availMetrics.length === 0 && availAccounts.length === 0 && availSpecial.length === 0 && availBalanceHist.length === 0 && accounts.length === 0 ? (
               <p className="text-sm text-gray-400 dark:text-gray-500 px-1 py-2">{t('dashboard.allStatsUsed')}</p>
             ) : (
               <>
@@ -1356,10 +1445,17 @@ function AddWidgetModal({ mode, existingIds, budgets, types, accounts, onAdd, on
                     </div>
                   </>
                 )}
-                {availBalanceHist.length > 0 && (
+                {(availBalanceHist.length > 0 || accounts.length > 0) && (
                   <>
                     <ModalSection label={t('dashboard.historical')} first={availMetrics.length === 0 && availAccounts.length === 0 && availSpecial.length === 0} />
                     <div className="grid grid-cols-2 gap-1">
+                      {accounts.length > 0 && (
+                        <ModalItem
+                          iconBg="#0ea5e920" iconColor="#0ea5e9" Icon={TrendingUp}
+                          label="Balance total (cuentas elegidas)" desc="Suma solo las cuentas que marques; ver año, todo o desde una fecha"
+                          onClick={() => setBalanceAccs(new Set(accounts.map(a => a.id)))}
+                        />
+                      )}
                       {availBalanceHist.map(o => (
                         <ModalItem key={o.id}
                           iconBg={o.color + '20'} iconColor={o.color} Icon={o.Icon}
@@ -1660,6 +1756,14 @@ export default function Dashboard() {
       <div className={PANEL}>
         <h2 className={`${TITLE} mb-4`}>{t('dashboard.chartBalanceCombined')}</h2>
         <CombinedBalanceHistoryChart accounts={allAccounts} movements={movements} movementTypes={movementTypes} height={chartH} />
+      </div>
+    )
+    if (w.id.startsWith('stat-balance-sel-')) return (
+      <div className={PANEL}>
+        <SelectedBalanceHistoryChart accounts={allAccounts} accountIds={w.accountIds ?? allAccounts.map(a => a.id)}
+          movements={movements} movementTypes={movementTypes} year={year}
+          range={w.range ?? 'year'} fromDate={w.fromDate ?? `${year}-01-01`}
+          onChange={patch => updateWidget(w.id, patch)} height={chartH} />
       </div>
     )
     if (w.id === 'stat-balance-cycle') return (
