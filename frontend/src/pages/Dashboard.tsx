@@ -298,7 +298,7 @@ function ExpensesPieChart({ groups, height = 200 }: { groups: Group[]; height?: 
       )}
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
-          <Pie data={slices} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value" paddingAngle={2}
+          <Pie data={slices} cx="50%" cy="50%" innerRadius="55%" outerRadius="85%" dataKey="value" paddingAngle={2}
             onMouseEnter={(_, i) => setActiveIdx(i)} onMouseLeave={() => setActiveIdx(null)}
           >
             {slices.map((s, i) => (
@@ -736,7 +736,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
     return (
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
-          <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" paddingAngle={2}>
+          <Pie data={data} cx="50%" cy="50%" innerRadius="55%" outerRadius="85%" dataKey="value" paddingAngle={2}>
             {data.map((d, i) => <Cell key={i} fill={d.color}/>)}
           </Pie>
           <Tooltip content={<ChartTooltip />}/>
@@ -754,7 +754,7 @@ function DashboardBuiltinChart({ chartId, allMvs, apiGroups, types, height, peri
     return (
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
-          <Pie data={data} cx="50%" cy="50%" innerRadius={55} outerRadius={85} dataKey="value" paddingAngle={2}>
+          <Pie data={data} cx="50%" cy="50%" innerRadius="55%" outerRadius="85%" dataKey="value" paddingAngle={2}>
             {data.map((d, i) => <Cell key={i} fill={d.color}/>)}
           </Pie>
           <Tooltip content={<ChartTooltip />}/>
@@ -881,11 +881,11 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
       .map(a => ({ name: a.name, value: a.balance, color: a.color }))
       .filter(d => d.value !== 0).sort((a, b) => b.value - a.value)
     if (!data.length) return <div className="flex items-center justify-center text-gray-300 text-sm" style={{ height }}>{t('dashboard.noData')}</div>
-    const innerR = def.defaultDisplay === 'donut' ? 55 : 0
+    const innerR = def.defaultDisplay === 'donut' ? '55%' : 0
     return (
       <ResponsiveContainer width="100%" height={height}>
         <PieChart>
-          <Pie data={data} cx="50%" cy="50%" innerRadius={innerR} outerRadius={85} dataKey="value" paddingAngle={2}>
+          <Pie data={data} cx="50%" cy="50%" innerRadius={innerR} outerRadius="85%" dataKey="value" paddingAngle={2}>
             {data.map((d, i) => <Cell key={i} fill={d.color}/>)}
           </Pie>
           <Tooltip content={<ChartTooltip />}/>
@@ -924,7 +924,7 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
       return (
         <ResponsiveContainer width="100%" height={height}>
           <PieChart>
-            <Pie data={pieData} cx="50%" cy="50%" innerRadius={def.defaultDisplay === 'donut' ? 55 : 0} outerRadius={85} dataKey="value" paddingAngle={2}>
+            <Pie data={pieData} cx="50%" cy="50%" innerRadius={def.defaultDisplay === 'donut' ? '55%' : 0} outerRadius="85%" dataKey="value" paddingAngle={2}>
               {pieData.map((item, i) => <Cell key={i} fill={item.color}/>)}
             </Pie>
             <Tooltip content={<ChartTooltip />}/>
