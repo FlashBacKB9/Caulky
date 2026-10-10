@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, AreaChart, Area, LineChart, Line } from 'recharts'
-import { Leaf, Package, ShoppingCart, Tag } from 'lucide-react'
+import { Leaf, ShoppingCart, Tag } from 'lucide-react'
 import {
   Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
   Eye, EyeOff, Search, ArrowRightLeft, ExternalLink, AlertTriangle, RefreshCw,
@@ -12,6 +12,8 @@ import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicke
 import { compressTicketImage } from '../utils/imageCompressor'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import MovementForm from '../components/MovementForm'
+import type { MovementSplit } from '../api/movements'
+import { mainSplitType, ticketSplit } from '../utils/splits'
 import {
   catCfg, getVisibleCategories, addCustomCat as registerCustomCat,
   ICON_NAME_MAP, PRESET_ICONS, PRESET_COLORS,
@@ -459,8 +461,9 @@ function TicketCard({
       .finally(() => setOcrDebugLoading(false))
   }, [showOcrDebug, ticket.id])
   const [movFormConfig, setMovFormConfig] = useState<{
-    mode: 'food' | 'supplies' | 'combined'
+    mode: 'split' | 'combined'
     name: string; money: string; date: string; movement_type_id: string
+    splits?: MovementSplit[]
   } | null>(null)
 
   useEffect(() => { setTicket(initialTicket) }, [initialTicket])
@@ -505,8 +508,6 @@ function TicketCard({
   const foodTotal     = ticket.items.filter(i => !SUPPLIES_CATS.has(i.category)).reduce((s, i) => s + i.amount, 0)
   const combinedTotal = ticket.items.reduce((s, i) => s + i.amount, 0)
 
-  const foodTypeId     = parseInt(localStorage.getItem('ticket_food_type_id') || '') || null
-  const suppliesTypeId = parseInt(localStorage.getItem('ticket_supplies_type_id') || '') || null
   const combinedTypeId = parseInt(localStorage.getItem('ticket_combined_type_id') || '') || null
 
   const typeNameById = (id: number | null) =>
@@ -514,7 +515,11 @@ function TicketCard({
 
   const genMovements = ticket.generated_movements ?? {}
 
-  const openMovForm = (mode: 'food' | 'supplies' | 'combined', total: number, typeId: number | null) => {
+  // Comida y suministros van en un solo movimiento con categoría múltiple
+  const split = ticketSplit(foodTotal, suppliesTotal)
+  const splitTypeId = mainSplitType(split.parts) ?? null
+
+  const openMovForm = (mode: 'split' | 'combined', total: number, typeId: number | null) => {
     if (!typeId) return
     const name = ticket.store_name ?? ticket.original_name.replace(/\.[^.]+$/, '')
     setMovFormConfig({
@@ -523,6 +528,7 @@ function TicketCard({
       money: total.toFixed(2),
       date: ticket.ticket_date ?? new Date().toLocaleDateString('en-CA'),
       movement_type_id: String(typeId),
+      splits: mode === 'split' && split.parts.length > 1 ? split.parts : undefined,
     })
     setShowMovPanel(false)
   }
@@ -537,9 +543,8 @@ function TicketCard({
   }
 
   const MOV_OPTIONS = [
-    { mode: 'food'     as const, label: 'Comida / Supermercado', icon: Leaf,         color: '#16a34a', total: foodTotal,     typeId: foodTypeId     },
-    { mode: 'supplies' as const, label: 'Suministros',           icon: Package,      color: '#4f46e5', total: suppliesTotal, typeId: suppliesTypeId },
-    { mode: 'combined' as const, label: 'Combinado',             icon: ShoppingCart, color: '#6b7280', total: combinedTotal, typeId: combinedTypeId },
+    { mode: 'split'    as const, label: 'Por tipo (comida + suministros)', icon: Leaf,         color: '#16a34a', total: foodTotal + suppliesTotal, typeId: split.ready ? splitTypeId : null },
+    { mode: 'combined' as const, label: 'Combinado',                       icon: ShoppingCart, color: '#6b7280', total: combinedTotal,             typeId: combinedTypeId },
   ]
 
   return (
@@ -614,8 +619,11 @@ function TicketCard({
         <div className="border-t border-gray-100 dark:border-gray-800 px-4 py-3 space-y-2 bg-emerald-50/50 dark:bg-emerald-950/20">
           <p className="text-xs font-semibold text-gray-600 dark:text-gray-400 mb-1">Generar movimiento</p>
           {MOV_OPTIONS.map(({ mode, label, icon: ModeIcon, color, total, typeId }) => {
-            const typeName = typeNameById(typeId)
-            const existingMovId = genMovements[mode]
+            const typeName = mode === 'split'
+              ? (split.ready ? split.parts.map(p => typeNameById(p.movement_type_id)).join(' + ') : null)
+              : typeNameById(typeId)
+            // Tickets antiguos: un movimiento por tipo
+            const existingMovId = mode === 'split' ? genMovements.split ?? genMovements.food ?? genMovements.supplies : genMovements[mode]
             const canCreate = !!typeId && total > 0
             return (
               <div key={mode} className="flex items-center gap-3">
@@ -673,6 +681,7 @@ function TicketCard({
             money: movFormConfig.money,
             date: movFormConfig.date,
             movement_type_id: movFormConfig.movement_type_id,
+            splits: movFormConfig.splits,
           }}
           onMovementCreated={handleMovementCreated}
         />

@@ -1,6 +1,8 @@
 import { useMemo, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { updateMovement, deleteMovement, createMovement, getMovement, getCreditLink, type Movement } from '../api/movements'
+import { updateMovement, deleteMovement, createMovement, getMovement, getCreditLink, type Movement, type MovementSplit } from '../api/movements'
+import SplitCategoryModal, { SplitSummary } from './SplitCategoryModal'
+import { MULTI_TYPE, mainSplitType } from '../utils/splits'
 import { type MovementType } from '../api/movementTypes'
 import FileUpload from './FileUpload'
 import { X, Trash2, Copy, ArrowLeft, CreditCard, ChevronRight } from 'lucide-react'
@@ -72,6 +74,7 @@ export function duplicatePayload(mv: Movement) {
   return {
     name: mv.name, money: mv.money, date: mv.date,
     bank_date: mv.bank_date, movement_type_id: mv.movement_type_id,
+    splits: mv.splits?.length ? mv.splits : undefined,
     account_id: mv.account_id, is_transfer: mv.is_transfer,
     from_account_id: mv.from_account_id, paid: mv.paid, no_count: mv.no_count, notes: mv.notes,
   }
@@ -157,7 +160,27 @@ function MovementDetailBody({ movement, types, onClose, onBack, onOpen }: {
     return map
   }, [types])
 
-  const selType = types.find(t => String(t.id) === draft.movement_type_id)
+  // Categoría múltiple: solo se envía si se ha tocado (si no, el backend escala las partes al cambiar el importe)
+  const [splits, setSplits] = useState<MovementSplit[]>(movement.splits ?? [])
+  const [splitsDirty, setSplitsDirty] = useState(false)
+  const [splitOpen, setSplitOpen] = useState(false)
+  const isSplit = splits.length > 0 && !draft.is_transfer
+  const saveSplits = (parts: MovementSplit[]) => {
+    const sign = parseFloat(draft.money) < 0 ? -1 : 1
+    const signed = parts.map(p => ({ ...p, money: p.money * sign }))
+    const total = signed.reduce((acc, p) => acc + p.money, 0)
+    setDraft(d => ({ ...d, money: total.toFixed(2), movement_type_id: String(mainSplitType(signed) ?? '') }))
+    setSplits(signed.length > 1 ? signed : [])
+    setSplitsDirty(true)
+    setSplitOpen(false)
+  }
+  const splitInitial: MovementSplit[] = splits.length
+    ? splits
+    : draft.movement_type_id && parseFloat(draft.money)
+      ? [{ movement_type_id: parseInt(draft.movement_type_id), money: Math.abs(parseFloat(draft.money)) }]
+      : []
+
+  const selType = isSplit ? undefined : types.find(t => String(t.id) === draft.movement_type_id)
 
   const invalidate = () => {
     qc.invalidateQueries({ queryKey: ['movements'], refetchType: 'all' })
@@ -221,7 +244,9 @@ function MovementDetailBody({ movement, types, onClose, onBack, onOpen }: {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('form.amountLabel')}</label>
-              <input type="number" step="0.01" className={IN} value={draft.money} onChange={e => setField('money', e.target.value)} />
+              <input type="number" step="0.01" className={IN + (isSplit ? ' cursor-pointer' : '')} value={draft.money}
+                readOnly={isSplit} onClick={() => { if (isSplit) setSplitOpen(true) }}
+                onChange={e => setField('money', e.target.value)} />
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">{t('common.date')}</label>
@@ -249,8 +274,14 @@ function MovementDetailBody({ movement, types, onClose, onBack, onOpen }: {
                 : <>
                     <div className="relative">
                       {selType && <span className="absolute left-3 top-1/2 -translate-y-1/2 w-2 h-2 rounded-full z-10 pointer-events-none" style={{ backgroundColor: selType.color }} />}
-                      <select className={IN + (selType ? ' pl-8' : '')} value={draft.movement_type_id} onChange={e => setField('movement_type_id', e.target.value)}>
+                      <select className={IN + (selType ? ' pl-8' : '')} value={isSplit ? MULTI_TYPE : draft.movement_type_id}
+                        onChange={e => {
+                          if (e.target.value === MULTI_TYPE) { setSplitOpen(true); return }
+                          setField('movement_type_id', e.target.value)
+                          if (splits.length) { setSplits([]); setSplitsDirty(true) }
+                        }}>
                         <option value="">{t('detail.noType')}</option>
+                        <option value={MULTI_TYPE}>{isSplit ? `${t('split.option')} · ${t('split.parts').replace('{n}', String(splits.length))}` : t('split.option')}</option>
                         {Object.entries(byCategory).map(([cat, items]) => (
                           <optgroup key={cat} label={cat}>
                             {items.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
@@ -258,6 +289,9 @@ function MovementDetailBody({ movement, types, onClose, onBack, onOpen }: {
                         ))}
                       </select>
                     </div>
+                    {isSplit && (
+                      <div className="mt-1.5"><SplitSummary splits={splits} types={types} onEdit={() => setSplitOpen(true)} /></div>
+                    )}
                     {linkedAcc && (
                       <div className="mt-1.5 px-3 py-1.5 bg-blue-50 dark:bg-blue-950/30 border border-blue-100 dark:border-blue-900 rounded-lg text-xs text-blue-600 dark:text-blue-400">
                         {parseFloat(draft.money) < 0
@@ -446,13 +480,17 @@ function MovementDetailBody({ movement, types, onClose, onBack, onOpen }: {
             <button onClick={onClose} className="px-3 py-1.5 text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition-colors">
               {t('common.cancel')}
             </button>
-            <button onClick={() => updateMut.mutate(draftPayload(draft, movement))} disabled={updateMut.isPending}
+            <button onClick={() => updateMut.mutate({ ...draftPayload(draft, movement), ...(splitsDirty ? { splits: draft.is_transfer ? [] : splits } : {}) })} disabled={updateMut.isPending}
               className="px-4 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors disabled:opacity-50">
               {updateMut.isPending ? t('form.saving') : t('common.save')}
             </button>
           </div>
         </div>
       </div>
+      {splitOpen && (
+        <SplitCategoryModal types={types} initial={splitInitial}
+          onCancel={() => setSplitOpen(false)} onSave={saveSplits} />
+      )}
     </div>
   )
 }

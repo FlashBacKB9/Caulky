@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models.account import Account
 from app.models.real_account import real_account_accounts
 from app.models.movement import Movement
+from app.models.movement_split import MovementSplit
 from app.models.movement_type import MovementType
 from app.models.income_expense_group import IncomeExpenseGroup
 from app.schemas.account import AccountRead, AccountCreate, AccountPatch, AccountsReorder, CreditChargeCreate
@@ -278,6 +279,11 @@ async def delete_account(
         raise HTTPException(status_code=409, detail=str(count))
 
     if delete_movements:
+        # SQLite no borra en cascada: las partes de categoría múltiple se quitan a mano
+        doomed = select(Movement.id).where(Movement.account_id == account_id)
+        if linked_type_ids:
+            doomed = doomed.union(select(Movement.id).where(Movement.movement_type_id.in_(linked_type_ids)))
+        await db.execute(sa_delete(MovementSplit).where(MovementSplit.movement_id.in_(doomed)))
         if linked_type_ids:
             await db.execute(sa_delete(Movement).where(Movement.movement_type_id.in_(linked_type_ids)))
         await db.execute(sa_delete(Movement).where(Movement.account_id == account_id))

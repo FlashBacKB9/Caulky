@@ -245,3 +245,25 @@ async def test_restore_replaces_existing_data(db, user):
     )).scalars().all()
     assert len(after_second) == 1
     assert after_second[0].name == "Solo este"
+
+
+async def test_movement_splits_restored_with_remapped_types(db, user):
+    """Las partes de categoría múltiple vuelven con los tipos nuevos."""
+    mv = _mv(id=100, name="Mercadona", money=40, type_id=3)
+    mv["splits"] = [{"movement_type_id": 3, "money": 30}, {"movement_type_id": 4, "money": 10}]
+    payload = _payload(
+        {
+            "groups": [{"id": 1, "name": "Vida Diaria", "color": "#000"}],
+            "types": [{"id": 3, "name": "Super", "category": "Vida Diaria", "income_expense_group_id": 1},
+                      {"id": 4, "name": "Limpieza", "category": "Vida Diaria", "income_expense_group_id": 1}],
+            "movements": [mv],
+        },
+        restore_groups=True, restore_types=True, restore_movements=True,
+    )
+    await restore_backup(payload, db=db, user=user)
+
+    types = {t.name: t.id for t in (await db.execute(
+        select(MovementType).where(MovementType.user_id == user.id))).scalars()}
+    restored = (await db.execute(select(Movement).where(Movement.user_id == user.id))).scalar_one()
+    assert {s.movement_type_id: float(s.money) for s in restored.splits} == {
+        types["Super"]: 30, types["Limpieza"]: 10}

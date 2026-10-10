@@ -11,6 +11,7 @@ from app.models.account import Account
 from app.schemas.movement import MovementCreate, MovementRead, MovementUpdate
 from app.services.calculations import compute_dinero, compute_label
 from app.services.audit import write_log
+from app.services.splits import apply_splits, rescale_splits
 from app.services.credit import apply_card_bank_date, settlement_for, settlement_items, sync_credit_charges
 from app.auth.setup import current_active_user
 from app.models.user import User
@@ -99,6 +100,7 @@ def _mv_snap(mv: Movement) -> dict:
         "is_shared": mv.is_shared,
         "shared_between": mv.shared_between,
         "my_share": float(mv.my_share) if mv.my_share is not None else None,
+        "splits": [{"movement_type_id": sp.movement_type_id, "money": float(sp.money)} for sp in mv.splits],
     }
 
 
@@ -128,7 +130,9 @@ async def list_movements(
 @router.post("", response_model=MovementRead, status_code=201)
 async def create_movement(body: MovementCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
     acc_name, bal_before = await _balance_for(db, user.id, body.account_id)
-    mv = Movement(**body.model_dump(), user_id=user.id)
+    mv = Movement(**body.model_dump(exclude={"splits"}), user_id=user.id, splits=[])
+    if body.splits is not None:
+        await apply_splits(db, user.id, mv, [sp.model_dump() for sp in body.splits])
     await apply_card_bank_date(db, mv)
     db.add(mv)
     await db.flush()
@@ -200,11 +204,24 @@ async def update_movement(movement_id: int, body: MovementUpdate, db: AsyncSessi
     if not mv:
         raise HTTPException(status_code=404, detail="Movement not found")
     changes = body.model_dump(exclude_unset=True)
-    before_snap = {k: _mv_snap(mv)[k] for k in changes if k in _mv_snap(mv)}
+    splits = changes.pop("splits", None)
+    before = _mv_snap(mv)
+    old_money, old_type = float(mv.money), mv.movement_type_id
     for k, v in changes.items():
         setattr(mv, k, v)
+    if splits is not None:
+        await apply_splits(db, user.id, mv, splits)
+    elif mv.splits:
+        # Elegir un tipo concreto (o pasar a traspaso) quita la división; cambiar el importe la escala
+        if mv.is_transfer or mv.movement_type_id != old_type:
+            mv.splits = []
+        elif float(mv.money) != old_money:
+            rescale_splits(mv, old_money)
     await apply_card_bank_date(db, mv)
-    after_snap = {k: _mv_snap(mv)[k] for k in changes if k in _mv_snap(mv)}
+    after = _mv_snap(mv)
+    keys = [k for k in after if k in changes or before[k] != after[k]]
+    before_snap = {k: before[k] for k in keys}
+    after_snap = {k: after[k] for k in keys}
     await write_log(user.id, "movement", mv.id, "update",
                    f"Movimiento editado: {mv.name}",
                    before=before_snap, after=after_snap)

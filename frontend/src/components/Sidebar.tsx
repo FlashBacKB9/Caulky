@@ -14,6 +14,14 @@ interface ChangelogEntry { version: string; date: string; items: { type: 'feat' 
 
 const CHANGELOG: ChangelogEntry[] = [
   {
+    version: 'v1.9.5', date: 'Octubre 2026',
+    items: [
+      { type: 'feat',    text: 'Categoría múltiple: al crear o editar un movimiento, la opción «Múltiple» del tipo abre un reparto con un importe por categoría y un donut en vivo; el movimiento cuenta en cada categoría con su parte en gráficos, análisis, presupuestos y control de gastos' },
+      { type: 'feat',    text: 'Tickets: comida y suministros se crean en un solo movimiento dividido por tipo en vez de uno por tipo' },
+      { type: 'fix',     text: 'Tickets: al generar un movimiento se comprueba que el tipo elegido sea del usuario' },
+    ],
+  },
+  {
     version: 'v1.9.4', date: 'Octubre 2026',
     items: [
       { type: 'feat',    text: 'Cuentas reales: cada tarjeta de crédito aparece dentro de la cuenta real que la paga, como una ficticia más, sin vincularla a mano; su deuda pendiente cuenta en el saldo de esa cuenta real' },

@@ -3,7 +3,9 @@ import { t } from '../utils/i18n'
 import { useSharedMovements } from '../hooks/useSharedMovements'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
-import { createMovement } from '../api/movements'
+import { createMovement, type MovementSplit } from '../api/movements'
+import SplitCategoryModal, { SplitSummary } from './SplitCategoryModal'
+import { MULTI_TYPE, mainSplitType } from '../utils/splits'
 import { getAccountsSummary } from '../api/accounts'
 import api from '../api/client'
 import {
@@ -25,6 +27,8 @@ interface Props {
     money?: string
     date?: string
     movement_type_id?: string
+    /** Categoría múltiple ya repartida (p. ej. un ticket por tipos) */
+    splits?: MovementSplit[]
   }
   onMovementCreated?: (id: number) => void
 }
@@ -60,16 +64,21 @@ function Toggle({ value, onChange, color = '#3b82f6' }: {
   )
 }
 
-function TypeSelect({ value, onChange, types, byCategory }: {
+function TypeSelect({ value, onChange, types, byCategory, splits, onMulti }: {
   value: string; onChange: (v: string) => void
   types: MovementType[]; byCategory: Record<string, MovementType[]>
+  /** Con onMulti aparece la opción «Múltiple», que abre el reparto en vez de cambiar el valor */
+  splits?: MovementSplit[]; onMulti?: () => void
 }) {
-  const sel = types.find(t => String(t.id) === value)
+  const multi = !!splits?.length
+  const sel = multi ? undefined : types.find(t => String(t.id) === value)
   return (
     <div className="relative">
       {sel && <span className="absolute left-3 top-1/2 -translate-y-1/2 w-2.5 h-2.5 rounded-full" style={{ backgroundColor: sel.color }} />}
-      <select value={value} onChange={e => onChange(e.target.value)} className={`${INP} ${sel ? 'pl-8' : ''}`}>
+      <select value={multi ? MULTI_TYPE : value} className={`${INP} ${sel ? 'pl-8' : ''}`}
+        onChange={e => e.target.value === MULTI_TYPE ? onMulti?.() : onChange(e.target.value)}>
         <option value="">{t('form.noCategory')}</option>
+        {onMulti && <option value={MULTI_TYPE}>{multi ? `${t('split.option')} · ${t('split.parts').replace('{n}', String(splits!.length))}` : t('split.option')}</option>}
         {Object.entries(byCategory).map(([cat, items]) => (
           <optgroup key={cat} label={cat}>
             {items.map(t => (
@@ -194,8 +203,30 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
     account_id: '', is_transfer: false, from_account_id: '',
     paid: true, no_count: false, notes: '',
     is_shared: false, shared_between: '2', my_share: '',
+    splits: (initialValues?.splits ?? []) as MovementSplit[],
   })
   const set = (field: string, value: unknown) => setForm(f => ({ ...f, [field]: value }))
+
+  // ── Categoría múltiple ───────────────────────────────────────────────────────
+  const [splitOpen, setSplitOpen] = useState(false)
+  const splitInitial: MovementSplit[] = form.splits.length
+    ? form.splits
+    : form.movement_type_id && parseFloat(form.money)
+      ? [{ movement_type_id: parseInt(form.movement_type_id), money: Math.abs(parseFloat(form.money)) }]
+      : []
+  const saveSplits = (parts: MovementSplit[]) => {
+    // El reparto va en positivo; una devolución (importe negativo) lo conserva en negativo
+    const sign = parseFloat(form.money) < 0 ? -1 : 1
+    const signed = parts.map(p => ({ ...p, money: p.money * sign }))
+    const total = signed.reduce((acc, p) => acc + p.money, 0)
+    setForm(f => ({
+      ...f,
+      money: total.toFixed(2),
+      movement_type_id: String(mainSplitType(signed) ?? ''),
+      splits: signed.length > 1 ? signed : [],
+    }))
+    setSplitOpen(false)
+  }
 
   // ── Panel mode ───────────────────────────────────────────────────────────────
   const [panel, setPanel] = useState<PanelMode>('form')
@@ -251,6 +282,7 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
         name: form.name, money: parseFloat(form.money), date: form.date,
         bank_date: form.bank_date || undefined,
         movement_type_id: form.movement_type_id ? parseInt(form.movement_type_id) : undefined,
+        splits: !form.is_transfer && form.splits.length > 1 ? form.splits : undefined,
         account_id: form.account_id ? parseInt(form.account_id) : undefined,
         is_transfer: form.is_transfer,
         from_account_id: form.is_transfer && form.from_account_id ? parseInt(form.from_account_id) : undefined,
@@ -317,6 +349,7 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
       is_transfer: false, from_account_id: '',
       paid: tpl.paid, no_count: tpl.no_count, notes: tpl.notes,
       is_shared: false, shared_between: '2', my_share: '',
+      splits: [],
     }))
     setPanel('form')
   }
@@ -532,8 +565,11 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
                   <div>
                     <label className={LBL}>{t('form.amountLabel')} *</label>
                     <div className="relative">
+                      {/* Con categoría múltiple el importe es la suma del reparto: se cambia desde ahí */}
                       <input type="number" step="0.01" value={form.money} onChange={e => set('money', e.target.value)}
-                        placeholder="0.00" className={INP + ' pr-7'} />
+                        readOnly={form.splits.length > 0 && !form.is_transfer}
+                        onClick={() => { if (form.splits.length > 0 && !form.is_transfer) setSplitOpen(true) }}
+                        placeholder="0.00" className={INP + ' pr-7' + (form.splits.length > 0 && !form.is_transfer ? ' cursor-pointer' : '')} />
                       <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 text-sm">€</span>
                     </div>
                     <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">{t('form.negativeHint')}</p>
@@ -555,8 +591,12 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
                               ? <div className="flex items-center gap-2 py-1"><span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: linked.color }} /><span className="text-sm text-gray-700 dark:text-gray-300">{linked.name}</span></div>
                               : <p className="text-xs text-gray-400 dark:text-gray-500 italic py-1">Sin tipo — es una transferencia</p>
                           })()
-                        : <><TypeSelect value={form.movement_type_id} onChange={v => set('movement_type_id', v)} types={types} byCategory={byCategory} />
-                          <SavingsHint typeId={form.movement_type_id} money={form.money} /></>
+                        : <><TypeSelect value={form.movement_type_id} types={types} byCategory={byCategory}
+                            onChange={v => setForm(f => ({ ...f, movement_type_id: v, splits: [] }))}
+                            splits={form.splits} onMulti={() => setSplitOpen(true)} />
+                          {form.splits.length > 0
+                            ? <SplitSummary splits={form.splits} types={types} onEdit={() => setSplitOpen(true)} />
+                            : <SavingsHint typeId={form.movement_type_id} money={form.money} />}</>
                       }
                     </div>
                   </div>
@@ -1109,7 +1149,12 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
           </div>
         </div>
 
+
       </div>
+      {splitOpen && (
+        <SplitCategoryModal types={types} initial={splitInitial}
+          onCancel={() => setSplitOpen(false)} onSave={saveSplits} />
+      )}
     </div>
   )
 }

@@ -18,6 +18,7 @@ from app.models.income_expense_group import IncomeExpenseGroup
 from app.models.investment import InvestmentFund, InvestmentPurchase
 from app.models.movement import Movement
 from app.models.movement_file import MovementFile
+from app.models.movement_split import MovementSplit
 from app.models.movement_type import MovementType
 from app.models.real_account import RealAccount, real_account_accounts
 from app.models.template import MovementTemplate as TemplateModel
@@ -33,7 +34,7 @@ _is_sqlite = settings.DATABASE_URL.startswith("sqlite")
 def _clean(obj) -> dict[str, Any]:
     result = {}
     for k, v in obj.__dict__.items():
-        if k.startswith("_"):
+        if k.startswith("_") or k == "splits":
             continue
         if isinstance(v, datetime.datetime):
             result[k] = v.isoformat()
@@ -99,7 +100,10 @@ async def export_backup(db: AsyncSession = Depends(get_db), user: User = Depends
             "groups":               [_clean(g) for g in groups],
             "accounts":             [_clean(a) for a in accounts],
             "types":                [_clean(t) for t in types],
-            "movements":            [_clean(m) for m in movements],
+            "movements": [
+                {**_clean(m), "splits": [{"movement_type_id": s.movement_type_id, "money": float(s.money)} for s in m.splits]}
+                for m in movements
+            ],
             "investment_funds":     [_clean(f) for f in inv_funds],
             "investment_purchases": [_clean(p) for p in inv_purchases],
             "templates":            [_clean(t) for t in tpls],
@@ -149,6 +153,7 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
             mv_ids2 = [r[0] for r in mv_ids_res2.all()]
             if mv_ids2:
                 await db.execute(sa_delete(MovementFile).where(MovementFile.movement_id.in_(mv_ids2)))
+                await db.execute(sa_delete(MovementSplit).where(MovementSplit.movement_id.in_(mv_ids2)))
             await db.execute(sa_delete(Movement).where(Movement.user_id == uid))
         if rt or ra or rg:
             await db.execute(sa_delete(MovementType).where(MovementType.user_id == uid))
@@ -226,9 +231,13 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
 
         if rm:
             pending = []
-            _mv_skip = {"user_id", "files", "id"}
+            _mv_skip = {"user_id", "files", "id", "splits"}
             for m in payload.db.get("movements", []):
                 d = {k: v for k, v in m.items() if k not in _mv_skip}
+                d["splits"] = [
+                    MovementSplit(movement_type_id=type_id_map.get(s["movement_type_id"], s["movement_type_id"]), money=s["money"])
+                    for s in m.get("splits") or []
+                ]
                 d["date"]      = _parse_date(d.get("date"))
                 d["bank_date"] = _parse_date(d.get("bank_date"))
                 for k in ("credit_cycle_end", "credit_cycle_start"):
@@ -347,6 +356,7 @@ async def reset_system(db: AsyncSession = Depends(get_db), user: User = Depends(
     if mv_ids:
         await db.execute(sa_delete(InvestmentPurchase).where(InvestmentPurchase.movement_id.in_(mv_ids)))
         await db.execute(sa_delete(MovementFile).where(MovementFile.movement_id.in_(mv_ids)))
+        await db.execute(sa_delete(MovementSplit).where(MovementSplit.movement_id.in_(mv_ids)))
     await db.execute(sa_delete(InvestmentFund).where(InvestmentFund.user_id == uid))
     await db.execute(sa_delete(Movement).where(Movement.user_id == uid))
     await db.execute(sa_delete(MovementType).where(MovementType.user_id == uid))

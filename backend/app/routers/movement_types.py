@@ -6,6 +6,7 @@ from app.database import get_db
 from app.models.movement_type import MovementType
 from app.schemas.movement_type import MovementTypeCreate, MovementTypeRead, MovementTypeUpdate
 from app.services.audit import write_log
+from app.services.splits import drop_type_from_splits
 from app.auth.setup import current_active_user
 from app.models.user import User
 
@@ -98,5 +99,7 @@ async def delete_type(type_id: int, db: AsyncSession = Depends(get_db), user: Us
     await write_log(user.id, "movement_type", mt.id, "delete",
               f"Tipo eliminado: {mt.name}",
               before=_type_snap(mt))
+    await drop_type_from_splits(db, mt.id)
+    await db.flush()
     await db.delete(mt)
     await db.commit()

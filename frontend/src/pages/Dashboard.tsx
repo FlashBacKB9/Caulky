@@ -35,6 +35,7 @@ import {
   PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, Legend, CartesianGrid, ReferenceArea, ReferenceLine,
 } from 'recharts'
+import { expandSplits } from '../utils/splits'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -932,6 +933,8 @@ function DashboardCustomChart({ def, apiGroups, types, accounts, height, period,
   const { data: allMovements = [] } = useQuery({
     queryKey: ['movements', fetchYear],
     queryFn: () => getMovements(fetchYear !== null ? { year: fetchYear } : undefined),
+    // Categoría múltiple: cada parte cuenta en su tipo
+    select: expandSplits,
     enabled: def.dataSource !== 'accounts',
   })
 
@@ -1587,7 +1590,7 @@ export default function Dashboard() {
   const needsChartsData       = hasChartsBuiltins || hasCustomChartWidgets
 
   const { data: movements = [] } = useQuery({
-    queryKey: ['movements'], queryFn: () => getMovements(),
+    queryKey: ['movements'], queryFn: () => getMovements(), select: expandSplits,
     enabled: hasBudgetWidgets || hasChartsBuiltins || hasBalanceHistory,
   })
   const { data: apiGroups = [] } = useQuery({

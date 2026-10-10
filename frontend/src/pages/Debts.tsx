@@ -15,6 +15,7 @@ import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
 import { syncPref } from '../utils/prefSync'
 import AppIcon from '../components/AppIcon'
+import { expandSplits } from '../utils/splits'
 
 // ── Types & storage ───────────────────────────────────────────────────────────
 
@@ -791,7 +792,7 @@ export default function Debts() {
   const qc          = useQueryClient()
 
   const { data: summary }           = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
-  const { data: allMovements = [] } = useQuery({ queryKey: ['movements'],        queryFn: () => getMovements() })
+  const { data: allMovements = [] } = useQuery({ queryKey: ['movements'],        queryFn: () => getMovements(), select: expandSplits })
   const { data: types = [] }        = useQuery({ queryKey: ['movement-types'],   queryFn: getMovementTypes })
 
   const [debts,      setDebts]      = useState<DebtConfig[]>(loadDebts)

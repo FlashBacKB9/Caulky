@@ -43,3 +43,8 @@ class Movement(Base):
     files: Mapped[list["MovementFile"]] = relationship(
         back_populates="movement", cascade="all, delete-orphan", lazy="selectin"
     )
+    # Categoría múltiple: si hay partes, movement_type_id es el tipo de la parte mayor
+    splits: Mapped[list["MovementSplit"]] = relationship(
+        back_populates="movement", cascade="all, delete-orphan", lazy="selectin",
+        order_by="MovementSplit.id",
+    )

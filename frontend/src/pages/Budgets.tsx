@@ -8,6 +8,7 @@ import { getMovements, type Movement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getGroups, type Group } from '../api/groups'
 import { useCurrency } from '../hooks/useCurrency'
+import { expandSplits } from '../utils/splits'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -689,7 +690,7 @@ function BudgetDetail({ budget, movements, types, onClose, onEdit }: {
                             ) : (
                               <div className="ml-4 divide-y divide-gray-50 dark:divide-gray-800/60">
                                 {rowMovements.map(mv => (
-                                  <div key={mv.id} className="flex items-center justify-between py-1.5 gap-3">
+                                  <div key={`${mv.id}-${mv.movement_type_id}`} className="flex items-center justify-between py-1.5 gap-3">
                                     <div className="flex items-center gap-2 min-w-0">
                                       <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: mv.color }}/>
                                       <span className="text-xs text-gray-600 dark:text-gray-300 truncate">{mv.name}</span>
@@ -727,7 +728,8 @@ export default function Budgets() {
   const [editingBudget, setEditingBudget] = useState<Budget | null>(null)
   const [detailId,      setDetailId]      = useState<string | null>(null)
 
-  const { data: movements = [] } = useQuery({ queryKey: ['movements'], queryFn: () => getMovements() })
+  // Categoría múltiple: cada parte cuenta en su tipo
+  const { data: movements = [] } = useQuery({ queryKey: ['movements'], queryFn: () => getMovements(), select: expandSplits })
   const { data: types  = [] }   = useQuery({ queryKey: ['movement-types'],  queryFn: getMovementTypes })
   const { data: groups = [] }   = useQuery({ queryKey: ['groups'],          queryFn: getGroups })
 

@@ -11,6 +11,7 @@ from app.models.movement_type import MovementType
 from app.models.movement import Movement
 from app.models.account import Account
 from app.services.calculations import compute_dinero, MONTH_NAMES, monthly_value
+from app.services.splits import split_parts
 from app.routers.accounts import _compute_balances
 from app.auth.setup import current_active_user
 from app.models.user import User
@@ -29,6 +30,19 @@ def _effective_money(mv) -> float:
     if mv.my_share is not None:
         return float(mv.my_share) * (1 if money >= 0 else -1)
     return money
+
+
+def _type_contributions(groups) -> dict[int, list[tuple[Movement, float]]]:
+    """Importe efectivo que cada movimiento aporta a cada tipo: los de categoría múltiple
+    (cargados solo bajo su tipo principal) se reparten entre sus partes."""
+    out: dict[int, list[tuple[Movement, float]]] = {}
+    for group in groups:
+        for mt in group.movement_types:
+            for mv in mt.movements:
+                eff, total = _effective_money(mv), float(mv.money)
+                for type_id, part in split_parts(mv):
+                    out.setdefault(type_id, []).append((mv, eff * part / total if total else 0.0))
+    return out
 
 
 def _groups_with_year(year: int, user_id: uuid.UUID):
@@ -63,6 +77,7 @@ async def annual_stats(
 ):
     result = await db.execute(_groups_with_year(year, user.id))
     groups = result.unique().scalars().all()
+    contributions = _type_contributions(groups)
 
     output = []
     for group in groups:
@@ -73,8 +88,8 @@ async def annual_stats(
 
         for mt in group.movement_types:
             mt_monthly = {m: 0.0 for m in MONTH_NAMES}
-            for mv in mt.movements:
-                dinero = compute_dinero(_effective_money(mv), group.name)
+            for mv, money in contributions.get(mt.id, []):
+                dinero = compute_dinero(money, group.name)
                 for i, month_name in enumerate(MONTH_NAMES, start=1):
                     val = monthly_value(dinero, mv.date, i, mv.no_count)
                     mt_monthly[month_name] += val
@@ -128,6 +143,7 @@ async def dashboard(
 
     result = await db.execute(_groups_with_year(year, user.id))
     groups = result.unique().scalars().all()
+    contributions = _type_contributions(groups)
 
     annual = {"income": 0.0, "expenses": 0.0, "savings": 0.0}
     monthly = {"income": 0.0, "expenses": 0.0, "savings": 0.0}
@@ -143,10 +159,10 @@ async def dashboard(
         group_monthly = 0.0
 
         for mt in group.movement_types:
-            for mv in mt.movements:
+            for mv, money in contributions.get(mt.id, []):
                 if mv.no_count:
                     continue
-                dinero = compute_dinero(_effective_money(mv), group.name)
+                dinero = compute_dinero(money, group.name)
                 group_annual += dinero
                 if mv.date.month == current_month:
                     group_monthly += dinero

@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTemplates } from '../api/templates'
 import { useNavigate } from 'react-router-dom'
-import { Check, Delete, ChevronDown, X, Upload, Loader2, AlertCircle, Receipt, ShoppingCart, Package, Leaf, RotateCcw } from 'lucide-react'
+import { Check, Delete, ChevronDown, X, Upload, Loader2, AlertCircle, Receipt, ShoppingCart, Leaf, RotateCcw } from 'lucide-react'
 import { createMovement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getAccountsSummary } from '../api/accounts'
@@ -14,6 +14,8 @@ import { useDarkMode } from '../hooks/useDarkMode'
 import { type MovementTemplate } from '../utils/recurringTemplates'
 import { t } from '../utils/i18n'
 import MovementForm from '../components/MovementForm'
+import type { MovementSplit } from '../api/movements'
+import { mainSplitType, ticketSplit } from '../utils/splits'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -251,7 +253,7 @@ const SUPPLIES_CATS = new Set([
   'Maquillaje', 'Mascotas',
 ])
 
-type MovMode = 'food' | 'supplies' | 'combined'
+type MovMode = 'split' | 'combined'
 
 interface MovFormCfg {
   mode: MovMode
@@ -259,6 +261,7 @@ interface MovFormCfg {
   money: string
   date: string
   movement_type_id: string
+  splits?: MovementSplit[]
 }
 
 function TicketTab(_: { movementTypes: MovementType[] }) {
@@ -316,16 +319,24 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
 
   const openMovForm = (mode: MovMode) => {
     if (!ticket) return
-    const total = mode === 'food' ? foodTotal : mode === 'supplies' ? suppliesTotal : combinedTotal
-    const prefKey = mode === 'food' ? 'ticket_food_type_id' : mode === 'supplies' ? 'ticket_supplies_type_id' : 'ticket_combined_type_id'
-    const typeId = localStorage.getItem(prefKey) ?? ''
-    const modeLabel = mode === 'food' ? 'Comida' : mode === 'supplies' ? 'Suministros' : 'Completo'
+    const store = ticket.store_name?.trim() || 'Ticket'
+    const date = ticket.ticket_date ?? new Date().toISOString().slice(0, 10)
+    if (mode === 'split') {
+      // Comida y suministros en un solo movimiento con categoría múltiple
+      const { parts } = ticketSplit(foodTotal, suppliesTotal)
+      setMovForm({
+        mode, name: store, date,
+        money: (foodTotal + suppliesTotal).toFixed(2),
+        movement_type_id: String(mainSplitType(parts) ?? ''),
+        splits: parts.length > 1 ? parts : undefined,
+      })
+      return
+    }
     setMovForm({
-      mode,
-      name: `${ticket.store_name?.trim() || 'Ticket'} — ${modeLabel}`,
-      money: total.toFixed(2),
-      date: ticket.ticket_date ?? new Date().toISOString().slice(0, 10),
-      movement_type_id: typeId,
+      mode, date,
+      name: `${store} — Completo`,
+      money: combinedTotal.toFixed(2),
+      movement_type_id: localStorage.getItem('ticket_combined_type_id') ?? '',
     })
   }
 
@@ -338,8 +349,7 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
   }
 
   const MOV_OPTS: { mode: MovMode; label: string; Icon: React.ComponentType<{ className?: string }>; color: string; total: number }[] = [
-    { mode: 'food',     label: 'Comida',       Icon: ShoppingCart, color: '#10b981', total: foodTotal     },
-    { mode: 'supplies', label: 'Suministros',  Icon: Package,      color: '#8b5cf6', total: suppliesTotal },
+    { mode: 'split',    label: 'Por tipo',     Icon: ShoppingCart, color: '#10b981', total: foodTotal + suppliesTotal },
     { mode: 'combined', label: 'Todo',         Icon: Leaf,         color: '#3b82f6', total: combinedTotal },
   ]
 
@@ -506,6 +516,7 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
             money: movForm.money,
             date: movForm.date,
             movement_type_id: movForm.movement_type_id || undefined,
+            splits: movForm.splits,
           }}
           onMovementCreated={handleMovCreated}
         />,

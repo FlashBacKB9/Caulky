@@ -21,6 +21,7 @@ import {
   BarChart2, Layers, TrendingUp, Activity, PieChart as PieIcon,
   GripVertical, Sigma,
 } from 'lucide-react'
+import { expandSplits } from '../utils/splits'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -660,7 +661,7 @@ function ChartWithFilter({ title, groups, types, allYears, modes, onDelete,
   const [advFilter,         setAdvFilter]         = useState<AdvancedFilter>(EMPTY_FILTER)
   const [mode,              setMode]              = useState<DisplayMode>(modes?.[0]?.id ?? 'bars')
 
-  const { data: movements = [] } = useQuery({ queryKey:['movements',year], queryFn:()=>getMovements(year!==null?{year}:undefined) })
+  const { data: movements = [] } = useQuery({ queryKey:['movements',year], queryFn:()=>getMovements(year!==null?{year}:undefined), select: expandSplits })
   const typeToGroup = useMemo(()=>Object.fromEntries(types.map(t=>[t.id,t.income_expense_group_id])),[types])
   const groupById   = useMemo(()=>Object.fromEntries(groups.map(g=>[g.id,g])),[groups])
   const typeById    = useMemo(()=>Object.fromEntries(types.map(t=>[t.id,t])),[types])
@@ -759,8 +760,8 @@ function CustomChartCard({ def, chartH, onUpdate, onDelete, onHide, onEdit, allY
 
   const isAccounts = (def.dataSource ?? 'movements') === 'accounts'
   const effectiveYear_c = def.period ? CUR_YEAR : def.year
-  const { data: movements = [] } = useQuery({ queryKey:['movements',effectiveYear_c], queryFn:()=>getMovements(effectiveYear_c!==null?{year:effectiveYear_c}:undefined) })
-  const { data: movementsAll = [] } = useQuery({ queryKey:['movements',null], queryFn:()=>getMovements(), enabled: isAccounts && def.xAxis!=='none' })
+  const { data: movements = [] } = useQuery({ queryKey:['movements',effectiveYear_c], queryFn:()=>getMovements(effectiveYear_c!==null?{year:effectiveYear_c}:undefined), select: expandSplits })
+  const { data: movementsAll = [] } = useQuery({ queryKey:['movements',null], queryFn:()=>getMovements(), select: expandSplits, enabled: isAccounts && def.xAxis!=='none' })
   const typeToGroup  = useMemo(()=>Object.fromEntries(types.map(t=>[t.id,t.income_expense_group_id])),[types])
   const groupById    = useMemo(()=>Object.fromEntries(groups.map(g=>[g.id,g])),[groups])
   const typeById     = useMemo(()=>Object.fromEntries(types.map(t=>[t.id,t])),[types])
@@ -1033,8 +1034,8 @@ function ChartBuilderScreen({ def, onUpdate, onSave, onCancel, allYears, groups,
 
   const isAccounts = (def.dataSource ?? 'movements') === 'accounts'
   const effectiveYear_b = def.period ? CUR_YEAR : def.year
-  const { data: movements = [] } = useQuery({ queryKey:['movements',effectiveYear_b], queryFn:()=>getMovements(effectiveYear_b!==null?{year:effectiveYear_b}:undefined) })
-  const { data: movementsAll = [] } = useQuery({ queryKey:['movements',null], queryFn:()=>getMovements(), enabled: isAccounts && def.xAxis!=='none' })
+  const { data: movements = [] } = useQuery({ queryKey:['movements',effectiveYear_b], queryFn:()=>getMovements(effectiveYear_b!==null?{year:effectiveYear_b}:undefined), select: expandSplits })
+  const { data: movementsAll = [] } = useQuery({ queryKey:['movements',null], queryFn:()=>getMovements(), select: expandSplits, enabled: isAccounts && def.xAxis!=='none' })
   const typeToGroup = useMemo(()=>Object.fromEntries(types.map(t=>[t.id,t.income_expense_group_id])),[types])
   const groupById   = useMemo(()=>Object.fromEntries(groups.map(g=>[g.id,g])),[groups])
   const typeById    = useMemo(()=>Object.fromEntries(types.map(t=>[t.id,t])),[types])
@@ -1537,7 +1538,7 @@ export default function Charts() {
 
   useEffect(() => { syncPref('spendly-custom-charts-v2', JSON.stringify(customCharts)) }, [customCharts])
 
-  const { data: allMovements = [] } = useQuery({ queryKey:['movements-all'],  queryFn:()=>getMovements() })
+  const { data: allMovements = [] } = useQuery({ queryKey:['movements-all'],  queryFn:()=>getMovements(), select: expandSplits })
   const { data: groups = [] }       = useQuery({ queryKey:['groups'],          queryFn:getGroups })
   const { data: types  = [] }       = useQuery({ queryKey:['movement-types'],  queryFn:getMovementTypes })
   const { data: summary }           = useQuery({ queryKey:['accounts-summary'], queryFn:getAccountsSummary })

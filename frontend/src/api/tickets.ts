@@ -18,7 +18,7 @@ export interface Ticket {
   total: number | null
   items: TicketItem[]
   categories: Record<string, number>
-  generated_movements?: { food?: number; supplies?: number; combined?: number } | null
+  generated_movements?: { food?: number; supplies?: number; combined?: number; split?: number } | null
   ocr_source?: string | null
   created_at: string
 }
@@ -71,7 +71,7 @@ export const updateTicketMeta = (
 export const attachTicketToMovement = (
   ticketId: number,
   movementId: number,
-  mode: 'food' | 'supplies' | 'combined',
+  mode: 'food' | 'supplies' | 'combined' | 'split',
 ): Promise<void> =>
   api.post(`/tickets/${ticketId}/attach/${movementId}`, { mode }).then(() => undefined)
 

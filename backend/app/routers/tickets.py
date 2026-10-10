@@ -14,6 +14,7 @@ from app.models.ticket import Ticket
 from app.models.item_category_rule import ItemCategoryRule
 from app.models.movement import Movement as MovementModel
 from app.models.movement_file import MovementFile
+from app.services.splits import apply_splits
 from app.schemas.ticket import TicketRead
 from app.auth.setup import current_active_user
 from app.models.user import User
@@ -1253,13 +1254,14 @@ async def get_ticket_file(
 
 
 class TicketToMovementRequest(PydanticModel):
-    mode: str           # "food" | "supplies" | "combined"
-    type_id: int
+    mode: str           # "food" | "supplies" | "combined" | "split"
+    type_id: int        # en "split", el tipo de la comida
+    supplies_type_id: int | None = None   # solo "split": tipo de los suministros
     movement_date: str | None = None   # ISO date, defaults to ticket_date or today
 
 
 class AttachMovementRequest(PydanticModel):
-    mode: str           # "food" | "supplies" | "combined"
+    mode: str           # "food" | "supplies" | "combined" | "split"
 
 
 @router.post("/{ticket_id}/to-movement", status_code=201)
@@ -1275,12 +1277,14 @@ async def ticket_to_movement(
 
     items = json.loads(t.items)
 
+    food = sum(i["amount"] for i in items if i["category"] not in SUPPLIES_CATEGORIES)
+    supplies = sum(i["amount"] for i in items if i["category"] in SUPPLIES_CATEGORIES)
     if body.mode == "food":
-        amount = sum(i["amount"] for i in items if i["category"] not in SUPPLIES_CATEGORIES)
+        amount = food
     elif body.mode == "supplies":
-        amount = sum(i["amount"] for i in items if i["category"] in SUPPLIES_CATEGORIES)
-    else:  # combined
-        amount = sum(i["amount"] for i in items)
+        amount = supplies
+    else:  # combined / split
+        amount = food + supplies
 
     amount = round(amount, 2)
     if amount <= 0:
@@ -1302,10 +1306,17 @@ async def ticket_to_movement(
         name=name,
         money=amount,
         date=mv_date,
-        movement_type_id=body.type_id,
+        movement_type_id=None,
         paid=True,
         no_count=False,
+        splits=[],
     )
+    # Un solo movimiento repartido por tipo (comida / suministros) con categoría múltiple
+    parts = [{"movement_type_id": body.type_id, "money": amount}]
+    if body.mode == "split":
+        parts = [{"movement_type_id": body.type_id, "money": round(food, 2)},
+                 {"movement_type_id": body.supplies_type_id or body.type_id, "money": round(supplies, 2)}]
+    await apply_splits(db, user.id, mv, parts)
     db.add(mv)
     await db.flush()   # get mv.id
 

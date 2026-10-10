@@ -1862,6 +1862,12 @@ export default function Movements() {
                                     <option value="">{t('movements.bulkNoCategory')}</option>
                                     {types.map(tp => <option key={tp.id} value={tp.id}>{tp.category} / {tp.name}</option>)}
                                   </select>
+                                : mv.splits?.length
+                                  ? <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+                                      title={mv.splits.map(sp => `${typeMap[sp.movement_type_id]?.name ?? '?'}: ${fmt(Math.abs(sp.money))}`).join('\n')}>
+                                      {mv.splits.map(sp => <span key={sp.movement_type_id} className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: typeMap[sp.movement_type_id]?.color ?? '#6b7280' }} />)}
+                                      {t('split.option')}
+                                    </span>
                                 : typeInfo
                                   ? <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium" style={{ backgroundColor: color + '22', color }}>{typeInfo.name}</span>
                                   : <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>}

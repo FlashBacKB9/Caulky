@@ -4,6 +4,7 @@ import { ChevronDown, ChevronUp, RefreshCw } from 'lucide-react'
 import { getMovementTypes } from '../../api/movementTypes'
 import { getMovements } from '../../api/movements'
 import { Section } from './shared'
+import { expandSplits } from '../../utils/splits'
 
 // ── Suscripciones ─────────────────────────────────────────────────────────────
 
@@ -53,7 +54,7 @@ function detectSuggestions(movements: { date: string; dinero: number; movement_t
 
 function SubscripcionesSection() {
   const { data: types = [] }     = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
-  const { data: movements = [] } = useQuery({ queryKey: ['movements'],      queryFn: () => getMovements(), staleTime: 5 * 60 * 1000 })
+  const { data: movements = [] } = useQuery({ queryKey: ['movements'],      queryFn: () => getMovements(), select: expandSplits, staleTime: 5 * 60 * 1000 })
   const [config, setConfig]      = useState<Record<number, SubEntry>>(loadSubsConfig)
   const [showSuggestions, setShowSuggestions] = useState(false)
 

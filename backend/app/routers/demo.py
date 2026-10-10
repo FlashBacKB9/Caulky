@@ -9,6 +9,7 @@ from app.database import get_db
 from app.models.account import Account
 from app.models.income_expense_group import IncomeExpenseGroup
 from app.models.movement import Movement
+from app.models.movement_split import MovementSplit
 from app.models.movement_type import MovementType
 from app.models.real_account import RealAccount, real_account_accounts
 from app.models.user import User
@@ -317,6 +318,8 @@ async def _seed_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
 
 async def _wipe_demo(db: AsyncSession, user_id: uuid.UUID) -> None:
     """Delete all data for the demo user so it can be reseeded."""
+    await db.execute(delete(MovementSplit).where(
+        MovementSplit.movement_id.in_(select(Movement.id).where(Movement.user_id == user_id))))
     await db.execute(delete(Movement).where(Movement.user_id == user_id))
     await db.execute(delete(MovementType).where(MovementType.user_id == user_id))
     await db.execute(delete(IncomeExpenseGroup).where(IncomeExpenseGroup.user_id == user_id))

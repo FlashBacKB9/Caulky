@@ -16,6 +16,7 @@ import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getAccountsSummary, type Account } from '../api/accounts'
 import { useCurrency } from '../hooks/useCurrency'
 import { t, getMonthNames } from '../utils/i18n'
+import { expandSplits } from '../utils/splits'
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 
@@ -258,7 +259,7 @@ function ConfigPanel({ config, onChange, accounts, groups, types, allExpenseMove
                   const excluded = config.excludedMovementIds.includes(m.id)
                   return (
                     <div
-                      key={m.id}
+                      key={`${m.id}-${m.movement_type_id}`}
                       className={`flex items-center gap-3 text-xs rounded-lg px-3 py-2 transition-opacity ${
                         excluded ? 'bg-gray-50/50 dark:bg-gray-800/30 opacity-50' : 'bg-gray-50 dark:bg-gray-800'
                       }`}
@@ -1031,7 +1032,8 @@ export default function Analysis() {
     syncPref(ANALYSIS_CONFIG_KEY, JSON.stringify(c))
   }
 
-  const { data: allMovements = [] } = useQuery({ queryKey: ['movements'], queryFn: () => getMovements() })
+  // Categoría múltiple: cada parte cuenta en su tipo
+  const { data: allMovements = [] } = useQuery({ queryKey: ['movements'], queryFn: () => getMovements(), select: expandSplits })
   const { data: groups = [] }       = useQuery({ queryKey: ['groups'],    queryFn: getGroups })
   const { data: types = [] }        = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes })
   const { data: accountsSummary }   = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })

@@ -7,6 +7,12 @@ export interface MovementFile {
   created_at: string
 }
 
+/** Parte de un movimiento con categoría múltiple. */
+export interface MovementSplit {
+  movement_type_id: number
+  money: number
+}
+
 export interface Movement {
   id: number
   name: string
@@ -30,6 +36,8 @@ export interface Movement {
   label: string
   color: string
   files: MovementFile[]
+  /** Categoría múltiple: si hay partes, movement_type_id es el tipo de la mayor. */
+  splits?: MovementSplit[]
 }
 
 export const getMovements = (params?: { year?: number; month?: number; unassigned?: boolean }) =>

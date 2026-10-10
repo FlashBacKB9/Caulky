@@ -27,6 +27,7 @@ import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getGroups, type Group } from '../api/groups'
 import FilterPanel, { EMPTY_FILTER, applyAdvancedFilter, type AdvancedFilter } from '../components/FilterPanel'
 import { visibleTooltipEntries, matchesControlMode, controlModeAmount } from '../utils/expenseControl'
+import { expandSplits } from '../utils/splits'
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -707,7 +708,7 @@ function MovementsPanel({ movements, allTypes, groups, typeMap, typeToGroupMap, 
             <span className="w-7 shrink-0" />
           </div>
           {filtered.map(mv => (
-            <MovementRow key={mv.id} movement={mv}
+            <MovementRow key={`${mv.id}-${mv.movement_type_id}`} movement={mv}
               type={mv.movement_type_id != null ? typeMap[mv.movement_type_id] : undefined}
               onRefresh={onRefresh} />
           ))}
@@ -934,7 +935,7 @@ export default function ExpenseControl() {
   // ── Queries ───────────────────────────────────────────────────────────────────
   const { data: allTypes = [] }     = useQuery({ queryKey: ['movement-types'], queryFn: getMovementTypes, staleTime: 5 * 60 * 1000 })
   const { data: groups   = [] }     = useQuery({ queryKey: ['groups'],         queryFn: getGroups,        staleTime: 5 * 60 * 1000 })
-  const { data: allMovements = [] } = useQuery({ queryKey: ['movements'],      queryFn: () => getMovements(), staleTime: 5 * 60 * 1000, enabled: viewMode === 'suscripciones' })
+  const { data: allMovements = [] } = useQuery({ queryKey: ['movements'],      queryFn: () => getMovements(), select: expandSplits, staleTime: 5 * 60 * 1000, enabled: viewMode === 'suscripciones' })
 
   const allYears = useMemo(() => [...activeYears].sort((a, b) => a - b), [activeYears])
 
@@ -948,7 +949,8 @@ export default function ExpenseControl() {
 
   const movementsByYear = useMemo(() => {
     const r: Record<number, Movement[]> = {}
-    allYears.forEach((y, i) => { r[y] = yearQueries[i]?.data ?? [] })
+    // Categoría múltiple: cada parte cuenta en su tipo
+    allYears.forEach((y, i) => { r[y] = expandSplits(yearQueries[i]?.data ?? []) })
     return r
   }, [allYears, yearQueries])
 

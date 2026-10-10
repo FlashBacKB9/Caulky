@@ -37,4 +37,5 @@ async def write_log(
             ))
             await db.commit()
     except Exception as e:
-        print(f"[audit] write_log failed: {e}", flush=True)
+        # ascii(): en una consola cp1252 (Windows) un «→» del resumen haría fallar el propio print
+        print(f"[audit] write_log failed: {ascii(e)}", flush=True)

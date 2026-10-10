@@ -4,6 +4,7 @@ import type { MovementType } from '../api/movementTypes'
 import type { Group } from '../api/groups'
 import type { Movement } from '../api/movements'
 import { t } from '../utils/i18n'
+import { movementTypeIds } from '../utils/splits'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -76,20 +77,21 @@ function matchCond(
       if (c.op === 'lte')   return val <= c.value
       return true
     }
+    // Categoría múltiple: el movimiento cuenta en cada tipo (y grupo) de sus partes
     case 'group': {
-      const groupId = String(typeToGroupMap[m.movement_type_id ?? -1] ?? '')
+      const groupIds = movementTypeIds(m).map(id => String(typeToGroupMap[id] ?? ''))
       if (c.op === 'empty')  return !m.movement_type_id
       if (c.op === 'set')    return !!m.movement_type_id
-      if (c.op === 'in')     return c.values.includes(groupId)
-      if (c.op === 'not_in') return !c.values.includes(groupId)
+      if (c.op === 'in')     return groupIds.some(g => c.values.includes(g))
+      if (c.op === 'not_in') return !groupIds.some(g => c.values.includes(g))
       return true
     }
     case 'type': {
-      const id = String(m.movement_type_id ?? '')
+      const ids = movementTypeIds(m).map(String)
       if (c.op === 'empty')  return !m.movement_type_id
       if (c.op === 'set')    return !!m.movement_type_id
-      if (c.op === 'in')     return c.values.includes(id)
-      if (c.op === 'not_in') return !c.values.includes(id)
+      if (c.op === 'in')     return ids.some(id => c.values.includes(id))
+      if (c.op === 'not_in') return !ids.some(id => c.values.includes(id))
       return true
     }
     case 'paid':

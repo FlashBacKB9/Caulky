@@ -8,6 +8,7 @@ import { useCurrency } from '../hooks/useCurrency'
 import {
   readBudgets, getCurrentPeriod, calcSpending, getAmountForDate,
 } from '../pages/Budgets'
+import { expandSplits } from '../utils/splits'
 
 // ── Dismiss persistence ───────────────────────────────────────────────────────
 
@@ -48,6 +49,7 @@ export default function BudgetAlerts() {
   const { data: movements = [] } = useQuery({
     queryKey:  ['movements'],
     queryFn:   () => getMovements(),
+    select:    expandSplits,
     staleTime: 5 * 60 * 1000,
   })
 

@@ -17,6 +17,15 @@ class MovementFileRead(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class MovementSplitIn(BaseModel):
+    movement_type_id: int
+    money: float
+
+
+class MovementSplitRead(MovementSplitIn):
+    model_config = {"from_attributes": True}
+
+
 class MovementBase(BaseModel):
     name: str
     money: float
@@ -35,7 +44,8 @@ class MovementBase(BaseModel):
 
 
 class MovementCreate(MovementBase):
-    pass
+    # Categoría múltiple: si se envía, el importe y el tipo salen de las partes
+    splits: Optional[list[MovementSplitIn]] = None
 
 
 class MovementUpdate(BaseModel):
@@ -54,6 +64,8 @@ class MovementUpdate(BaseModel):
     is_shared: Optional[bool] = None
     shared_between: Optional[int] = None
     my_share: Optional[float] = None
+    # None = sin cambios; [] = quitar la división
+    splits: Optional[list[MovementSplitIn]] = None
 
 
 class MovementRead(MovementBase):
@@ -62,6 +74,7 @@ class MovementRead(MovementBase):
     label: str = "Gasto"
     color: str = "#6b7280"
     files: list[MovementFileRead] = []
+    splits: list[MovementSplitRead] = []
     from_account_id: Optional[int] = None
     credit_cycle_end: Optional[_Date] = None
     credit_cycle_start: Optional[_Date] = None
