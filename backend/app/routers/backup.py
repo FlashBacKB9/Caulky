@@ -57,6 +57,28 @@ def _parse_date(v) -> datetime.date | None:
     return datetime.date.fromisoformat(v)
 
 
+class _Remapper:
+    """IDs de un backup → IDs de esta base de datos.
+
+    Si la fila se acaba de restaurar, su ID nuevo; si no, el mismo ID solo cuando ya es del
+    usuario (restaurar movimientos sin sus tipos, por ejemplo). Cualquier otro ID se descarta:
+    un backup manipulado no puede apuntar a filas de otro usuario.
+    """
+    def __init__(self, db: AsyncSession, uid):
+        self.db, self.uid = db, uid
+        self._owned: dict[type, set[int]] = {}
+
+    async def __call__(self, model, mapping: dict[int, int], old_id):
+        if old_id is None:
+            return None
+        if old_id in mapping:
+            return mapping[old_id]
+        if model not in self._owned:
+            res = await self.db.execute(select(model.id).where(model.user_id == self.uid))
+            self._owned[model] = {r[0] for r in res.all()}
+        return old_id if old_id in self._owned[model] else None
+
+
 async def _fix_sequences(db: AsyncSession) -> None:
     for table, col in [
         ("income_expense_groups", "id"),
@@ -171,6 +193,7 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
         # IDs from the backup belong to another DB / user, so we never reuse them.
         # After each batch flush SQLAlchemy populates obj.id with the new PK.
 
+        remap = _Remapper(db, uid)
         group_id_map: dict[int, int] = {}
         account_id_map: dict[int, int] = {}
         type_id_map: dict[int, int] = {}
@@ -200,7 +223,7 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
             # La cuenta pagadora de una tarjeta apunta a otra cuenta del mismo backup
             for _, obj in pending:
                 if obj.credit_pay_account_id is not None:
-                    obj.credit_pay_account_id = account_id_map.get(obj.credit_pay_account_id, obj.credit_pay_account_id)
+                    obj.credit_pay_account_id = await remap(Account, account_id_map, obj.credit_pay_account_id)
             # Backups anteriores no traen cuentas reales: entonces se quedan sin ninguna
             for r in payload.db.get("real_accounts") or []:
                 real = RealAccount(
@@ -220,9 +243,9 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
             for t in payload.db.get("types", []):
                 d = {k: v for k, v in t.items() if k not in ("user_id", "id")}
                 if d.get("income_expense_group_id") is not None:
-                    d["income_expense_group_id"] = group_id_map.get(d["income_expense_group_id"], d["income_expense_group_id"])
+                    d["income_expense_group_id"] = await remap(IncomeExpenseGroup, group_id_map, d["income_expense_group_id"])
                 if d.get("linked_account_id") is not None:
-                    d["linked_account_id"] = account_id_map.get(d["linked_account_id"], d["linked_account_id"])
+                    d["linked_account_id"] = await remap(Account, account_id_map, d["linked_account_id"])
                 obj = MovementType(**d, user_id=uid)
                 db.add(obj)
                 pending.append((t["id"], obj))
@@ -234,9 +257,10 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
             _mv_skip = {"user_id", "files", "id", "splits"}
             for m in payload.db.get("movements", []):
                 d = {k: v for k, v in m.items() if k not in _mv_skip}
+                split_types = [await remap(MovementType, type_id_map, s["movement_type_id"]) for s in m.get("splits") or []]
                 d["splits"] = [
-                    MovementSplit(movement_type_id=type_id_map.get(s["movement_type_id"], s["movement_type_id"]), money=s["money"])
-                    for s in m.get("splits") or []
+                    MovementSplit(movement_type_id=tid, money=s["money"])
+                    for tid, s in zip(split_types, m.get("splits") or []) if tid is not None
                 ]
                 d["date"]      = _parse_date(d.get("date"))
                 d["bank_date"] = _parse_date(d.get("bank_date"))
@@ -244,11 +268,11 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
                     if k in d:
                         d[k] = _parse_date(d[k])
                 if d.get("movement_type_id") is not None:
-                    d["movement_type_id"] = type_id_map.get(d["movement_type_id"], d["movement_type_id"])
+                    d["movement_type_id"] = await remap(MovementType, type_id_map, d["movement_type_id"])
                 if d.get("account_id") is not None:
-                    d["account_id"] = account_id_map.get(d["account_id"], d["account_id"])
+                    d["account_id"] = await remap(Account, account_id_map, d["account_id"])
                 if d.get("from_account_id") is not None:
-                    d["from_account_id"] = account_id_map.get(d["from_account_id"], d["from_account_id"])
+                    d["from_account_id"] = await remap(Account, account_id_map, d["from_account_id"])
                 obj = Movement(**d, user_id=uid)
                 db.add(obj)
                 pending.append((m["id"], obj))
@@ -259,13 +283,14 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
             for f in payload.db.get("investment_funds", []):
                 d = {k: v for k, v in f.items() if k not in ("user_id", "id")}
                 if d.get("movement_type_id") is not None:
-                    d["movement_type_id"] = type_id_map.get(d["movement_type_id"], d["movement_type_id"])
+                    d["movement_type_id"] = await remap(MovementType, type_id_map, d["movement_type_id"])
                 db.add(InvestmentFund(**d, user_id=uid))
             await db.flush()
             for p in payload.db.get("investment_purchases", []):
                 d = {k: v for k, v in p.items() if k != "id"}
-                if d.get("movement_id") is not None:
-                    d["movement_id"] = movement_id_map.get(d["movement_id"], d["movement_id"])
+                d["movement_id"] = await remap(Movement, movement_id_map, d.get("movement_id"))
+                if d["movement_id"] is None:
+                    continue   # su movimiento no está en el backup ni es del usuario
                 db.add(InvestmentPurchase(**d))
             await db.flush()
 
@@ -275,7 +300,9 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
             for t in payload.db.get("templates", []):
                 d = {k: v for k, v in t.items() if k not in ("user_id", "id")}
                 if d.get("movement_type_id") is not None:
-                    d["movement_type_id"] = type_id_map.get(d["movement_type_id"], d["movement_type_id"])
+                    d["movement_type_id"] = await remap(MovementType, type_id_map, d["movement_type_id"])
+                if d.get("account_id") is not None:
+                    d["account_id"] = await remap(Account, account_id_map, d["account_id"])
                 db.add(TemplateModel(**d, user_id=uid))
             await db.flush()
 
@@ -291,7 +318,8 @@ async def restore_backup(payload: RestorePayload, db: AsyncSession = Depends(get
     except Exception as exc:
         await db.rollback()
         log.exception("Restore failed")
-        raise HTTPException(status_code=422, detail=str(exc)) from exc
+        # El detalle queda en el log del servidor; al cliente no se le enseñan las tripas
+        raise HTTPException(status_code=422, detail="No se pudo restaurar la copia: el archivo no es válido o está incompleto") from exc
 
 
 async def _seed_defaults(db: AsyncSession, user_id: uuid.UUID) -> None:

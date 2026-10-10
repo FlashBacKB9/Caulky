@@ -9,6 +9,7 @@ from app.services.audit import write_log
 from app.services.splits import drop_type_from_splits
 from app.auth.setup import current_active_user
 from app.models.user import User
+from app.services.ownership import ensure_owned
 
 router = APIRouter(prefix="/movement-types", tags=["movement_types"])
 
@@ -42,6 +43,7 @@ async def list_types(db: AsyncSession = Depends(get_db), user: User = Depends(cu
 
 @router.post("", response_model=MovementTypeRead, status_code=201)
 async def create_type(body: MovementTypeCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    await ensure_owned(db, user.id, body.model_dump())
     mt = MovementType(**body.model_dump(), user_id=user.id)
     db.add(mt)
     await db.flush()
@@ -77,6 +79,7 @@ async def update_type(type_id: int, body: MovementTypeUpdate, db: AsyncSession =
     mt = result.scalar_one_or_none()
     if not mt:
         raise HTTPException(status_code=404, detail="Movement type not found")
+    await ensure_owned(db, user.id, body.model_dump())
     before = _type_snap(mt)
     for k, v in body.model_dump().items():
         setattr(mt, k, v)
@@ -99,7 +102,7 @@ async def delete_type(type_id: int, db: AsyncSession = Depends(get_db), user: Us
     await write_log(user.id, "movement_type", mt.id, "delete",
               f"Tipo eliminado: {mt.name}",
               before=_type_snap(mt))
-    await drop_type_from_splits(db, mt.id)
+    await drop_type_from_splits(db, mt.id, user.id)
     await db.flush()
     await db.delete(mt)
     await db.commit()

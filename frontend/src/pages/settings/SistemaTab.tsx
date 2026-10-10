@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Trash2 } from 'lucide-react'
 import { getAuditLog, clearAuditLog } from '../../api/auditLog'
+import { getAdminSettings, updateAdminSettings, type AdminSettings } from '../../api/admin'
+import { useAuth } from '../../context/AuthContext'
 import { resetSystem } from '../../api/backup'
 import { t } from '../../utils/i18n'
 import { Section } from './shared'
@@ -12,6 +14,8 @@ const ACTION_COLOR: Record<string, string> = {
   create: 'text-green-400',
   update: 'text-blue-400',
   delete: 'text-red-400',
+  login: 'text-emerald-400',
+  login_failed: 'text-amber-400',
 }
 
 function fmtTs(iso: string) {
@@ -85,6 +89,42 @@ function LogsSection() {
             ))
         }
       </div>
+    </div>
+  )
+}
+
+// ── Administración ────────────────────────────────────────────────────────────
+
+function AdminSection() {
+  const queryClient = useQueryClient()
+  const { data } = useQuery({ queryKey: ['admin-settings'], queryFn: getAdminSettings })
+  const mut = useMutation({
+    mutationFn: updateAdminSettings,
+    onSuccess: s => queryClient.setQueryData(['admin-settings'], s),
+  })
+  if (!data) return null
+  const rows: { key: keyof AdminSettings; label: string; desc: string }[] = [
+    { key: 'registration_open',   label: t('settings.adminRegistration'), desc: t('settings.adminRegistrationDesc') },
+    { key: 'ai_terminal_enabled', label: t('settings.adminTerminal'),     desc: t('settings.adminTerminalDesc') },
+  ]
+  return (
+    <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
+      {rows.map(r => {
+        const on = data[r.key]
+        return (
+          <div key={r.key} className="flex items-center justify-between gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <p className="text-sm text-gray-700 dark:text-gray-200">{r.label}</p>
+              <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">{r.desc}</p>
+            </div>
+            <button type="button" role="switch" aria-checked={on} disabled={mut.isPending}
+              onClick={() => mut.mutate({ ...data, [r.key]: !on })}
+              className={`relative inline-flex h-5 w-9 shrink-0 rounded-full transition-colors duration-200 disabled:opacity-50 ${on ? 'bg-blue-500' : 'bg-gray-300 dark:bg-gray-600'}`}>
+              <span className={`absolute top-0.5 h-4 w-4 transform rounded-full bg-white shadow-sm transition-transform duration-200 ${on ? 'translate-x-[18px]' : 'translate-x-0.5'}`} />
+            </button>
+          </div>
+        )
+      })}
     </div>
   )
 }
@@ -187,8 +227,14 @@ function ResetSection() {
 // ── Tab entry point ────────────────────────────────────────────────────────────
 
 export default function SistemaTab() {
+  const { user } = useAuth()
   return (
     <>
+      {user?.is_superuser && (
+        <Section title={t('settings.admin')}>
+          <AdminSection />
+        </Section>
+      )}
       <Section title={t('settings.activityLog')}>
         <LogsSection />
       </Section>

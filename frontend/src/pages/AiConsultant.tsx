@@ -242,8 +242,10 @@ export default function AiConsultant() {
       }
       ws.onclose = () => sess.term.writeln('\r\n\x1b[33m[Sesión cerrada]\x1b[0m')
       ws.onerror = () => sess.term.writeln('\r\n\x1b[31m[Error de conexión]\x1b[0m')
-    } catch {
-      sess.term.writeln('\r\n\x1b[31m[No se pudo conectar]\x1b[0m')
+    } catch (err) {
+      // 403: no eres el administrador o el Consultor IA está desactivado; el servidor dice cuál
+      const detail = (err as { response?: { data?: { detail?: string } } })?.response?.data?.detail
+      sess.term.writeln(detail ? `\r\n\x1b[33m${detail}\x1b[0m` : '\r\n\x1b[31m[No se pudo conectar]\x1b[0m')
     }
   }, [])
 

@@ -1,5 +1,5 @@
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -7,15 +7,27 @@ from app.routers import income_expense_groups, movement_types, movements, stats,
 from app.auth.setup import fastapi_users, auth_backend
 from app.auth.schemas import UserRead, UserCreate, UserUpdate
 from app.config import settings
-from app.database import engine
+from app.database import AsyncSessionLocal, engine, get_db
+from app.models.app_setting import AppSetting
 from app.models.audit_log import AuditLog
+from app.auth.login_guard import LoginGuardMiddleware
+from app.services.admin import ensure_admin, registration_open
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(AuditLog.__table__.create, checkfirst=True)
+        await conn.run_sync(AppSetting.__table__.create, checkfirst=True)
+    # Instalaciones anteriores no tenían administrador: se nombra al primer usuario real
+    async with AsyncSessionLocal() as db:
+        await ensure_admin(db)
     yield
+
+
+async def require_registration_open(db=Depends(get_db)):
+    if not await registration_open(db):
+        raise HTTPException(status_code=403, detail="El registro de cuentas nuevas está cerrado")
 
 
 # Docs bajo /api: es lo único que el proxy (nginx / Vite) manda al backend, y /docs es una ruta de la SPA
@@ -48,6 +60,7 @@ class ApiKeyScopeMiddleware(BaseHTTPMiddleware):
 
 app.add_middleware(NoCacheMiddleware)
 app.add_middleware(ApiKeyScopeMiddleware)
+app.add_middleware(LoginGuardMiddleware)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,
@@ -66,6 +79,7 @@ app.include_router(
     fastapi_users.get_register_router(UserRead, UserCreate),
     prefix="/api/auth",
     tags=["auth"],
+    dependencies=[Depends(require_registration_open)],
 )
 app.include_router(
     fastapi_users.get_users_router(UserRead, UserUpdate),

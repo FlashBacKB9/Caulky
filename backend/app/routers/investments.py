@@ -14,6 +14,7 @@ from app.schemas.investment import (
 from app.services.audit import write_log
 from app.auth.setup import current_active_user
 from app.models.user import User
+from app.services.ownership import ensure_owned
 
 router = APIRouter(prefix="/investments", tags=["investments"])
 
@@ -166,6 +167,7 @@ def _fund_snap(f: InvestmentFund) -> dict:
 
 @router.post("/funds", response_model=FundRead, status_code=201)
 async def create_fund(body: FundCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    await ensure_owned(db, user.id, body.model_dump())
     fund = InvestmentFund(**body.model_dump(), user_id=user.id)
     db.add(fund)
     await db.flush()
@@ -183,6 +185,7 @@ async def update_fund(fund_id: int, body: FundPatch, db: AsyncSession = Depends(
     if not fund or fund.user_id != user.id:
         raise HTTPException(404, "Fondo no encontrado")
     changes = body.model_dump(exclude_unset=True)
+    await ensure_owned(db, user.id, changes)
     before = {k: _fund_snap(fund)[k] for k in changes if k in _fund_snap(fund)}
     for k, v in changes.items():
         setattr(fund, k, v)
@@ -291,9 +294,10 @@ async def fetch_purchase_price(movement_id: int, db: AsyncSession = Depends(get_
         raise HTTPException(404, "Movimiento no encontrado")
 
     fund_res = await db.execute(
-        select(InvestmentFund).where(InvestmentFund.movement_type_id == movement.movement_type_id)
+        select(InvestmentFund).where(InvestmentFund.movement_type_id == movement.movement_type_id,
+                                     InvestmentFund.user_id == user.id)
     )
-    fund = fund_res.scalar_one_or_none()
+    fund = fund_res.scalars().first()
     if not fund or not fund.ticker:
         raise HTTPException(400, "El fondo no tiene ticker configurado")
 

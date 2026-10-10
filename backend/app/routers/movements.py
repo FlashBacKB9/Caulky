@@ -15,6 +15,7 @@ from app.services.splits import apply_splits, rescale_splits
 from app.services.credit import apply_card_bank_date, settlement_for, settlement_items, sync_credit_charges
 from app.auth.setup import current_active_user
 from app.models.user import User
+from app.services.ownership import ensure_owned
 
 router = APIRouter(prefix="/movements", tags=["movements"])
 
@@ -129,6 +130,7 @@ async def list_movements(
 
 @router.post("", response_model=MovementRead, status_code=201)
 async def create_movement(body: MovementCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    await ensure_owned(db, user.id, body.model_dump(exclude={"splits"}))
     acc_name, bal_before = await _balance_for(db, user.id, body.account_id)
     mv = Movement(**body.model_dump(exclude={"splits"}), user_id=user.id, splits=[])
     if body.splits is not None:
@@ -205,6 +207,7 @@ async def update_movement(movement_id: int, body: MovementUpdate, db: AsyncSessi
         raise HTTPException(status_code=404, detail="Movement not found")
     changes = body.model_dump(exclude_unset=True)
     splits = changes.pop("splits", None)
+    await ensure_owned(db, user.id, changes)
     before = _mv_snap(mv)
     old_money, old_type = float(mv.money), mv.movement_type_id
     for k, v in changes.items():

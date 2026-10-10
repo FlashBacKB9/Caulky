@@ -19,6 +19,9 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: 'feat',    text: 'Categoría múltiple: al crear o editar un movimiento, la opción «Múltiple» del tipo abre un reparto con un importe por categoría y un donut en vivo; el movimiento cuenta en cada categoría con su parte en gráficos, análisis, presupuestos y control de gastos' },
       { type: 'feat',    text: 'Tickets: comida y suministros se crean en un solo movimiento dividido por tipo en vez de uno por tipo' },
       { type: 'fix',     text: 'Tickets: al generar un movimiento se comprueba que el tipo elegido sea del usuario' },
+      { type: 'feat',    text: 'Seguridad: el primer usuario real es el administrador; en Ajustes → Sistema puede abrir o cerrar el registro de cuentas nuevas (cerrado por defecto) y activar o apagar el Consultor IA, que ya solo usa él' },
+      { type: 'feat',    text: 'Seguridad: tras 5 intentos de login fallidos en un minuto se bloquea esa IP un rato, y los inicios de sesión (correctos y fallidos, con su IP) quedan en el historial de actividad' },
+      { type: 'fix',     text: 'Seguridad: ningún movimiento, tipo, cuenta, plantilla, fondo, importación ni copia de seguridad puede apuntar a datos de otro usuario' },
     ],
   },
   {

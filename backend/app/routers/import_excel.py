@@ -20,6 +20,7 @@ from app.models.income_expense_group import IncomeExpenseGroup
 from app.models.account import Account
 from app.auth.setup import current_active_user
 from app.models.user import User
+from app.services.ownership import ensure_owned
 
 router = APIRouter(prefix="/import", tags=["import"])
 
@@ -58,7 +59,8 @@ async def parse_excel(file: UploadFile = File(...), user: User = Depends(current
     filename = (file.filename or "").lower()
     is_csv = filename.endswith(".csv")
     ext = ".csv" if is_csv else ".xlsx"
-    temp_path = TEMP_DIR / f"{session_id}{ext}"
+    # El usuario va en el nombre: solo quien subió el archivo puede importarlo
+    temp_path = TEMP_DIR / f"{user.id}_{session_id}{ext}"
 
     content = await file.read()
     with open(temp_path, "wb") as f:
@@ -171,12 +173,17 @@ async def run_import(req: RunImportRequest, db: AsyncSession = Depends(get_db), 
         raise HTTPException(status_code=400, detail="session_id inválido")
 
     temp_path = next(
-        (TEMP_DIR / f"{req.session_id}{ext}" for ext in (".xlsx", ".csv")
-         if (TEMP_DIR / f"{req.session_id}{ext}").exists()),
+        (TEMP_DIR / f"{user.id}_{req.session_id}{ext}" for ext in (".xlsx", ".csv")
+         if (TEMP_DIR / f"{user.id}_{req.session_id}{ext}").exists()),
         None,
     )
     if temp_path is None:
         raise HTTPException(status_code=404, detail="Sesión expirada, sube el archivo de nuevo")
+
+    # Cuenta, grupos y tipos elegidos en el mapeo tienen que ser del usuario
+    await ensure_owned(db, user.id, {"account_id": req.account_id})
+    for mapping in req.type_map.values():
+        await ensure_owned(db, user.id, {"group_id": mapping.group_id, "type_id": mapping.type_id})
 
     account_id = req.account_id
     if account_id is None:

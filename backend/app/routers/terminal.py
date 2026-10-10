@@ -15,12 +15,20 @@ from pydantic import BaseModel, field_validator  # noqa: F401
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.setup import current_active_user
 from app.database import get_db
 from app.models.user import User
 from app.models.user_preference import UserPreference
+from app.services.admin import AI_TERMINAL_ENABLED, current_admin, get_flag
 
 router = APIRouter(prefix="/ai", tags=["ai-consultant"])
+
+
+async def terminal_user(user: User = Depends(current_admin), db: AsyncSession = Depends(get_db)) -> User:
+    """La terminal abre un Claude dentro del contenedor del backend, que tiene acceso a la base
+    de datos de todos: solo la usa el administrador, y solo si está activada en Ajustes."""
+    if not await get_flag(db, AI_TERMINAL_ENABLED):
+        raise HTTPException(status_code=403, detail="El Consultor IA está desactivado en esta instalación")
+    return user
 
 # Single-use WebSocket tickets: token → (user_id, expiry, write_perms_json, session_id)
 _tickets: dict[str, tuple[str, float, str, str]] = {}
@@ -40,7 +48,7 @@ def _sanitize_session_id(raw: str) -> str:
 @router.post("/terminal/ticket")
 async def create_terminal_ticket(
     body: TicketRequest = Body(default=TicketRequest()),
-    user: User = Depends(current_active_user),
+    user: User = Depends(terminal_user),
     db: AsyncSession = Depends(get_db),
 ):
     """Issue a 30-second single-use ticket for the terminal WebSocket."""
@@ -373,7 +381,7 @@ async def terminal_ws(websocket: WebSocket, ticket: str):
 # ── Workspace file browser ───────────────────────────────────────────────────
 
 @router.get("/workspace/view/{path:path}")
-async def view_workspace_file(path: str, user: User = Depends(current_active_user)):
+async def view_workspace_file(path: str, user: User = Depends(terminal_user)):
     """Serve a workspace file inline with path-based routing so relative links work."""
     workspace = f"/app/workspace/{user.id}"
     safe = os.path.normpath(os.path.join(workspace, path))
@@ -390,7 +398,7 @@ _SKIP_DIRS  = {"sessions", "claude-home"}
 
 
 @router.get("/workspace/files")
-async def list_workspace_files(user: User = Depends(current_active_user)):
+async def list_workspace_files(user: User = Depends(terminal_user)):
     workspace = f"/app/workspace/{user.id}"
     if not os.path.exists(workspace):
         return {"files": [], "dirs": []}
@@ -427,7 +435,7 @@ async def list_workspace_files(user: User = Depends(current_active_user)):
 
 
 @router.delete("/workspace/file")
-async def delete_workspace_item(path: str, user: User = Depends(current_active_user)):
+async def delete_workspace_item(path: str, user: User = Depends(terminal_user)):
     workspace = f"/app/workspace/{user.id}"
     safe = os.path.normpath(os.path.join(workspace, path))
     if not safe.startswith(os.path.join(workspace, "")):
@@ -452,7 +460,7 @@ _MAX_UPLOAD_BYTES = 20 * 1024 * 1024  # 20 MB
 @router.post("/workspace/upload")
 async def upload_context_file(
     file: UploadFile = File(...),
-    user: User = Depends(current_active_user),
+    user: User = Depends(terminal_user),
 ):
     raw_name = os.path.basename(file.filename or "file")
     name, ext = os.path.splitext(raw_name)
@@ -475,7 +483,7 @@ async def upload_context_file(
 
 
 @router.get("/workspace/file")
-async def download_workspace_file(path: str, inline: bool = False, user: User = Depends(current_active_user)):
+async def download_workspace_file(path: str, inline: bool = False, user: User = Depends(terminal_user)):
     workspace = f"/app/workspace/{user.id}"
     safe = os.path.normpath(os.path.join(workspace, path))
     if not safe.startswith(os.path.join(workspace, "")):
@@ -501,7 +509,7 @@ class MkdirRequest(BaseModel):
 
 
 @router.post("/workspace/mkdir")
-async def make_workspace_dir(body: MkdirRequest, user: User = Depends(current_active_user)):
+async def make_workspace_dir(body: MkdirRequest, user: User = Depends(terminal_user)):
     workspace = f"/app/workspace/{user.id}"
     target = os.path.normpath(os.path.join(workspace, body.path))
     if not target.startswith(os.path.join(workspace, "")):
@@ -527,7 +535,7 @@ class MoveRequest(BaseModel):
 
 
 @router.post("/workspace/move")
-async def move_workspace_file(body: dict, user: User = Depends(current_active_user)):
+async def move_workspace_file(body: dict, user: User = Depends(terminal_user)):
     from_path = body.get("from", "")
     to_path   = body.get("to", "")
     if not from_path or not to_path:

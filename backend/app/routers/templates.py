@@ -7,6 +7,7 @@ from app.models.template import MovementTemplate
 from app.schemas.template import TemplateCreate, TemplateRead, TemplateUpdate
 from app.auth.setup import current_active_user
 from app.models.user import User
+from app.services.ownership import ensure_owned
 
 router = APIRouter(prefix="/templates", tags=["templates"])
 
@@ -35,6 +36,7 @@ async def create_template(
     db: AsyncSession = Depends(get_db),
     user: User = Depends(current_active_user),
 ):
+    await ensure_owned(db, user.id, body.model_dump())
     t = MovementTemplate(**_to_db_dict(body), user_id=user.id)
     db.add(t)
     await db.commit()
@@ -52,6 +54,7 @@ async def update_template(
     t = await db.get(MovementTemplate, template_id)
     if not t or t.user_id != user.id:
         raise HTTPException(status_code=404, detail="Template not found")
+    await ensure_owned(db, user.id, body.model_dump())
     for k, v in _to_db_dict(body).items():
         setattr(t, k, v)
     await db.commit()

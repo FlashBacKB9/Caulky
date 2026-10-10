@@ -15,6 +15,7 @@ from app.services.credit import CREDIT_CATEGORY, create_charge, ensure_last_cycl
 from datetime import date
 from app.auth.setup import current_active_user
 from app.models.user import User
+from app.services.ownership import ensure_owned
 
 router = APIRouter(prefix="/accounts", tags=["accounts"])
 
@@ -132,6 +133,7 @@ async def accounts_summary(db: AsyncSession = Depends(get_db), user: User = Depe
 
 @router.post("", response_model=AccountRead, status_code=201)
 async def create_account(body: AccountCreate, db: AsyncSession = Depends(get_db), user: User = Depends(current_active_user)):
+    await ensure_owned(db, user.id, body.model_dump())
     res = await db.execute(
         select(func.max(Account.sort_order)).where(Account.user_id == user.id)
     )
@@ -167,6 +169,7 @@ async def update_account(account_id: int, body: AccountPatch, db: AsyncSession =
     if not account or account.user_id != user.id:
         raise HTTPException(status_code=404, detail="Account not found")
     changes = body.model_dump(exclude_unset=True)
+    await ensure_owned(db, user.id, changes)
     before = {k: _acc_snap(account)[k] for k in changes if k in _acc_snap(account)}
     for k, v in changes.items():
         setattr(account, k, v)
@@ -262,17 +265,17 @@ async def delete_account(
         raise HTTPException(status_code=400, detail="Cannot delete the main account")
 
     types_res = await db.execute(
-        select(MovementType.id).where(MovementType.linked_account_id == account_id)
+        select(MovementType.id).where(MovementType.linked_account_id == account_id, MovementType.user_id == user.id)
     )
     linked_type_ids = [r[0] for r in types_res.all()]
 
     count = 0
     if linked_type_ids:
         r = await db.execute(
-            select(func.count(Movement.id)).where(Movement.movement_type_id.in_(linked_type_ids))
+            select(func.count(Movement.id)).where(Movement.movement_type_id.in_(linked_type_ids), Movement.user_id == user.id)
         )
         count += r.scalar() or 0
-    r2 = await db.execute(select(func.count(Movement.id)).where(Movement.account_id == account_id))
+    r2 = await db.execute(select(func.count(Movement.id)).where(Movement.account_id == account_id, Movement.user_id == user.id))
     count += r2.scalar() or 0
 
     if count > 0 and not delete_movements and not convert_to_expense:
@@ -280,18 +283,18 @@ async def delete_account(
 
     if delete_movements:
         # SQLite no borra en cascada: las partes de categoría múltiple se quitan a mano
-        doomed = select(Movement.id).where(Movement.account_id == account_id)
+        doomed = select(Movement.id).where(Movement.account_id == account_id, Movement.user_id == user.id)
         if linked_type_ids:
-            doomed = doomed.union(select(Movement.id).where(Movement.movement_type_id.in_(linked_type_ids)))
+            doomed = doomed.union(select(Movement.id).where(Movement.movement_type_id.in_(linked_type_ids), Movement.user_id == user.id))
         await db.execute(sa_delete(MovementSplit).where(MovementSplit.movement_id.in_(doomed)))
         if linked_type_ids:
-            await db.execute(sa_delete(Movement).where(Movement.movement_type_id.in_(linked_type_ids)))
-        await db.execute(sa_delete(Movement).where(Movement.account_id == account_id))
+            await db.execute(sa_delete(Movement).where(Movement.movement_type_id.in_(linked_type_ids), Movement.user_id == user.id))
+        await db.execute(sa_delete(Movement).where(Movement.account_id == account_id, Movement.user_id == user.id))
 
     if linked_type_ids:
         await db.execute(
             sa_update(MovementType)
-            .where(MovementType.linked_account_id == account_id)
+            .where(MovementType.linked_account_id == account_id, MovementType.user_id == user.id)
             .values(linked_account_id=None)
         )
     # SQLite no aplica el ON DELETE CASCADE: se quita a mano de su cuenta real

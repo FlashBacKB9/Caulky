@@ -80,12 +80,12 @@ def rescale_splits(mv: Movement, old_money: float) -> None:
         s.money = a
 
 
-async def drop_type_from_splits(db: AsyncSession, type_id: int) -> None:
+async def drop_type_from_splits(db: AsyncSession, type_id: int, user_id) -> None:
     """Antes de borrar un tipo: se quita su parte de los movimientos divididos y el resto
     del movimiento se conserva (con otro tipo principal si hacía falta)."""
     res = await db.execute(
         select(Movement).join(MovementSplit, MovementSplit.movement_id == Movement.id)
-        .where(MovementSplit.movement_type_id == type_id)
+        .where(MovementSplit.movement_type_id == type_id, Movement.user_id == user_id)
     )
     for mv in res.unique().scalars().all():
         parts = {s.movement_type_id: float(s.money) for s in mv.splits if s.movement_type_id != type_id}

@@ -13,13 +13,13 @@ from app.models.movement_split import MovementSplit
 from app.models.movement_type import MovementType
 from app.models.real_account import RealAccount, real_account_accounts
 from app.models.user import User
+from app.services.admin import DEMO_EMAIL
 from app.auth.manager import get_user_manager, UserManager
 from app.auth.schemas import UserCreate
 from fastapi_users.exceptions import UserAlreadyExists
 
 router = APIRouter(prefix="/demo", tags=["demo"])
 
-DEMO_EMAIL = "demo@caulky.app"
 DEMO_PASSWORD = "demo123456"
 
 

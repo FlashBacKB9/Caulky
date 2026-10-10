@@ -1,4 +1,6 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { getPublicSettings } from '../api/admin'
 import { useNavigate } from 'react-router-dom'
 import { Wallet, Eye, EyeOff, FlaskConical } from 'lucide-react'
 import { login, register, getMe, claimData, setupDemo } from '../api/auth'
@@ -11,6 +13,9 @@ export default function LoginPage() {
   const navigate = useNavigate()
 
   const [mode, setMode] = useState<'login' | 'register'>('login')
+  // Con el registro cerrado solo queda la pestaña de entrar (el modo test sigue disponible)
+  const { data: publicSettings } = useQuery({ queryKey: ['public-settings'], queryFn: getPublicSettings, retry: false })
+  const registrationOpen = publicSettings?.registration_open ?? true
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [name, setName] = useState('')
@@ -60,7 +65,10 @@ export default function LoginPage() {
       navigate('/', { replace: true })
     } catch (err: any) {
       const detail = err?.response?.data?.detail
-      if (detail === 'LOGIN_BAD_CREDENTIALS') setError(t('auth.errorCredentials'))
+      const status = err?.response?.status
+      if (status === 429) setError(t('auth.errorTooMany'))
+      else if (mode === 'register' && status === 403) setError(t('auth.registrationClosed'))
+      else if (detail === 'LOGIN_BAD_CREDENTIALS') setError(t('auth.errorCredentials'))
       else if (detail === 'REGISTER_USER_ALREADY_EXISTS') setError(t('auth.errorExists'))
       else if (mode === 'register') setError(t('auth.errorRegister'))
       else setError(t('auth.errorLogin'))
@@ -81,7 +89,7 @@ export default function LoginPage() {
 
         <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-800 p-6">
           <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1 mb-6">
-            {(['login', 'register'] as const).map(m => (
+            {(registrationOpen ? ['login', 'register'] as const : ['login'] as const).map(m => (
               <button
                 key={m}
                 onClick={() => { setMode(m); setError('') }}
