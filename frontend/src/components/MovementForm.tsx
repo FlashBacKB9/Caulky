@@ -1152,7 +1152,7 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
 
       </div>
       {splitOpen && (
-        <SplitCategoryModal types={types} initial={splitInitial}
+        <SplitCategoryModal types={types} initial={splitInitial} total={Math.abs(parseFloat(form.money)) || 0}
           onCancel={() => setSplitOpen(false)} onSave={saveSplits} />
       )}
     </div>

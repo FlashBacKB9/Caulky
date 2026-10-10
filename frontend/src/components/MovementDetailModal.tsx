@@ -488,7 +488,7 @@ function MovementDetailBody({ movement, types, onClose, onBack, onOpen }: {
         </div>
       </div>
       {splitOpen && (
-        <SplitCategoryModal types={types} initial={splitInitial}
+        <SplitCategoryModal types={types} initial={splitInitial} total={Math.abs(parseFloat(draft.money)) || 0}
           onCancel={() => setSplitOpen(false)} onSave={saveSplits} />
       )}
     </div>
