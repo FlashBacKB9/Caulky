@@ -39,6 +39,15 @@ export const updateTicketItems = (id: number, items: TicketItem[]): Promise<Tick
 export const rescanTicket = (id: number, source: 'gemini' | 'mistral', model?: string): Promise<Ticket> =>
   api.post<Ticket>(`/tickets/${id}/rescan`, { source, model }).then(r => r.data)
 
+export interface GeminiModel {
+  id: string
+  label: string
+}
+
+/** Models the user's Gemini key can use, best free one first. */
+export const getGeminiModels = (refresh = false): Promise<GeminiModel[]> =>
+  api.get<GeminiModel[]>('/tickets/gemini-models', { params: refresh ? { refresh: true } : {} }).then(r => r.data)
+
 export const deleteTicket = (id: number): Promise<void> =>
   api.delete(`/tickets/${id}`).then(() => undefined)
 

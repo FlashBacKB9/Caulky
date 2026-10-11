@@ -653,7 +653,7 @@ async def _analyze_with_mistral(file_path: str, mime_type: str, api_key: str = "
 
 
 async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = "", preferred_model: str = "") -> dict | None:
-    """Use Gemini 2.0 Flash (free tier) to extract structured data from a receipt.
+    """Use Gemini (free tier) to extract structured data from a receipt.
 
     api_key: caller-supplied key (from user preferences); falls back to GEMINI_API_KEY env var.
     Returns a dict with keys:
@@ -670,7 +670,6 @@ async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = ""
     if not api_key:
         print("[Tickets] GEMINI_API_KEY no configurada — usando Tesseract")
         return None
-    print(f"[Tickets] Llamando a Gemini 2.0 Flash para {os.path.basename(file_path)}")
 
     import base64
     import httpx
@@ -733,22 +732,19 @@ async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = ""
         },
     }
 
-    # Try models in order — availability varies by account/region.
-    # GEMINI_MODEL env var lets the user pin a specific model.
-    env_model = preferred_model.strip() or os.environ.get("GEMINI_MODEL", "").strip()
-    models_to_try = [m for m in [
-        env_model,
-        "gemini-2.0-flash",
-        "gemini-2.0-flash-lite",
-        "gemini-1.5-flash-latest",
-        "gemini-1.5-flash-8b",
-    ] if m]
+    # Order: the model the caller pins → the user's chosen model → GEMINI_MODEL
+    # env var → the best free models the key can actually use (live from the API).
+    pinned = [m for m in (preferred_model.strip(), os.environ.get("GEMINI_MODEL", "").strip()) if m]
+    available = await _list_gemini_models(api_key)
+    ranked = [m["id"] for m in available] if available else list(_GEMINI_FALLBACK_MODELS)
+    models_to_try = list(dict.fromkeys(pinned + ranked[:_GEMINI_MAX_AUTO_TRIES]))
 
     base_url = "https://generativelanguage.googleapis.com/v1beta/models"
 
     async with httpx.AsyncClient(timeout=60.0) as client:
         for model in models_to_try:
             url = f"{base_url}/{model}:generateContent?key={api_key}"
+            print(f"[Tickets] Llamando a Gemini ({model}) para {os.path.basename(file_path)}")
             try:
                 resp = await client.post(url, json=payload)
                 if resp.status_code in (404, 400):
@@ -769,6 +765,7 @@ async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = ""
                 raw = re.sub(r'\s*```$', '', raw)
                 result = json.loads(raw)
                 print(f"[Tickets] Gemini OK ({model}) — tienda={result.get('store_name')} total={result.get('total')} productos={len(result.get('items') or [])}")
+                result["_gemini_model"] = model
                 return result
             except Exception as exc:
                 msg = str(exc).replace(api_key, "***")
@@ -777,6 +774,98 @@ async def _analyze_with_gemini(file_path: str, mime_type: str, api_key: str = ""
 
     print("[Tickets] Gemini: ningún modelo disponible, usando Tesseract")
     return None
+
+
+# ── Gemini model discovery ────────────────────────────────────────────────────
+# Google retires models often (1.5 and 2.0 are gone), so instead of a hardcoded
+# list we ask the API which models this key can use and rank them.
+
+# Only used if the models endpoint itself can't be reached.
+_GEMINI_FALLBACK_MODELS = ("gemini-flash-latest", "gemini-2.5-flash", "gemini-flash-lite-latest", "gemini-2.5-flash-lite")
+_GEMINI_MAX_AUTO_TRIES = 4
+_GEMINI_CACHE_TTL = 6 * 3600
+_gemini_models_cache: dict[str, tuple[float, list[dict]]] = {}
+
+# Models that can't read a receipt image or aren't general text models.
+_GEMINI_EXCLUDE = (
+    "embedding", "tts", "image", "live", "audio", "native", "robotics",
+    "computer-use", "learnlm", "aqa", "veo", "imagen", "gemma",
+)
+
+
+def _gemini_rank(model_id: str) -> tuple:
+    """Sort key: best free model first.
+
+    The API doesn't say which models are free, but Flash and Flash-Lite are the
+    ones Google keeps in the free tier — Pro has little or no free quota, so it
+    goes last. Stable beats preview/experimental (those vanish without notice),
+    newer version beats older, Flash beats Flash-Lite within a version, and the
+    unversioned *-latest aliases come after the explicit versions.
+    """
+    mid = model_id.lower()
+    unstable = any(t in mid for t in ("preview", "exp"))
+    not_flash = "flash" not in mid
+    m = re.search(r"gemini-(\d+(?:\.\d+)?)", mid)
+    version = float(m.group(1)) if m else 0.0
+    is_lite = "lite" in mid
+    return (unstable, not_flash, -version, is_lite, mid)
+
+
+def _gemini_label(model_id: str, display_name: str) -> str:
+    tags = []
+    if "preview" in model_id or "exp" in model_id:
+        tags.append("preview")
+    if "pro" in model_id and "flash" not in model_id:
+        tags.append("cuota gratuita limitada")
+    return display_name + (f" ({', '.join(tags)})" if tags else "")
+
+
+async def _list_gemini_models(api_key: str, force: bool = False) -> list[dict] | None:
+    """Models this key can call with generateContent, best free one first.
+
+    Returns [{id, label}] or None if the API couldn't be reached.
+    Cached per key for a few hours so uploads don't pay for an extra request.
+    """
+    import time
+    import hashlib
+    import httpx
+
+    if not api_key:
+        return None
+    cache_key = hashlib.sha256(api_key.encode()).hexdigest()
+    cached = _gemini_models_cache.get(cache_key)
+    if cached and not force and time.time() - cached[0] < _GEMINI_CACHE_TTL:
+        return cached[1]
+
+    models: list[dict] = []
+    url = "https://generativelanguage.googleapis.com/v1beta/models"
+    params: dict[str, str | int] = {"key": api_key, "pageSize": 1000}
+    try:
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            while True:
+                resp = await client.get(url, params=params)
+                resp.raise_for_status()
+                data = resp.json()
+                for m in data.get("models", []):
+                    mid = (m.get("name") or "").removeprefix("models/")
+                    if not mid.startswith("gemini"):
+                        continue
+                    if "generateContent" not in (m.get("supportedGenerationMethods") or []):
+                        continue
+                    if any(x in mid for x in _GEMINI_EXCLUDE):
+                        continue
+                    models.append({"id": mid, "label": _gemini_label(mid, m.get("displayName") or mid)})
+                token = data.get("nextPageToken")
+                if not token:
+                    break
+                params["pageToken"] = token
+    except Exception as exc:
+        print(f"[Tickets] Gemini: no se pudo listar modelos: {str(exc).replace(api_key, '***')}")
+        return None
+
+    models.sort(key=lambda m: _gemini_rank(m["id"]))
+    _gemini_models_cache[cache_key] = (time.time(), models)
+    return models
 
 
 async def _extract_text_header(file_path: str) -> str:
@@ -904,6 +993,52 @@ class TicketMetaPatch(PydanticModel):
 
 # ── Endpoints ──────────────────────────────────────────────────────────────────
 
+@router.get("/gemini-models")
+async def get_gemini_models(
+    refresh: bool = False,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(current_active_user),
+):
+    """Gemini models the user's key can use, best free one first (for Settings)."""
+    from app.models.user_preference import UserPreference
+    pref = (await db.execute(
+        select(UserPreference).where(
+            UserPreference.user_id == user.id, UserPreference.key == "gemini_api_key",
+        )
+    )).scalar_one_or_none()
+    api_key = (pref.value if pref else "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
+    if not api_key:
+        raise HTTPException(status_code=400, detail="No hay clave de Gemini configurada")
+    models = await _list_gemini_models(api_key, force=refresh)
+    if models is None:
+        raise HTTPException(status_code=502, detail="No se pudo obtener la lista de modelos de Gemini (¿clave válida?)")
+    return models
+
+
+async def _replace_retired_gemini_model(db: AsyncSession, user: User, prefs: dict, ai_result: dict | None) -> None:
+    """If the user's chosen model no longer exists, save the one that worked instead.
+
+    Only when the model is missing from the key's model list — a 429 on a model
+    that still exists must not overwrite the user's choice.
+    """
+    from app.models.user_preference import UserPreference
+    chosen = (prefs.get("gemini_model") or "").strip()
+    used = (ai_result or {}).get("_gemini_model")
+    if not chosen or not used or used == chosen:
+        return
+    api_key = (prefs.get("gemini_api_key") or "").strip() or os.environ.get("GEMINI_API_KEY", "").strip()
+    available = await _list_gemini_models(api_key)
+    if available is None or any(m["id"] == chosen for m in available):
+        return
+    pref = (await db.execute(
+        select(UserPreference).where(UserPreference.user_id == user.id, UserPreference.key == "gemini_model")
+    )).scalar_one_or_none()
+    if pref:
+        print(f"[Tickets] Gemini: el modelo {chosen!r} ya no existe, se cambia a {used!r}")
+        pref.value = used
+        await db.commit()
+
+
 @router.post("/analyze", response_model=TicketRead, status_code=201)
 async def analyze_ticket(
     file: UploadFile,
@@ -932,9 +1067,14 @@ async def analyze_ticket(
     gemini_key  = prefs.get("gemini_api_key", "")
     mistral_key = prefs.get("mistral_api_key", "")
 
-    # ── Primary: Gemini 2.0 Flash → Mistral pixtral-12b (free tiers) ────────
-    ai_result = await _analyze_with_gemini(dest, file.content_type or "", api_key=gemini_key)
+    # ── Primary: Gemini (user's model, else best free) → Mistral pixtral-12b ──
+    ai_result = await _analyze_with_gemini(
+        dest, file.content_type or "", api_key=gemini_key,
+        preferred_model=prefs.get("gemini_model", ""),
+    )
     ocr_source = "gemini" if ai_result else None
+    if ai_result:
+        await _replace_retired_gemini_model(db, user, prefs, ai_result)
     if not ai_result:
         ai_result = await _analyze_with_mistral(dest, file.content_type or "", api_key=mistral_key)
         if ai_result:
@@ -1171,10 +1311,12 @@ async def rescan_ticket(
     else:
         ai_result = await _analyze_with_gemini(
             file_path, t.mime_type, api_key=gemini_key,
-            preferred_model=body.model or "",
+            preferred_model=body.model or prefs.get("gemini_model", ""),
         )
         if ai_result:
             ocr_source = "gemini"
+            if not body.model:
+                await _replace_retired_gemini_model(db, user, prefs, ai_result)
 
     if not ai_result:
         raise HTTPException(status_code=422, detail="El modelo no pudo extraer datos del ticket")

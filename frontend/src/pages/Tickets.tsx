@@ -8,7 +8,7 @@ import {
   Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
   Eye, EyeOff, Search, ArrowRightLeft, ExternalLink, AlertTriangle, RefreshCw,
 } from 'lucide-react'
-import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicketMeta, rescanTicket, ticketFileUrl, attachTicketToMovement, getTicketOcrDebug, type Ticket, type TicketItem, type TicketOcrDebug } from '../api/tickets'
+import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicketMeta, rescanTicket, getGeminiModels, ticketFileUrl, attachTicketToMovement, getTicketOcrDebug, type Ticket, type TicketItem, type TicketOcrDebug } from '../api/tickets'
 import { compressTicketImage } from '../utils/imageCompressor'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import MovementForm from '../components/MovementForm'
@@ -435,6 +435,13 @@ function TicketCard({
   const [ocrDebug, setOcrDebug] = useState<TicketOcrDebug | null>(null)
   const [ocrDebugLoading, setOcrDebugLoading] = useState(false)
   const [showRescanPicker, setShowRescanPicker] = useState(false)
+  const { data: geminiModels = [] } = useQuery({
+    queryKey: ['gemini-models'],
+    queryFn: () => getGeminiModels(),
+    enabled: showRescanPicker,
+    staleTime: 60 * 60 * 1000,
+    retry: false,
+  })
 
   const rescanMut = useMutation({
     mutationFn: ({ source, model }: { source: 'gemini' | 'mistral'; model?: string }) =>
@@ -946,17 +953,15 @@ function TicketCard({
                     {rescanMut.isPending ? 'Reescaneando…' : 'Reescanear'}
                   </button>
                   {showRescanPicker && (
-                    <div className="absolute bottom-full left-0 mb-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-20 min-w-44 py-1">
+                    <div className="absolute bottom-full left-0 mb-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg z-20 min-w-56 max-h-72 overflow-y-auto py-1">
                       <p className="px-3 py-1.5 text-[10px] text-gray-400 font-semibold uppercase tracking-wide">Modelo</p>
                       {[
-                        { label: 'Gemini 2.5 Flash', source: 'gemini' as const, model: 'gemini-2.5-flash' },
-                        { label: 'Gemini 2.5 Pro',   source: 'gemini' as const, model: 'gemini-2.5-pro' },
-                        { label: 'Gemini 2.0 Flash', source: 'gemini' as const, model: 'gemini-2.0-flash' },
-                        { label: 'Gemini 1.5 Flash', source: 'gemini' as const, model: 'gemini-1.5-flash-latest' },
-                        { label: 'Mistral Pixtral',  source: 'mistral' as const, model: undefined },
+                        { label: 'Gemini (modelo de la configuración)', source: 'gemini' as const, model: undefined },
+                        ...geminiModels.map(m => ({ label: m.label, source: 'gemini' as const, model: m.id })),
+                        { label: 'Mistral Pixtral', source: 'mistral' as const, model: undefined },
                       ].map(opt => (
                         <button
-                          key={opt.label}
+                          key={`${opt.source}:${opt.model ?? opt.label}`}
                           onClick={() => rescanMut.mutate({ source: opt.source, model: opt.model })}
                           className="w-full text-left px-3 py-2 text-xs hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300"
                         >

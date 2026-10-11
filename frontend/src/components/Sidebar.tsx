@@ -22,6 +22,8 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: 'feat',    text: 'Seguridad: el primer usuario real es el administrador; en Ajustes → Sistema puede abrir o cerrar el registro de cuentas nuevas (cerrado por defecto) y activar o apagar el Consultor IA, que ya solo usa él' },
       { type: 'feat',    text: 'Seguridad: tras 5 intentos de login fallidos en un minuto se bloquea esa IP un rato, y los inicios de sesión (correctos y fallidos, con su IP) quedan en el historial de actividad' },
       { type: 'fix',     text: 'Seguridad: ningún movimiento, tipo, cuenta, plantilla, fondo, importación ni copia de seguridad puede apuntar a datos de otro usuario' },
+      { type: 'feat',    text: 'Tickets: en Ajustes → Tickets se elige el modelo de Gemini entre los que tu clave puede usar de verdad (se consultan a Google); en automático, o si el elegido falla o Google lo retira, se usa el mejor gratuito disponible' },
+      { type: 'fix',     text: 'Tickets: el OCR ya no depende de Gemini 1.5/2.0, que Google ha retirado; el menú «Reescanear» muestra los modelos disponibles en vez de una lista fija' },
     ],
   },
   {
