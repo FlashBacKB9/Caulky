@@ -100,17 +100,7 @@ body {
   display: none;
 }
 
-/* ── APK (Capacitor): respetar la barra de estado y la de navegación de Android ── */
-html.native-app body {
-  padding-top: env(safe-area-inset-top);
-  padding-bottom: env(safe-area-inset-bottom);
-  box-sizing: border-box;
-  /* La franja de la barra de estado toma el color de la cabecera */
-  background-color: #ffffff;
-}
-html.native-app.dark body {
-  background-color: #111827;
-}
+/* ── APK (Capacitor) ── */
 html.native-app .safe-bottom {
   margin-bottom: env(safe-area-inset-bottom);
 }
@@ -121,3 +111,8 @@ html.floating-quickadd body,
 html.floating-quickadd #root {
   background-color: transparent !important;
 }
+/* Aparece con un fundido suave en lugar de golpe */
+@keyframes floating-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes floating-pop { from { opacity: 0; transform: scale(0.96) } to { opacity: 1; transform: scale(1) } }
+.floating-backdrop { animation: floating-fade 180ms ease-out both; }
+.floating-card { animation: floating-pop 200ms ease-out both; }

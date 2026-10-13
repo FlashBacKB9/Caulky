@@ -36,3 +36,6 @@ export function apiBase(): string {
 export function apiUrl(path: string): string {
   return apiBase() + path
 }
+
+/** Evento para pedir una sincronización (revisar pendientes o descargar todo). */
+export const SYNC_NOW_EVENT = 'caulky-sync-now'

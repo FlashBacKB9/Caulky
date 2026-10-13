@@ -1,6 +1,7 @@
 import axios, { AxiosError, type AxiosAdapter, type AxiosResponse, type InternalAxiosRequestConfig } from 'axios'
 import { applyOverlay, deriveFromCache, parseJson, enrichMovement, findCachedItem, pendingCreate, readCache, writeCache } from './cache'
 import { isOnline, probe, setOnline, wasChecked } from './connectivity'
+import { filesEnabled, isFilePath, readFile, writeFile } from './files'
 import { enqueue, getOps, nextTempId, removeOp, splitPath, uuid, type Op } from './outbox'
 
 /**
@@ -117,8 +118,22 @@ export const offlineAdapter: AxiosAdapter = async (config) => {
 
   if (method === 'GET') {
     if (binary) {
-      if (!isOnline() && wasChecked()) throw offlineError(config, 'Necesitas conexión para abrir este fichero')
-      return network(config)
+      // Adjuntos: con conexión se guardan al abrirlos; sin ella se sirven de la copia
+      const isFile = isFilePath(path)
+      if (isOnline() || !wasChecked()) {
+        try {
+          const res = await network(config)
+          setOnline(true)
+          if (isFile && filesEnabled() && res.data instanceof Blob) void writeFile(path, res.data).catch(() => {})
+          return res
+        } catch (e) {
+          if (!isNetworkError(e)) throw e
+          setOnline(false)
+        }
+      }
+      const blob = isFile ? await readFile(path).catch(() => undefined) : undefined
+      if (blob) return respond(config, config.responseType === 'arraybuffer' ? await blob.arrayBuffer() : blob)
+      throw offlineError(config, 'Necesitas conexión para abrir este fichero')
     }
     if (isOnline() || !wasChecked()) {
       try {

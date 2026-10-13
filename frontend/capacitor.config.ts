@@ -16,8 +16,9 @@ const config: CapacitorConfig = {
     // Peticiones por HTTP nativo: sin CORS y con la cookie de sesión guardada en el móvil
     CapacitorHttp: { enabled: true },
     CapacitorCookies: { enabled: true },
-    // Con WebView reciente la app ocupa también la franja de la barra de estado (ver index.css)
-    SystemBars: { insetsHandling: 'css', initialViewportFitValueHint: 'cover' },
+    // Android deja fuera de la app la franja de las barras del sistema (así nada fijo queda
+    // debajo); su color lo pone la app con CaulkyNative.setBarColor
+    SystemBars: { insetsHandling: 'native' },
   },
 }
 

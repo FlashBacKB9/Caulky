@@ -7,4 +7,10 @@
     <string name="quickadd_label">Añadir rápido</string>
     <string name="quickadd_long">Añadir movimiento rápido</string>
     <string name="widget_description">Añade un gasto o ingreso sin abrir la app</string>
+    <string name="widget_accounts_label">Caulky · Cuentas</string>
+    <string name="widget_accounts_description">Saldo total y de cada cuenta</string>
+    <string name="widget_budgets_label">Caulky · Presupuestos</string>
+    <string name="widget_budgets_description">Cuánto llevas gastado de cada presupuesto</string>
+    <string name="widget_month_label">Caulky · Este mes</string>
+    <string name="widget_month_description">Gastos, ingresos y ahorro del mes</string>
 </resources>

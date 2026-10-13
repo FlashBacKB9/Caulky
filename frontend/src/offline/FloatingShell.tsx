@@ -8,9 +8,9 @@ export function FloatingShell({ children }: { children: ReactNode }) {
   const online = useSyncExternalStore(subscribe, isOnline)
   return (
     // Centrada en la pantalla, como un diálogo
-    <div className="fixed inset-0 flex items-center justify-center p-4 bg-black/50" onClick={closeFloating}>
+    <div className="fixed inset-0 flex items-center justify-center p-4 bg-black/50 floating-backdrop" onClick={closeFloating}>
       <div
-        className="w-full max-w-md h-full max-h-[760px] flex flex-col rounded-3xl overflow-hidden shadow-2xl bg-white dark:bg-gray-950"
+        className="w-full max-w-md h-full max-h-[760px] flex flex-col rounded-3xl overflow-hidden shadow-2xl bg-white dark:bg-gray-950 floating-card"
         onClick={e => e.stopPropagation()}
       >
         {!online && (

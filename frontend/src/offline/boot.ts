@@ -6,6 +6,8 @@ import { startConnectivity } from './connectivity'
 import { loadOutbox, reloadOutbox } from './outbox'
 import { closeFloating, detectFloating, isFloatingQuickAdd } from './floating'
 import { apiBase, getServerUrl, isNative } from './platform'
+import { CaulkyNative } from './native'
+import { pushWidgets } from './widgets'
 
 /** Comprueba si el servidor contesta (ruta pública y ligera). */
 async function serverReachable(): Promise<boolean> {
@@ -60,14 +62,37 @@ export async function bootOffline() {
     else void CapApp.exitApp()
   })
 
+  // Abrir la app en una pantalla concreta desde un widget: caulky://open/<ruta>
+  const openPath = (url?: string) => {
+    if (!url?.startsWith('caulky://open/')) return
+    const path = '/' + url.slice('caulky://open/'.length)
+    window.history.pushState(null, '', path)
+    window.dispatchEvent(new PopStateEvent('popstate'))
+  }
+  if (!isFloatingQuickAdd()) {
+    const launch = await CapApp.getLaunchUrl().catch(() => undefined)
+    if (launch?.url?.startsWith('caulky://open/')) {
+      window.history.replaceState(null, '', '/' + launch.url.slice('caulky://open/'.length))
+    }
+    CapApp.addListener('appUrlOpen', e => openPath(e.url))
+  }
+
+  // La ventana flotante es transparente: ni barra ni widgets desde ella
+  if (isFloatingQuickAdd()) return
+
+  // Android deja fuera de la app la franja de la barra de estado: se pinta del color de la cabecera
   const syncBar = () => {
-    // Con WebView reciente la franja de la barra la pinta la app (color de la cabecera);
-    // con una antigua la pinta Android en blanco y los iconos tienen que ser oscuros
-    const appDrawsBar = parseFloat(getComputedStyle(document.body).paddingTop) > 0
-    const dark = appDrawsBar && document.documentElement.classList.contains('dark')
+    const dark = document.documentElement.classList.contains('dark')
+    CaulkyNative.setBarColor({ color: dark ? '#111827' : '#ffffff' }).catch(() => {})
     StatusBar.setStyle({ style: dark ? Style.Dark : Style.Light }).catch(() => {})
   }
   syncBar()
-  window.addEventListener('resize', syncBar)
   new MutationObserver(syncBar).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+
+  // Widgets del escritorio: se refrescan al salir de la app y al cambiar el modo privacidad
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') void pushWidgets()
+  })
+  window.addEventListener('caulky-privacy-change', () => { void pushWidgets() })
+  void pushWidgets()
 }

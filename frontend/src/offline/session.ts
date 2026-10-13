@@ -1,10 +1,11 @@
 import { clearCache } from './cache'
+import { clearFiles } from './files'
 import { clearOutbox, getOps } from './outbox'
 import { offlineEnabled } from './platform'
 
 /** Al cerrar sesión no deben quedar en el móvil los datos ni los cambios de esa cuenta. */
 export async function clearOfflineData() {
-  await Promise.all([clearCache().catch(() => {}), clearOutbox().catch(() => {})])
+  await Promise.all([clearCache().catch(() => {}), clearOutbox().catch(() => {}), clearFiles().catch(() => {})])
   localStorage.removeItem('caulky-offline-last-sync')
 }
 

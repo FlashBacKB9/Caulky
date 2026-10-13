@@ -6,6 +6,8 @@ import { getOps, subscribeOutbox } from './outbox'
 import { lastFullSync } from './cache'
 import { prefetchAll } from './prefetch'
 import { buildReview, runSync, type ReviewItem, type ReviewKind } from './sync'
+import { pushWidgets } from './widgets'
+import { SYNC_NOW_EVENT } from './platform'
 
 /**
  * Aviso de "sin conexión" arriba y, al recuperarla con cambios pendientes, la ventana para
@@ -206,8 +208,19 @@ export default function SyncCenter() {
   const refreshAll = useCallback(() => {
     setDownload([0, 1])
     prefetchAll((d, t) => setDownload([d, t]))
-      .finally(() => { setDownload(null); setTick(t => t + 1); qc.invalidateQueries() })
+      .finally(() => { setDownload(null); setTick(t => t + 1); qc.invalidateQueries(); void pushWidgets() })
   }, [qc])
+
+  // Desde Acerca de → Almacenamiento local: "Sincronizar ahora"
+  useEffect(() => {
+    const open = () => {
+      if (!isOnline()) return
+      if (getOps().length) setReviewOpen(true)
+      else refreshAll()
+    }
+    window.addEventListener(SYNC_NOW_EVENT, open)
+    return () => window.removeEventListener(SYNC_NOW_EVENT, open)
+  }, [refreshAll])
 
   // Al entrar con conexión o recuperarla: revisar lo pendiente o, si no hay, descargar todo
   useEffect(() => {

@@ -1,21 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Widget 1x1: solo el botón "+" -->
+<!-- Añadir rápido 1x1: solo el botón "+" -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/widget_root"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@drawable/widget_background"
-    android:contentDescription="@string/quickadd_long"
-    android:padding="6dp">
+    android:contentDescription="@string/quickadd_long">
 
-    <TextView
+    <ImageView
+        android:id="@+id/bg"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY"
+        android:src="@drawable/widget_shape"
+        android:tint="#1C1C1E" />
+
+    <ImageView
+        android:id="@+id/plus_circle"
         android:layout_width="44dp"
         android:layout_height="44dp"
         android:layout_gravity="center"
-        android:background="@drawable/widget_plus"
-        android:gravity="center"
-        android:text="+"
-        android:textColor="#0F172A"
-        android:textSize="26sp"
-        android:textStyle="bold" />
+        android:src="@drawable/widget_circle" />
+
+    <ImageView
+        android:id="@+id/plus_icon"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_gravity="center"
+        android:src="@drawable/ic_widget_plus"
+        android:tint="#1C1C1E" />
 </FrameLayout>

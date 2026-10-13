@@ -13,6 +13,9 @@ import SuscripcionesTab from './settings/SuscripcionesTab'
 import PluginsTab from './settings/PluginsTab'
 import SistemaTab from './settings/SistemaTab'
 import ApiTab from './settings/ApiTab'
+import { useSearchParams } from 'react-router-dom'
+import { isNative } from '../offline/platform'
+import WidgetsTab from '../offline/WidgetsTab'
 
 const SETTINGS_TABS = [
   { id: 'cuentas',        labelKey: 'settings.accounts'  },
@@ -27,10 +30,15 @@ const SETTINGS_TABS = [
   { id: 'sistema',        label:    'Sistema'              },
 ] as const
 
+// APK: colores de los widgets del escritorio
+const TABS = isNative ? [...SETTINGS_TABS, { id: 'widgets', label: 'Widgets' } as const] : SETTINGS_TABS
+
 export default function Settings() {
   const { fmt } = useCurrency()
   const { data, isLoading } = useQuery({ queryKey: ['accounts-summary'], queryFn: getAccountsSummary })
-  const [activeTab, setActiveTab] = useState<string>('cuentas')
+  // ?tab=widgets: desde "Configurar" de un widget
+  const [searchParams] = useSearchParams()
+  const [activeTab, setActiveTab] = useState<string>(() => searchParams.get('tab') ?? 'cuentas')
 
   if (isLoading) return <div className="p-8 text-gray-500">{t('common.loading')}</div>
   if (!data) return null
@@ -41,7 +49,7 @@ export default function Settings() {
 
       {/* Tab bar */}
       <div className="flex overflow-x-auto border-b border-gray-100 dark:border-gray-800 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {SETTINGS_TABS.map(tab => {
+        {TABS.map(tab => {
           const label = 'label' in tab ? tab.label : t(tab.labelKey)
           return (
             <button
@@ -71,6 +79,7 @@ export default function Settings() {
         {activeTab === 'plugins'       && <PluginsTab />}
         {activeTab === 'api'           && <ApiTab />}
         {activeTab === 'sistema'       && <SistemaTab />}
+        {activeTab === 'widgets'       && <WidgetsTab />}
       </div>
     </div>
   )

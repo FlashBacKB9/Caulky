@@ -1,5 +1,6 @@
 import api from '../api/client'
-import { cachedKeys, markFullSync } from './cache'
+import { cachedKeys, markFullSync, readCache } from './cache'
+import { filesEnabled, storedFiles } from './files'
 import { isOnline } from './connectivity'
 
 /**
@@ -33,12 +34,27 @@ async function getQuiet(key: string) {
   try { await api.get(key) } catch { /* se queda con la copia anterior */ }
 }
 
-async function pool(keys: string[], size: number, onDone: () => void) {
+async function getFile(path: string) {
+  try { await api.get(path, { responseType: 'blob' }) } catch { /* se intentará la próxima vez */ }
+}
+
+/** Rutas de adjuntos de movimientos y tickets que faltan en el móvil. */
+async function missingFiles(): Promise<string[]> {
+  const have = new Set(await storedFiles())
+  const paths: string[] = []
+  const movements = (await readCache('/movements'))?.data as { files?: { id: number }[] }[] | undefined
+  for (const m of movements ?? []) for (const f of m.files ?? []) paths.push(`/movements/files/${f.id}/download`)
+  const tickets = (await readCache('/tickets'))?.data as { id: number }[] | undefined
+  for (const t of tickets ?? []) paths.push(`/tickets/${t.id}/file`)
+  return paths.filter(p => !have.has(p))
+}
+
+async function pool(keys: string[], size: number, onDone: () => void, fetchOne: (key: string) => Promise<void> = getQuiet) {
   let i = 0
   const worker = async () => {
     while (i < keys.length && isOnline()) {
       const k = keys[i++]
-      await getQuiet(k)
+      await fetchOne(k)
       onDone()
     }
   }
@@ -72,9 +88,14 @@ export function prefetchAll(onProgress?: Progress): Promise<void> {
     }
 
     const list = [...keys]
+    let total = list.length + 1
     let done = 1
-    onProgress?.(done, list.length + 1)
-    await pool(list, 4, () => onProgress?.(++done, list.length + 1))
+    onProgress?.(done, total)
+    await pool(list, 4, () => onProgress?.(++done, total))
+    // Después, con las listas ya al día, los adjuntos que aún no están en el móvil
+    const files = filesEnabled() ? await missingFiles().catch(() => [] as string[]) : []
+    total += files.length
+    await pool(files, 2, () => onProgress?.(++done, total), getFile)
     if (isOnline()) markFullSync()
   })().finally(() => { running = null })
   return running

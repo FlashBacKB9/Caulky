@@ -6,7 +6,9 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
+    <!-- Transparente desde el principio: la ventana flotante no da un fogonazo blanco al abrir -->
     <WebView
         android:layout_width="match_parent"
-        android:layout_height="match_parent" />
+        android:layout_height="match_parent"
+        android:background="@android:color/transparent" />
 </androidx.coordinatorlayout.widget.CoordinatorLayout>

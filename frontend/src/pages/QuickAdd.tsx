@@ -707,7 +707,8 @@ export default function QuickAdd() {
           <span className={`text-7xl font-bold tabular-nums tracking-tight ${clrText}`}>
             {raw === '0' ? '0' : raw}
           </span>
-          <span className={`text-3xl font-light ml-2 ${clrText}`}>€</span>
+          {/* APK: el € de la fuente monoespaciada en trazo fino se ve raro; uno del sistema y del mismo peso */}
+          <span className={`ml-2 ${isNative ? 'font-sans font-bold text-5xl' : 'text-3xl font-light'} ${clrText}`}>€</span>
         </div>
 
         {/* Kind toggle — segmented control */}

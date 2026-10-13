@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Gastos e ingresos del mes: desde 1x1 (solo la cifra) hasta el tamaño que quieras (con filas) -->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:configure="app.caulky.mobile.WidgetConfigActivity"
+    android:description="@string/widget_month_description"
+    android:initialLayout="@layout/widget_card"
+    android:previewLayout="@layout/widget_card"
+    android:minWidth="40dp"
+    android:minHeight="40dp"
+    android:minResizeWidth="40dp"
+    android:minResizeHeight="40dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="1"
+    android:resizeMode="horizontal|vertical"
+    android:updatePeriodMillis="0"
+    android:widgetCategory="home_screen"
+    android:widgetFeatures="reconfigurable|configuration_optional" />

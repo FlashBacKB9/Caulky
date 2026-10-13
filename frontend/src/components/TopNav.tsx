@@ -4,6 +4,8 @@ import { Wallet, Settings, LogOut, Info, X, ExternalLink, EyeOff, Eye } from 'lu
 import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 import { logout } from '../api/auth'
 import { confirmLogout } from '../offline/session'
+import { isNative } from '../offline/platform'
+import LocalStorageInfo from '../offline/LocalStorageInfo'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
 import { t } from '../utils/i18n'
@@ -12,7 +14,7 @@ import { usePrivacyMode } from '../hooks/usePrivacyMode'
 function InfoModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm" onClick={onClose}>
-      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm" onClick={e => e.stopPropagation()}>
+      <div className="bg-white dark:bg-gray-900 rounded-2xl shadow-2xl w-full max-w-sm max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-gray-100 dark:border-gray-800">
           <div>
             <h2 className="text-base font-semibold text-gray-800 dark:text-white">{t('about.title')}</h2>
@@ -32,6 +34,13 @@ function InfoModal({ onClose }: { onClose: () => void }) {
             <span className="font-medium text-gray-800 dark:text-gray-100">FlashBacKB9</span>
             <ExternalLink className="w-3 h-3 text-gray-400 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
           </a>
+          {/* APK: copia local, conexión y servidor */}
+          {isNative && (
+            <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-800">
+              <p className="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 mb-2">Almacenamiento local</p>
+              <LocalStorageInfo />
+            </div>
+          )}
         </div>
       </div>
     </div>

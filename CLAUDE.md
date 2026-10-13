@@ -25,7 +25,7 @@ la APK está en `frontend/src/offline/` y solo se activa dentro de la app (en la
 apagado; para probarlo en el navegador: `localStorage.setItem('caulky-offline-dev', '1')`).
 
 ```bash
-# Desde frontend/: compila la web en modo android, la copia al proyecto y genera la APK
+# Desde frontend/: compila la web, la copia al proyecto Android y genera la APK
 npm run android:sync
 cd android && JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew assembleDebug
 # → android/app/build/outputs/apk/debug/app-debug.apk
@@ -36,3 +36,7 @@ cd android && JAVA_HOME="/c/Program Files/Android/Android Studio/jbr" ./gradlew 
   al reconectar se revisan en una ventana (duplicados, conflictos) antes de mandarlos.
 - Widget / acceso directo «Añadir rápido» → `QuickAddActivity` (ventana transparente) abre
   `caulky://speedmode`, que muestra el speedmode como diálogo flotante.
+- Widgets de datos (Cuentas, Presupuestos, Este mes): la web prepara los datos ya formateados
+  (`src/offline/widgets.ts`) y se los pasa a Android por el plugin propio `CaulkyNative`;
+  `Widgets.java` los pinta según el tamaño. Colores en Ajustes → Widgets (solo APK).
+- Acerca de → Almacenamiento local (solo APK): conexión, servidor, espacio, sincronizar.

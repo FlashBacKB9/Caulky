@@ -33,6 +33,7 @@ import { usePluginLoader } from './hooks/usePlugins'
 import { getActiveSkin, applySkinCSS } from './utils/skins'
 import { offlineEnabled } from './offline/platform'
 import SyncCenter from './offline/SyncCenter'
+import { isFloatingQuickAdd } from './offline/floating'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null }
@@ -197,6 +198,8 @@ function AppRoutes() {
   }, [user?.id])
 
   if (loading || (user && !prefsReady)) {
+    // Speedmode flotante: nada mientras carga (la pantalla gris de carga se vería como un destello)
+    if (isFloatingQuickAdd()) return null
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-950">
         <div className="w-6 h-6 border-2 border-gray-300 border-t-gray-800 dark:border-t-white rounded-full animate-spin" />

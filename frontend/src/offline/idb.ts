@@ -1,9 +1,11 @@
 /** Almacén mínimo sobre IndexedDB: caché de respuestas y cola de cambios pendientes. */
 
 const DB_NAME = 'caulky-offline'
-const VERSION = 1
+const VERSION = 2
 export const CACHE = 'cache'
 export const OUTBOX = 'outbox'
+/** Adjuntos (PDF, fotos de tickets...) descargados para verlos sin conexión */
+export const FILES = 'files'
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -15,8 +17,13 @@ function open(): Promise<IDBDatabase> {
         const db = req.result
         if (!db.objectStoreNames.contains(CACHE)) db.createObjectStore(CACHE)
         if (!db.objectStoreNames.contains(OUTBOX)) db.createObjectStore(OUTBOX)
+        if (!db.objectStoreNames.contains(FILES)) db.createObjectStore(FILES)
       }
-      req.onsuccess = () => resolve(req.result)
+      req.onsuccess = () => {
+        // Si otra ventana (la flotante) actualiza la base de datos, esta suelta la suya
+        req.result.onversionchange = () => { req.result.close(); dbPromise = null }
+        resolve(req.result)
+      }
       req.onerror = () => { dbPromise = null; reject(req.error) }
     })
   }

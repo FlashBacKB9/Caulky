@@ -5,6 +5,8 @@ import CalculatorModal from './CalculatorModal'
 import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 import { logout } from '../api/auth'
 import { confirmLogout } from '../offline/session'
+import { isNative } from '../offline/platform'
+import LocalStorageInfo from '../offline/LocalStorageInfo'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
 import { t } from '../utils/i18n'
@@ -28,6 +30,11 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: 'feat',    text: 'App Android (APK): se conecta a tu servidor de Caulky y se descarga todos los datos para usarla sin conexión; lo que cambies sin conexión se guarda en el móvil y, al volver a tenerla, te enseña los cambios para elegir cuáles guardar, avisando de duplicados y de cambios hechos a la vez en el servidor' },
       { type: 'feat',    text: 'App Android: widget y acceso directo «Añadir rápido» que abren el speedmode como ventana flotante, con foto del ticket directamente desde la cámara' },
       { type: 'improve', text: 'Móvil: los gráficos se apilan a ancho completo, las filas de cuentas de Ajustes caben enteras y los interruptores del formulario de movimiento ya no se pisan' },
+      { type: 'feat',    text: 'App Android: widgets de Cuentas, Presupuestos y Este mes, además del de Añadir rápido; todos se pueden estirar desde 1×1 y enseñan más cuanto más grandes, respetan el modo privacidad y abren la app en su pantalla' },
+      { type: 'feat',    text: 'App Android: Ajustes → Widgets para elegir el estilo (Nothing, Nothing claro, Caulky, Cristal) o colores propios, con vista previa' },
+      { type: 'feat',    text: 'App Android: Acerca de → Almacenamiento local, con el estado de la conexión, el servidor, el espacio usado y botones para sincronizar o volver a descargarlo todo' },
+      { type: 'feat',    text: 'App Android: los adjuntos de movimientos y las fotos o PDF de los tickets también se descargan para verlos sin conexión (se puede desactivar)' },
+      { type: 'fix',     text: 'App Android: los avisos de arriba ya no quedan tapados por la barra de estado, y el speedmode flotante se abre sin destello'},
     ],
   },
   {
@@ -238,8 +245,8 @@ const BADGE_LABEL = { feat: 'Nueva', fix: 'Fix', improve: 'Mejora' }
 
 // ── Accordion section inside InfoModal ────────────────────────────────────────
 
-function InfoSection({ title, children }: { title: string; children: React.ReactNode }) {
-  const [open, setOpen] = useState(false)
+function InfoSection({ title, children, defaultOpen = false }: { title: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen)
   return (
     <div className="border-t border-gray-100 dark:border-gray-800 first:border-t-0">
       <button
@@ -281,6 +288,13 @@ function InfoModal({ onClose }: { onClose: () => void }) {
               <ExternalLink className="w-3 h-3 text-gray-400 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
             </a>
           </div>
+
+          {/* APK: copia local, conexión y servidor */}
+          {isNative && (
+            <InfoSection title="Almacenamiento local" defaultOpen>
+              <LocalStorageInfo />
+            </InfoSection>
+          )}
 
           {/* APIs externas */}
           <InfoSection title={t('about.externalApis')}>
