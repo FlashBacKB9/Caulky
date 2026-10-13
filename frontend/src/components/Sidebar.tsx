@@ -35,6 +35,7 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: 'feat',    text: 'App Android: Acerca de → Almacenamiento local, con el estado de la conexión, el servidor, el espacio usado y botones para sincronizar o volver a descargarlo todo' },
       { type: 'feat',    text: 'App Android: los adjuntos de movimientos y las fotos o PDF de los tickets también se descargan para verlos sin conexión (se puede desactivar)' },
       { type: 'fix',     text: 'App Android: los avisos de arriba ya no quedan tapados por la barra de estado, y el speedmode flotante se abre sin destello'},
+      { type: 'feat',    text: 'App Android: el widget de Presupuestos en 2×1 muestra un presupuesto con su barra, y cada widget elige qué presupuestos enseña (al ponerlo o desde Ajustes → Widgets)' },
     ],
   },
   {

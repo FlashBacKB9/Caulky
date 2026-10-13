@@ -1,7 +1,10 @@
-import { useState, type CSSProperties } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Check, Plus } from 'lucide-react'
 import { Section } from '../pages/settings/shared'
-import { readWidgetStyle, saveWidgetStyle, WIDGET_PRESETS, type WidgetStyle } from './widgets'
+import { readBudgets } from '../pages/Budgets'
+import { CaulkyNative } from './native'
+import { readBudgetSelection, readWidgetStyle, saveBudgetSelection, saveWidgetStyle, WIDGET_PRESETS, type WidgetStyle } from './widgets'
 
 /** Ajustes → Widgets (solo en la APK): colores de los widgets del escritorio. */
 
@@ -68,6 +71,81 @@ function Preview({ s }: { s: WidgetStyle }) {
   )
 }
 
+/** Cada widget de presupuestos del escritorio con sus casillas: cuáles enseña y en qué orden. */
+function BudgetWidgets() {
+  const [params] = useSearchParams()
+  const focus = Number(params.get('widget') ?? 0)
+  const [ids, setIds] = useState<number[] | null>(null)
+  const [selection, setSelection] = useState(readBudgetSelection)
+  const budgets = readBudgets()
+  const focusRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    CaulkyNative.listWidgets().then(r => setIds(r.budgets)).catch(() => setIds([]))
+  }, [focus])
+
+  useEffect(() => {
+    if (ids?.includes(focus)) focusRef.current?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+  }, [ids, focus])
+
+  const toggle = (widgetId: number, budgetId: string) => {
+    const current = selection[String(widgetId)] ?? []
+    const next = current.includes(budgetId) ? current.filter(x => x !== budgetId) : [...current, budgetId]
+    setSelection({ ...selection, [String(widgetId)]: next })
+    saveBudgetSelection(widgetId, next)
+  }
+
+  if (ids === null) return null
+  return (
+    <Section title="Widgets de presupuestos">
+      {ids.length === 0 ? (
+        <p className="text-xs text-gray-500 dark:text-gray-400">
+          Pon un widget de Presupuestos en el escritorio y aquí podrás elegir qué presupuestos enseña.
+        </p>
+      ) : !budgets.length ? (
+        <p className="text-xs text-gray-500 dark:text-gray-400">Aún no tienes presupuestos: créalos en Presupuestos.</p>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-xs text-gray-500 dark:text-gray-400">
+            Marca los que quieras en cada widget. En 1×1 y 2×1 se ve solo el primero que marques; más grande, todos en ese
+            orden. Sin ninguno marcado, enseña todos del más gastado al menos.
+          </p>
+          {ids.map((id, n) => {
+            const chosen = selection[String(id)] ?? []
+            return (
+              <div key={id} ref={id === focus ? focusRef : undefined}
+                className={`rounded-xl border p-3 ${id === focus
+                  ? 'border-blue-500 bg-blue-50/50 dark:bg-blue-950/20'
+                  : 'border-gray-200 dark:border-gray-700'}`}>
+                <p className="text-sm font-medium text-gray-800 dark:text-gray-100 mb-2">
+                  Widget {n + 1}{id === focus && <span className="ml-2 text-xs font-normal text-blue-600 dark:text-blue-400">el que estás configurando</span>}
+                </p>
+                <div className="space-y-1">
+                  {budgets.map(b => {
+                    const pos = chosen.indexOf(b.id)
+                    return (
+                      <label key={b.id} className="flex items-center gap-2.5 py-1 cursor-pointer">
+                        <input type="checkbox" checked={pos >= 0} onChange={() => toggle(id, b.id)}
+                          className="w-4 h-4 accent-blue-500" />
+                        <span className="flex-1 text-sm text-gray-700 dark:text-gray-200">{b.name}</span>
+                        {pos >= 0 && (
+                          <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 dark:bg-gray-800 text-gray-500">
+                            {pos === 0 ? '1º · el del 2×1' : `${pos + 1}º`}
+                          </span>
+                        )}
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </Section>
+  )
+}
+
 export default function WidgetsTab() {
   const [style, setStyle] = useState<WidgetStyle>(readWidgetStyle)
   const presetId = WIDGET_PRESETS.find(p => JSON.stringify(p.style) === JSON.stringify(style))?.id
@@ -84,6 +162,8 @@ export default function WidgetsTab() {
         </p>
         <Preview s={style} />
       </Section>
+
+      <BudgetWidgets />
 
       <Section title="Estilo">
         <div className="grid grid-cols-2 gap-2">

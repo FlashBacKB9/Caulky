@@ -65,6 +65,22 @@ export function saveWidgetStyle(style: WidgetStyle) {
   pushTimer = setTimeout(() => { void pushWidgets() }, 300)
 }
 
+// ── Qué presupuestos enseña cada widget ─────────────────────────────────────────
+
+const SELECTION_KEY = 'caulky-widget-budgets'
+
+/** Id del widget → ids de presupuesto elegidos, en orden (el primero es el del 1x1 y 2x1). */
+export function readBudgetSelection(): Record<string, string[]> {
+  try { return JSON.parse(localStorage.getItem(SELECTION_KEY) ?? '{}') } catch { return {} }
+}
+
+export function saveBudgetSelection(widgetId: number, budgetIds: string[]) {
+  const all = readBudgetSelection()
+  all[String(widgetId)] = budgetIds
+  localStorage.setItem(SELECTION_KEY, JSON.stringify(all))
+  void pushWidgets()
+}
+
 // ── Formato ─────────────────────────────────────────────────────────────────────
 
 const privacy = () => localStorage.getItem('caulky-privacy-mode') === 'true'
@@ -89,7 +105,7 @@ const time = () => new Date().toLocaleTimeString('es-ES', { hour: '2-digit', min
 
 // ── Bloques ─────────────────────────────────────────────────────────────────────
 
-interface Item { name: string; value: string; color?: string; pct?: number; over?: boolean }
+interface Item { id?: string; name: string; value: string; color?: string; pct?: number; pctRaw?: number; over?: boolean }
 interface Block {
   title: string; smallTitle?: string; big: string; sub: string; bigOver?: boolean
   smallBig: string; smallSub: string; smallOver?: boolean
@@ -121,7 +137,7 @@ async function budgetsBlock(): Promise<Block | null> {
     const limit = getAmountForDate(b.versions, end)
     if (!limit) return []
     const spent = calcSpending(movements, new Set(b.typeIds), start, end)
-    return [{ name: b.name, spent, limit, pct: (spent / limit) * 100 }]
+    return [{ id: b.id, name: b.name, spent, limit, pct: (spent / limit) * 100 }]
   })
   if (!rows.length) {
     return { title: 'Presupuestos', big: '—', sub: 'Sin presupuestos', smallBig: '—', smallSub: 'Sin presupuestos', items: [] }
@@ -137,8 +153,11 @@ async function budgetsBlock(): Promise<Block | null> {
     smallBig: `${Math.round(top.pct)}%`,
     smallOver: top.pct > 100,
     smallSub: top.name,
-    items: rows.map(r => ({
+    // Del más gastado al menos: así sale si el widget no tiene presupuestos elegidos
+    items: [...rows].sort((a, b) => b.pct - a.pct).map(r => ({
+      id: r.id,
       name: r.name,
+      pctRaw: Math.round(r.pct),
       value: privacy() ? `${Math.round(r.pct)}%` : `${money(r.spent, 0)} / ${money(r.limit, 0)}`,
       pct: Math.round(Math.min(100, r.pct)),
       over: r.pct > 100,
@@ -177,7 +196,7 @@ export function pushWidgets(): Promise<void> {
     const [accounts, budgets, month] = await Promise.all([
       accountsBlock().catch(() => null), budgetsBlock().catch(() => null), monthBlock().catch(() => null),
     ])
-    const data: Record<string, unknown> = { style: readWidgetStyle() }
+    const data: Record<string, unknown> = { style: readWidgetStyle(), budgetSelection: readBudgetSelection() }
     if (accounts) data.accounts = accounts
     if (budgets) data.budgets = budgets
     if (month) data.month = month

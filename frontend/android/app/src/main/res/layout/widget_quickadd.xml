@@ -19,25 +19,29 @@
         android:layout_height="match_parent"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="18dp"
+        android:paddingStart="14dp"
         android:paddingEnd="10dp">
 
         <LinearLayout
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:layout_marginEnd="6dp"
             android:orientation="vertical">
 
+            <!-- Se encoge en 2x1 en vez de cortarse -->
             <TextView
                 android:id="@+id/title"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
+                android:layout_width="match_parent"
+                android:layout_height="20dp"
+                android:autoSizeMaxTextSize="14sp"
+                android:autoSizeMinTextSize="9sp"
+                android:autoSizeTextType="uniform"
                 android:fontFamily="monospace"
+                android:gravity="center_vertical"
                 android:maxLines="1"
                 android:text="@string/quickadd_label"
                 android:textColor="#FFFFFF"
-                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <TextView

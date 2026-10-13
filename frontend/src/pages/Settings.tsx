@@ -39,6 +39,13 @@ export default function Settings() {
   // ?tab=widgets: desde "Configurar" de un widget
   const [searchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<string>(() => searchParams.get('tab') ?? 'cuentas')
+  // También si ya estaba abierta (al venir de otro widget)
+  const tabParam = searchParams.get('tab')
+  const [lastTabParam, setLastTabParam] = useState(tabParam)
+  if (tabParam !== lastTabParam) {
+    setLastTabParam(tabParam)
+    if (tabParam) setActiveTab(tabParam)
+  }
 
   if (isLoading) return <div className="p-8 text-gray-500">{t('common.loading')}</div>
   if (!data) return null

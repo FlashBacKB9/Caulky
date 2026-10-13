@@ -7,8 +7,8 @@ import android.net.Uri;
 import android.os.Bundle;
 
 /**
- * "Configurar" de un widget (al mantenerlo pulsado): acepta el widget y abre la app en
- * Ajustes → Widgets, donde se eligen los colores de todos.
+ * "Configurar" de un widget (al ponerlo o al mantenerlo pulsado): acepta el widget y abre
+ * la app en Ajustes → Widgets, donde se eligen los colores y, si es de presupuestos, cuáles enseña.
  */
 public class WidgetConfigActivity extends Activity {
 
@@ -19,7 +19,8 @@ public class WidgetConfigActivity extends Activity {
         setResult(RESULT_OK, new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, id));
         WidgetUpdater.updateAll(this);
 
-        Intent open = new Intent(Intent.ACTION_VIEW, Uri.parse("caulky://open/settings?tab=widgets"), this, MainActivity.class);
+        // Con el id: en la app se eligen los presupuestos de este widget en concreto
+        Intent open = new Intent(Intent.ACTION_VIEW, Uri.parse("caulky://open/settings?tab=widgets&widget=" + id), this, MainActivity.class);
         open.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         startActivity(open);
         finish();

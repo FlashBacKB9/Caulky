@@ -1,7 +1,10 @@
 package app.caulky.mobile;
 
+import android.appwidget.AppWidgetManager;
+import android.content.ComponentName;
 import android.content.Context;
 import android.graphics.Color;
+import com.getcapacitor.JSArray;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -27,6 +30,17 @@ public class CaulkyNativePlugin extends Plugin {
             }
             call.resolve();
         });
+    }
+
+    /** Ids de los widgets de presupuestos puestos en el escritorio (cada uno elige los suyos). */
+    @PluginMethod
+    public void listWidgets(PluginCall call) {
+        AppWidgetManager manager = AppWidgetManager.getInstance(getContext());
+        JSArray budgets = new JSArray();
+        for (int id : manager.getAppWidgetIds(new ComponentName(getContext(), BudgetsWidget.class))) budgets.put(id);
+        JSObject result = new JSObject();
+        result.put("budgets", budgets);
+        call.resolve(result);
     }
 
     @PluginMethod

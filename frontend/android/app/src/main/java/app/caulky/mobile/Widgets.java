@@ -47,11 +47,11 @@ final class Widgets {
             // Android 12+: se dan varios diseños por tamaño y el sistema elige el que cabe
             Map<SizeF, RemoteViews> bySize = new LinkedHashMap<>();
             if (QUICKADD.equals(kind)) {
-                bySize.put(new SizeF(40f, 40f), build(context, kind, data, style, 40, 40));
-                bySize.put(new SizeF(QUICKADD_WIDE_W, 40f), build(context, kind, data, style, QUICKADD_WIDE_W, 40));
+                bySize.put(new SizeF(40f, 40f), build(context, kind, data, style, 40, 40, id));
+                bySize.put(new SizeF(QUICKADD_WIDE_W, 40f), build(context, kind, data, style, QUICKADD_WIDE_W, 40, id));
             } else {
                 for (int w : WIDTHS) for (int h : HEIGHTS) {
-                    bySize.put(new SizeF(w, h), build(context, kind, data, style, w, h));
+                    bySize.put(new SizeF(w, h), build(context, kind, data, style, w, h, id));
                 }
             }
             views = new RemoteViews(bySize);
@@ -59,16 +59,21 @@ final class Widgets {
             Bundle o = manager.getAppWidgetOptions(id);
             int w = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH, 40);
             int h = o.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 40);
-            views = build(context, kind, data, style, w, h);
+            views = build(context, kind, data, style, w, h, id);
         }
         manager.updateAppWidget(id, views);
     }
 
-    private static RemoteViews build(Context context, String kind, JSONObject data, WidgetStyle style, int w, int h) {
+    private static RemoteViews build(Context context, String kind, JSONObject data, WidgetStyle style, int w, int h, int id) {
         if (QUICKADD.equals(kind)) return quickAdd(context, style, w >= QUICKADD_WIDE_W);
 
         JSONObject block = data.optJSONObject(kind);
         if (block == null) block = new JSONObject();
+        if (BUDGETS.equals(kind)) {
+            block = budgetsFor(block, data, id);
+            // 2x1: un solo presupuesto con su barra
+            if (w >= SMALL_W && h < SMALL_H) return oneBudget(context, block, style);
+        }
         boolean small = w < SMALL_W || h < SMALL_H;
         RemoteViews v = new RemoteViews(context.getPackageName(), small ? R.layout.widget_small : R.layout.widget_card);
         paintBackground(v, style);
@@ -98,6 +103,76 @@ final class Widgets {
             }
         }
         v.setOnClickPendingIntent(R.id.widget_root, openApp(context, kind));
+        return v;
+    }
+
+    /**
+     * Presupuestos que enseña este widget: los elegidos para él en la app (en ese orden) o,
+     * si no se eligió ninguno, todos, del más gastado al menos. La cifra grande y el 1x1
+     * son del primero.
+     */
+    private static JSONObject budgetsFor(JSONObject block, JSONObject data, int id) {
+        JSONArray all = block.optJSONArray("items");
+        if (all == null || all.length() == 0) return block;
+        JSONObject selections = data.optJSONObject("budgetSelection");
+        JSONArray chosen = selections == null ? null : selections.optJSONArray(String.valueOf(id));
+        JSONArray items = new JSONArray();
+        if (chosen != null && chosen.length() > 0) {
+            for (int i = 0; i < chosen.length(); i++) {
+                String want = chosen.optString(i);
+                for (int j = 0; j < all.length(); j++) {
+                    JSONObject it = all.optJSONObject(j);
+                    if (it != null && want.equals(it.optString("id"))) items.put(it);
+                }
+            }
+        }
+        if (items.length() == 0) items = all;
+        try {
+            JSONObject out = new JSONObject(block.toString());
+            out.put("items", items);
+            JSONObject first = items.getJSONObject(0);
+            int pct = first.optInt("pctRaw", first.optInt("pct", 0));
+            boolean over = first.optBoolean("over", false);
+            int overCount = 0;
+            for (int i = 0; i < items.length(); i++) if (items.getJSONObject(i).optBoolean("over", false)) overCount++;
+            out.put("big", pct + "% " + first.optString("name"));
+            out.put("bigOver", over);
+            out.put("sub", overCount > 0 ? overCount + (overCount == 1 ? " pasado" : " pasados") + " del límite" : "Todo dentro del límite");
+            out.put("smallBig", pct + "%");
+            out.put("smallOver", over);
+            out.put("smallSub", first.optString("name"));
+            return out;
+        } catch (org.json.JSONException e) {
+            return block;
+        }
+    }
+
+    /** Presupuesto en 2x1: nombre y porcentaje, barra, y gastado / límite. */
+    private static RemoteViews oneBudget(Context context, JSONObject block, WidgetStyle style) {
+        RemoteViews v = new RemoteViews(context.getPackageName(), R.layout.widget_budget_one);
+        paintBackground(v, style);
+        JSONArray items = block.optJSONArray("items");
+        JSONObject item = items != null && items.length() > 0 ? items.optJSONObject(0) : null;
+        if (item == null) {
+            v.setTextViewText(R.id.name, "Presupuestos");
+            v.setTextViewText(R.id.pct, "");
+            v.setTextViewText(R.id.value, block.has("items") ? "Sin presupuestos" : "Abre Caulky para cargar los datos");
+            v.setProgressBar(R.id.bar, 100, 0, false);
+        } else {
+            boolean over = item.optBoolean("over", false);
+            v.setTextViewText(R.id.name, item.optString("name"));
+            v.setTextViewText(R.id.pct, item.optInt("pctRaw", item.optInt("pct", 0)) + "%");
+            v.setTextColor(R.id.pct, over ? style.over : style.text);
+            v.setTextViewText(R.id.value, item.optString("value"));
+            v.setProgressBar(R.id.bar, 100, Math.max(0, Math.min(100, item.optInt("pct", 0))), false);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                v.setColorStateList(R.id.bar, "setProgressTintList", ColorStateList.valueOf(over ? style.over : style.accent));
+                v.setColorStateList(R.id.bar, "setProgressBackgroundTintList", ColorStateList.valueOf(style.track));
+            }
+        }
+        v.setTextColor(R.id.name, style.text);
+        v.setTextColor(R.id.value, style.muted);
+        v.setOnClickPendingIntent(R.id.widget_root, openApp(context, BUDGETS));
         return v;
     }
 
