@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom'
 import { Wallet, Settings, LogOut, Info, X, ExternalLink, EyeOff, Eye } from 'lucide-react'
 import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 import { logout } from '../api/auth'
+import { confirmLogout } from '../offline/session'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
 import { t } from '../utils/i18n'
@@ -45,6 +46,7 @@ export default function TopNav() {
   const { privacyMode, togglePrivacyMode } = usePrivacyMode()
 
   async function handleLogout() {
+    if (!confirmLogout()) return
     await logout().catch(() => {})
     queryClient.clear()
     setUser(null)

@@ -352,7 +352,7 @@ function MovementDetailBody({ movement, types, onClose, onBack, onOpen }: {
           })()}
 
           {/* Transferencia / Pagado / No contar / Compartido */}
-          <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-4' : 'grid-cols-3'}`}>
+          <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
             <div>
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-2">Transferencia</label>
               <Toggle

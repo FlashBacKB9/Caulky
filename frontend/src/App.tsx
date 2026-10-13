@@ -31,6 +31,8 @@ import { useDarkMode } from './hooks/useDarkMode'
 import { useUiZoom } from './hooks/useUiZoom'
 import { usePluginLoader } from './hooks/usePlugins'
 import { getActiveSkin, applySkinCSS } from './utils/skins'
+import { offlineEnabled } from './offline/platform'
+import SyncCenter from './offline/SyncCenter'
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
   state = { error: null }
@@ -173,8 +175,15 @@ function Layout() {
     applySkinCSS(skin?.css)
   }, [skin?.id])
 
-  if (skin?.layout === 'topnav') return <TopNavLayout />
-  return <SidebarLayout />
+  const layout = skin?.layout === 'topnav' ? <TopNavLayout /> : <SidebarLayout />
+  if (!offlineEnabled) return layout
+  // APK: aviso de sin conexión y revisión de cambios pendientes encima de todo
+  return (
+    <div className="flex flex-col h-full">
+      <SyncCenter />
+      <div className="flex-1 min-h-0">{layout}</div>
+    </div>
+  )
 }
 
 function AppRoutes() {

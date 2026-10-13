@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import api from '../api/client'
+import { movementFileDownloadUrl } from '../api/movements'
 import {
   Paperclip, Image as ImageIcon, FileText, BarChart2, X, AlertTriangle,
   ArrowLeft, ZoomIn, ZoomOut, Download,
@@ -110,7 +111,7 @@ function FileViewer({ file, onClose }: { file: FileRecord; onClose: () => void }
             </>
           )}
           <a
-            href={`/api/movements/files/${file.id}/download`}
+            href={movementFileDownloadUrl(file.id)}
             download={file.original_name}
             className="p-1.5 text-gray-400 hover:text-white transition-colors rounded-lg hover:bg-white/10"
             title="Descargar"
@@ -155,7 +156,7 @@ function FileViewer({ file, onClose }: { file: FileRecord; onClose: () => void }
             <FileText className="w-12 h-12 opacity-20" strokeWidth={1} />
             <p className="text-sm">Vista previa no disponible para este tipo de archivo</p>
             <a
-              href={`/api/movements/files/${file.id}/download`}
+              href={movementFileDownloadUrl(file.id)}
               download={file.original_name}
               className="text-sm text-blue-400 hover:text-blue-300 transition-colors"
             >

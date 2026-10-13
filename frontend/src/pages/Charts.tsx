@@ -1547,6 +1547,8 @@ export default function Charts() {
   const allYears = useMemo(()=>[...new Set(allMovements.map(m=>+m.date.slice(0,4)))].sort((a,b)=>b-a),[allMovements])
   const shared   = { groups, types, allYears }
   const { width: gridWidth, containerRef } = useContainerWidth()
+  // Como en el panel: en pantallas estrechas cada gráfico a ancho completo, uno debajo de otro
+  const isMobile = gridWidth > 0 && gridWidth < 640
 
   const BUILTIN_DEFS = useMemo(()=>[
     { id:'monthly',    wide:true  },
@@ -1646,6 +1648,18 @@ export default function Charts() {
   }
   function cancelDraft() { setDraftChart(null); setEditingId(null) }
 
+  const displayLayout = useMemo(() => {
+    if (!isMobile) return layout
+    let y = 0
+    return [...layout]
+      .sort((a, b) => a.y !== b.y ? a.y - b.y : a.x - b.x)
+      .map(item => {
+        const mapped = { ...item, x: 0, y, w: 2 }
+        y += item.h
+        return mapped
+      })
+  }, [layout, isMobile])
+
   return (
     <>
       {draftChart && (
@@ -1688,13 +1702,13 @@ export default function Charts() {
 
       <div ref={containerRef}>
       {gridWidth > 0 && <GridLayout
-        layout={layout}
+        layout={displayLayout}
         width={gridWidth}
-        gridConfig={{ cols: 4, rowHeight: ROW_H, margin: [16, 16] as [number,number], containerPadding: [0, 0] as [number,number] }}
-        dragConfig={{ handle: '.drag-handle' }}
-        resizeConfig={{ handles: ['s', 'e'] }}
+        gridConfig={{ cols: isMobile ? 2 : 4, rowHeight: ROW_H, margin: [16, 16] as [number,number], containerPadding: [0, 0] as [number,number] }}
+        dragConfig={{ enabled: !isMobile, handle: '.drag-handle' }}
+        resizeConfig={{ enabled: !isMobile, handles: ['s', 'e'] }}
         compactor={verticalCompactor}
-        onLayoutChange={handleLayoutChange}
+        onLayoutChange={l => { if (!isMobile) handleLayoutChange(l) }}
       >
         {BUILTIN_DEFS.filter(b=>!hiddenBuiltins.has(b.id)).map(({id})=>{
           const bp = { ...shared, onDelete: ()=>hideBuiltin(id) }

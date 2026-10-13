@@ -1,4 +1,5 @@
 import api from './client'
+import { apiUrl } from '../offline/platform'
 
 export interface MovementFile {
   id: number
@@ -71,4 +72,4 @@ export const deleteMovementFile = (fileId: number): Promise<void> =>
   api.delete(`/movements/files/${fileId}`).then(() => undefined)
 
 export const movementFileDownloadUrl = (fileId: number) =>
-  `/api/movements/files/${fileId}/download`
+  apiUrl(`/movements/files/${fileId}/download`)

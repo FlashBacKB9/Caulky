@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTemplates } from '../api/templates'
 import { useNavigate } from 'react-router-dom'
-import { Check, Delete, ChevronDown, X, Upload, Loader2, AlertCircle, Receipt, ShoppingCart, Leaf, RotateCcw } from 'lucide-react'
+import { Camera, Check, Delete, ChevronDown, X, Upload, Loader2, AlertCircle, Receipt, ShoppingCart, Leaf, RotateCcw } from 'lucide-react'
 import { createMovement } from '../api/movements'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import { getAccountsSummary } from '../api/accounts'
@@ -16,6 +16,9 @@ import { t } from '../utils/i18n'
 import MovementForm from '../components/MovementForm'
 import type { MovementSplit } from '../api/movements'
 import { mainSplitType, ticketSplit } from '../utils/splits'
+import { closeFloating, isFloatingQuickAdd } from '../offline/floating'
+import { FloatingShell } from '../offline/FloatingShell'
+import { isNative } from '../offline/platform'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -382,20 +385,40 @@ function TicketTab(_: { movementTypes: MovementType[] }) {
           />
           {/* Camera button */}
           <button
-            onClick={() => { fileRef.current?.setAttribute('capture', 'environment'); fileRef.current?.click() }}
+            onClick={() => {
+              // Solo imagen: con PDF en `accept`, Android abre el selector de archivos en vez de la cámara
+              fileRef.current?.setAttribute('accept', 'image/*')
+              fileRef.current?.setAttribute('capture', 'environment')
+              fileRef.current?.click()
+            }}
             className={`w-full h-28 rounded-2xl border-2 border-dashed flex flex-col items-center justify-center gap-2 transition-colors active:scale-[0.98] ${
               dragging
                 ? 'border-blue-400 bg-blue-50 dark:bg-blue-950/30 text-blue-500'
                 : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:border-blue-400 hover:text-blue-500'
             }`}
           >
-            <Upload className="w-7 h-7" />
-            <span className="text-sm font-medium">Hacer foto o subir imagen / PDF</span>
-            <span className="text-xs text-gray-400">Arrastra aquí o pega con Ctrl+V · se extraerán productos y precios</span>
+            {isNative ? (
+              // APK: este botón abre directamente la cámara
+              <>
+                <Camera className="w-7 h-7" />
+                <span className="text-sm font-medium">Hacer foto del ticket</span>
+                <span className="text-xs text-gray-400">Se extraerán productos y precios</span>
+              </>
+            ) : (
+              <>
+                <Upload className="w-7 h-7" />
+                <span className="text-sm font-medium">Hacer foto o subir imagen / PDF</span>
+                <span className="text-xs text-gray-400">Arrastra aquí o pega con Ctrl+V · se extraerán productos y precios</span>
+              </>
+            )}
           </button>
           {/* Gallery / file picker */}
           <button
-            onClick={() => { fileRef.current?.removeAttribute('capture'); fileRef.current?.click() }}
+            onClick={() => {
+              fileRef.current?.setAttribute('accept', 'image/*,application/pdf')
+              fileRef.current?.removeAttribute('capture')
+              fileRef.current?.click()
+            }}
             className="w-full py-3 rounded-2xl bg-gray-100 dark:bg-gray-800 text-sm text-gray-500 dark:text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors active:scale-[0.98]"
           >
             Elegir desde galería o archivos
@@ -535,6 +558,8 @@ export default function QuickAdd() {
   const qc = useQueryClient()
   const { fmt } = useCurrency()
   const { raw, press, reset, value, setAmount } = useAmountInput()
+  // APK: abierto desde el widget como ventana flotante
+  const floating = isFloatingQuickAdd()
 
   const [kind, setKind]               = useState<Kind>('gasto')
   const [typeId, setTypeId]           = useState<number | null>(null)
@@ -610,6 +635,7 @@ export default function QuickAdd() {
       qc.invalidateQueries({ queryKey: ['accounts-summary'] })
       setSaved(true)
       setTimeout(() => {
+        if (floating) { closeFloating(); return }
         setSaved(false)
         reset()
         setTypeId(null)
@@ -630,14 +656,14 @@ export default function QuickAdd() {
 
   const [tab, setTab] = useState<'movement' | 'ticket'>('movement')
 
-  return (
+  const page = (
     // h-full respects CSS zoom unlike h-screen (100vh ignores zoom on <html>)
     <div className="flex flex-col bg-white dark:bg-gray-950 max-w-md mx-auto h-full overflow-hidden">
 
       {/* Header: cancel + tabs */}
       <div className="shrink-0 flex items-center gap-3 px-5 pt-5 pb-3">
         <button
-          onClick={() => navigate(-1)}
+          onClick={() => floating ? closeFloating() : navigate(-1)}
           className="text-sm text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-200 transition-colors shrink-0"
         >
           Cancelar
@@ -818,4 +844,5 @@ export default function QuickAdd() {
       )}
     </div>
   )
+  return floating ? <FloatingShell>{page}</FloatingShell> : page
 }

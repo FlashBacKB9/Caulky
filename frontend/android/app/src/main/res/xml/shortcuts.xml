@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="quickadd"
+        android:enabled="true"
+        android:icon="@mipmap/ic_launcher_round"
+        android:shortcutShortLabel="@string/quickadd_label"
+        android:shortcutLongLabel="@string/quickadd_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="caulky://speedmode"
+            android:targetPackage="app.caulky.mobile"
+            android:targetClass="app.caulky.mobile.QuickAddActivity" />
+    </shortcut>
+</shortcuts>

@@ -3,8 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { KeyRound, Plus, Trash2, Copy, Check } from 'lucide-react'
 import { getApiKeys, createApiKey, revokeApiKey, type ApiKeyCreated } from '../../api/apiKeys'
 import { Section } from './shared'
+import { apiBase, isNative } from '../../offline/platform'
 
-const API_BASE = `${window.location.origin}/api`
+const API_BASE = isNative ? apiBase() : `${window.location.origin}/api`
 
 function fmtTs(iso: string) {
   return iso.replace('T', ' ').slice(0, 16)

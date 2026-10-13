@@ -1,4 +1,5 @@
 import api from './client'
+import { apiUrl } from '../offline/platform'
 
 export interface TicketItem {
   name: string
@@ -69,7 +70,7 @@ export const createMovementFromTicket = (
     movement_date: movementDate ?? null,
   }).then(r => r.data)
 
-export const ticketFileUrl = (id: number) => `/api/tickets/${id}/file`
+export const ticketFileUrl = (id: number) => apiUrl(`/tickets/${id}/file`)
 
 export const updateTicketMeta = (
   id: number,

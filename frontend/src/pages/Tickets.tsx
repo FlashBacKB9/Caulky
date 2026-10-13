@@ -8,7 +8,8 @@ import {
   Upload, Trash2, Receipt, ChevronDown, ChevronUp, AlertCircle, Loader2, Pencil, Plus, X, Check,
   Eye, EyeOff, Search, ArrowRightLeft, ExternalLink, AlertTriangle, RefreshCw,
 } from 'lucide-react'
-import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicketMeta, rescanTicket, getGeminiModels, ticketFileUrl, attachTicketToMovement, getTicketOcrDebug, type Ticket, type TicketItem, type TicketOcrDebug } from '../api/tickets'
+import { useApiSrc } from '../offline/media'
+import { analyzeTicket, getTickets, deleteTicket, updateTicketItems, updateTicketMeta, rescanTicket, getGeminiModels, attachTicketToMovement, getTicketOcrDebug, type Ticket, type TicketItem, type TicketOcrDebug } from '../api/tickets'
 import { compressTicketImage } from '../utils/imageCompressor'
 import { getMovementTypes, type MovementType } from '../api/movementTypes'
 import MovementForm from '../components/MovementForm'
@@ -428,6 +429,7 @@ function TicketCard({
   const navigate = useNavigate()
   const [open, setOpen] = useState(false)
   const [viewFile, setViewFile] = useState(false)
+  const fileSrc = useApiSrc(viewFile ? `/tickets/${ticket.id}/file` : null, ticket.mime_type)
   const [editItems, setEditItems] = useState<TicketItem[] | null>(null)
   const [showMovPanel, setShowMovPanel] = useState(false)
   const [movSuccess, setMovSuccess] = useState<string | null>(null)
@@ -702,13 +704,13 @@ function TicketCard({
             <div className="border-b border-gray-100 dark:border-gray-800">
               {ticket.mime_type.startsWith('image/') ? (
                 <img
-                  src={ticketFileUrl(ticket.id)}
+                  src={fileSrc}
                   alt="Ticket"
                   className="w-full max-h-[480px] object-contain bg-gray-50 dark:bg-gray-800"
                 />
               ) : (
                 <iframe
-                  src={ticketFileUrl(ticket.id)}
+                  src={fileSrc}
                   className="w-full h-[480px] bg-gray-50 dark:bg-gray-800"
                   title="Ticket PDF"
                 />

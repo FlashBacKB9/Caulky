@@ -434,21 +434,22 @@ function AccountCard({ account, allTypes, payAccounts, fmt, onDeleted, onMoveUp,
         } ${isDragging ? 'opacity-40' : ''}`}
         style={{ borderLeftColor: account.color, borderLeftWidth: 3 }}
       >
-        <div className="flex items-center gap-3 px-4 py-3">
+        <div className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-3">
           <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 cursor-grab active:cursor-grabbing"
             style={{ backgroundColor: account.color + '20' }}
             title={t('settings.dragToReorder')}>
             <AppIcon name={account.icon} className="w-4 h-4" style={{ color: account.color }} strokeWidth={1.5} />
           </div>
-          <span className="flex-1 text-sm font-medium text-gray-700 dark:text-gray-200">{account.name}</span>
-          <span className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
+          <span className="flex-1 min-w-0 break-words text-sm font-medium text-gray-700 dark:text-gray-200">{account.name}</span>
+          {/* En el móvil no cabe junto al saldo y los botones */}
+          <span className="hidden sm:inline text-[10px] uppercase tracking-wider text-gray-400 dark:text-gray-500">
             {(() => {
               const c = ACCOUNT_CATEGORIES.find(c => c.value === account.category)
               return c ? t(c.labelKey) : account.category
             })()}
           </span>
-          <span className="text-sm font-mono text-gray-400 dark:text-gray-500">{fmt(account.initial_balance)}</span>
-          <div className="flex items-center">
+          <span className="text-sm font-mono text-gray-400 dark:text-gray-500 shrink-0">{fmt(account.initial_balance)}</span>
+          <div className="flex items-center shrink-0">
             <button onClick={onMoveUp} disabled={!canMoveUp}
               className="p-1 text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-300 disabled:opacity-20 disabled:hover:text-gray-300 dark:disabled:hover:text-gray-600 rounded transition-colors">
               <ChevronUp className="w-3.5 h-3.5" />

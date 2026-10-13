@@ -646,7 +646,7 @@ export default function MovementForm({ onClose, initialDate, initialValues, onMo
                     </div>
                   )
                 })()}
-                <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-4' : 'grid-cols-3'}`}>
+                <div className={`grid gap-3 ${sharedEnabled ? 'grid-cols-2 sm:grid-cols-4' : 'grid-cols-3'}`}>
                   {sharedEnabled && (
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">{t('form.shared')}</label>

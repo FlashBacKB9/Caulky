@@ -4,6 +4,7 @@ import { Wallet, Settings, Info, X, ExternalLink, LogOut, ChevronLeft, ChevronRi
 import CalculatorModal from './CalculatorModal'
 import { useNavConfig, PAGE_META } from '../hooks/useNavConfig'
 import { logout } from '../api/auth'
+import { confirmLogout } from '../offline/session'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
 import { t } from '../utils/i18n'
@@ -24,6 +25,9 @@ const CHANGELOG: ChangelogEntry[] = [
       { type: 'fix',     text: 'Seguridad: ningún movimiento, tipo, cuenta, plantilla, fondo, importación ni copia de seguridad puede apuntar a datos de otro usuario' },
       { type: 'feat',    text: 'Tickets: en Ajustes → Tickets se elige el modelo de Gemini entre los que tu clave puede usar de verdad (se consultan a Google); en automático, o si el elegido falla o Google lo retira, se usa el mejor gratuito disponible' },
       { type: 'fix',     text: 'Tickets: el OCR ya no depende de Gemini 1.5/2.0, que Google ha retirado; el menú «Reescanear» muestra los modelos disponibles en vez de una lista fija' },
+      { type: 'feat',    text: 'App Android (APK): se conecta a tu servidor de Caulky y se descarga todos los datos para usarla sin conexión; lo que cambies sin conexión se guarda en el móvil y, al volver a tenerla, te enseña los cambios para elegir cuáles guardar, avisando de duplicados y de cambios hechos a la vez en el servidor' },
+      { type: 'feat',    text: 'App Android: widget y acceso directo «Añadir rápido» que abren el speedmode como ventana flotante, con foto del ticket directamente desde la cámara' },
+      { type: 'improve', text: 'Móvil: los gráficos se apilan a ancho completo, las filas de cuentas de Ajustes caben enteras y los interruptores del formulario de movimiento ya no se pisan' },
     ],
   },
   {
@@ -398,6 +402,7 @@ export default function Sidebar({
   const inSettings = pathname.startsWith('/settings')
 
   async function handleLogout() {
+    if (!confirmLogout()) return
     await logout().catch(() => {})
     queryClient.clear()
     setUser(null)

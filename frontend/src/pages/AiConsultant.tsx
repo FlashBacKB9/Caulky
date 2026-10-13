@@ -1,4 +1,5 @@
 import { useEffect, useRef, useCallback, useState } from 'react'
+import { apiUrl, getServerUrl, isNative } from '../offline/platform'
 import { Terminal } from '@xterm/xterm'
 import { FitAddon } from '@xterm/addon-fit'
 import '@xterm/xterm/css/xterm.css'
@@ -195,7 +196,7 @@ export default function AiConsultant() {
 
   const downloadFile = useCallback((path: string) => {
     const a = document.createElement('a')
-    a.href = `/api/ai/workspace/file?path=${encodeURIComponent(path)}`
+    a.href = apiUrl(`/ai/workspace/file?path=${encodeURIComponent(path)}`)
     a.download = path.split('/').pop() ?? path
     document.body.appendChild(a)
     a.click()
@@ -228,7 +229,8 @@ export default function AiConsultant() {
     try {
       const { data } = await api.post<{ ticket: string }>('/ai/terminal/ticket', { session_id: sess.id })
       const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      const ws = new WebSocket(`${proto}://${window.location.host}/api/ai/terminal/ws?ticket=${data.ticket}`)
+      const wsBase = isNative ? getServerUrl().replace(/^http/, 'ws') : `${proto}://${window.location.host}`
+      const ws = new WebSocket(`${wsBase}/api/ai/terminal/ws?ticket=${data.ticket}`)
       ws.binaryType = 'arraybuffer'
       sess.ws = ws
       ws.onopen = () => {
@@ -329,7 +331,7 @@ export default function AiConsultant() {
 
   const openHtmlViewer = useCallback((file: WorkspaceFile) => {
     // Use path-based URL so relative links inside the HTML resolve correctly
-    const src = `/api/ai/workspace/view/${file.path}`
+    const src = apiUrl(`/ai/workspace/view/${file.path}`)
     setTabs(prev => {
       const existing = prev.find(t => t.kind === 'html' && (t as Extract<Tab, {kind:'html'}>).src === src)
       if (existing) {

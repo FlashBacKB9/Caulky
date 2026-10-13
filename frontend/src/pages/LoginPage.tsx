@@ -2,19 +2,36 @@ import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getPublicSettings } from '../api/admin'
 import { useNavigate } from 'react-router-dom'
-import { Wallet, Eye, EyeOff, FlaskConical } from 'lucide-react'
+import { Wallet, Eye, EyeOff, FlaskConical, Server } from 'lucide-react'
 import { login, register, getMe, claimData, setupDemo } from '../api/auth'
 import { useAuth } from '../context/AuthContext'
 import { queryClient } from '../App'
 import { t, BUILT_IN_LANGS, getLanguage, setLanguage } from '../utils/i18n'
+import api from '../api/client'
+import { apiBase, getServerUrl, isNative, setServerUrl } from '../offline/platform'
+import { onLoggedIn } from '../offline/session'
+import { probe } from '../offline/connectivity'
 
 export default function LoginPage() {
   const { setUser } = useAuth()
   const navigate = useNavigate()
 
   const [mode, setMode] = useState<'login' | 'register'>('login')
+  // APK: dirección del servidor de Caulky (en la web es el propio origen)
+  const [server, setServer] = useState(getServerUrl())
+  const [serverApplied, setServerApplied] = useState(getServerUrl())
+  async function applyServer() {
+    setServerUrl(server)
+    api.defaults.baseURL = apiBase()
+    setServer(getServerUrl())
+    setServerApplied(getServerUrl())
+    await probe()
+  }
   // Con el registro cerrado solo queda la pestaña de entrar (el modo test sigue disponible)
-  const { data: publicSettings } = useQuery({ queryKey: ['public-settings'], queryFn: getPublicSettings, retry: false })
+  const { data: publicSettings } = useQuery({
+    queryKey: ['public-settings', serverApplied], queryFn: getPublicSettings, retry: false,
+    enabled: !isNative || !!serverApplied,
+  })
   const registrationOpen = publicSettings?.registration_open ?? true
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -34,10 +51,12 @@ export default function LoginPage() {
     setError('')
     setDemoLoading(true)
     try {
+      if (isNative) await applyServer()
       const creds = await setupDemo()
       await login(creds.email, creds.password)
       queryClient.clear()
       const u = await getMe()
+      await onLoggedIn(u.id)
       setUser(u)
       navigate('/', { replace: true })
     } catch {
@@ -52,6 +71,7 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
+      if (isNative) await applyServer()
       if (mode === 'login') {
         await login(email, password)
       } else {
@@ -60,13 +80,15 @@ export default function LoginPage() {
       }
       queryClient.clear()
       const u = await getMe()
+      await onLoggedIn(u.id)
       await claimData().catch(() => {})
       setUser(u)
       navigate('/', { replace: true })
     } catch (err: any) {
       const detail = err?.response?.data?.detail
       const status = err?.response?.status
-      if (status === 429) setError(t('auth.errorTooMany'))
+      if (isNative && !err?.response) setError('No se pudo conectar con el servidor. Revisa la dirección y que estés en la misma red.')
+      else if (status === 429) setError(t('auth.errorTooMany'))
       else if (mode === 'register' && status === 403) setError(t('auth.registrationClosed'))
       else if (detail === 'LOGIN_BAD_CREDENTIALS') setError(t('auth.errorCredentials'))
       else if (detail === 'REGISTER_USER_ALREADY_EXISTS') setError(t('auth.errorExists'))
@@ -127,6 +149,25 @@ export default function LoginPage() {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-3">
+            {isNative && (
+              <div>
+                <label className="flex items-center gap-1.5 text-xs font-medium text-gray-500 dark:text-gray-400 mb-1.5">
+                  <Server className="w-3.5 h-3.5" /> Servidor de Caulky
+                </label>
+                <input
+                  type="url"
+                  inputMode="url"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  placeholder="http://192.168.1.10:8081"
+                  required
+                  value={server}
+                  onChange={e => setServer(e.target.value)}
+                  onBlur={() => { void applyServer() }}
+                  className={IN}
+                />
+              </div>
+            )}
             {mode === 'register' && (
               <input
                 type="text"

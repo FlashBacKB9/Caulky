@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Caulky</string>
+    <string name="title_activity_main">Caulky</string>
+    <string name="package_name">app.caulky.mobile</string>
+    <string name="custom_url_scheme">app.caulky.mobile</string>
+    <string name="quickadd_label">Añadir rápido</string>
+    <string name="quickadd_long">Añadir movimiento rápido</string>
+    <string name="widget_description">Añade un gasto o ingreso sin abrir la app</string>
+</resources>

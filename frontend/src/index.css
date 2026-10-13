@@ -99,3 +99,25 @@ body {
 .scrollbar-none::-webkit-scrollbar {
   display: none;
 }
+
+/* ── APK (Capacitor): respetar la barra de estado y la de navegación de Android ── */
+html.native-app body {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+  box-sizing: border-box;
+  /* La franja de la barra de estado toma el color de la cabecera */
+  background-color: #ffffff;
+}
+html.native-app.dark body {
+  background-color: #111827;
+}
+html.native-app .safe-bottom {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+/* Speedmode flotante (widget): fondo transparente, se ve lo que haya debajo */
+html.floating-quickadd,
+html.floating-quickadd body,
+html.floating-quickadd #root {
+  background-color: transparent !important;
+}
