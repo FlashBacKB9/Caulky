@@ -12,7 +12,7 @@ import { runAutoRecurring, computeDates, applyFormula, shiftWeekend, type Moveme
 import { getTemplates, updateTemplate } from '../api/templates'
 import FilterPanel, { applyAdvancedFilter, EMPTY_FILTER, type AdvancedFilter } from '../components/FilterPanel'
 import { buildPerspective, balanceDelta, amountForAccount, displayAmount, isNeutralSettlement } from '../utils/accountView'
-import { ArrowLeftRight, MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search, ArrowUpDown } from 'lucide-react'
+import { ArrowLeftRight, MessageSquare, Paperclip, Inbox, X, Check, Plus, SlidersHorizontal, ChevronUp, ChevronDown, Filter, Bookmark, Trash2, Table2, CalendarDays, ChevronLeft, ChevronRight, LayoutGrid, Copy, GripVertical, Download, Users, Search, ArrowUpDown, Clock, EyeOff } from 'lucide-react'
 import { useCurrency } from '../hooks/useCurrency'
 import { useDateFormat } from '../hooks/useDateFormat'
 import { t, getDayNames, getMonthNames } from '../utils/i18n'
@@ -189,6 +189,33 @@ function MovementContextMenu({ menu, onDuplicate, onDelete, onClose }: {
 
 // El importe visto desde la cuenta activa vive en utils/accountView, compartido con
 // el cálculo del saldo para que columna y saldo no puedan discrepar.
+
+// ── Importe marcado: sin pagar / no cuenta ────────────────────────────────────
+// Envuelve el importe en una cápsula: ámbar con reloj si no está pagado, gris y entre
+// paréntesis si no cuenta (las dos cosas a la vez: borde ámbar discontinuo y gris).
+
+type QuickStatus = { unpaid: boolean; noCount: boolean }
+const NO_QUICK: QuickStatus = { unpaid: false, noCount: false }
+const passesQuick = (mv: Movement, q: QuickStatus) =>
+  (!q.unpaid && !q.noCount) || (q.unpaid && !mv.paid) || (q.noCount && !!mv.no_count)
+
+function MarkedAmount({ mv, text, size = 'sm' }: { mv: Movement; text: string; size?: 'xs' | 'sm' }) {
+  const unpaid = !mv.paid
+  const noCount = !!mv.no_count
+  if (!unpaid && !noCount) return <>{text}</>
+  const tip = [unpaid && t('movements.markUnpaid'), noCount && t('movements.markNoCount')].filter(Boolean).join(' · ')
+  const cls = unpaid && noCount
+    ? 'border-dashed border-amber-400 dark:border-amber-500/70 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+    : unpaid
+      ? 'border-amber-400 dark:border-amber-500/70 bg-amber-50 dark:bg-amber-950/40'
+      : 'border-gray-200 dark:border-gray-700 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+  return (
+    <span title={tip} className={`inline-flex items-center gap-0.5 rounded-full border whitespace-nowrap ${size === 'xs' ? 'px-1 leading-4' : 'px-1.5 leading-5'} ${cls}`}>
+      {unpaid && <Clock className={`${size === 'xs' ? 'w-2.5 h-2.5' : 'w-3 h-3'} shrink-0 text-amber-500 dark:text-amber-400`} strokeWidth={2.5} />}
+      {noCount ? `(${text})` : text}
+    </span>
+  )
+}
 
 // ── Calendar preview tracking ─────────────────────────────────────────────────
 
@@ -496,7 +523,7 @@ function CalendarView({ movements, types, selectedYear, perspective }: {
                         </span>
                       ) : (
                         <span className={`text-[11px] font-mono ${amountForAccount(mv, perspective) >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-                          {fmtCal(amountForAccount(mv, perspective))}
+                          <MarkedAmount mv={mv} size="xs" text={fmtCal(amountForAccount(mv, perspective))} />
                         </span>
                       )}
                       {typ && (
@@ -567,7 +594,7 @@ function CalendarView({ movements, types, selectedYear, perspective }: {
 
 // ── Kanban view ───────────────────────────────────────────────────────────────
 
-function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
+function KanbanView({ allTypes, quick = NO_QUICK }: { allTypes: MovementType[]; quick?: QuickStatus }) {
   const { fmt } = useCurrency()
   const fmtCal = (v: number) => (v >= 0 ? '+' : '') + fmt(v)
   const today = new Date()
@@ -617,9 +644,10 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
   , [rawMovements])
 
   const movements = useMemo(() => {
-    if (kanbanMonth === null) return rawMovements
-    return rawMovements.filter(mv => new Date(mv.date + 'T00:00:00').getMonth() === kanbanMonth)
-  }, [rawMovements, kanbanMonth])
+    const byStatus = rawMovements.filter(mv => passesQuick(mv, quick))
+    if (kanbanMonth === null) return byStatus
+    return byStatus.filter(mv => new Date(mv.date + 'T00:00:00').getMonth() === kanbanMonth)
+  }, [rawMovements, kanbanMonth, quick])
 
   const typeMap = useMemo(() => Object.fromEntries(allTypes.map(t => [t.id, t])), [allTypes])
 
@@ -641,6 +669,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
   const tree = useMemo(() => {
     const mvsByType: Record<number | string, Movement[]> = {}
     for (const mv of rawMovements) {
+      if (!passesQuick(mv, quick)) continue
       const key = mv.movement_type_id ?? '__none__'
       if (!mvsByType[key]) mvsByType[key] = []
       mvsByType[key].push(mv)
@@ -657,7 +686,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
         return { ...g, types, total }
       })
       .filter(g => g.types.length > 0)
-  }, [rawMovements, groups, allTypes])
+  }, [rawMovements, groups, allTypes, quick])
 
   const sortedTree = useMemo(() => {
     if (groupOrder.length === 0) return tree
@@ -787,7 +816,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
                                       <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 min-w-0 truncate">{mv.name}</span>
                                       {mv.credit_cycle_end
                                         ? <span className="text-sm font-mono shrink-0 text-gray-400 dark:text-gray-500 inline-flex items-center gap-1"><ArrowLeftRight className="w-3.5 h-3.5" />{fmt(Math.abs(mv.money))}</span>
-                                        : <span className={`text-sm font-mono shrink-0 ${amtCls(displayAmount(mv))}`}>{fmtCal(displayAmount(mv))}</span>}
+                                        : <span className={`text-sm font-mono shrink-0 ${amtCls(displayAmount(mv))}`}><MarkedAmount mv={mv} text={fmtCal(displayAmount(mv))} /></span>}
                                     </div>
                                   ))}
                                 </div>
@@ -830,7 +859,7 @@ function KanbanView({ allTypes }: { allTypes: MovementType[] }) {
                           <span className="text-sm text-gray-700 dark:text-gray-300 flex-1 min-w-0 truncate">{mv.name}</span>
                           {mv.credit_cycle_end
                                         ? <span className="text-sm font-mono shrink-0 text-gray-400 dark:text-gray-500 inline-flex items-center gap-1"><ArrowLeftRight className="w-3.5 h-3.5" />{fmt(Math.abs(mv.money))}</span>
-                                        : <span className={`text-sm font-mono shrink-0 ${amtCls(displayAmount(mv))}`}>{fmtCal(displayAmount(mv))}</span>}
+                                        : <span className={`text-sm font-mono shrink-0 ${amtCls(displayAmount(mv))}`}><MarkedAmount mv={mv} text={fmtCal(displayAmount(mv))} /></span>}
                         </div>
                       ))}
                     </div>
@@ -917,6 +946,7 @@ export default function Movements() {
   const [showYearPicker, setShowYearPicker] = useState(false)
   const [showSearch, setShowSearch] = useState(false)
   const [quickSearch, setQuickSearch] = useState('')
+  const [quickStatus, setQuickStatus] = useState<QuickStatus>(NO_QUICK)
   const colPickerRef = useRef<HTMLDivElement>(null)
   const yearPickerRef = useRef<HTMLDivElement>(null)
   const searchInputRef = useRef<HTMLInputElement>(null)
@@ -1222,7 +1252,7 @@ export default function Movements() {
     })
   }, [movements, sorts, typeMap, dayOrder])
 
-  const filteredMovements = useMemo(() => {
+  const baseFilteredMovements = useMemo(() => {
     const base = applyAdvancedFilter(sortedMovements, advFilter, typeToGroupMap)
     const searched = !quickSearch.trim() ? base : base.filter(mv => mv.name.toLowerCase().includes(quickSearch.toLowerCase()))
     // multi-account filter (from real accounts)
@@ -1251,6 +1281,16 @@ export default function Movements() {
       return false
     })
   }, [sortedMovements, advFilter, typeToGroupMap, quickSearch, accountFilter, accountsFilter, accounts, types])
+
+  // Filtro rápido (sin pagar / no cuenta): se aplica encima del resto de filtros
+  const filteredMovements = useMemo(
+    () => baseFilteredMovements.filter(mv => passesQuick(mv, quickStatus)),
+    [baseFilteredMovements, quickStatus],
+  )
+  const quickCounts = useMemo(() => ({
+    unpaid: baseFilteredMovements.filter(mv => !mv.paid).length,
+    noCount: baseFilteredMovements.filter(mv => mv.no_count).length,
+  }), [baseFilteredMovements])
 
   // Dates that have more than one movement in the current view (eligible for drag reorder)
   const sameDayDates = useMemo(() => {
@@ -1434,36 +1474,55 @@ export default function Movements() {
           </button>
 
           {/* Orden */}
-          <button onClick={() => setShowSortPanel(v => !v)}
-            className={`relative flex items-center gap-1.5 px-3 py-1.5 border text-sm font-medium rounded-lg transition-colors ${
+          <button onClick={() => setShowSortPanel(v => !v)} title={t('movements.sortBtn')}
+            className={`relative p-1.5 border rounded-lg transition-colors ${
               showSortPanel || sorts.length > 0
                 ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 border-transparent'
                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}>
             <ArrowUpDown className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span className="hidden sm:inline">{t('movements.sortBtn')}</span>
             {sorts.length > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-violet-500 text-white text-[10px] flex items-center justify-center font-bold">{sorts.length}</span>
             )}
           </button>
 
+          {/* Filtro rápido: sin pagar / no cuenta */}
+          <div className="flex rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 overflow-hidden">
+            <button onClick={() => setQuickStatus(q => ({ ...q, unpaid: !q.unpaid }))} title={t('movements.quickUnpaid')}
+              className={`flex items-center gap-1 px-2 py-1.5 text-xs font-semibold transition-colors ${
+                quickStatus.unpaid
+                  ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}>
+              <Clock className="w-3.5 h-3.5" strokeWidth={2} />
+              <span className="tabular-nums">{quickCounts.unpaid}</span>
+            </button>
+            <button onClick={() => setQuickStatus(q => ({ ...q, noCount: !q.noCount }))} title={t('movements.quickNoCount')}
+              className={`flex items-center gap-1 px-2 py-1.5 text-xs font-semibold border-l border-gray-200 dark:border-gray-700 transition-colors ${
+                quickStatus.noCount
+                  ? 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'
+                  : 'text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
+              }`}>
+              <EyeOff className="w-3.5 h-3.5" strokeWidth={2} />
+              <span className="tabular-nums">{quickCounts.noCount}</span>
+            </button>
+          </div>
+
           {/* Filtros */}
-          <button onClick={() => setShowFilters(v => !v)}
-            className={`relative flex items-center gap-1.5 px-3 py-1.5 border text-sm font-medium rounded-lg transition-colors ${
+          <button onClick={() => setShowFilters(v => !v)} title={t('movements.filtersBtn')}
+            className={`relative p-1.5 border rounded-lg transition-colors ${
               showFilters || activeFilterCount > 0
                 ? 'bg-gray-800 dark:bg-gray-100 text-white dark:text-gray-900 border-transparent'
                 : 'bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800'
             }`}>
             <Filter className="w-3.5 h-3.5" strokeWidth={1.5} />
-            <span className="hidden sm:inline">{t('movements.filtersBtn')}</span>
             {activeFilterCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-blue-500 text-white text-[10px] flex items-center justify-center font-bold">{activeFilterCount}</span>
             )}
           </button>
-          <button onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 px-4 py-1.5 bg-gray-900 dark:bg-white text-white dark:text-gray-900 text-sm font-medium rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors">
+          <button onClick={() => setShowForm(true)} title={t('movements.newBtn')}
+            className="p-1.5 border border-transparent bg-gray-900 dark:bg-white text-white dark:text-gray-900 rounded-lg hover:bg-gray-700 dark:hover:bg-gray-100 transition-colors">
             <Plus className="w-3.5 h-3.5" strokeWidth={2.5} />
-            <span className="hidden sm:inline">{t('movements.newBtn')}</span>
           </button>
         </div>
       </div>
@@ -1667,7 +1726,7 @@ export default function Movements() {
       )}
 
       {viewMode === 'kanban' && (
-        <KanbanView allTypes={types} />
+        <KanbanView allTypes={types} quick={quickStatus} />
       )}
 
       {viewMode === 'table' && (isLoading ? <p className="text-gray-400">{t('common.loading')}</p> : (
@@ -1878,7 +1937,7 @@ export default function Movements() {
                               {isEditing ? <input type="number" step="0.01" value={d!.money} className={INPUT + ' text-right'} onChange={e => setField('money', e.target.value)} onClick={e => e.stopPropagation()} />
                                 : isNeutralSettlement(mv, perspective)
                                   ? <span className="inline-flex items-center gap-1"><ArrowLeftRight className="w-3.5 h-3.5" />{fmt(Math.abs(mv.money))}</span>
-                                  : fmt(amountForAccount(mv, perspective))}
+                                  : <MarkedAmount mv={mv} text={fmt(amountForAccount(mv, perspective))} />}
                             </td>
                           )
                           case 'paid': return (
