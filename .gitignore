@@ -38,3 +38,9 @@ analyze_*.py
 compare_*.py
 check_*.py
 find_*.py
+
+# Notas locales de Claude (contienen secretos)
+CLAUDE.local.md
+
+# Copias locales de datos reales (tickets, movimientos)
+backups/
