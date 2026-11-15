@@ -1,97 +1,12 @@
 import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { X, Trash2 } from 'lucide-react'
-import { getAuditLog, clearAuditLog } from '../../api/auditLog'
 import { getAdminSettings, updateAdminSettings, type AdminSettings } from '../../api/admin'
 import { useAuth } from '../../context/AuthContext'
 import { resetSystem } from '../../api/backup'
 import { t } from '../../utils/i18n'
 import { Section } from './shared'
-
-// ── Audit Log ─────────────────────────────────────────────────────────────────
-
-const ACTION_COLOR: Record<string, string> = {
-  create: 'text-green-400',
-  update: 'text-blue-400',
-  delete: 'text-red-400',
-  login: 'text-emerald-400',
-  login_failed: 'text-amber-400',
-}
-
-function fmtTs(iso: string) {
-  return iso.replace('T', ' ').slice(0, 19)
-}
-
-function LogsSection() {
-  const queryClient = useQueryClient()
-  const { data: entries = [], isLoading, refetch } = useQuery({
-    queryKey: ['audit-log'],
-    queryFn: () => getAuditLog({ limit: 500 }),
-  })
-  const clearMut = useMutation({
-    mutationFn: clearAuditLog,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['audit-log'] }),
-  })
-
-  const download = () => {
-    const lines = entries
-      .map(e => `${fmtTs(e.created_at)}  [${e.action.toUpperCase()}]  ${e.summary}`)
-      .join('\n')
-    const blob = new Blob([lines], { type: 'text/plain' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `activity-${new Date().toISOString().slice(0, 10)}.log`
-    a.click()
-    URL.revokeObjectURL(url)
-  }
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-gray-400 dark:text-gray-500">
-          {isLoading ? '…' : `${entries.length} ${t('settings.entries')}`}
-        </span>
-        <div className="flex items-center gap-3">
-          <button onClick={() => refetch()} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-            {t('settings.refresh')}
-          </button>
-          {entries.length > 0 && (
-            <button onClick={download} className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors">
-              {t('settings.download')}
-            </button>
-          )}
-          {entries.length > 0 && (
-            <button
-              onClick={() => { if (confirm(t('settings.clearActivityConfirm'))) clearMut.mutate() }}
-              className="text-xs text-red-400 hover:text-red-600 dark:hover:text-red-300 transition-colors"
-            >
-              {t('settings.clearAll')}
-            </button>
-          )}
-        </div>
-      </div>
-      <div className="font-mono text-xs bg-gray-950 text-gray-300 rounded-xl p-3 overflow-y-auto max-h-72 leading-5">
-        {isLoading
-          ? <span className="text-gray-500">{t('common.loading')}</span>
-          : entries.length === 0
-            ? <span className="text-gray-500">{t('settings.noActivity')}</span>
-            : entries.map(e => (
-              <div key={e.id}>
-                <span className="text-gray-500">{fmtTs(e.created_at)}</span>
-                {'  '}
-                <span className={ACTION_COLOR[e.action] ?? 'text-gray-400'}>
-                  [{e.action.toUpperCase()}]
-                </span>
-                {'  '}
-                <span>{e.summary}</span>
-              </div>
-            ))
-        }
-      </div>
-    </div>
-  )
-}
+import ActivityLog from './ActivityLog'
 
 // ── Administración ────────────────────────────────────────────────────────────
 
@@ -105,7 +20,6 @@ function AdminSection() {
   if (!data) return null
   const rows: { key: keyof AdminSettings; label: string; desc: string }[] = [
     { key: 'registration_open',   label: t('settings.adminRegistration'), desc: t('settings.adminRegistrationDesc') },
-    { key: 'ai_terminal_enabled', label: t('settings.adminTerminal'),     desc: t('settings.adminTerminalDesc') },
   ]
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-gray-100 dark:border-gray-800 divide-y divide-gray-50 dark:divide-gray-800">
@@ -236,7 +150,7 @@ export default function SistemaTab() {
         </Section>
       )}
       <Section title={t('settings.activityLog')}>
-        <LogsSection />
+        <ActivityLog />
       </Section>
       <Section title={t('settings.danger')}>
         <ResetSection />

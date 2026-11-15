@@ -14,6 +14,88 @@ services:
       timeout: 5s
       retries: 10
 
+  # Copia diaria de la base: pg_dump -Fc cuando la última diaria tiene más de 24 h
+  # (caulky_AAAAMMDD_HHMMSS.dump); conserva las 14 últimas en el volumen backup_data.
+  # Volver a una: Ajustes → Copia de seguridad (solo el administrador). El backend deja el
+  # nombre en /backups/restaurar/pedido y se reinicia; este contenedor hace una copia de
+  # «ahora» (caulky_antes-de-restaurar_…, se guardan 5), carga la elegida en una base nueva
+  # y, si sale bien, la cambia por la actual (la anterior queda como `spendly_anterior`
+  # hasta la siguiente restauración). El resultado queda en /backups/restaurar/estado.
+  db-backup:
+    image: postgres:16-alpine
+    environment:
+      PGPASSWORD: spendly
+      TZ: ${TZ:-Europe/Madrid}
+    # Forma exec + bloque literal (|): con el plegado (>) los `&&` quedan empezando línea
+    # y `sh` falla. Los $$ son $ para el shell (Compose interpola los $ sueltos).
+    entrypoint:
+      - sh
+      - -c
+      - |
+        R=/backups/restaurar
+        mkdir -p $$R
+        estado() {
+          printf '{"estado":"%s","fichero":"%s","seguro":"%s","fin":"%s","error":"%s"}\n' \
+            "$$1" "$$2" "$$3" "$$(date -Iseconds)" "$$(printf '%s' "$$4" | tr -d '"\\\n' | cut -c1-300)" > $$R/estado.tmp
+          mv $$R/estado.tmp $$R/estado
+        }
+        volcar() {
+          if pg_dump -h db -U spendly -Fc spendly > "/backups/$$1.part" 2>$$R/log; then
+            mv "/backups/$$1.part" "/backups/$$1"
+          else
+            rm -f "/backups/$$1.part"; return 1
+          fi
+        }
+        restaurar() {
+          f=$$(head -n1 $$R/pedido | tr -cd 'A-Za-z0-9_.-')
+          src=/backups/$$f
+          if [ -z "$$f" ] || [ ! -f "$$src" ]; then
+            estado error "$$f" "" "No encuentro la copia"; rm -f $$R/pedido; return
+          fi
+          estado en_curso "$$f" "" ""
+          seguro=caulky_antes-de-restaurar_$$(date +%Y%m%d_%H%M%S).dump
+          if ! volcar "$$seguro"; then
+            estado error "$$f" "" "No se pudo hacer la copia de ahora: $$(tail -n1 $$R/log)"; rm -f $$R/pedido; return
+          fi
+          psql -h db -U spendly -d postgres -qc "DROP DATABASE IF EXISTS spendly_restaurando" >/dev/null
+          if ! createdb -h db -U spendly spendly_restaurando 2>$$R/log \
+             || ! pg_restore -h db -U spendly -d spendly_restaurando --no-owner --exit-on-error "$$src" 2>$$R/log; then
+            psql -h db -U spendly -d postgres -qc "DROP DATABASE IF EXISTS spendly_restaurando" >/dev/null
+            estado error "$$f" "$$seguro" "La copia no se pudo cargar (no se ha tocado nada): $$(tail -n1 $$R/log)"; rm -f $$R/pedido; return
+          fi
+          if psql -h db -U spendly -d postgres -v ON_ERROR_STOP=1 -q \
+               -c "DROP DATABASE IF EXISTS spendly_anterior" \
+               -c "SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = 'spendly' AND pid <> pg_backend_pid()" \
+               -c "ALTER DATABASE spendly RENAME TO spendly_anterior" \
+               -c "ALTER DATABASE spendly_restaurando RENAME TO spendly" >/dev/null 2>$$R/log; then
+            estado ok "$$f" "$$seguro" ""
+            echo "restaurada $$f $$(date)"
+          else
+            psql -h db -U spendly -d postgres -qc "ALTER DATABASE spendly_anterior RENAME TO spendly" >/dev/null 2>&1
+            estado error "$$f" "$$seguro" "No se pudo cambiar la base: $$(tail -n1 $$R/log)"
+          fi
+          rm -f $$R/pedido
+          ls -t /backups/caulky_antes-de-restaurar_*.dump 2>/dev/null | tail -n +6 | xargs -r rm -f
+        }
+        while true; do
+          if ! find /backups -maxdepth 1 -name 'caulky_[0-9]*.dump' -mmin -1440 | grep -q .; then
+            if volcar "caulky_$$(date +%Y%m%d_%H%M%S).dump"; then
+              echo "copia ok $$(date)"
+            else
+              echo "copia FALLIDA $$(date): $$(tail -n1 $$R/log)"
+            fi
+            ls -t /backups/caulky_[0-9]*.dump 2>/dev/null | tail -n +15 | xargs -r rm -f
+          fi
+          [ -f $$R/pedido ] && restaurar
+          sleep 10
+        done
+    volumes:
+      - backup_data:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
   backend:
     build: ./backend
     env_file:
@@ -26,13 +108,16 @@ services:
       SECRET_KEY: ${SECRET_KEY}
       COOKIE_SECURE: "false"
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      # Volver a una copia de la base: el proceso sale tras pedirlo y Docker lo levanta
+      # (restart: unless-stopped); al arrancar espera a db-backup y aplica las migraciones.
+      RESTORE_SELF_RESTART: "1"
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - uploads_data:/app/uploads
-      - workspace_data:/app/workspace
-      - claude_data:/var/claude-home
+      # Copias diarias de la base (las hace db-backup); aquí se listan y se pide restaurar
+      - backup_data:/backups
     restart: unless-stopped
 
   frontend:
@@ -46,5 +131,4 @@ services:
 volumes:
   postgres_data:
   uploads_data:
-  workspace_data:
-  claude_data:
+  backup_data:

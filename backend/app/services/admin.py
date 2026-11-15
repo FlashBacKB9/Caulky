@@ -17,8 +17,7 @@ DEMO_EMAIL = "demo@caulky.app"
 
 # Ajustes globales y su valor por defecto
 REGISTRATION_OPEN = "registration_open"
-AI_TERMINAL_ENABLED = "ai_terminal_enabled"
-DEFAULTS = {REGISTRATION_OPEN: False, AI_TERMINAL_ENABLED: True}
+DEFAULTS = {REGISTRATION_OPEN: False}
 
 
 def is_demo(user: User) -> bool:

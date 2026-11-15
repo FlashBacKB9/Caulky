@@ -4,6 +4,8 @@ import { Download, Upload, AlertTriangle } from 'lucide-react'
 import { exportBackup, importBackup, type RestoreOptions } from '../../api/backup'
 import { t } from '../../utils/i18n'
 import { Section } from './shared'
+import DbBackups from './DbBackups'
+import { useAuth } from '../../context/AuthContext'
 
 const ALL_ON: RestoreOptions = {
   groups: true, accounts: true, types: true, movements: true, investments: true,
@@ -179,9 +181,17 @@ function BackupSection() {
 }
 
 export default function BackupTab() {
+  const { user } = useAuth()
   return (
-    <Section title={t('settings.backup')}>
-      <BackupSection />
-    </Section>
+    <>
+      <Section title={t('settings.backup')}>
+        <BackupSection />
+      </Section>
+      {user?.is_superuser && (
+        <Section title="Copias diarias de la base">
+          <DbBackups />
+        </Section>
+      )}
+    </>
   )
 }

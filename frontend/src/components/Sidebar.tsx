@@ -19,6 +19,9 @@ const CHANGELOG: ChangelogEntry[] = [
   {
     version: 'v1.9.5', date: 'Octubre 2026',
     items: [
+      { type: 'feat',    text: 'Historial de actividad con «Deshacer» (solo el administrador): cada operación se puede deshacer entera o por filas; lo creado se borra, lo borrado vuelve con su id y lo cambiado recupera su valor. Lo que va en pareja (un movimiento y sus partes, una liquidación de tarjeta y su ciclo cobrado) se deshace junto y, si algo cambió después, no se toca nada y se explica por qué' },
+      { type: 'feat',    text: 'Copias diarias de la base en el servidor (se guardan 14) y, en Ajustes → Copia de seguridad, un botón para volver a una sin restaurar la máquina entera; antes se guarda una copia de cómo estaba' },
+      { type: 'improve', text: 'Se quita el Consultor IA: para usar Caulky desde un asistente basta con la API y sus claves' },
       { type: 'feat',    text: 'Categoría múltiple: al crear o editar un movimiento, la opción «Múltiple» del tipo abre un reparto con un importe por categoría y un donut en vivo; el movimiento cuenta en cada categoría con su parte en gráficos, análisis, presupuestos y control de gastos' },
       { type: 'feat',    text: 'Tickets: comida y suministros se crean en un solo movimiento dividido por tipo en vez de uno por tipo' },
       { type: 'fix',     text: 'Tickets: al generar un movimiento se comprueba que el tipo elegido sea del usuario' },

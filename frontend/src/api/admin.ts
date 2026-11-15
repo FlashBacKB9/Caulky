@@ -3,7 +3,6 @@ import api from './client'
 /** Ajustes de toda la instalación; solo los ve y cambia el administrador. */
 export interface AdminSettings {
   registration_open: boolean
-  ai_terminal_enabled: boolean
 }
 
 export const getPublicSettings = () =>

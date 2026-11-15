@@ -1,4 +1,4 @@
-"""Administrador, registro cerrado, terminal solo para admin, límite de logins y su registro."""
+"""Administrador, registro cerrado, límite de logins y su registro."""
 import uuid
 
 import pytest
@@ -50,7 +50,7 @@ async def test_first_real_user_is_admin_and_registration_closes(client, db):
 async def test_admin_can_reopen_registration(client):
     await _register(client, "yo@example.com")
     await _login(client, "yo@example.com")
-    r = await client.put("/api/admin/settings", json={"registration_open": True, "ai_terminal_enabled": True})
+    r = await client.put("/api/admin/settings", json={"registration_open": True})
     assert r.status_code == 200
     assert (await _register(client, "otro@example.com")).status_code == 201
 
@@ -81,7 +81,7 @@ async def test_admin_is_the_owner_of_the_oldest_account(db):
 async def test_non_admin_cannot_change_settings_or_claim_orphans(client, db):
     await _register(client, "yo@example.com")
     await _login(client, "yo@example.com")
-    await client.put("/api/admin/settings", json={"registration_open": True, "ai_terminal_enabled": True})
+    await client.put("/api/admin/settings", json={"registration_open": True})
     await client.post("/api/auth/logout")
     await _register(client, "otro@example.com")
     orphan = IncomeExpenseGroup(name="Huérfano", color="#000", user_id=None)
@@ -89,28 +89,21 @@ async def test_non_admin_cannot_change_settings_or_claim_orphans(client, db):
     await db.commit()
 
     await _login(client, "otro@example.com")
-    r = await client.put("/api/admin/settings", json={"registration_open": True, "ai_terminal_enabled": True})
+    r = await client.put("/api/admin/settings", json={"registration_open": True})
     assert r.status_code == 403
     assert (await client.post("/api/admin/claim")).status_code == 200
     await db.refresh(orphan)
     assert orphan.user_id is None
 
 
-# ── terminal del Consultor IA ─────────────────────────────────────────────────
+# ── el Consultor IA ya no existe ──────────────────────────────────────────────
 
-async def test_terminal_only_for_admin_and_when_enabled(client):
+async def test_ai_terminal_is_gone(client):
     await _register(client, "yo@example.com")
     await _login(client, "yo@example.com")
-    assert (await client.post("/api/ai/terminal/ticket", json={})).status_code == 200
-    await client.put("/api/admin/settings", json={"registration_open": True, "ai_terminal_enabled": False})
-    assert (await client.post("/api/ai/terminal/ticket", json={})).status_code == 403
-    await client.put("/api/admin/settings", json={"registration_open": True, "ai_terminal_enabled": True})
-    await client.post("/api/auth/logout")
-
-    await _register(client, "otro@example.com")
-    await _login(client, "otro@example.com")
-    assert (await client.post("/api/ai/terminal/ticket", json={})).status_code == 403
-    assert (await client.get("/api/ai/workspace/files")).status_code == 403
+    assert (await client.post("/api/ai/terminal/ticket", json={})).status_code == 404
+    assert (await client.get("/api/ai/workspace/files")).status_code == 404
+    assert (await client.get("/api/admin/settings")).json() == {"registration_open": False}
 
 
 # ── límite de intentos y registro de logins ───────────────────────────────────

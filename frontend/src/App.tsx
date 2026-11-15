@@ -1,5 +1,5 @@
-import { useState, useLayoutEffect, useEffect, Component, type ReactNode } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { useState, useLayoutEffect, useEffect } from 'react'
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Menu, Wallet } from 'lucide-react'
 import Sidebar from './components/Sidebar'
@@ -18,7 +18,6 @@ import Comparaciones from './pages/Comparaciones'
 import AccountsPage from './pages/AccountsPage'
 import Projection from './pages/Projection'
 import Analysis from './pages/Analysis'
-import AiConsultant from './pages/AiConsultant'
 import Tickets from './pages/Tickets'
 import ExpenseControl from './pages/ExpenseControl'
 import Huchas from './pages/Huchas'
@@ -34,23 +33,6 @@ import { getActiveSkin, applySkinCSS } from './utils/skins'
 import { offlineEnabled } from './offline/platform'
 import SyncCenter from './offline/SyncCenter'
 import { isFloatingQuickAdd } from './offline/floating'
-
-class ErrorBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
-  state = { error: null }
-  static getDerivedStateFromError(error: Error) { return { error } }
-  render() {
-    if (this.state.error) {
-      const err = this.state.error as Error
-      return (
-        <div className="p-6 text-red-600 bg-red-50 dark:bg-red-950 dark:text-red-400 rounded-lg m-4">
-          <p className="font-bold mb-2">Error en Consultor IA</p>
-          <pre className="text-xs whitespace-pre-wrap">{err.message}{'\n'}{err.stack}</pre>
-        </div>
-      )
-    }
-    return this.props.children
-  }
-}
 
 // Apply active skin CSS before first paint
 const _skin = getActiveSkin()
@@ -89,7 +71,6 @@ function PageRoutes() {
       <Route path="/comparaciones" element={<Comparaciones />} />
       <Route path="/proyeccion" element={<Projection />} />
       <Route path="/analisis" element={<Analysis />} />
-      <Route path="/consultor-ia" element={<ErrorBoundary><AiConsultant /></ErrorBoundary>} />
       <Route path="/tickets" element={<Tickets />} />
       <Route path="/gastos" element={<ExpenseControl />} />
       <Route path="/huchas" element={<Huchas />} />
@@ -103,8 +84,6 @@ function SidebarLayout() {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => localStorage.getItem('sidebar-collapsed') === '1'
   )
-  const { pathname } = useLocation()
-  const fullscreen = pathname === '/consultor-ia'
 
   const toggleCollapsed = () => {
     setSidebarCollapsed(v => {
@@ -144,10 +123,7 @@ function SidebarLayout() {
           <Wallet className="w-5 h-5 text-gray-800 dark:text-white" strokeWidth={1.5} />
           <span className="font-bold text-gray-800 dark:text-white">Caulky</span>
         </header>
-        {fullscreen
-          ? <div className="flex-1 min-h-0 relative overflow-hidden"><PageRoutes /></div>
-          : <main className="flex-1 overflow-y-auto"><PageRoutes /></main>
-        }
+        <main className="flex-1 overflow-y-auto"><PageRoutes /></main>
       </div>
     </div>
   )

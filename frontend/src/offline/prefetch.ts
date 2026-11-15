@@ -25,7 +25,7 @@ const BASE = [
 ]
 
 /** Consultas que no se repiten aunque se hayan abierto: de un solo uso o pesadas. */
-const SKIP = [/^\/tickets\/\d+\/ocr-text/, /^\/tickets\/gemini-models/, /^\/audit-log/, /^\/backup/, /^\/ai\//, /^\/api-keys/]
+const SKIP = [/^\/tickets\/\d+\/ocr-text/, /^\/tickets\/gemini-models/, /^\/audit-log/, /^\/backup/, /^\/db-backups/, /^\/api-keys/]
 
 let running: Promise<void> | null = null
 type Progress = (done: number, total: number) => void

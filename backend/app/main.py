@@ -3,7 +3,7 @@ from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.base import BaseHTTPMiddleware
-from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin, templates, preferences, audit_log, terminal, tickets, real_accounts, demo, api_keys
+from app.routers import income_expense_groups, movement_types, movements, stats, files, accounts, import_excel, backup, investments, admin, templates, preferences, audit_log, tickets, real_accounts, demo, api_keys, db_backups
 from app.auth.setup import fastapi_users, auth_backend
 from app.auth.schemas import UserRead, UserCreate, UserUpdate
 from app.config import settings
@@ -22,6 +22,13 @@ async def lifespan(_app: FastAPI):
     # Instalaciones anteriores no tenían administrador: se nombra al primer usuario real
     async with AsyncSessionLocal() as db:
         await ensure_admin(db)
+    # Historial: los datos para deshacer se guardan 90 días
+    from app.services.audit import purge_old
+    try:
+        async with AsyncSessionLocal() as db:
+            await purge_old(db)
+    except Exception as exc:  # una base sin la migración aplicada no debe impedir arrancar
+        print(f"[audit] purge_old failed: {ascii(exc)}", flush=True)
     yield
 
 
@@ -101,11 +108,11 @@ app.include_router(admin.router, prefix="/api")
 app.include_router(templates.router, prefix="/api")
 app.include_router(preferences.router, prefix="/api")
 app.include_router(audit_log.router, prefix="/api")
-app.include_router(terminal.router, prefix="/api")
 app.include_router(tickets.router, prefix="/api")
 app.include_router(real_accounts.router, prefix="/api")
 app.include_router(demo.router, prefix="/api")
 app.include_router(api_keys.router, prefix="/api")
+app.include_router(db_backups.router, prefix="/api")
 
 
 @app.get("/health")

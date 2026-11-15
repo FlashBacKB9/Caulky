@@ -1,4 +1,5 @@
 import uuid
+from fastapi import Depends, Request
 from fastapi_users import FastAPIUsers
 from fastapi_users.authentication import AuthenticationBackend, CookieTransport, JWTStrategy
 from app.auth.manager import get_user_manager
@@ -30,13 +31,30 @@ fastapi_users = FastAPIUsers[User, uuid.UUID](
     [auth_backend, api_key_backend],
 )
 
-current_active_user = fastapi_users.current_user(active=True)
+_any_user = fastapi_users.current_user(active=True)
 
 
 def _session_backends():
     return [auth_backend]
 
 
+_browser_user = fastapi_users.current_user(active=True, get_enabled_backends=_session_backends)
+
+
+def _mark_actor(request: Request, user: User) -> None:
+    """Historial de actividad: quién hace los cambios de esta petición (web o clave API)."""
+    from app.services.audit import set_actor
+    bearer = request.headers.get("authorization", "").lower().startswith("bearer ")
+    set_actor(user.id, "api" if bearer else "web")
+
+
+async def current_active_user(request: Request, user: User = Depends(_any_user)) -> User:
+    _mark_actor(request, user)
+    return user
+
+
 # Solo sesión del navegador: para lo que una clave API filtrada no debe poder hacer
-# (gestionar claves, borrar todo)
-current_session_user = fastapi_users.current_user(active=True, get_enabled_backends=_session_backends)
+# (gestionar claves, borrar todo, deshacer, restaurar una copia de la base)
+async def current_session_user(request: Request, user: User = Depends(_browser_user)) -> User:
+    _mark_actor(request, user)
+    return user

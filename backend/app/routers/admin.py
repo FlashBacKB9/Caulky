@@ -14,7 +14,7 @@ from app.auth.setup import current_active_user
 from app.models.user import User
 from app.routers.backup import _seed_defaults
 from app.services.admin import (
-    AI_TERMINAL_ENABLED, REGISTRATION_OPEN, current_admin, current_session_admin,
+    REGISTRATION_OPEN, current_admin, current_session_admin,
     get_flag, registration_open, set_flag,
 )
 
@@ -57,7 +57,6 @@ async def claim_unclaimed_data(
 
 class AdminSettings(BaseModel):
     registration_open: bool
-    ai_terminal_enabled: bool
 
 
 @router.get("/public-settings")
@@ -70,7 +69,6 @@ async def public_settings(db: AsyncSession = Depends(get_db)):
 async def get_settings(db: AsyncSession = Depends(get_db), _: User = Depends(current_admin)):
     return AdminSettings(
         registration_open=await get_flag(db, REGISTRATION_OPEN),
-        ai_terminal_enabled=await get_flag(db, AI_TERMINAL_ENABLED),
     )
 
 
@@ -78,6 +76,5 @@ async def get_settings(db: AsyncSession = Depends(get_db), _: User = Depends(cur
 async def update_settings(body: AdminSettings, db: AsyncSession = Depends(get_db),
                           _: User = Depends(current_session_admin)):
     await set_flag(db, REGISTRATION_OPEN, body.registration_open)
-    await set_flag(db, AI_TERMINAL_ENABLED, body.ai_terminal_enabled)
     await db.commit()
     return body
